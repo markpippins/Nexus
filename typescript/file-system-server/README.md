@@ -35,7 +35,7 @@ bash run-tests.sh
 ## Server Requirements
 
 - bun runtime
-- Port 4040 available
+- Port 4042 available
 - `FS_ROOT_DIR` env var (optional, defaults to `fs_root/`)
 
 ## Starting the Server

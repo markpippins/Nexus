@@ -246,3 +246,19 @@ curl -s http://localhost:3300/api/instances/<instance-uuid>
 - **The advance endpoint is the only way to progress a workflow.** It returns `new_tickets` so the UI can immediately show what happened next.
 - **Validation should be called before starting an instance** to catch graph issues early.
 - **CORS is enabled** — no proxy needed for local development.
+
+
+---
+
+## REST API & OpenAPI
+
+- Endpoint inventory: [`API.md`](./API.md) (generated from source route registrations)
+- OpenAPI 3.0 spec: [`openapi.yaml`](./openapi.yaml) (generated from source route registrations)
+
+Regenerate after route changes:
+
+```bash
+cd nexus
+python3 tools/api-docs/extract_routes.py --out /tmp/api_inventory.json
+python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json
+```

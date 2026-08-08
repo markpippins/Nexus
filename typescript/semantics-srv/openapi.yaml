@@ -1,0 +1,3609 @@
+openapi: "3.0.3"
+info:
+  title: semantics-srv REST API
+  version: "1.0.0"
+  description: "REST API over the semantics.* Postgres schema — the type-level semantic topology legend of the Nexus platform. Append-only, expire-not-delete: writes go through stored procedures, PATCH supersedes (new id + superseded_id), DELETE soft-expires. This document is GENERATED from src/tables.ts — re-run `npm run openapi:gen` after table changes."
+servers:
+  - url: "http://localhost:3160"
+    description:
+      local semantics-srv
+tags:
+  - name: system
+    description:
+      Health + schema introspection
+  - name: owning_subsystem
+    description:
+      owning subsystem (fleet)
+  - name: concept
+    description:
+      concept (class)
+  - name: representation
+    description:
+      representation (physical form of a concept)
+  - name: representation_relationship
+    description:
+      representation relationship (fidelity/lineage between forms)
+  - name: consumer_operation
+    description:
+      consumer operation (who touches a representation and how)
+  - name: identity_strategy
+    description:
+      identity strategy (what identity means for a concept)
+  - name: representation_identity
+    description:
+      representation identity (how a form expresses its concept's identity)
+  - name: snapshot
+    description:
+      snapshot (per-baseline judgment record)
+  - name: snapshot_observation
+    description:
+      snapshot observation (per-baseline judgment on a representation)
+  - name: concept_relationship
+    description:
+      concept relationship (legal pipeline shape between classes)
+  - name: relationship_type
+    description:
+      relationship type (vocabulary of legal edge types)
+  - name: drift_finding
+    description:
+      drift lifecycle
+paths:
+  /api/owning_subsystem:
+    get:
+      summary: List active rows in semantics.owning_subsystem (owning subsystem (fleet))
+      operationId: listOwning_subsystem
+      tags:
+        - owning_subsystem
+      parameters:
+        - name: limit
+          in:
+            query
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+          description:
+            Max rows (clamped to 500)
+        - name: offset
+          in:
+            query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description:
+            Row offset
+        - name: includeExpired
+          in:
+            query
+          schema:
+            type: boolean
+            default: false
+          description:
+            Also return rows with expired_at set
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/owning_subsystemList"
+        500:
+          description: list_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Add a row to semantics.owning_subsystem via add_ proc (owning subsystem (fleet))
+      operationId: addOwning_subsystem
+      tags:
+        - owning_subsystem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/owning_subsystemWrite"
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/owning_subsystemRow"
+        400:
+          description: add_failed / duplicate_active_key / FK violation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/owning_subsystem/{id}:
+    get:
+      summary: Get a single row from semantics.owning_subsystem by id
+      operationId: getOwning_subsystem
+      tags:
+        - owning_subsystem
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: integer
+            format: int32
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/owning_subsystemRow"
+        404:
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: get_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: "Append-only replace on semantics.owning_subsystem — expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id"
+      operationId: updateOwning_subsystem
+      tags:
+        - owning_subsystem
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: integer
+            format: int32
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/owning_subsystemUpdate"
+      responses:
+        200:
+          description: "OK — new row with superseded_id"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/owning_subsystemRow"
+                  - type: object
+                    required:
+                      - superseded_id
+                    properties:
+                      superseded_id:
+                        type: string
+                        description: id of the expired row
+        400:
+          description: duplicate_active_key / update_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: "not_found — no active row"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Soft-delete (expire) a row in semantics.owning_subsystem — expire-not-delete, idempotent"
+      operationId: softDeleteOwning_subsystem
+      tags:
+        - owning_subsystem
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: integer
+            format: int32
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - table
+                  - id
+                  - deleted
+                properties:
+                  table:
+                    type: string
+                    enum:
+                      - owning_subsystem
+                  id:
+                    type: integer
+                    format: int32
+                  deleted:
+                    type: integer
+                    description: "1 on first delete, 0 if already expired/missing"
+        500:
+          description: soft_delete_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/concept:
+    get:
+      summary: List active rows in semantics.concept (concept (class))
+      operationId: listConcept
+      tags:
+        - concept
+      parameters:
+        - name: limit
+          in:
+            query
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+          description:
+            Max rows (clamped to 500)
+        - name: offset
+          in:
+            query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description:
+            Row offset
+        - name: includeExpired
+          in:
+            query
+          schema:
+            type: boolean
+            default: false
+          description:
+            Also return rows with expired_at set
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/conceptList"
+        500:
+          description: list_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Add a row to semantics.concept via add_ proc (concept (class))
+      operationId: addConcept
+      tags:
+        - concept
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/conceptWrite"
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/conceptRow"
+        400:
+          description: add_failed / duplicate_active_key / FK violation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/concept/{id}:
+    get:
+      summary: Get a single row from semantics.concept by id
+      operationId: getConcept
+      tags:
+        - concept
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/conceptRow"
+        404:
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: get_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: "Append-only replace on semantics.concept — expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id"
+      operationId: updateConcept
+      tags:
+        - concept
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/conceptUpdate"
+      responses:
+        200:
+          description: "OK — new row with superseded_id"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/conceptRow"
+                  - type: object
+                    required:
+                      - superseded_id
+                    properties:
+                      superseded_id:
+                        type: string
+                        description: id of the expired row
+        400:
+          description: duplicate_active_key / update_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: "not_found — no active row"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Soft-delete (expire) a row in semantics.concept — expire-not-delete, idempotent"
+      operationId: softDeleteConcept
+      tags:
+        - concept
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - table
+                  - id
+                  - deleted
+                properties:
+                  table:
+                    type: string
+                    enum:
+                      - concept
+                  id:
+                    type: string
+                  deleted:
+                    type: integer
+                    description: "1 on first delete, 0 if already expired/missing"
+        500:
+          description: soft_delete_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/representation:
+    get:
+      summary: List active rows in semantics.representation (representation (physical form of a concept))
+      operationId: listRepresentation
+      tags:
+        - representation
+      parameters:
+        - name: limit
+          in:
+            query
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+          description:
+            Max rows (clamped to 500)
+        - name: offset
+          in:
+            query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description:
+            Row offset
+        - name: includeExpired
+          in:
+            query
+          schema:
+            type: boolean
+            default: false
+          description:
+            Also return rows with expired_at set
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/representationList"
+        500:
+          description: list_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Add a row to semantics.representation via add_ proc (representation (physical form of a concept))
+      operationId: addRepresentation
+      tags:
+        - representation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/representationWrite"
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/representationRow"
+        400:
+          description: add_failed / duplicate_active_key / FK violation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/representation/{id}:
+    get:
+      summary: Get a single row from semantics.representation by id
+      operationId: getRepresentation
+      tags:
+        - representation
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/representationRow"
+        404:
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: get_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: "Append-only replace on semantics.representation — expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id"
+      operationId: updateRepresentation
+      tags:
+        - representation
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/representationUpdate"
+      responses:
+        200:
+          description: "OK — new row with superseded_id"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/representationRow"
+                  - type: object
+                    required:
+                      - superseded_id
+                    properties:
+                      superseded_id:
+                        type: string
+                        description: id of the expired row
+        400:
+          description: duplicate_active_key / update_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: "not_found — no active row"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Soft-delete (expire) a row in semantics.representation — expire-not-delete, idempotent"
+      operationId: softDeleteRepresentation
+      tags:
+        - representation
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - table
+                  - id
+                  - deleted
+                properties:
+                  table:
+                    type: string
+                    enum:
+                      - representation
+                  id:
+                    type: string
+                  deleted:
+                    type: integer
+                    description: "1 on first delete, 0 if already expired/missing"
+        500:
+          description: soft_delete_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/representation_relationship:
+    get:
+      summary: List active rows in semantics.representation_relationship (representation relationship (fidelity/lineage between forms))
+      operationId: listRepresentation_relationship
+      tags:
+        - representation_relationship
+      parameters:
+        - name: limit
+          in:
+            query
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+          description:
+            Max rows (clamped to 500)
+        - name: offset
+          in:
+            query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description:
+            Row offset
+        - name: includeExpired
+          in:
+            query
+          schema:
+            type: boolean
+            default: false
+          description:
+            Also return rows with expired_at set
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/representation_relationshipList"
+        500:
+          description: list_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Add a row to semantics.representation_relationship via add_ proc (representation relationship (fidelity/lineage between forms))
+      operationId: addRepresentation_relationship
+      tags:
+        - representation_relationship
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/representation_relationshipWrite"
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/representation_relationshipRow"
+        400:
+          description: add_failed / duplicate_active_key / FK violation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/representation_relationship/{id}:
+    get:
+      summary: Get a single row from semantics.representation_relationship by id
+      operationId: getRepresentation_relationship
+      tags:
+        - representation_relationship
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/representation_relationshipRow"
+        404:
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: get_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: "Append-only replace on semantics.representation_relationship — expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id"
+      operationId: updateRepresentation_relationship
+      tags:
+        - representation_relationship
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/representation_relationshipUpdate"
+      responses:
+        200:
+          description: "OK — new row with superseded_id"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/representation_relationshipRow"
+                  - type: object
+                    required:
+                      - superseded_id
+                    properties:
+                      superseded_id:
+                        type: string
+                        description: id of the expired row
+        400:
+          description: duplicate_active_key / update_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: "not_found — no active row"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Soft-delete (expire) a row in semantics.representation_relationship — expire-not-delete, idempotent"
+      operationId: softDeleteRepresentation_relationship
+      tags:
+        - representation_relationship
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - table
+                  - id
+                  - deleted
+                properties:
+                  table:
+                    type: string
+                    enum:
+                      - representation_relationship
+                  id:
+                    type: string
+                  deleted:
+                    type: integer
+                    description: "1 on first delete, 0 if already expired/missing"
+        500:
+          description: soft_delete_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/consumer_operation:
+    get:
+      summary: List active rows in semantics.consumer_operation (consumer operation (who touches a representation and how))
+      operationId: listConsumer_operation
+      tags:
+        - consumer_operation
+      parameters:
+        - name: limit
+          in:
+            query
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+          description:
+            Max rows (clamped to 500)
+        - name: offset
+          in:
+            query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description:
+            Row offset
+        - name: includeExpired
+          in:
+            query
+          schema:
+            type: boolean
+            default: false
+          description:
+            Also return rows with expired_at set
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/consumer_operationList"
+        500:
+          description: list_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Add a row to semantics.consumer_operation via add_ proc (consumer operation (who touches a representation and how))
+      operationId: addConsumer_operation
+      tags:
+        - consumer_operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/consumer_operationWrite"
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/consumer_operationRow"
+        400:
+          description: add_failed / duplicate_active_key / FK violation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/consumer_operation/{id}:
+    get:
+      summary: Get a single row from semantics.consumer_operation by id
+      operationId: getConsumer_operation
+      tags:
+        - consumer_operation
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/consumer_operationRow"
+        404:
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: get_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: "Append-only replace on semantics.consumer_operation — expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id"
+      operationId: updateConsumer_operation
+      tags:
+        - consumer_operation
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/consumer_operationUpdate"
+      responses:
+        200:
+          description: "OK — new row with superseded_id"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/consumer_operationRow"
+                  - type: object
+                    required:
+                      - superseded_id
+                    properties:
+                      superseded_id:
+                        type: string
+                        description: id of the expired row
+        400:
+          description: duplicate_active_key / update_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: "not_found — no active row"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Soft-delete (expire) a row in semantics.consumer_operation — expire-not-delete, idempotent"
+      operationId: softDeleteConsumer_operation
+      tags:
+        - consumer_operation
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - table
+                  - id
+                  - deleted
+                properties:
+                  table:
+                    type: string
+                    enum:
+                      - consumer_operation
+                  id:
+                    type: string
+                  deleted:
+                    type: integer
+                    description: "1 on first delete, 0 if already expired/missing"
+        500:
+          description: soft_delete_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/identity_strategy:
+    get:
+      summary: List active rows in semantics.identity_strategy (identity strategy (what identity means for a concept))
+      operationId: listIdentity_strategy
+      tags:
+        - identity_strategy
+      parameters:
+        - name: limit
+          in:
+            query
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+          description:
+            Max rows (clamped to 500)
+        - name: offset
+          in:
+            query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description:
+            Row offset
+        - name: includeExpired
+          in:
+            query
+          schema:
+            type: boolean
+            default: false
+          description:
+            Also return rows with expired_at set
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/identity_strategyList"
+        500:
+          description: list_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Add a row to semantics.identity_strategy via add_ proc (identity strategy (what identity means for a concept))
+      operationId: addIdentity_strategy
+      tags:
+        - identity_strategy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/identity_strategyWrite"
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/identity_strategyRow"
+        400:
+          description: add_failed / duplicate_active_key / FK violation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/identity_strategy/{id}:
+    get:
+      summary: Get a single row from semantics.identity_strategy by id
+      operationId: getIdentity_strategy
+      tags:
+        - identity_strategy
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/identity_strategyRow"
+        404:
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: get_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: "Append-only replace on semantics.identity_strategy — expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id"
+      operationId: updateIdentity_strategy
+      tags:
+        - identity_strategy
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/identity_strategyUpdate"
+      responses:
+        200:
+          description: "OK — new row with superseded_id"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/identity_strategyRow"
+                  - type: object
+                    required:
+                      - superseded_id
+                    properties:
+                      superseded_id:
+                        type: string
+                        description: id of the expired row
+        400:
+          description: duplicate_active_key / update_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: "not_found — no active row"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Soft-delete (expire) a row in semantics.identity_strategy — expire-not-delete, idempotent"
+      operationId: softDeleteIdentity_strategy
+      tags:
+        - identity_strategy
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - table
+                  - id
+                  - deleted
+                properties:
+                  table:
+                    type: string
+                    enum:
+                      - identity_strategy
+                  id:
+                    type: string
+                  deleted:
+                    type: integer
+                    description: "1 on first delete, 0 if already expired/missing"
+        500:
+          description: soft_delete_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/representation_identity:
+    get:
+      summary: List active rows in semantics.representation_identity (representation identity (how a form expresses its concept's identity))
+      operationId: listRepresentation_identity
+      tags:
+        - representation_identity
+      parameters:
+        - name: limit
+          in:
+            query
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+          description:
+            Max rows (clamped to 500)
+        - name: offset
+          in:
+            query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description:
+            Row offset
+        - name: includeExpired
+          in:
+            query
+          schema:
+            type: boolean
+            default: false
+          description:
+            Also return rows with expired_at set
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/representation_identityList"
+        500:
+          description: list_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Add a row to semantics.representation_identity via add_ proc (representation identity (how a form expresses its concept's identity))
+      operationId: addRepresentation_identity
+      tags:
+        - representation_identity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/representation_identityWrite"
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/representation_identityRow"
+        400:
+          description: add_failed / duplicate_active_key / FK violation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/representation_identity/{id}:
+    get:
+      summary: Get a single row from semantics.representation_identity by id
+      operationId: getRepresentation_identity
+      tags:
+        - representation_identity
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/representation_identityRow"
+        404:
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: get_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: "Append-only replace on semantics.representation_identity — expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id"
+      operationId: updateRepresentation_identity
+      tags:
+        - representation_identity
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/representation_identityUpdate"
+      responses:
+        200:
+          description: "OK — new row with superseded_id"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/representation_identityRow"
+                  - type: object
+                    required:
+                      - superseded_id
+                    properties:
+                      superseded_id:
+                        type: string
+                        description: id of the expired row
+        400:
+          description: duplicate_active_key / update_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: "not_found — no active row"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Soft-delete (expire) a row in semantics.representation_identity — expire-not-delete, idempotent"
+      operationId: softDeleteRepresentation_identity
+      tags:
+        - representation_identity
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - table
+                  - id
+                  - deleted
+                properties:
+                  table:
+                    type: string
+                    enum:
+                      - representation_identity
+                  id:
+                    type: string
+                  deleted:
+                    type: integer
+                    description: "1 on first delete, 0 if already expired/missing"
+        500:
+          description: soft_delete_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/snapshot:
+    get:
+      summary: List active rows in semantics.snapshot (snapshot (per-baseline judgment record))
+      operationId: listSnapshot
+      tags:
+        - snapshot
+      parameters:
+        - name: limit
+          in:
+            query
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+          description:
+            Max rows (clamped to 500)
+        - name: offset
+          in:
+            query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description:
+            Row offset
+        - name: includeExpired
+          in:
+            query
+          schema:
+            type: boolean
+            default: false
+          description:
+            Also return rows with expired_at set
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/snapshotList"
+        500:
+          description: list_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Add a row to semantics.snapshot via add_ proc (snapshot (per-baseline judgment record))
+      operationId: addSnapshot
+      tags:
+        - snapshot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/snapshotWrite"
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/snapshotRow"
+        400:
+          description: add_failed / duplicate_active_key / FK violation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/snapshot/{id}:
+    get:
+      summary: Get a single row from semantics.snapshot by id
+      operationId: getSnapshot
+      tags:
+        - snapshot
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/snapshotRow"
+        404:
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: get_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: "Append-only replace on semantics.snapshot — expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id"
+      operationId: updateSnapshot
+      tags:
+        - snapshot
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/snapshotUpdate"
+      responses:
+        200:
+          description: "OK — new row with superseded_id"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/snapshotRow"
+                  - type: object
+                    required:
+                      - superseded_id
+                    properties:
+                      superseded_id:
+                        type: string
+                        description: id of the expired row
+        400:
+          description: duplicate_active_key / update_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: "not_found — no active row"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Soft-delete (expire) a row in semantics.snapshot — expire-not-delete, idempotent"
+      operationId: softDeleteSnapshot
+      tags:
+        - snapshot
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - table
+                  - id
+                  - deleted
+                properties:
+                  table:
+                    type: string
+                    enum:
+                      - snapshot
+                  id:
+                    type: string
+                  deleted:
+                    type: integer
+                    description: "1 on first delete, 0 if already expired/missing"
+        500:
+          description: soft_delete_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/snapshot_observation:
+    get:
+      summary: List active rows in semantics.snapshot_observation (snapshot observation (per-baseline judgment on a representation))
+      operationId: listSnapshot_observation
+      tags:
+        - snapshot_observation
+      parameters:
+        - name: limit
+          in:
+            query
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+          description:
+            Max rows (clamped to 500)
+        - name: offset
+          in:
+            query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description:
+            Row offset
+        - name: includeExpired
+          in:
+            query
+          schema:
+            type: boolean
+            default: false
+          description:
+            Also return rows with expired_at set
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/snapshot_observationList"
+        500:
+          description: list_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Add a row to semantics.snapshot_observation via add_ proc (snapshot observation (per-baseline judgment on a representation))
+      operationId: addSnapshot_observation
+      tags:
+        - snapshot_observation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/snapshot_observationWrite"
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/snapshot_observationRow"
+        400:
+          description: add_failed / duplicate_active_key / FK violation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/snapshot_observation/{id}:
+    get:
+      summary: Get a single row from semantics.snapshot_observation by id
+      operationId: getSnapshot_observation
+      tags:
+        - snapshot_observation
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/snapshot_observationRow"
+        404:
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: get_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: "Append-only replace on semantics.snapshot_observation — expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id"
+      operationId: updateSnapshot_observation
+      tags:
+        - snapshot_observation
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/snapshot_observationUpdate"
+      responses:
+        200:
+          description: "OK — new row with superseded_id"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/snapshot_observationRow"
+                  - type: object
+                    required:
+                      - superseded_id
+                    properties:
+                      superseded_id:
+                        type: string
+                        description: id of the expired row
+        400:
+          description: duplicate_active_key / update_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: "not_found — no active row"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Soft-delete (expire) a row in semantics.snapshot_observation — expire-not-delete, idempotent"
+      operationId: softDeleteSnapshot_observation
+      tags:
+        - snapshot_observation
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - table
+                  - id
+                  - deleted
+                properties:
+                  table:
+                    type: string
+                    enum:
+                      - snapshot_observation
+                  id:
+                    type: string
+                  deleted:
+                    type: integer
+                    description: "1 on first delete, 0 if already expired/missing"
+        500:
+          description: soft_delete_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/drift_finding:
+    get:
+      summary: List active rows in semantics.drift_finding (drift finding (finding against a snapshot observation))
+      operationId: listDrift_finding
+      tags:
+        - drift_finding
+      parameters:
+        - name: limit
+          in:
+            query
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+          description:
+            Max rows (clamped to 500)
+        - name: offset
+          in:
+            query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description:
+            Row offset
+        - name: includeExpired
+          in:
+            query
+          schema:
+            type: boolean
+            default: false
+          description:
+            Also return rows with expired_at set
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/drift_findingList"
+        500:
+          description: list_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Add a row to semantics.drift_finding via add_ proc (drift finding (finding against a snapshot observation))
+      operationId: addDrift_finding
+      tags:
+        - drift_finding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/drift_findingWrite"
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/drift_findingRow"
+        400:
+          description: add_failed / duplicate_active_key / FK violation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/drift_finding/{id}:
+    get:
+      summary: Get a single row from semantics.drift_finding by id
+      operationId: getDrift_finding
+      tags:
+        - drift_finding
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/drift_findingRow"
+        404:
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: get_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: "Append-only replace on semantics.drift_finding — expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id"
+      operationId: updateDrift_finding
+      tags:
+        - drift_finding
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/drift_findingUpdate"
+      responses:
+        200:
+          description: "OK — new row with superseded_id"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/drift_findingRow"
+                  - type: object
+                    required:
+                      - superseded_id
+                    properties:
+                      superseded_id:
+                        type: string
+                        description: id of the expired row
+        400:
+          description: duplicate_active_key / update_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: "not_found — no active row"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Soft-delete (expire) a row in semantics.drift_finding — expire-not-delete, idempotent"
+      operationId: softDeleteDrift_finding
+      tags:
+        - drift_finding
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - table
+                  - id
+                  - deleted
+                properties:
+                  table:
+                    type: string
+                    enum:
+                      - drift_finding
+                  id:
+                    type: string
+                  deleted:
+                    type: integer
+                    description: "1 on first delete, 0 if already expired/missing"
+        500:
+          description: soft_delete_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/concept_relationship:
+    get:
+      summary: List active rows in semantics.concept_relationship (concept relationship (legal pipeline shape between classes))
+      operationId: listConcept_relationship
+      tags:
+        - concept_relationship
+      parameters:
+        - name: limit
+          in:
+            query
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+          description:
+            Max rows (clamped to 500)
+        - name: offset
+          in:
+            query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description:
+            Row offset
+        - name: includeExpired
+          in:
+            query
+          schema:
+            type: boolean
+            default: false
+          description:
+            Also return rows with expired_at set
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/concept_relationshipList"
+        500:
+          description: list_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Add a row to semantics.concept_relationship via add_ proc (concept relationship (legal pipeline shape between classes))
+      operationId: addConcept_relationship
+      tags:
+        - concept_relationship
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/concept_relationshipWrite"
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/concept_relationshipRow"
+        400:
+          description: add_failed / duplicate_active_key / FK violation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/concept_relationship/{id}:
+    get:
+      summary: Get a single row from semantics.concept_relationship by id
+      operationId: getConcept_relationship
+      tags:
+        - concept_relationship
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/concept_relationshipRow"
+        404:
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: get_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: "Append-only replace on semantics.concept_relationship — expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id"
+      operationId: updateConcept_relationship
+      tags:
+        - concept_relationship
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/concept_relationshipUpdate"
+      responses:
+        200:
+          description: "OK — new row with superseded_id"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/concept_relationshipRow"
+                  - type: object
+                    required:
+                      - superseded_id
+                    properties:
+                      superseded_id:
+                        type: string
+                        description: id of the expired row
+        400:
+          description: duplicate_active_key / update_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: "not_found — no active row"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Soft-delete (expire) a row in semantics.concept_relationship — expire-not-delete, idempotent"
+      operationId: softDeleteConcept_relationship
+      tags:
+        - concept_relationship
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Row id (uuid, or smallint for owning_subsystem)"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - table
+                  - id
+                  - deleted
+                properties:
+                  table:
+                    type: string
+                    enum:
+                      - concept_relationship
+                  id:
+                    type: string
+                  deleted:
+                    type: integer
+                    description: "1 on first delete, 0 if already expired/missing"
+        500:
+          description: soft_delete_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/relationship_type:
+    get:
+      summary: List active rows in semantics.relationship_type (relationship type (vocabulary of legal edge types))
+      operationId: listRelationship_type
+      tags:
+        - relationship_type
+      parameters:
+        - name: limit
+          in:
+            query
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+          description:
+            Max rows (clamped to 500)
+        - name: offset
+          in:
+            query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description:
+            Row offset
+        - name: includeExpired
+          in:
+            query
+          schema:
+            type: boolean
+            default: false
+          description:
+            Also return rows with expired_at set
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/relationship_typeList"
+        500:
+          description: list_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Add a row to semantics.relationship_type via add_ proc (relationship type (vocabulary of legal edge types))
+      operationId: addRelationship_type
+      tags:
+        - relationship_type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/relationship_typeWrite"
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/relationship_typeRow"
+        400:
+          description: add_failed / duplicate_active_key / FK violation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/relationship_type/{id}:
+    get:
+      summary: Get a single row from semantics.relationship_type by id
+      operationId: getRelationship_type
+      tags:
+        - relationship_type
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Relationship type name (or uuid) — matches on either"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/relationship_typeRow"
+        404:
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: get_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: "Append-only replace on semantics.relationship_type — expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id"
+      operationId: updateRelationship_type
+      tags:
+        - relationship_type
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Relationship type name (or uuid) — matches on either"
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/relationship_typeUpdate"
+      responses:
+        200:
+          description: "OK — new row with superseded_id"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/relationship_typeRow"
+                  - type: object
+                    required:
+                      - superseded_id
+                    properties:
+                      superseded_id:
+                        type: string
+                        description: id of the expired row
+        400:
+          description: duplicate_active_key / update_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: "not_found — no active row"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Soft-delete (expire) a row in semantics.relationship_type — expire-not-delete, idempotent"
+      operationId: softDeleteRelationship_type
+      tags:
+        - relationship_type
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            "Relationship type name (or uuid) — matches on either"
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - table
+                  - id
+                  - deleted
+                properties:
+                  table:
+                    type: string
+                    enum:
+                      - relationship_type
+                  id:
+                    type: string
+                  deleted:
+                    type: integer
+                    description: "1 on first delete, 0 if already expired/missing"
+        500:
+          description: soft_delete_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/drift_finding/{id}/resolve:
+    post:
+      summary: "Transition a drift finding from detected → resolved (idempotent)"
+      operationId: resolveDriftFinding
+      tags:
+        - drift_finding
+      parameters:
+        - name: id
+          in:
+            path
+          required:
+            true
+          description:
+            Drift finding uuid
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                p_resolved_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  description: "ISO timestamp; defaults to now()"
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - resolved
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  resolved:
+                    type: integer
+                    description: "1 on first resolve, 0 if already resolved/expired/missing"
+        500:
+          description: resolve_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /health:
+    get:
+      summary: Health check
+      operationId: health
+      tags:
+        - system
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /api/meta:
+    get:
+      summary: "Schema overview — every table with active/total counts, stored-proc count, and writable p_* params per table"
+      operationId: meta
+      tags:
+        - system
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - service
+                  - schema
+                  - tables
+                  - procs
+                  - writableParams
+                properties:
+                  service:
+                    type: string
+                  schema:
+                    type: string
+                    enum:
+                      - semantics
+                  tables:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - table
+                        - label
+                        - idType
+                        - idAuto
+                        - active
+                        - total
+                      properties:
+                        table:
+                          type: string
+                        label:
+                          type: string
+                        idType:
+                          type: string
+                          enum:
+                            - uuid
+                            - smallint
+                        idAuto:
+                          type: boolean
+                        active:
+                          type: integer
+                          description: rows with expired_at IS NULL
+                        total:
+                          type: integer
+                  procs:
+                    type: integer
+                  writableParams:
+                    type: object
+                    additionalProperties:
+                      type: array
+                      items:
+                        type: string
+        500:
+          description: meta_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+components:
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: "Machine-readable error code (not_found, add_failed, duplicate_active_key, update_failed, list_failed, get_failed, soft_delete_failed, resolve_failed, meta_failed)"
+        message:
+          type: string
+          description: Human-readable detail
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+        service:
+          type: string
+        port:
+          type: integer
+        pid:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+    owning_subsystemRow:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        name:
+          type: string
+        description:
+          type: string
+        path:
+          type: string
+        expired_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        effective_at:
+          type: string
+          format: date-time
+          nullable: true
+        detected_at:
+          type: string
+    owning_subsystemWrite:
+      type: object
+      properties:
+        p_id:
+          type: integer
+          format: int32
+          description: "Required — stable smallint lookup key (caller-supplied)"
+        p_name:
+          type: string
+        p_description:
+          type: string
+        p_path:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+        p_new_id:
+          type: number
+          description: "Required for update — the new smallint key"
+      required:
+        - p_id
+        - p_name
+    owning_subsystemUpdate:
+      type: object
+      properties:
+        p_id:
+          type: integer
+          format: int32
+          description: "Required — stable smallint lookup key (caller-supplied)"
+        p_name:
+          type: string
+        p_description:
+          type: string
+        p_path:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+        p_new_id:
+          type: number
+          description: "Required for update — the new smallint key"
+    owning_subsystemList:
+      type: object
+      required:
+        - table
+        - count
+        - items
+      properties:
+        table:
+          type: string
+          enum:
+            - owning_subsystem
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/owning_subsystemRow"
+    conceptRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        expired_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        effective_at:
+          type: string
+          format: date-time
+          nullable: true
+        detected_at:
+          type: string
+    conceptWrite:
+      type: object
+      properties:
+        p_name:
+          type: string
+        p_description:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - p_name
+    conceptUpdate:
+      type: object
+      properties:
+        p_name:
+          type: string
+        p_description:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+    conceptList:
+      type: object
+      required:
+        - table
+        - count
+        - items
+      properties:
+        table:
+          type: string
+          enum:
+            - concept
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/conceptRow"
+    representationRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        concept_id:
+          type: string
+        label:
+          type: string
+        schema_name:
+          type: string
+        table_name:
+          type: string
+        owning_subsystem_id:
+          type: number
+        owner:
+          type: string
+        raw_metadata:
+          type: object
+          additionalProperties: true
+        expired_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        effective_at:
+          type: string
+          format: date-time
+          nullable: true
+        detected_at:
+          type: string
+    representationWrite:
+      type: object
+      properties:
+        p_concept_id:
+          type: string
+        p_label:
+          type: string
+        p_schema_name:
+          type: string
+        p_table_name:
+          type: string
+        p_owning_subsystem_id:
+          type: number
+          description: owning subsystem smallint id
+        p_owner:
+          type: string
+        p_raw_metadata:
+          type: object
+          additionalProperties: true
+          description: JSONB metadata
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - p_concept_id
+        - p_label
+        - p_owning_subsystem_id
+    representationUpdate:
+      type: object
+      properties:
+        p_concept_id:
+          type: string
+        p_label:
+          type: string
+        p_schema_name:
+          type: string
+        p_table_name:
+          type: string
+        p_owning_subsystem_id:
+          type: number
+          description: owning subsystem smallint id
+        p_owner:
+          type: string
+        p_raw_metadata:
+          type: object
+          additionalProperties: true
+          description: JSONB metadata
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+    representationList:
+      type: object
+      required:
+        - table
+        - count
+        - items
+      properties:
+        table:
+          type: string
+          enum:
+            - representation
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/representationRow"
+    representation_relationshipRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        from_representation_id:
+          type: string
+        to_representation_id:
+          type: string
+        relationship_type:
+          type: string
+        notes:
+          type: string
+        evidence_source:
+          type: string
+        evidence_type:
+          type: string
+        confidence:
+          type: number
+        evidence_notes:
+          type: string
+        expired_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        effective_at:
+          type: string
+          format: date-time
+          nullable: true
+        detected_at:
+          type: string
+    representation_relationshipWrite:
+      type: object
+      properties:
+        p_from_representation_id:
+          type: string
+        p_to_representation_id:
+          type: string
+        p_relationship_type:
+          type: string
+        p_notes:
+          type: string
+        p_evidence_source:
+          type: string
+        p_evidence_type:
+          type: string
+        p_confidence:
+          type: number
+        p_evidence_notes:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - p_from_representation_id
+        - p_to_representation_id
+        - p_relationship_type
+    representation_relationshipUpdate:
+      type: object
+      properties:
+        p_from_representation_id:
+          type: string
+        p_to_representation_id:
+          type: string
+        p_relationship_type:
+          type: string
+        p_notes:
+          type: string
+        p_evidence_source:
+          type: string
+        p_evidence_type:
+          type: string
+        p_confidence:
+          type: number
+        p_evidence_notes:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+    representation_relationshipList:
+      type: object
+      required:
+        - table
+        - count
+        - items
+      properties:
+        table:
+          type: string
+          enum:
+            - representation_relationship
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/representation_relationshipRow"
+    consumer_operationRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        representation_id:
+          type: string
+        consumer_name:
+          type: string
+        operation:
+          type: string
+        notes:
+          type: string
+        expired_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        effective_at:
+          type: string
+          format: date-time
+          nullable: true
+        detected_at:
+          type: string
+    consumer_operationWrite:
+      type: object
+      properties:
+        p_representation_id:
+          type: string
+        p_consumer_name:
+          type: string
+        p_operation:
+          type: string
+        p_notes:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - p_representation_id
+        - p_consumer_name
+        - p_operation
+    consumer_operationUpdate:
+      type: object
+      properties:
+        p_representation_id:
+          type: string
+        p_consumer_name:
+          type: string
+        p_operation:
+          type: string
+        p_notes:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+    consumer_operationList:
+      type: object
+      required:
+        - table
+        - count
+        - items
+      properties:
+        table:
+          type: string
+          enum:
+            - consumer_operation
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/consumer_operationRow"
+    identity_strategyRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        concept_id:
+          type: string
+        canonical_key_description:
+          type: string
+        notes:
+          type: string
+        expired_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        effective_at:
+          type: string
+          format: date-time
+          nullable: true
+        detected_at:
+          type: string
+    identity_strategyWrite:
+      type: object
+      properties:
+        p_concept_id:
+          type: string
+        p_canonical_key_description:
+          type: string
+        p_notes:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - p_concept_id
+        - p_canonical_key_description
+    identity_strategyUpdate:
+      type: object
+      properties:
+        p_concept_id:
+          type: string
+        p_canonical_key_description:
+          type: string
+        p_notes:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+    identity_strategyList:
+      type: object
+      required:
+        - table
+        - count
+        - items
+      properties:
+        table:
+          type: string
+          enum:
+            - identity_strategy
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/identity_strategyRow"
+    representation_identityRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        representation_id:
+          type: string
+        identity_strategy_id:
+          type: string
+        identity_expression:
+          type: string
+        notes:
+          type: string
+        expired_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        effective_at:
+          type: string
+          format: date-time
+          nullable: true
+        detected_at:
+          type: string
+    representation_identityWrite:
+      type: object
+      properties:
+        p_representation_id:
+          type: string
+        p_identity_strategy_id:
+          type: string
+        p_identity_expression:
+          type: string
+        p_notes:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - p_representation_id
+        - p_identity_strategy_id
+        - p_identity_expression
+    representation_identityUpdate:
+      type: object
+      properties:
+        p_representation_id:
+          type: string
+        p_identity_strategy_id:
+          type: string
+        p_identity_expression:
+          type: string
+        p_notes:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+    representation_identityList:
+      type: object
+      required:
+        - table
+        - count
+        - items
+      properties:
+        table:
+          type: string
+          enum:
+            - representation_identity
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/representation_identityRow"
+    snapshotRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        version:
+          type: number
+        parent_id:
+          type: string
+        status:
+          type: string
+        created_by:
+          type: string
+        notes:
+          type: string
+        expired_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        effective_at:
+          type: string
+          format: date-time
+          nullable: true
+        detected_at:
+          type: string
+    snapshotWrite:
+      type: object
+      properties:
+        p_label:
+          type: string
+        p_version:
+          type: number
+        p_parent_id:
+          type: string
+        p_status:
+          type: string
+        p_created_by:
+          type: string
+        p_notes:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - p_label
+        - p_version
+        - p_created_by
+    snapshotUpdate:
+      type: object
+      properties:
+        p_label:
+          type: string
+        p_version:
+          type: number
+        p_parent_id:
+          type: string
+        p_status:
+          type: string
+        p_created_by:
+          type: string
+        p_notes:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+    snapshotList:
+      type: object
+      required:
+        - table
+        - count
+        - items
+      properties:
+        table:
+          type: string
+          enum:
+            - snapshot
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/snapshotRow"
+    snapshot_observationRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        snapshot_id:
+          type: string
+        representation_id:
+          type: string
+        lifecycle_state:
+          type: string
+        is_completed_fix:
+          type: boolean
+        completed_fix_ref:
+          type: string
+        audit_reason:
+          type: string
+        safe_to_retire:
+          type: boolean
+        expired_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        effective_at:
+          type: string
+          format: date-time
+          nullable: true
+        detected_at:
+          type: string
+    snapshot_observationWrite:
+      type: object
+      properties:
+        p_snapshot_id:
+          type: string
+        p_representation_id:
+          type: string
+        p_lifecycle_state:
+          type: string
+        p_is_completed_fix:
+          type: boolean
+        p_completed_fix_ref:
+          type: string
+        p_audit_reason:
+          type: string
+        p_safe_to_retire:
+          type: boolean
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - p_snapshot_id
+        - p_representation_id
+        - p_lifecycle_state
+    snapshot_observationUpdate:
+      type: object
+      properties:
+        p_snapshot_id:
+          type: string
+        p_representation_id:
+          type: string
+        p_lifecycle_state:
+          type: string
+        p_is_completed_fix:
+          type: boolean
+        p_completed_fix_ref:
+          type: string
+        p_audit_reason:
+          type: string
+        p_safe_to_retire:
+          type: boolean
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+    snapshot_observationList:
+      type: object
+      required:
+        - table
+        - count
+        - items
+      properties:
+        table:
+          type: string
+          enum:
+            - snapshot_observation
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/snapshot_observationRow"
+    drift_findingRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        observation_id:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+        expired_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        effective_at:
+          type: string
+          format: date-time
+          nullable: true
+        detected_at:
+          type: string
+    drift_findingWrite:
+      type: object
+      properties:
+        p_observation_id:
+          type: string
+        p_description:
+          type: string
+        p_severity:
+          type: string
+        p_resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - p_observation_id
+        - p_description
+        - p_severity
+    drift_findingUpdate:
+      type: object
+      properties:
+        p_observation_id:
+          type: string
+        p_description:
+          type: string
+        p_severity:
+          type: string
+        p_resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+    drift_findingList:
+      type: object
+      required:
+        - table
+        - count
+        - items
+      properties:
+        table:
+          type: string
+          enum:
+            - drift_finding
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/drift_findingRow"
+    concept_relationshipRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        from_concept_id:
+          type: string
+        to_concept_id:
+          type: string
+        relationship_type:
+          type: string
+        path:
+          type: string
+        notes:
+          type: string
+        evidence_source:
+          type: string
+        evidence_type:
+          type: string
+        confidence:
+          type: number
+        evidence_notes:
+          type: string
+        expired_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        effective_at:
+          type: string
+          format: date-time
+          nullable: true
+        detected_at:
+          type: string
+    concept_relationshipWrite:
+      type: object
+      properties:
+        p_from_concept_id:
+          type: string
+        p_to_concept_id:
+          type: string
+        p_relationship_type:
+          type: string
+        p_path:
+          type: string
+        p_notes:
+          type: string
+        p_evidence_source:
+          type: string
+        p_evidence_type:
+          type: string
+        p_confidence:
+          type: number
+        p_evidence_notes:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - p_from_concept_id
+        - p_to_concept_id
+        - p_relationship_type
+    concept_relationshipUpdate:
+      type: object
+      properties:
+        p_from_concept_id:
+          type: string
+        p_to_concept_id:
+          type: string
+        p_relationship_type:
+          type: string
+        p_path:
+          type: string
+        p_notes:
+          type: string
+        p_evidence_source:
+          type: string
+        p_evidence_type:
+          type: string
+        p_confidence:
+          type: number
+        p_evidence_notes:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+    concept_relationshipList:
+      type: object
+      required:
+        - table
+        - count
+        - items
+      properties:
+        table:
+          type: string
+          enum:
+            - concept_relationship
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/concept_relationshipRow"
+    relationship_typeRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        scope:
+          type: string
+        notes:
+          type: string
+        expired_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        effective_at:
+          type: string
+          format: date-time
+          nullable: true
+        detected_at:
+          type: string
+    relationship_typeWrite:
+      type: object
+      properties:
+        p_name:
+          type: string
+        p_description:
+          type: string
+        p_scope:
+          type: string
+        p_notes:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+        p_new_name:
+          type: string
+          description: "Required for update — the new relationship type name"
+      required:
+        - p_name
+        - p_description
+    relationship_typeUpdate:
+      type: object
+      properties:
+        p_name:
+          type: string
+        p_description:
+          type: string
+        p_scope:
+          type: string
+        p_notes:
+          type: string
+        p_expired_at:
+          type: string
+          format: date-time
+          nullable: true
+        p_new_name:
+          type: string
+          description: "Required for update — the new relationship type name"
+    relationship_typeList:
+      type: object
+      required:
+        - table
+        - count
+        - items
+      properties:
+        table:
+          type: string
+          enum:
+            - relationship_type
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/relationship_typeRow"

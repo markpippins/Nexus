@@ -68,6 +68,9 @@ export class IconComponent {
 
       // --- Resolutions -----------------------------------------------------
       'check-circle': `<path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/>`,
+
+      // --- To Do (top-level) ----------------------------------------------
+      'check-square': `<path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>`,
     };
 
     const body = inner[this.name] || '';

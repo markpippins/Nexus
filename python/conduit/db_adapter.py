@@ -9,6 +9,89 @@ from datetime import datetime, timedelta
 
 _log = logging.getLogger("conduit.db_adapter")
 
+# ── OpenCode model-ID qualification (shared by pipeline + executor) ──
+#
+# opencode registers each provider instance's models under
+# '<provider-id>/<config-key>', where the config key is the API model
+# name exactly as configured in AI settings.  The API model name may
+# itself be org-prefixed (NVIDIA's 'nvidia/nemotron-3-ultra-550b-a55b'),
+# so the registered ID is '<slug>/<model_identifier>' in every case —
+# double-prefixed for org-prefixed providers
+# ('nvidia/nvidia/nemotron-3-ultra-550b-a55b'), single-prefixed for bare
+# names ('big-pickle' → 'opencode/big-pickle').
+#
+# The executor's old _ensure_provider_prefix prefixed EVERY chain model
+# with the ROLE's provider, producing 'nvidia/big-pickle' etc. for
+# fallbacks (ProviderModelNotFoundError).  The pipeline now qualifies
+# each model with its OWN provider at chain-build time (main.py
+# _resolve_model_chain), and these helpers keep both layers in sync.
+
+# provider_type values that are generic API protocols, not opencode
+# provider slugs — never usable as a model-ID prefix.
+_GENERIC_PROVIDER_TYPES = {"openai", "anthropic"}
+
+
+def provider_prefix_slug(
+    provider_name: str = "",
+    provider_type: str = "",
+    provider_id: str = "",
+) -> str:
+    """Resolve the opencode provider-prefix slug for a model's provider.
+
+    Priority:
+    1. provider_name → lowercased/dashed slug (e.g. 'Nvidia' → 'nvidia')
+    2. provider_type → as-is, unless it is a generic API protocol
+       ('openai'/'anthropic') that is not an opencode provider slug
+    3. provider_id → strip a leading 'prov-' (numeric DB PKs are
+       skipped — they are not opencode provider IDs)
+
+    Returns '' when nothing usable is found.
+    """
+    slug = ""
+    if provider_name:
+        slug = provider_name.lower().replace(" ", "-")
+    if not slug and provider_type and provider_type not in _GENERIC_PROVIDER_TYPES:
+        slug = provider_type
+    if not slug and provider_id:
+        pid = provider_id[5:] if provider_id.startswith("prov-") else provider_id
+        if pid and not pid.isdigit():
+            slug = pid
+    return slug
+
+
+def qualify_opencode_model_id(model_identifier: str, slug: str) -> str:
+    """Return the opencode-registered ID for a provider's model.
+
+    Registered form is always '<slug>/<model_identifier>' (see module
+    note above).  Models lacking a slug (no provider info available)
+    pass through unchanged.
+    """
+    if not model_identifier or not slug:
+        return model_identifier
+    return f"{slug}/{model_identifier}"
+
+
+def fallback_provider_prefix_slug(
+    provider_name: str = "",
+    provider_type: str = "",
+    provider_id: str = "",
+    primary_slug: str = "",
+) -> str:
+    """Resolve the opencode provider-prefix slug for a FALLBACK model.
+
+    Type-first: for non-generic provider types (e.g. 'opencode', 'ollama')
+    the type IS the opencode provider slug — this keeps the gemini
+    fallback (OpenCode Go, type 'opencode') as 'opencode/gemini-3.5-flash'.
+    Generic API types ('openai'/'anthropic' — e.g. OpenRouter) cannot be
+    opencode slugs, so fall back to the provider name ('OpenRouter' →
+    'openrouter'), then provider_id, then the primary's slug.
+    """
+    if provider_type and provider_type not in _GENERIC_PROVIDER_TYPES:
+        return provider_type
+    slug = provider_prefix_slug(provider_name, provider_type, provider_id)
+    return slug or primary_slug
+
+
 # ── PostgreSQL (mandatory — no SQLite fallback) ──────────────────────
 import psycopg2
 import psycopg2.pool
@@ -84,10 +167,13 @@ class _ConnectionProxy:
     def __init__(self, conn, schema: str = "conduit"):
         self._conn = conn
         self.total_changes = 0
-        if "'" in schema:
+        # SECURITY: validate schema is a safe PostgreSQL identifier before
+        # DDL interpolation (SET search_path doesn't support parameterized ids).
+        if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', schema):
             raise ValueError(
-                f"Invalid schema name '{schema}': single-quote characters are not "
-                f"allowed."
+                f"Invalid schema name '{schema}': must match "
+                f"/^[a-zA-Z_][a-zA-Z0-9_]*$/. Only unquoted PostgreSQL "
+                f"identifiers are allowed."
             )
         try:
             cur = conn.cursor()
@@ -473,7 +559,7 @@ class DBAdapter:
         with self._get_connection() as conn:
             latest = conn.execute(
                 """
-                SELECT type FROM receipts
+                SELECT type FROM vision.receipts
                 WHERE plan_id = %s
                 ORDER BY created_at DESC LIMIT 1
                 """,
@@ -685,7 +771,7 @@ class DBAdapter:
         receipt_id = f"rec-{plan_id}-{receipt_type}-{uuid.uuid4().hex[:8]}"
         meta_json = json.dumps(metadata or {})
         query = """
-            INSERT INTO receipts (id, plan_id, type, agent_role, session_id,
+            INSERT INTO vision.receipts (id, plan_id, type, agent_role, session_id,
                 ticket_id, summary, artifact_path, metadata_json, tokens_used, created_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT DO NOTHING
@@ -695,7 +781,6 @@ class DBAdapter:
                 receipt_id, plan_id, receipt_type, agent_role, session_id,
                 ticket_id, summary, artifact_path, meta_json, tokens_used, now,
             ))
-            conn.execute("UPDATE plans SET updated_at = %s WHERE id = %s", (now, plan_id))
             conn.commit()
         _log.debug("insert_receipt: created %s", receipt_id)
 
@@ -712,12 +797,26 @@ class DBAdapter:
         _log.info("add_work_request: wr=%s plan=%s title=%s", wr_id, plan_id, title or '(empty)')
         now = datetime.utcnow().isoformat() + "Z"
         with self._get_connection() as conn:
-            conn.execute(
-                "INSERT INTO nebula.work_requests (id, legacy_id, plan_id, title, business_status, dco_json, created_at, updated_at) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
-                "ON CONFLICT (legacy_id) DO NOTHING",
-                (str(uuid.uuid4()), wr_id, plan_id, title, 'DRAFT', dco_json, now, now),
-            )
+            # SCD-type-4 temporal upgrade: nebula.work_requests is a VIEW over
+            # work_requests_history. INSERT ... ON CONFLICT through views is not
+            # supported by PostgreSQL (no matching unique constraint on the view
+            # target). Preserve the idempotent DO NOTHING semantics with an
+            # explicit existence check, then write to the _history table
+            # directly (temporal columns take table defaults: now()/sentinel).
+            existing = conn.execute(
+                "SELECT 1 FROM nebula.work_requests_history "
+                "WHERE legacy_id = %s LIMIT 1",
+                (wr_id,),
+            ).fetchone()
+            if existing:
+                _log.info("add_work_request: wr=%s already exists, skipping", wr_id)
+            else:
+                conn.execute(
+                    "INSERT INTO nebula.work_requests_history "
+                    "(id, legacy_id, plan_id, title, business_status, dco_json, created_at, updated_at) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                    (str(uuid.uuid4()), wr_id, plan_id, title, 'DRAFT', dco_json, now, now),
+                )
             conn.commit()
 
     def update_work_request_status(self, wr_id: str, status: str):
@@ -798,7 +897,7 @@ class DBAdapter:
     def delete_receipt(self, plan_id: str, receipt_type: str, session_id: str) -> bool:
         _log.debug("delete_receipt: plan=%s type=%s session=%s", plan_id, receipt_type, session_id)
         with self._get_connection() as conn:
-            cursor = conn.execute("DELETE FROM receipts WHERE plan_id=%s AND type=%s AND session_id=%s", (plan_id, receipt_type, session_id))
+            cursor = conn.execute("DELETE FROM vision.receipts WHERE plan_id=%s AND type=%s AND session_id=%s", (plan_id, receipt_type, session_id))
             conn.commit()
             deleted = cursor.rowcount > 0
             if deleted:
@@ -808,7 +907,9 @@ class DBAdapter:
     def get_plan_by_id(self, plan_id: str) -> Optional[Dict[str, Any]]:
         _log.debug("get_plan_by_id: plan=%s", plan_id)
         with self._get_connection() as conn:
-            cursor = conn.execute("SELECT * FROM plans WHERE id = %s", (plan_id,))
+            # conduit.plans dropped 2026-08-02 — nebula.plans is the
+            # legacy-compat VIEW over nebula.implementation_plans (canonical).
+            cursor = conn.execute("SELECT * FROM nebula.plans WHERE id = %s", (plan_id,))
             plan = cursor.dict_fetchone()
             _log.debug("get_plan_by_id: plan=%s found=%s", plan_id, plan is not None)
             return plan
@@ -1011,7 +1112,7 @@ class DBAdapter:
             row = conn.execute(
                 """
                 SELECT COALESCE(SUM(tokens_used), 0) as total_tokens, COUNT(*) as receipts
-                FROM receipts WHERE plan_id = %s
+                FROM vision.receipts WHERE plan_id = %s
                 """,
                 (plan_id,),
             ).fetchone()
@@ -1029,7 +1130,7 @@ class DBAdapter:
             row = conn.execute(
                 """
                 SELECT COALESCE(SUM(tokens_used), 0) as total_tokens, COUNT(*) as receipts
-                FROM receipts WHERE agent_role = %s
+                FROM vision.receipts WHERE agent_role = %s
                 """,
                 (role,),
             ).fetchone()
@@ -1287,7 +1388,16 @@ class DBAdapter:
             return None
         model_id = cfg.get("model_identifier", "")
         _log.debug("get_role_model_config: role=%s harness=%s model=%s", role, harness_binary, model_id)
-        return {"harness": harness_binary, "model": model_id}
+        return {
+            "harness": harness_binary,
+            "model": model_id,
+            # Provider fields let the pipeline qualify the model ID with
+            # the model's OWN provider (see provider_prefix_slug /
+            # qualify_opencode_model_id above).
+            "provider_name": cfg.get("provider_name", ""),
+            "provider_id": cfg.get("provider_id", ""),
+            "provider_type": cfg.get("provider_type", ""),
+        }
 
     # ── v105: Failure recovery config ────────────────────────────────
 

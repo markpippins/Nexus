@@ -1,0 +1,28 @@
+[Unit]
+Description=Mildred Digital Asset Management REST API
+After=network.target postgresql.service
+Wants=postgresql.service
+
+# Prerequisites:
+#   1. Build the binary:  cd /home/codex/dev/mildred/service && go build -o mildred-service .
+#   2. Create env file (mode 600):  /etc/nexus/mildred.env  with:
+#        MILDRED_PORT=3140
+#        MILDRED_DSN=postgres://pguser:<password>@localhost:5432/mildred?search_path=media,public
+
+[Service]
+Type=simple
+ExecStart=/home/codex/dev/mildred/service/mildred-service
+User=codex
+Group=codex
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=10s
+TimeoutStopSec=10s
+
+EnvironmentFile=-/etc/nexus/mildred.env
+
+# Hardening
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

@@ -29,7 +29,7 @@ import { FileTreeNode } from '../../services/ui-preferences.service';
       }
 
       <!-- Icon -->
-      <span class="mr-1.5 text-xs">
+      <span class="mr-1.5 text-sm">
         @if (node().type === 'directory') {
           @if (isExpanded) {
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[rgb(var(--color-accent-text))]" fill="currentColor" viewBox="0 0 20 20">
@@ -47,7 +47,7 @@ import { FileTreeNode } from '../../services/ui-preferences.service';
         }
       </span>
 
-      <span class="truncate text-xs">{{ node().name }}</span>
+      <span class="truncate text-sm">{{ node().name }}</span>
 
       <!-- Loading spinner while fetching children -->
       @if (needsChildren) {
@@ -108,7 +108,7 @@ export class TreeNodeComponent {
     <div class="flex flex-col h-full bg-[rgb(var(--color-surface-sidebar))] text-sm">
       <!-- Header -->
       <div class="flex items-center justify-between px-3 py-2 border-b border-[rgb(var(--color-border-base))] flex-shrink-0">
-        <span class="text-xs font-semibold uppercase tracking-wider text-[rgb(var(--color-text-subtle))]">Files</span>
+        <span class="text-sm font-semibold uppercase tracking-wider text-[rgb(var(--color-text-subtle))]">Files</span>
         <div class="flex items-center gap-1">
           <button
             class="p-1 rounded hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))]"
@@ -129,7 +129,7 @@ export class TreeNodeComponent {
             <div class="w-5 h-5 border-2 border-[rgb(var(--color-accent-ring))] border-t-transparent rounded-full animate-spin"></div>
           </div>
         } @else if (nodes().length === 0) {
-          <div class="px-3 py-6 text-center text-[rgb(var(--color-text-subtle))] text-xs">
+          <div class="px-3 py-6 text-center text-[rgb(var(--color-text-subtle))] text-sm">
             <p>No files to show.</p>
             <p class="mt-1">Connect to a server in Nexus to browse files.</p>
           </div>

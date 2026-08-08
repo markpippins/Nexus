@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { randomUUID } from 'crypto';
+import { startHeartbeat } from 'heartbeat-client';
 
 // ── Types ─────────────────────────────────────────────────────────
 interface UiEvent {
@@ -22,6 +23,19 @@ const clients = new Map<string, SseClient>();
 // ── Express Setup ─────────────────────────────────────────────────
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3200;
+
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: Error & { code?: string }) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`ui-event-bus: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[ui-event-bus] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[ui-event-bus] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
 
 app.use(cors());
 app.use(express.json({ limit: '256kb' }));
@@ -125,6 +139,22 @@ const server = app.listen(PORT, () => {
   console.log(`  GET  /api/events/stream    — SSE subscription (?sender=xxx)`);
   console.log(`  GET  /api/events/clients   — list connected clients`);
   console.log(`  GET  /health               — health check`);
+
+  startHeartbeat({
+    serviceId: 120,
+    serviceName: 'ui-event-bus',
+    interval: 30,
+    log: (...args: any[]) => console.log(new Date().toISOString(), '[heartbeat ui-event-bus]', ...args),
+  });
+});
+
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`ui-event-bus: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+  } else {
+    console.error('ui-event-bus: listen error:', err.message);
+  }
+  process.exit(1);
 });
 
 // ── Graceful Shutdown ─────────────────────────────────────────────

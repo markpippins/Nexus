@@ -378,9 +378,13 @@ async function withTransaction<T>(
   cb: (client: PoolClient) => Promise<T>
 ): Promise<T> {
   const client = await pool.connect();
-  await client.query(`SET search_path TO ${PG_SCHEMA},${TACKLE_SCHEMA}`);
   try {
     await client.query("BEGIN");
+    // SET LOCAL (not plain SET): scoped to this transaction, so the session
+    // reverts to the pool default search_path (conduit,vision,peb,tackle) when
+    // the client is released. A plain SET here leaked a vision-less path into
+    // pooled connections, crashing the watcher's unqualified `FROM tickets`.
+    await client.query(`SET LOCAL search_path TO ${PG_SCHEMA},${TACKLE_SCHEMA}`);
     const result = await cb(client);
     await client.query("COMMIT");
     return result;
@@ -405,25 +409,9 @@ async function createSchema(
   await exec(`CREATE SCHEMA IF NOT EXISTS ${TACKLE_SCHEMA}`);
 
   await exec(`
-    CREATE TABLE IF NOT EXISTS plans (
-      id            TEXT PRIMARY KEY,
-      file_name     TEXT NOT NULL,
-      title         TEXT NOT NULL DEFAULT '',
-      project       TEXT NOT NULL DEFAULT '',
-      goal          TEXT NOT NULL DEFAULT '',
-      content       TEXT NOT NULL DEFAULT '',
-      files_affected    TEXT NOT NULL DEFAULT '[]',
-      acceptance_criteria TEXT NOT NULL DEFAULT '[]',
-      dependencies  TEXT NOT NULL DEFAULT '[]',
-      prompt_ref    TEXT NOT NULL DEFAULT '',
-      notes         TEXT NOT NULL DEFAULT '',
-      priority      INTEGER NOT NULL DEFAULT 0,
-      deleted       INTEGER NOT NULL DEFAULT 0,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-    CREATE INDEX IF NOT EXISTS idx_plans_status ON plans(updated_at);
-
+    -- conduit.plans removed 2026-08-07: empty legacy table, no dependents
+    -- (runtime reads nebula.plans, the legacy-compat view over
+    -- nebula.implementation_plans_history). Dropped from DDL so it stays gone.
     -- Schema version tracking for formal migrations
     CREATE TABLE IF NOT EXISTS schema_version (
       version     INTEGER PRIMARY KEY,
@@ -776,14 +764,40 @@ const migrations: Migration[] = [
     version: 3,
     description: "Add notes TEXT column to plans for free-form annotation",
     up: async (exec) => {
-      await exec(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT ''`);
+      // Guard: conduit.plans no longer exists on fresh schemas (removed
+      // 2026-08-07). Only legacy DBs that still carry the table get the column.
+      await exec(`
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = current_schema()
+            AND table_name = 'plans'
+          ) THEN
+            ALTER TABLE plans ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '';
+          END IF;
+        END $$;
+      `);
     },
   },
   {
     version: 4,
     description: "Add priority INTEGER column to plans for ordering importance",
     up: async (exec) => {
-      await exec(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS priority INTEGER NOT NULL DEFAULT 0`);
+      // Guard: conduit.plans no longer exists on fresh schemas (removed
+      // 2026-08-07). Only legacy DBs that still carry the table get the column.
+      await exec(`
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = current_schema()
+            AND table_name = 'plans'
+          ) THEN
+            ALTER TABLE plans ADD COLUMN IF NOT EXISTS priority INTEGER NOT NULL DEFAULT 0;
+          END IF;
+        END $$;
+      `);
     },
   },
   {
@@ -939,9 +953,24 @@ const migrations: Migration[] = [
       // The existing vision.work_requests was created as a VIEW during the
       // manual schema split (pointing at the old conduit.work_requests which
       // was later dropped). Replace it with a proper BASE TABLE.
-      await exec(`DROP VIEW IF EXISTS ${VISION_SCHEMA}.work_requests CASCADE`);
+      // NOTE: on fresh DBs createSchema already creates this as a BASE TABLE,
+      // so the DROP is relkind-guarded (only a leftover VIEW is dropped) and
+      // the CREATE is IF NOT EXISTS. The INDEX still must be created here —
+      // createSchema deliberately defers it to v12/v13 (see comment above).
       await exec(`
-        CREATE TABLE ${VISION_SCHEMA}.work_requests (
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = '${VISION_SCHEMA}' AND c.relname = 'work_requests'
+            AND c.relkind = 'v'
+          ) THEN
+            EXECUTE 'DROP VIEW ${VISION_SCHEMA}.work_requests CASCADE';
+          END IF;
+        END $$;
+      `);
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ${VISION_SCHEMA}.work_requests (
           id              BIGSERIAL PRIMARY KEY,
           wr_id           TEXT UNIQUE,
           dco_json        TEXT NOT NULL DEFAULT '{}',
@@ -1116,10 +1145,23 @@ const migrations: Migration[] = [
       // enforced at application level (insert-time sequence assignment).  The
       // UNIQUE index + NOT NULL guarantee that each plan has at most one receipt
       // per sequence value; MAX(sequence) = COUNT(*)-1 is a runtime invariant.
+      // Guarded for idempotency — fresh-DB replay (schema tests) and live DB
+      // (already-applied v15) must both pass.  ADD CONSTRAINT has no
+      // IF NOT EXISTS in PG, so pre-check pg_constraint (same pattern as v25).
       await exec(`
-        ALTER TABLE ${VISION_SCHEMA}.receipts
-        ADD CONSTRAINT chk_receipts_sequence_non_negative
-        CHECK (sequence >= 0)
+        DO $MIGRATE$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conrelid = '${VISION_SCHEMA}.receipts'::regclass
+              AND conname = 'chk_receipts_sequence_non_negative'
+          ) THEN
+            ALTER TABLE ${VISION_SCHEMA}.receipts
+            ADD CONSTRAINT chk_receipts_sequence_non_negative
+            CHECK (sequence >= 0);
+          END IF;
+        END;
+        $MIGRATE$
       `);
 
       // Step 6: Create a trigger function that auto-assigns sequence on INSERT
@@ -1164,6 +1206,32 @@ const migrations: Migration[] = [
     version: 17,
     description: "Add work_request_events table for Runtime Kernel event-sourced state machine",
     up: async (exec) => {
+      // v18 (event-sourcing foundation) DROPs this v17-shaped table and
+      // rebuilds it with a different shape (work_request_id instead of
+      // wr_id). On fresh-replay after v18 has run, the table already exists
+      // in v18 shape — v17's CREATE TABLE IF NOT EXISTS would skip, but the
+      // wr_id index/backfill below would fail ("column wr_id does not exist").
+      // Guard: skip the v17 body entirely when the table exists without a
+      // wr_id column (v18 shape). Absent table or v17-shape table → run.
+      const shapeCheck = await exec(`
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.tables t
+          WHERE t.table_schema = '${PG_SCHEMA}'
+          AND t.table_name = 'work_request_events'
+          AND NOT EXISTS (
+            SELECT 1 FROM information_schema.columns c
+            WHERE c.table_schema = t.table_schema
+            AND c.table_name = t.table_name
+            AND c.column_name = 'wr_id'
+          )
+        ) AS is_v18_shape
+      `);
+      const isV18Shape = shapeCheck?.rows?.[0]?.is_v18_shape === true;
+      if (isV18Shape) {
+        console.log("[migrations] v17: Skipped — work_request_events already in v18 shape");
+        return;
+      }
+
       // The event log is the source of truth for WorkRequest lifecycle.
       // State = fold(events), never direct mutation.
       await exec(`
@@ -1245,7 +1313,7 @@ const migrations: Migration[] = [
       `);
 
       await exec(`
-        CREATE TABLE ${PG_SCHEMA}.work_request_state (
+        CREATE TABLE IF NOT EXISTS ${PG_SCHEMA}.work_request_state (
           work_request_id   UUID PRIMARY KEY,
           current_state     TEXT NOT NULL DEFAULT 'PROPOSED'
             CHECK(current_state IN (
@@ -1263,7 +1331,7 @@ const migrations: Migration[] = [
       `);
 
       await exec(`
-        CREATE TABLE ${VISION_SCHEMA}.vision_ir_artifacts (
+        CREATE TABLE IF NOT EXISTS ${VISION_SCHEMA}.vision_ir_artifacts (
           artifact_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           work_request_id   UUID NOT NULL,
           event_id          UUID NOT NULL,
@@ -1741,9 +1809,21 @@ const migrations: Migration[] = [
 
       // Quick smoke-query — confirm the function is callable and returns
       // the expected shape (zero rows on a clean DB).
+      // Guarded: on DBs where v22 already applied, the parameterized
+      // check_receipt_integrity(p_threshold_seconds int DEFAULT 1800) also
+      // exists, making the zero-arg call ambiguous ("function is not unique").
+      // The smoke check is a verification nicety — skip it when overloads
+      // coexist rather than failing the migration.
       await exec(`
-        SELECT count(*) AS anomaly_rows
-        FROM vision.check_receipt_integrity()
+        DO $SMOKE$
+        BEGIN
+          BEGIN
+            PERFORM count(*) FROM vision.check_receipt_integrity();
+          EXCEPTION WHEN ambiguous_function OR undefined_function THEN
+            RAISE NOTICE 'v20 smoke query skipped: check_receipt_integrity overloads coexist (v22 parameterized version present)';
+          END;
+        END;
+        $SMOKE$
       `);
     },
   },
@@ -1837,53 +1917,47 @@ const migrations: Migration[] = [
         FROM nebula.implementation_plans
       `);
 
-      // Recreate conduit.plans_by_status to avoid duplicate column name.
-      // Adding 'status' to nebula.plans means ps.* now includes a 'status'
-      // column, which conflicts with 'ps.derived_status AS status'.
-      // We rebuild with explicit column selection to resolve the ambiguity.
+      // plan_status / plans_by_status views are now owned by nebula-srv
+      // (migration 040, 2026-07-25), which drops the legacy conduit views.
+      // On DBs that still carry conduit.plan_status (pre-040), rebuild the
+      // conduit.plans_by_status mirror to avoid the duplicate-column-name
+      // ambiguity introduced by adding 'status' to nebula.plans above.
+      // On current/fresh DBs the conduit views no longer exist — no-op.
+      // The nebula.plans_by_status mirror is no longer created here.
       await exec(`
-        DROP VIEW IF EXISTS nebula.plans_by_status CASCADE;
-        DROP VIEW IF EXISTS conduit.plans_by_status CASCADE;
-        CREATE VIEW conduit.plans_by_status AS
-        SELECT
-          ps.id,
-          ps.file_name,
-          ps.title,
-          ps.project,
-          ps.goal,
-          ps.content,
-          ps.files_affected,
-          ps.acceptance_criteria,
-          ps.dependencies,
-          ps.prompt_ref,
-          ps.notes,
-          ps.priority,
-          ps.deleted,
-          ps.created_at,
-          ps.updated_at,
-          ps.derived_status AS status
-        FROM conduit.plan_status ps
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.views
+            WHERE table_schema = 'conduit' AND table_name = 'plan_status'
+          ) THEN
+            DROP VIEW IF EXISTS conduit.plans_by_status CASCADE;
+            CREATE VIEW conduit.plans_by_status AS
+            SELECT
+              ps.id,
+              ps.file_name,
+              ps.title,
+              ps.project,
+              ps.goal,
+              ps.content,
+              ps.files_affected,
+              ps.acceptance_criteria,
+              ps.dependencies,
+              ps.prompt_ref,
+              ps.notes,
+              ps.priority,
+              ps.deleted,
+              ps.created_at,
+              ps.updated_at,
+              ps.derived_status AS status
+            FROM conduit.plan_status ps;
+          END IF;
+        END $$;
       `);
 
-      // Recreate nebula mirror views
-      await exec(`
-        CREATE OR REPLACE VIEW nebula.plans_by_status AS SELECT * FROM conduit.plans_by_status
-      `);
-
-      // Temporal schema is optional — skip if it doesn't exist
-      try {
-        await exec(`
-          DO $$ BEGIN
-            CREATE OR REPLACE VIEW temporal.plans AS SELECT * FROM nebula.plans;
-            CREATE OR REPLACE VIEW temporal.plan_status AS SELECT * FROM conduit.plan_status;
-          EXCEPTION WHEN undefined_schema THEN
-            RAISE NOTICE 'temporal schema does not exist, skipping temporal views';
-          END $$;
-        `);
-      } catch {
-        console.log("[migrations] v24: temporal schema not found, skipping temporal views");
-      }
-
+      // NOTE: temporal.plans / temporal.plan_status mirror views were removed
+      // (2026-08-07) — the temporal schema was eliminated long ago and the
+      // guarded CREATE was dead code that never fired on any DB.
       console.log("[migrations] v24: Exposed status column in nebula.plans view");
     },
   },
@@ -2274,7 +2348,20 @@ const migrations: Migration[] = [
         up: async (exec) => {
       // conduit.plan_status VIEW depends on vision.receipts.created_at —
       // must drop it before altering the column type, then recreate after.
-      await exec(`DROP VIEW IF EXISTS conduit.plan_status CASCADE`);
+      // NOTE: since nebula-srv migration 040 (2026-07-25), the plan_status /
+      // plans_by_status views are owned by nebula and the conduit ones are
+      // dropped. Only legacy DBs that still carry conduit.plan_status get the
+      // drop/recreate cycle; fresh DBs must NOT recreate views in the shared
+      // conduit schema (they live in nebula now).
+      const legacyView = await exec(`
+        SELECT 1 FROM information_schema.views
+        WHERE table_schema = 'conduit' AND table_name = 'plan_status'
+        LIMIT 1
+      `);
+      const hasLegacyConduitView = (legacyView?.rows?.length ?? 0) > 0;
+      if (hasLegacyConduitView) {
+        await exec(`DROP VIEW IF EXISTS conduit.plan_status CASCADE`);
+      }
 
       const tables: [string, string[]][] = [
         ["vision.receipts", ["created_at"]],
@@ -2301,69 +2388,72 @@ const migrations: Migration[] = [
         }
       }
 
-      // Recreate the plan_status and plans_by_status views
-      await exec(`
-        CREATE VIEW conduit.plan_status AS
-        SELECT
-          p.*,
-          CASE
-            WHEN EXISTS (
-              SELECT 1 FROM vision.receipts r WHERE r.plan_id = p.id AND r.type = 'HOLD'
-              AND NOT EXISTS (
-                SELECT 1 FROM vision.receipts r2
-                WHERE r2.plan_id = p.id
-                AND r2.type IN ('CANCELLED', 'ABANDONED')
-                AND r2.created_at > r.created_at
+      // Recreate the plan_status and plans_by_status views (legacy path only —
+      // fresh DBs get them from nebula-srv migration 040)
+      if (hasLegacyConduitView) {
+        await exec(`
+          CREATE VIEW conduit.plan_status AS
+          SELECT
+            p.*,
+            CASE
+              WHEN EXISTS (
+                SELECT 1 FROM vision.receipts r WHERE r.plan_id = p.id AND r.type = 'HOLD'
+                AND NOT EXISTS (
+                  SELECT 1 FROM vision.receipts r2
+                  WHERE r2.plan_id = p.id
+                  AND r2.type IN ('CANCELLED', 'ABANDONED')
+                  AND r2.created_at > r.created_at
+                )
+              ) THEN 'HOLD'
+              WHEN (
+                SELECT r.type FROM vision.receipts r
+                WHERE r.plan_id = p.id
+                AND r.type NOT IN ('PLANNING', 'HOLD')
+                ORDER BY r.created_at DESC LIMIT 1
+              ) = 'REQUEUED' THEN 'PLAN_CREATE'
+              WHEN EXISTS (
+                SELECT 1 FROM vision.receipts r WHERE r.plan_id = p.id AND r.type = 'REVIEW_PASS'
+                AND NOT EXISTS (
+                  SELECT 1 FROM vision.receipts r2
+                  WHERE r2.plan_id = p.id
+                  AND r2.type IN ('BLOCK', 'PLAN_BLOCK', 'CANCELLED', 'ABANDONED')
+                  AND r2.created_at > r.created_at
+                )
+              ) THEN 'REVIEW_PASS'
+              WHEN EXISTS (
+                SELECT 1 FROM vision.receipts r WHERE r.plan_id = p.id AND r.type = 'REVIEW_REJECT'
+              ) THEN COALESCE(
+                (SELECT r.type FROM vision.receipts r
+                 WHERE r.plan_id = p.id
+                 AND r.type != 'BLOCK'
+                 ORDER BY r.created_at DESC LIMIT 1),
+                'PLAN_CREATE'
               )
-            ) THEN 'HOLD'
-            WHEN (
-              SELECT r.type FROM vision.receipts r
-              WHERE r.plan_id = p.id
-              AND r.type NOT IN ('PLANNING', 'HOLD')
-              ORDER BY r.created_at DESC LIMIT 1
-            ) = 'REQUEUED' THEN 'PLAN_CREATE'
-            WHEN EXISTS (
-              SELECT 1 FROM vision.receipts r WHERE r.plan_id = p.id AND r.type = 'REVIEW_PASS'
-              AND NOT EXISTS (
-                SELECT 1 FROM vision.receipts r2
-                WHERE r2.plan_id = p.id
-                AND r2.type IN ('BLOCK', 'PLAN_BLOCK', 'CANCELLED', 'ABANDONED')
-                AND r2.created_at > r.created_at
+              ELSE COALESCE(
+                (SELECT r.type FROM vision.receipts r
+                 WHERE r.plan_id = p.id
+                 AND r.type NOT IN ('PLANNING', 'HOLD')
+                 ORDER BY r.created_at DESC LIMIT 1),
+                (SELECT r.type FROM vision.receipts r
+                 WHERE r.plan_id = p.id
+                 ORDER BY r.created_at DESC LIMIT 1),
+                NULL
               )
-            ) THEN 'REVIEW_PASS'
-            WHEN EXISTS (
-              SELECT 1 FROM vision.receipts r WHERE r.plan_id = p.id AND r.type = 'REVIEW_REJECT'
-            ) THEN COALESCE(
-              (SELECT r.type FROM vision.receipts r
-               WHERE r.plan_id = p.id
-               AND r.type != 'BLOCK'
-               ORDER BY r.created_at DESC LIMIT 1),
-              'PLAN_CREATE'
-            )
-            ELSE COALESCE(
-              (SELECT r.type FROM vision.receipts r
-               WHERE r.plan_id = p.id
-               AND r.type NOT IN ('PLANNING', 'HOLD')
-               ORDER BY r.created_at DESC LIMIT 1),
-              (SELECT r.type FROM vision.receipts r
-               WHERE r.plan_id = p.id
-               ORDER BY r.created_at DESC LIMIT 1),
-              NULL
-            )
-          END AS derived_status
-        FROM nebula.plans p
-        WHERE p.deleted = 0
-      `);
+            END AS derived_status
+          FROM nebula.plans p
+          WHERE p.deleted = 0
+        `);
 
-      await exec(`
-        CREATE VIEW conduit.plans_by_status AS
-        SELECT
-          ps.id, ps.file_name, ps.title, ps.project, ps.goal, ps.content,
-          ps.files_affected, ps.acceptance_criteria, ps.dependencies,
-          ps.prompt_ref, ps.notes, ps.priority, ps.deleted,
-          ps.created_at, ps.updated_at, ps.derived_status AS status
-        FROM conduit.plan_status ps
-      `);
+        await exec(`
+          CREATE VIEW conduit.plans_by_status AS
+          SELECT
+            ps.id, ps.file_name, ps.title, ps.project, ps.goal, ps.content,
+            ps.files_affected, ps.acceptance_criteria, ps.dependencies,
+            ps.prompt_ref, ps.notes, ps.priority, ps.deleted,
+            ps.created_at, ps.updated_at, ps.derived_status AS status
+          FROM conduit.plan_status ps
+        `);
+      }
 
       console.log("[migrations] v30: Migrated TEXT→TIMESTAMPTZ for vision + peb tables");
     },
@@ -2545,7 +2635,7 @@ const migrations: Migration[] = [
             p.id AS source_plan_id,
             MIN(r.created_at) AS created_at,
             MAX(r.created_at) AS updated_at
-        FROM conduit.plans p
+        FROM nebula.plans p
         JOIN vision.receipts r ON r.plan_id = p.id
         WHERE NOT EXISTS (
             SELECT 1 FROM execution.requests er
@@ -2978,10 +3068,10 @@ export async function undeletePlan(planId: string): Promise<boolean> {
   return changes > 0;
 }
 
-// ── Hard delete ────────────────────────────────────────────────────
+// ── Expire (soft-delete) ────────────────────────────────────────────
 
 export async function hardDeletePlan(planId: string): Promise<{
-  deleted: boolean;
+  expired: boolean;
   ticketsDeleted: number;
   receiptsDeleted: number;
 }> {
@@ -2994,11 +3084,11 @@ export async function hardDeletePlan(planId: string): Promise<{
     );
     const changes = await tRun(
       client,
-      "DELETE FROM nebula.implementation_plans WHERE plan_number = @planId",
+      "UPDATE nebula.implementation_plans SET valid_until = now() WHERE plan_number = @planId AND valid_until > now()",
       { planId },
     );
     return {
-      deleted: changes > 0,
+      expired: changes > 0,
       ticketsDeleted,
       receiptsDeleted,
     };
@@ -3748,7 +3838,7 @@ export async function supersedeTicket(
 
     await tRun(
       client,
-      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'superseded', closed_at = @now,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'superseded', closed_at = @now::timestamptz,
         last_activity = @now, closure_reason = @reason
       WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
       { ticketId, now, reason }
@@ -3803,7 +3893,7 @@ export async function cancelTicket(ticketId: string, reason: string): Promise<nu
 
     const cancelled = await tRun(
       client,
-      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now::timestamptz,
         last_activity = @now, closure_reason = @reason
       WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
       { ticketId, now, reason }
@@ -3912,7 +4002,7 @@ export async function cancelTicketsByPlan(planId: string, reason: string): Promi
 
     const count = await tRun(
       client,
-      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now::timestamptz,
         last_activity = @now, closure_reason = @reason
       WHERE plan_id = @planId AND status IN ('open', 'claimed', 'stale', 'failed')`,
       { planId, now, reason }

@@ -17,18 +17,30 @@ import json
 import logging
 import subprocess
 import sys
+import os
 import tempfile
 import time
 from pathlib import Path
 
 import httpx
 
+# Add rover source dir so `event_emitter` is importable without PYTHONPATH
+# (matches the pattern in analyst_answer_questions.py /
+# architect_process_todo.py).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "python", "rover"))
+
 from event_emitter import emit_embedding_created
+
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "embed_harvests.log"),
+    ],
 )
 log = logging.getLogger("embed_harvests")
 

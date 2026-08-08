@@ -1,0 +1,21 @@
+[Unit]
+Description=Sysadmin Outage Detector — health checks and transition detection
+Documentation=https://github.com/codex/nexus/wiki/sysadmin-agent
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/codex/dev/nexus/bin/sysadmin-outage-detect.sh --wake-sysadmin
+User=codex
+Group=codex
+TimeoutStopSec=10s
+
+# Environment
+Environment=OPENCODE_BIN=/home/codex/.opencode/bin/opencode
+Environment=SYSMODEL=nvidia/z-ai/glm-5.2
+
+# Hardening
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

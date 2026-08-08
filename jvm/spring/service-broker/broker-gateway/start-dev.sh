@@ -3,7 +3,7 @@
 # This configuration is for local development with debug logging
 
 echo "Starting Broker Gateway with Dev profile..."
-echo "File System Server: http://localhost:4040/fs"
+echo "Secure File System Server: http://localhost:4040/fs"
 echo "MongoDB: localhost:27017"
 echo "Logging: DEBUG level enabled"
 echo ""

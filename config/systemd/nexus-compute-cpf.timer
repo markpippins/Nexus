@@ -1,0 +1,11 @@
+[Unit]
+Description=Compute CPF Scores (hourly)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=60min
+Persistent=true
+RandomizedDelaySec=2min
+
+[Install]
+WantedBy=timers.target

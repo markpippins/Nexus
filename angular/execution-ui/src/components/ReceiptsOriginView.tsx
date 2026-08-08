@@ -77,7 +77,7 @@ export const ReceiptsOriginView: React.FC<ReceiptsOriginViewProps> = ({
   return (
     <div className="p-4 space-y-4 font-sans text-slate-200 overflow-y-auto max-w-7xl mx-auto">
       {/* Top Filter & Search Bar */}
-      <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 font-mono text-xs shadow-md">
+      <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 font-mono text-sm shadow-md">
         <div className="flex items-center gap-2 flex-1">
           <div className="relative flex-1">
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
@@ -131,7 +131,7 @@ export const ReceiptsOriginView: React.FC<ReceiptsOriginViewProps> = ({
       </div>
 
       {/* Main Split Layout: Receipts List vs Side-by-Side Lineage Seam Matrix */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 font-mono text-xs">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 font-mono text-sm">
         {/* Receipts Table */}
         <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-lg overflow-hidden shadow-md">
           <div className="px-3 py-2 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
@@ -212,7 +212,7 @@ export const ReceiptsOriginView: React.FC<ReceiptsOriginViewProps> = ({
               {/* Relationship Badge */}
               <div className="p-3 bg-slate-950/80 border border-slate-800 rounded flex items-center justify-between">
                 <span className="text-slate-400 font-bold">LINEAGE RELATIONSHIP</span>
-                <span className={`px-2.5 py-1 rounded text-xs font-bold border uppercase ${
+                <span className={`px-2.5 py-1 rounded text-sm font-bold border uppercase ${
                   origin.relationship === 'backfilled_from_vision'
                     ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
                     : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'

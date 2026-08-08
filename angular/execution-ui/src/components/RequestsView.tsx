@@ -113,7 +113,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
   return (
     <div className="p-4 space-y-4 font-sans text-slate-200 overflow-y-auto max-w-7xl mx-auto">
       {/* Top Filter & Search Bar */}
-      <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 font-mono text-xs shadow-md">
+      <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 font-mono text-sm shadow-md">
         <div className="flex items-center gap-2 flex-1">
           <div className="relative flex-1">
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
@@ -169,7 +169,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
       {/* Main Layout: Split Table vs Inspector Drawer */}
       <div className={`grid grid-cols-1 ${selectedRequestId ? 'lg:grid-cols-12' : ''} gap-4`}>
         {/* Requests High-Contrast Data Table */}
-        <div className={`${selectedRequestId ? 'lg:col-span-5' : 'w-full'} bg-slate-900 border border-slate-800 rounded-lg overflow-hidden shadow-md font-mono text-xs`}>
+        <div className={`${selectedRequestId ? 'lg:col-span-5' : 'w-full'} bg-slate-900 border border-slate-800 rounded-lg overflow-hidden shadow-md font-mono text-sm`}>
           <div className="px-3 py-2 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
             <span className="font-bold text-slate-200 flex items-center gap-1.5">
               <FileCode2 className="w-4 h-4 text-blue-400" />
@@ -242,7 +242,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
 
               <button
                 onClick={onClearSelectedRequest}
-                className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs border border-slate-700"
+                className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 text-sm border border-slate-700"
               >
                 Close Inspector
               </button>
@@ -251,15 +251,15 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
             {isLoadingDetail ? (
               <div className="py-12 text-center text-slate-400 space-y-2">
                 <Clock className="w-6 h-6 animate-spin mx-auto text-blue-400" />
-                <p className="text-xs">Fetching lifecycle aggregate root...</p>
+                <p className="text-sm">Fetching lifecycle aggregate root...</p>
               </div>
             ) : reqState ? (
-              <div className="space-y-4 text-xs">
+              <div className="space-y-4 text-sm">
                 {/* 1. Request Primary Info Box */}
                 <div className="p-3 bg-slate-950/80 border border-slate-800 rounded space-y-2">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
                     <span className="text-slate-400 font-bold">Aggregate State</span>
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold border ${getStatusPill(reqState.request.status)}`}>
+                    <span className={`px-2 py-0.5 rounded text-sm font-bold border ${getStatusPill(reqState.request.status)}`}>
                       {reqState.request.status}
                     </span>
                   </div>

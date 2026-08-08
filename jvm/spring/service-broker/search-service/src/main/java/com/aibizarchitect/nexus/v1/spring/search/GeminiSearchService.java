@@ -23,34 +23,57 @@ public class GeminiSearchService {
     private static final Logger log = LoggerFactory.getLogger(GeminiSearchService.class);
 
     private final RestTemplate restTemplate;
-
     private final SearchResultsCacheRepository cacheRepository;
+    private final SearchRateLimiter rateLimiter;
 
     // Gemini API key - in a real implementation, this should be configured via
     // properties
     private String geminiApiKey = "YOUR_GEMINI_API_KEY_HERE";
 
     private static final long CACHE_TTL_MINUTES = 30; // Cache TTL in minutes
+    private static final String SERVICE_KEY = "gemini";
 
-    public GeminiSearchService(RestTemplate restTemplate, SearchResultsCacheRepository cacheRepository) {
+    public GeminiSearchService(RestTemplate restTemplate,
+                               SearchResultsCacheRepository cacheRepository,
+                               SearchRateLimiter rateLimiter) {
         this.restTemplate = restTemplate;
         this.cacheRepository = cacheRepository;
-        log.info("GeminiSearchService initialized with MongoDB cache");
+        this.rateLimiter = rateLimiter;
+        log.info("GeminiSearchService initialized with MongoDB cache + Redis rate limiter");
     }
 
     @BrokerOperation("generateContent")
     public SearchResult generateContent(@BrokerParam("token") String token, @BrokerParam("prompt") String prompt) {
-        log.info("Gemini content generation request received: {}", prompt);
+        return generateContent(token, prompt, false);
+    }
 
-        // First, check if we have a cached result for this prompt in MongoDB
-        String query = "gemini_prompt:" + prompt; // Use a prefixed query to distinguish Gemini prompts
+    @BrokerOperation("forceGenerateContent")
+    public SearchResult forceGenerateContent(@BrokerParam("token") String token, @BrokerParam("prompt") String prompt) {
+        return generateContent(token, prompt, true);
+    }
+
+    private SearchResult generateContent(String token, String prompt, boolean forceRefresh) {
+        log.info("Gemini content generation request received: {} (forceRefresh={})", prompt, forceRefresh);
+
+        // Gemini uses a prefixed cache key to distinguish prompts from other search queries
+        String query = "gemini_prompt:" + prompt;
+
+        // ── Rate-limit check ──────────────────────────────────────────
+        if (!forceRefresh && rateLimiter.isRateLimited(SERVICE_KEY, prompt)) {
+            SearchResultsCacheEntry cachedEntry = findAnyCacheEntry(query);
+            if (cachedEntry != null) {
+                log.info("Rate-limited — returning MongoDB-cached Gemini result for prompt: {}", prompt);
+                return buildResult(cachedEntry);
+            }
+            log.info("Rate-limited but no MongoDB cache entry — falling through to fresh generation");
+        }
+
+        // ── Fresh cache check ────────────────────────────────────────
         SearchResultsCacheEntry cachedEntry = findValidCacheEntry(query);
         if (cachedEntry != null) {
-            log.info("Returning cached result from MongoDB for Gemini prompt: {}", prompt);
-            SearchResult result = new SearchResult();
-            result.setItems(cachedEntry.getItems());
-            result.setRawResponse(cachedEntry.getItems().get(0).getPagemap()); // Simplified for demo
-            return result;
+            log.info("Returning fresh MongoDB-cached Gemini result for prompt: {}", prompt);
+            rateLimiter.markSearched(SERVICE_KEY, prompt);
+            return buildResult(cachedEntry);
         }
 
         // Validate configuration
@@ -139,6 +162,9 @@ public class GeminiSearchService {
                 cacheRepository.save(newCacheEntry);
                 log.info("Cached Gemini response in MongoDB for prompt: {}", prompt);
 
+                // Record rate-limit timestamp
+                rateLimiter.markSearched(SERVICE_KEY, prompt);
+
                 return result;
             } else {
                 log.error("Gemini API returned error: {}", response.getStatusCode());
@@ -187,7 +213,20 @@ public class GeminiSearchService {
     }
 
     /**
-     * Find a valid cache entry (not expired) for the given query
+     * Find any MongoDB cache entry for the query — even if expired.
+     */
+    private SearchResultsCacheEntry findAnyCacheEntry(String query) {
+        try {
+            var optionalEntry = cacheRepository.findByQuery(query);
+            return optionalEntry.orElse(null);
+        } catch (Exception e) {
+            log.warn("Error accessing Gemini cache for query {}: {}", query, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Find a valid (non-expired) cache entry. Deletes expired entries.
      */
     private SearchResultsCacheEntry findValidCacheEntry(String query) {
         try {
@@ -197,7 +236,6 @@ public class GeminiSearchService {
                 if (!entry.isExpired()) {
                     return entry;
                 } else {
-                    // Entry is expired, remove it
                     cacheRepository.deleteById(entry.getId());
                     log.info("Removed expired Gemini cache entry for query: {}", query);
                 }
@@ -205,7 +243,16 @@ public class GeminiSearchService {
             return null;
         } catch (Exception e) {
             log.warn("Error accessing Gemini cache for query {}: {}", query, e.getMessage());
-            return null; // Return null to proceed with fresh request
+            return null;
         }
+    }
+
+    private SearchResult buildResult(SearchResultsCacheEntry entry) {
+        SearchResult result = new SearchResult();
+        result.setItems(entry.getItems());
+        if (entry.getItems() != null && !entry.getItems().isEmpty()) {
+            result.setRawResponse(entry.getItems().get(0).getPagemap());
+        }
+        return result;
     }
 }

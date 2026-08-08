@@ -4,7 +4,7 @@ from functools import lru_cache
 
 class Settings:
     postgres_dsn: str = os.environ.get(
-        "NEBULA_PG_DSN", "postgresql://pguser:pguser@localhost:5432/nebula"
+        "NEBULA_PG_DSN", "postgresql://pguser:pgpass@localhost:5432/nexus"
     )
     redis_url: str = os.environ.get("NEBULA_REDIS_URL", "redis://localhost:6379/0")
     # Safety-net TTL only — cache is actively invalidated on every write path,

@@ -19,6 +19,10 @@ import uuid
 import urllib.request
 import urllib.error
 import subprocess
+from pathlib import Path
+
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 log = logging.getLogger("batch_embed")
 
@@ -30,7 +34,10 @@ DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "batch_embed_and_match.log"),
+    ],
 )
 
 

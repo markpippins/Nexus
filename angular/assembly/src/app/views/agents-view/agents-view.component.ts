@@ -43,10 +43,10 @@ import { RaiseQuestionComponent } from '../../components/raise-question/raise-qu
               <tr *ngFor="let item of sortedItems()">
                 <td>
                   <a [routerLink]="['/agents', item.id]" class="app-link">{{ item.title || 'Untitled' }}</a>
-                  <div class="text-xs text-gray-500 line-clamp-1 mt-0.5">{{ item.recordType || 'Record' }}</div>
+                  <div class="text-sm text-gray-500 line-clamp-1 mt-0.5">{{ item.recordType || 'Record' }}</div>
                 </td>
                 <td><app-status-badge [status]="item.role || 'unknown'"></app-status-badge></td>
-                <td class="text-xs text-gray-500">{{ formatDate(item.createdAt) }}</td>
+                <td class="text-sm text-gray-500">{{ formatDate(item.createdAt) }}</td>
                 <td class="text-right"><app-raise-question objectType="agent" [objectId]="item.id" [objectTitle]="item.title || 'Untitled'"></app-raise-question></td>
               </tr>
             </tbody>

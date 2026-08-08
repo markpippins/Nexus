@@ -422,7 +422,7 @@ export async function supersedeSegment(
   segmentId: string,
 ): Promise<{ ok: boolean }> {
   const { rowCount } = await pool.query(
-    'DELETE FROM nebula.segments WHERE id = $1',
+    'UPDATE nebula.segments SET valid_until = now() WHERE id = $1 AND valid_until > now()',
     [segmentId],
   );
   if (rowCount === 0) throw new Error('Segment not found');
@@ -479,7 +479,7 @@ export async function removeProjectionOverride(
   overrideId: string,
 ): Promise<{ ok: boolean }> {
   const { rowCount } = await pool.query(
-    'DELETE FROM nebula.projection_overrides WHERE id = $1',
+    'UPDATE nebula.projection_overrides SET valid_until = now() WHERE id = $1 AND valid_until > now()',
     [overrideId],
   );
   if (rowCount === 0) throw new Error('Override not found');

@@ -31,6 +31,10 @@ import argparse
 import json
 import logging
 import sys
+from pathlib import Path
+
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -97,7 +101,10 @@ def fetch_all_agendas_with_items() -> list[dict]:
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "heal_agendas.log"),
+    ],
 )
 
 

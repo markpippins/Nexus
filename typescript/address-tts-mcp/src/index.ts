@@ -15,6 +15,19 @@ loadEnv();
 
 const PORT = parseInt(process.env.ADDRESS_TTS_MCP_PORT || "3105", 10);
 
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: Error & { code?: string }) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`address-tts-mcp: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[address-tts-mcp] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[address-tts-mcp] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -99,10 +112,19 @@ app.get("/state", async (_req, res) => {
 async function main() {
   console.log(`[address-tts-mcp] TTS URL: ${TTS_URL}`);
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`[address-tts-mcp] Server running on http://localhost:${PORT}`);
     console.log(`[address-tts-mcp] MCP endpoint: POST http://localhost:${PORT}/`);
     console.log(`[address-tts-mcp] Tools: ${toolDefinitions.map(t => t.name).join(", ")}`);
+  });
+
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`address-tts-mcp: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    } else {
+      console.error('address-tts-mcp: listen error:', err.message);
+    }
+    process.exit(1);
   });
 }
 

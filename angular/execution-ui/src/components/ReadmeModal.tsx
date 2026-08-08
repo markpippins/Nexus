@@ -79,7 +79,7 @@ In the top addressbar:
 
   return (
     <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col font-mono text-xs text-slate-200">
+      <div className="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col font-mono text-sm text-slate-200">
         <div className="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950">
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-blue-400" />
@@ -99,8 +99,8 @@ In the top addressbar:
           </div>
         </div>
 
-        <div className="p-4 overflow-y-auto space-y-3 font-sans text-xs text-slate-300 leading-relaxed">
-          <pre className="font-mono text-xs text-slate-300 whitespace-pre-wrap bg-slate-950 p-4 rounded border border-slate-800">
+        <div className="p-4 overflow-y-auto space-y-3 font-sans text-sm text-slate-300 leading-relaxed">
+          <pre className="font-mono text-sm text-slate-300 whitespace-pre-wrap bg-slate-950 p-4 rounded border border-slate-800">
             {readmeContent}
           </pre>
         </div>

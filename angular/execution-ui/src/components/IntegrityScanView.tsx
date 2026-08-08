@@ -79,18 +79,18 @@ export const IntegrityScanView: React.FC<IntegrityScanViewProps> = ({
           <div>
             <h1 className="text-base font-bold text-slate-100 flex items-center gap-2">
               Cross-Table Consistency Scanner
-              <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+              <span className="text-sm px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
                 /api/execution/health/integrity-scan
               </span>
             </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-sm text-slate-400 mt-0.5">
               Named pathologies scanner generalized from <code className="text-emerald-400 font-mono">vision.check_receipt_integrity()</code>.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="text-right text-xs">
+          <div className="text-right text-sm">
             <span className="text-slate-400 block">Scanned At</span>
             <span className="text-slate-200 font-bold">
               {scanResult?.scanned_at ? new Date(scanResult.scanned_at).toLocaleTimeString() : 'Just Now'}
@@ -100,7 +100,7 @@ export const IntegrityScanView: React.FC<IntegrityScanViewProps> = ({
           <button
             onClick={onRefreshScan}
             disabled={isScanning}
-            className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded font-bold text-xs transition-colors flex items-center gap-2"
+            className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded font-bold text-sm transition-colors flex items-center gap-2"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
             <span>{isScanning ? 'Scanning Schema...' : 'Run Integrity Scan'}</span>
@@ -109,7 +109,7 @@ export const IntegrityScanView: React.FC<IntegrityScanViewProps> = ({
       </div>
 
       {/* Summary KPI Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-sm">
         <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg flex items-center justify-between">
           <div>
             <span className="text-slate-400 block text-[11px]">ACTIVE PATHOLOGIES</span>
@@ -165,12 +165,12 @@ export const IntegrityScanView: React.FC<IntegrityScanViewProps> = ({
                       </span>
                       <code className="text-[10px] text-slate-500 font-normal">[{item.kind}]</code>
                     </div>
-                    <p className="text-xs text-slate-400 font-sans mt-0.5">{item.description}</p>
+                    <p className="text-sm text-slate-400 font-sans mt-0.5">{item.description}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <span className={`px-2.5 py-1 rounded-md text-xs font-bold border ${
+                  <span className={`px-2.5 py-1 rounded-md text-sm font-bold border ${
                     item.count > 0 
                       ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
                       : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
@@ -182,7 +182,7 @@ export const IntegrityScanView: React.FC<IntegrityScanViewProps> = ({
 
               {/* Expanded Payload & SQL Details */}
               {isExpanded && (
-                <div className="p-4 border-t border-slate-800/80 bg-slate-950/70 space-y-3 text-xs">
+                <div className="p-4 border-t border-slate-800/80 bg-slate-950/70 space-y-3 text-sm">
                   {/* SQL Pathology Query */}
                   <div>
                     <div className="flex items-center gap-1.5 text-slate-400 text-[11px] font-bold mb-1">
@@ -210,7 +210,7 @@ export const IntegrityScanView: React.FC<IntegrityScanViewProps> = ({
                     ) : (
                       <div className="space-y-2">
                         {item.samples.map((sample, idx) => (
-                          <div key={idx} className="p-2.5 bg-slate-900 border border-slate-800 rounded font-mono text-xs space-y-1">
+                          <div key={idx} className="p-2.5 bg-slate-900 border border-slate-800 rounded font-mono text-sm space-y-1">
                             <div className="flex items-center justify-between border-b border-slate-800 pb-1 text-[11px]">
                               <span className="text-amber-400 font-bold">Sample #{idx + 1}</span>
                               {sample.id && (

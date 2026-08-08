@@ -1,0 +1,37 @@
+[Unit]
+Description=Substance — Segment Sets API (FastAPI, port 3115)
+Documentation=https://github.com/nexus/python/substance
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/python/substance
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/home/codex/dev/nexus/python
+Environment=SUBSTANCE_PORT=3115
+Environment=NEBULA_PG_DSN=postgresql://pguser:pgpass@localhost:5432/nexus
+Environment=NEBULA_REDIS_URL=redis://localhost:6379/0
+Environment=PATH=/home/codex/dev/nexus/python/substance/.venv/bin:/usr/local/bin:/usr/bin:/bin
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/home/codex/dev/nexus/python/substance/.venv/bin/python3 -m uvicorn substance.main:app --host 0.0.0.0 --port 3115
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart behavior ───────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=3
+
+# ── Hardening ──────────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/codex/dev/nexus/python/substance
+
+[Install]
+WantedBy=default.target

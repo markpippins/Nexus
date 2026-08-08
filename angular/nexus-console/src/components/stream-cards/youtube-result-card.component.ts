@@ -11,9 +11,11 @@ import { WebviewService } from '../../services/webview.service.js';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class YoutubeResultCardComponent {
-  result = input.required<YoutubeSearchResult>();
+  result = input.required<YoutubeSearchResult & { sourceMagnetPath?: string[] }>();
   isBookmarked = input(false);
+  sourceMagnetPath = input<string[]>();
   bookmarkToggled = output<YoutubeSearchResult>();
+  navigateToMagnet = output<string[]>();
 
   private webviewService = inject(WebviewService);
 
@@ -21,9 +23,20 @@ export class YoutubeResultCardComponent {
     this.bookmarkToggled.emit(this.result());
   }
 
+  onMagnetClick(event: MouseEvent, path: string[]): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.navigateToMagnet.emit(path);
+  }
+
   openLink(event: MouseEvent): void {
     event.preventDefault();
-    const embedUrl = `https://www.youtube.com/embed/${this.result().videoId}`;
+    const videoId = this.result().videoId;
+    if (!videoId) {
+      console.warn('YoutubeResultCard: no videoId to open for', this.result().title);
+      return;
+    }
+    const embedUrl = `https://www.youtube.com/embed/${videoId}`;
     this.webviewService.open(embedUrl, this.result().title);
   }
 }

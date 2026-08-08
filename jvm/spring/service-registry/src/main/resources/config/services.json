@@ -190,5 +190,101 @@
     "status": "DEPRECATED",
     "version": "1.5.0",
     "dependencies": []
+  },
+  {
+    "name": "semantics-srv",
+    "description": "REST API over the semantics.* Postgres schema (type-level semantic topology legend). Registered via POST /api/v1/registry/register (serviceId 60); sends 30s heartbeats via heartbeat-client.",
+    "framework": "Express",
+    "type": "REST API",
+    "defaultPort": 3160,
+    "apiBasePath": "/api",
+    "repositoryUrl": "",
+    "status": "ACTIVE",
+    "version": "1.0.0",
+    "dependencies": []
+  },
+  {
+    "name": "semantics-mcp",
+    "description": "MCP server (streamable HTTP) exposing the semantics.* schema tools, delegating to semantics-srv REST. Registered in service-registry (serviceId 61); sends 30s heartbeats via heartbeat-client.",
+    "framework": "Express",
+    "type": "MCP Server",
+    "defaultPort": 3161,
+    "apiBasePath": "/",
+    "repositoryUrl": "",
+    "status": "ACTIVE",
+    "version": "1.0.0",
+    "dependencies": []
+  },
+  {
+    "name": "assembly-mcp",
+    "description": "Assembly forum MCP server \u2014 threaded discussions, change-log, issues, harvest candidates across all roles. Port corrected to 3113 (mesh-reconcile 2026-08-04).",
+    "framework": "Express",
+    "type": "MCP Server",
+    "defaultPort": 3113,
+    "apiBasePath": "",
+    "repositoryUrl": "",
+    "status": "ACTIVE",
+    "version": "1.0.0",
+    "dependencies": []
+  },
+  {
+    "name": "cascade-ui",
+    "description": "Cascade event visualizer \u2014 Angular SPA for semantic transition events, lineage graph, and analytics dashboard. Port corrected to 4203 (mesh-reconcile 2026-08-04).",
+    "framework": "Express",
+    "type": "Frontend Host",
+    "defaultPort": 4203,
+    "apiBasePath": "",
+    "repositoryUrl": "",
+    "status": "ACTIVE",
+    "version": "1.0.0",
+    "dependencies": []
+  },
+  {
+    "name": "nexus-console",
+    "description": "Nexus console \u2014 3D distributed systems visualizer, service topology, real-time status graph. Port corrected to 4200 (mesh-reconcile 2026-08-04).",
+    "framework": "Express",
+    "type": "Frontend Host",
+    "defaultPort": 4200,
+    "apiBasePath": "",
+    "repositoryUrl": "",
+    "status": "ACTIVE",
+    "version": "1.0.0",
+    "dependencies": []
+  },
+  {
+    "name": "conduit-ui",
+    "description": "Conduit pipeline UI \u2014 plan lifecycle, circuit breaker status, builder tickets, receipt chain viewer. Port corrected to 4201 (mesh-reconcile 2026-08-04).",
+    "framework": "Express",
+    "type": "Frontend Host",
+    "defaultPort": 4201,
+    "apiBasePath": "",
+    "repositoryUrl": "",
+    "status": "ACTIVE",
+    "version": "1.0.0",
+    "dependencies": []
+  },
+  {
+    "name": "nebula-ui",
+    "description": "Nebula database UI \u2014 agent records, requirements, projections, cross-references, harvest pipeline status. Port corrected to 3000 (mesh-reconcile 2026-08-04).",
+    "framework": "Express",
+    "type": "Frontend Host",
+    "defaultPort": 3000,
+    "apiBasePath": "",
+    "repositoryUrl": "",
+    "status": "ACTIVE",
+    "version": "1.0.0",
+    "dependencies": []
+  },
+  {
+    "name": "secure-file-system-server",
+    "description": "Secure file system service for service-broker (broker-gateway restfs). Port corrected to 4040 + deployment health poll (mesh-reconcile 2026-08-04).",
+    "framework": "typescript",
+    "type": "REST API",
+    "defaultPort": 4040,
+    "apiBasePath": "http://localhost:4040",
+    "repositoryUrl": "",
+    "status": "ACTIVE",
+    "version": "1.0.0",
+    "dependencies": []
   }
 ]

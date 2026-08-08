@@ -44,7 +44,7 @@ import {
   upsertRole,
   deleteRole,
 } from "./db";
-import { initRedis, closeRedis, getRoleCheckpoints } from "./memory";
+import { initRedis, closeRedis, getRoleCheckpoints, redis } from "./memory";
 import { registerToolHandlers, toolDefinitions } from "./tools";
 import { getDueSchedulerEntries, updateSchedulerEntry, listSchedulerEntries, createSchedulerEntry, deleteSchedulerEntry } from "./db";
 
@@ -131,6 +131,115 @@ app.get("/health", async (_req, res) => {
     pid: process.pid,
     timestamp: new Date().toISOString()
   });
+});
+
+// ── Persona prompt bridge (HTTP) ───────────────────────────────────
+// Serves the same payload as tackle-prompt-bridge's prompts/get but over
+// plain HTTP, so the agent runtime can fetch its role persona with curl.
+// The agent files (.opencode/agents/*.md) reference this URL directly.
+// GET /prompts/get?name=<role>/<slug>
+// POST /prompts/get  {"name": "<role>/<slug>"}
+// Reads the Redis key prompt:proc:{role}::{slug} populated by
+// tackle-prompt-sync-srv (port 3501, systemd unit
+// tackle-prompt-sync-srv.service).
+
+const PROMPT_PROC_PREFIX = "prompt:proc:";
+
+interface CachedPromptCard {
+  id: string;
+  role: string;
+  slug: string;
+  version: number;
+  title: string;
+  body_md: string;
+  parameter_schema: Record<string, any>;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+async function readPromptCard(role: string, slug: string): Promise<CachedPromptCard | null> {
+  try {
+    const raw = await redis.get(`${PROMPT_PROC_PREFIX}${role}::${slug}`);
+    return raw ? (JSON.parse(raw) as CachedPromptCard) : null;
+  } catch (err: any) {
+    console.error(`[prompts/get] redis read failed for ${role}::${slug}: ${err.message}`);
+    return null;
+  }
+}
+
+function renderPromptResponse(card: CachedPromptCard, args: Record<string, any>) {
+  return {
+    messages: [
+      {
+        role: "user",
+        content: { type: "text", text: card.body_md },
+      },
+    ],
+    _tackle: {
+      role: card.role,
+      slug: card.slug,
+      version: card.version,
+      title: card.title,
+      tags: card.tags,
+      parameter_schema: card.parameter_schema,
+      created_at: card.created_at,
+      updated_at: card.updated_at,
+      arguments: args || {},
+    },
+  };
+}
+
+app.get("/prompts/get", async (req, res) => {
+  const name = typeof req.query?.name === "string" ? req.query.name : undefined;
+  const argsRaw = typeof req.query?.arguments === "string" ? req.query.arguments : undefined;
+  let args: Record<string, any> = {};
+  if (argsRaw) {
+    try {
+      args = JSON.parse(argsRaw);
+    } catch {
+      args = { _raw: argsRaw };
+    }
+  }
+  if (!name || !name.includes("/")) {
+    res.status(400).json({
+      error: `Invalid prompt name "${name}". Expected "{role}/{slug}".`,
+    });
+    return;
+  }
+  const slashIdx = name.indexOf("/");
+  const role = name.substring(0, slashIdx);
+  const slug = name.substring(slashIdx + 1);
+  const card = await readPromptCard(role, slug);
+  if (!card) {
+    res.status(404).json({
+      error: `Prompt "${name}" not cached. Run tackle-prompt-sync-srv (port 3501, /refresh) to populate Redis.`,
+    });
+    return;
+  }
+  res.json(renderPromptResponse(card, args));
+});
+
+app.post("/prompts/get", async (req, res) => {
+  const name: string | undefined = req.body?.name;
+  const args: Record<string, any> = req.body?.arguments || {};
+  if (!name || !name.includes("/")) {
+    res.status(400).json({
+      error: `Invalid prompt name "${name}". Expected "{role}/{slug}".`,
+    });
+    return;
+  }
+  const slashIdx = name.indexOf("/");
+  const role = name.substring(0, slashIdx);
+  const slug = name.substring(slashIdx + 1);
+  const card = await readPromptCard(role, slug);
+  if (!card) {
+    res.status(404).json({
+      error: `Prompt "${name}" not cached. Run tackle-prompt-sync-srv (port 3501, /refresh) to populate Redis.`,
+    });
+    return;
+  }
+  res.json(renderPromptResponse(card, args));
 });
 
 // ── MCP Memory Updates ─────────────────────────────────────────────
@@ -724,9 +833,9 @@ app.get("/scheduler/due", async (_req, res) => {
 
 app.post("/scheduler", async (req, res) => {
   try {
-    const { role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, enabled } = req.body || {};
+    const { role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, task_slug, enabled } = req.body || {};
     if (!role) { res.status(400).json({ error: "role is required" }); return; }
-    const entry = await createSchedulerEntry({ role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, enabled });
+    const entry = await createSchedulerEntry({ role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, task_slug, enabled });
     res.json({ created: true, entry });
   } catch (e: any) {
     res.status(500).json({ error: e.message });

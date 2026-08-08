@@ -16,13 +16,20 @@ import logging
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 import httpx
+
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "embed_knowledge_entities.log"),
+    ],
 )
 log = logging.getLogger("embed_knowledge")
 

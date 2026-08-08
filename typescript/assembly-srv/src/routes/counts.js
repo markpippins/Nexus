@@ -11,8 +11,8 @@ countsRouter.get('/', async (req, res, next) => {
 
     // Assembly-local counts
     const [forumsResult, postsResult] = await Promise.all([
-      pool.query("SELECT COUNT(*)::int AS total FROM assembly.forums WHERE expiration_dt = 'infinity'::timestamptz OR expiration_dt IS NULL"),
-      pool.query("SELECT COUNT(*)::int AS total FROM assembly.posts"),
+      pool.query("SELECT COUNT(*)::int AS total FROM assembly.forums WHERE expiration_dt = 'infinity'::timestamptz OR expiration_dt > now()"),
+      pool.query("SELECT COUNT(*)::int AS total FROM assembly.posts WHERE expiration_dt = 'infinity'::timestamptz OR expiration_dt > now()"),
     ]);
 
     res.json({

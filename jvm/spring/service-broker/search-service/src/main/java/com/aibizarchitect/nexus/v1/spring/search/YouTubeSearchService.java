@@ -23,32 +23,53 @@ public class YouTubeSearchService {
     private static final Logger log = LoggerFactory.getLogger(YouTubeSearchService.class);
 
     private final RestTemplate restTemplate;
-    
     private final SearchResultsCacheRepository cacheRepository;
+    private final SearchRateLimiter rateLimiter;
 
     @Value("${youtube.api.key:#{null}}")
     private String youtubeApiKey;
 
     private static final long CACHE_TTL_MINUTES = 30; // Cache TTL in minutes
+    private static final String SERVICE_KEY = "youtube";
 
-    public YouTubeSearchService(RestTemplate restTemplate, SearchResultsCacheRepository cacheRepository) {
+    public YouTubeSearchService(RestTemplate restTemplate,
+                                SearchResultsCacheRepository cacheRepository,
+                                SearchRateLimiter rateLimiter) {
         this.restTemplate = restTemplate;
         this.cacheRepository = cacheRepository;
-        log.info("YouTubeSearchService initialized with MongoDB cache");
+        this.rateLimiter = rateLimiter;
+        log.info("YouTubeSearchService initialized with MongoDB cache + Redis rate limiter");
     }
 
     @BrokerOperation("searchVideos")
     public SearchResult searchVideos(@BrokerParam("token") String token, @BrokerParam("query") String query) {
-        log.info("YouTube video search query received: {}", query);
+        return searchVideos(token, query, false);
+    }
 
-        // First, check if we have a cached result for this query in MongoDB
+    @BrokerOperation("forceSearchVideos")
+    public SearchResult forceSearchVideos(@BrokerParam("token") String token, @BrokerParam("query") String query) {
+        return searchVideos(token, query, true);
+    }
+
+    private SearchResult searchVideos(String token, String query, boolean forceRefresh) {
+        log.info("YouTube video search query received: {} (forceRefresh={})", query, forceRefresh);
+
+        // ── Rate-limit check ──────────────────────────────────────────
+        if (!forceRefresh && rateLimiter.isRateLimited(SERVICE_KEY, query)) {
+            SearchResultsCacheEntry cachedEntry = findAnyCacheEntry(query);
+            if (cachedEntry != null) {
+                log.info("Rate-limited — returning MongoDB-cached YouTube result for query: {}", query);
+                return buildResult(cachedEntry);
+            }
+            log.info("Rate-limited but no MongoDB cache entry — falling through to fresh search");
+        }
+
+        // ── Fresh cache check ────────────────────────────────────────
         SearchResultsCacheEntry cachedEntry = findValidCacheEntry(query);
         if (cachedEntry != null) {
-            log.info("Returning cached result from MongoDB for YouTube query: {}", query);
-            SearchResult result = new SearchResult();
-            result.setItems(cachedEntry.getItems());
-            result.setRawResponse(cachedEntry.getItems().get(0).getPagemap()); // Simplified for demo
-            return result;
+            log.info("Returning fresh MongoDB-cached YouTube result for query: {}", query);
+            rateLimiter.markSearched(SERVICE_KEY, query);
+            return buildResult(cachedEntry);
         }
 
         // Validate configuration
@@ -139,7 +160,10 @@ public class YouTubeSearchService {
                 SearchResultsCacheEntry newCacheEntry = new SearchResultsCacheEntry(query, items, CACHE_TTL_MINUTES);
                 cacheRepository.save(newCacheEntry);
                 log.info("Cached YouTube search result in MongoDB for query: {}", query);
-                
+
+                // Record rate-limit timestamp
+                rateLimiter.markSearched(SERVICE_KEY, query);
+
                 return result;
             } else {
                 log.error("YouTube search API returned error: {}", response.getStatusCode());
@@ -167,7 +191,20 @@ public class YouTubeSearchService {
     }
     
     /**
-     * Find a valid cache entry (not expired) for the given query
+     * Find any MongoDB cache entry for the query — even if expired.
+     */
+    private SearchResultsCacheEntry findAnyCacheEntry(String query) {
+        try {
+            var optionalEntry = cacheRepository.findByQuery(query);
+            return optionalEntry.orElse(null);
+        } catch (Exception e) {
+            log.warn("Error accessing YouTube cache for query {}: {}", query, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Find a valid (non-expired) cache entry. Deletes expired entries.
      */
     private SearchResultsCacheEntry findValidCacheEntry(String query) {
         try {
@@ -177,7 +214,6 @@ public class YouTubeSearchService {
                 if (!entry.isExpired()) {
                     return entry;
                 } else {
-                    // Entry is expired, remove it
                     cacheRepository.deleteById(entry.getId());
                     log.info("Removed expired YouTube cache entry for query: {}", query);
                 }
@@ -185,7 +221,16 @@ public class YouTubeSearchService {
             return null;
         } catch (Exception e) {
             log.warn("Error accessing YouTube cache for query {}: {}", query, e.getMessage());
-            return null; // Return null to proceed with fresh search
+            return null;
         }
+    }
+
+    private SearchResult buildResult(SearchResultsCacheEntry entry) {
+        SearchResult result = new SearchResult();
+        result.setItems(entry.getItems());
+        if (entry.getItems() != null && !entry.getItems().isEmpty()) {
+            result.setRawResponse(entry.getItems().get(0).getPagemap());
+        }
+        return result;
     }
 }

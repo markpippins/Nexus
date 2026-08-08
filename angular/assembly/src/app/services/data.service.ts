@@ -29,6 +29,7 @@ export interface Counts {
   agentRecords: number;
   specifications: number;
   plans: number;
+  toDoThreads: number;
 }
 
 export interface Forum {
@@ -36,6 +37,7 @@ export interface Forum {
   slug: string;
   name: string;
   description: string;
+  sortOrder: number;
   threadCount: number;
   postCount: number;
 }
@@ -632,6 +634,22 @@ export class DataService {
 
   createComment(threadId: string, payload: { body: string; postedById: string; parentId?: string }) {
     return this.http.post<{ id: string }>(`${this.base}/forums/threads/${threadId}/comments`, payload);
+  }
+
+  createForum(payload: { name: string; slug: string; description: string }) {
+    return this.http.post<Forum>(`${this.base}/forums`, payload);
+  }
+
+  updateForum(id: string, payload: { name?: string; slug?: string; description?: string }) {
+    return this.http.put<Forum>(`${this.base}/forums/${id}`, payload);
+  }
+
+  deleteForum(id: string) {
+    return this.http.delete<{ id: string }>(`${this.base}/forums/${id}`);
+  }
+
+  reorderForums(orderedIds: string[]) {
+    return this.http.put<{ reordered: boolean }>(`${this.base}/forums/reorder`, { orderedIds });
   }
 
   search(q: string) {

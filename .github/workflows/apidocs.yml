@@ -1,0 +1,45 @@
+name: API Docs Drift
+
+# Fails when any committed *-srv openapi.yaml no longer matches the route
+# registrations in source (new/moved/removed endpoints), or when regeneration
+# would change the committed specs (summaries, versions, API.md tables).
+#
+# Backed by `make apidocs-*` targets — same commands locally and in CI.
+# vision-srv's openapi.yaml is captured live from its FastAPI /openapi.json,
+# so it is excluded from the byte-identical regeneration check (the surface
+# drift check still covers it; if vision's source routes change, CI fails
+# and the spec must be refreshed where vision-srv is running).
+
+on:
+  push:
+    branches: [main, master, feature/*, dev]
+  pull_request:
+    branches: [main, master, feature/*]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apidocs:
+    name: "OpenAPI specs match source routes"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install PyYAML
+        run: pip install --quiet pyyaml
+      - name: Drift check (route surface)
+        run: make apidocs-validate
+        shell: bash
+      - name: Regeneration byte-identical
+        run: |
+          make apidocs-gen SKIP_FASTAPI=1
+          git diff --exit-code -- . ':!python/vision-srv/openapi.yaml'
+        shell: bash
+      - name: Show what would change (on failure)
+        if: failure()
+        run: git diff --stat -- . ':!python/vision-srv/openapi.yaml' || true
+        shell: bash

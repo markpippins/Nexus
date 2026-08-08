@@ -29,7 +29,7 @@ import { Library } from '../../../models/service-mesh.model.js';
                     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-3.5">
                         <!-- Name -->
                         <div class="flex flex-col gap-1.5">
-                            <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Name *</label>
+                            <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Name *</label>
                             <input
                                 formControlName="name"
                                 type="text"
@@ -40,7 +40,7 @@ import { Library } from '../../../models/service-mesh.model.js';
 
                         <!-- Description -->
                         <div class="flex flex-col gap-1.5">
-                            <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Description</label>
+                            <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Description</label>
                             <textarea
                                 formControlName="description"
                                 rows="2"
@@ -52,7 +52,7 @@ import { Library } from '../../../models/service-mesh.model.js';
                         <!-- Category & Language Row -->
                         <div class="grid grid-cols-2 gap-4">
                             <div class="flex flex-col gap-1.5">
-                                <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Category</label>
+                                <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Category</label>
                                 <select
                                     formControlName="categoryId"
                                     class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors"
@@ -64,7 +64,7 @@ import { Library } from '../../../models/service-mesh.model.js';
                                 </select>
                             </div>
                             <div class="flex flex-col gap-1.5">
-                                <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Language</label>
+                                <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Language</label>
                                 <select
                                     formControlName="languageId"
                                     class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors"
@@ -80,7 +80,7 @@ import { Library } from '../../../models/service-mesh.model.js';
                         <!-- Package Info Row -->
                         <div class="grid grid-cols-2 gap-4">
                             <div class="flex flex-col gap-1.5">
-                                <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Package Name</label>
+                                <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Package Name</label>
                                 <input
                                     formControlName="packageName"
                                     type="text"
@@ -89,7 +89,7 @@ import { Library } from '../../../models/service-mesh.model.js';
                                 />
                             </div>
                             <div class="flex flex-col gap-1.5">
-                                <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Package Manager</label>
+                                <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Package Manager</label>
                                 <select
                                     formControlName="packageManager"
                                     class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors"
@@ -108,7 +108,7 @@ import { Library } from '../../../models/service-mesh.model.js';
                         <!-- Version & License Row -->
                         <div class="grid grid-cols-2 gap-4">
                             <div class="flex flex-col gap-1.5">
-                                <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Current Version</label>
+                                <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Current Version</label>
                                 <input
                                     formControlName="currentVersion"
                                     type="text"
@@ -117,7 +117,7 @@ import { Library } from '../../../models/service-mesh.model.js';
                                 />
                             </div>
                             <div class="flex flex-col gap-1.5">
-                                <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">License</label>
+                                <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">License</label>
                                 <input
                                     formControlName="license"
                                     type="text"
@@ -129,7 +129,7 @@ import { Library } from '../../../models/service-mesh.model.js';
 
                         <!-- URLs -->
                         <div class="flex flex-col gap-1.5">
-                            <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Homepage URL</label>
+                            <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Homepage URL</label>
                             <input
                                 formControlName="url"
                                 type="url"
@@ -138,7 +138,7 @@ import { Library } from '../../../models/service-mesh.model.js';
                             />
                         </div>
                         <div class="flex flex-col gap-1.5">
-                            <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Repository URL</label>
+                            <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Repository URL</label>
                             <input
                                 formControlName="repositoryUrl"
                                 type="url"

@@ -1,0 +1,607 @@
+openapi: 3.0.3
+info:
+  title: voyager-srv — Filesystem / Entity Voyager API
+  version: 1.0.508b8b20
+  description: 'Voyager over filesystems and entities: scan epochs, file/directory observations, topology signals and edge
+    hints, identity candidates, entities, spans, requirements, and stats.
+
+
+    Endpoint inventory generated from source route registrations by `nexus/tools/api-docs/`. Request/response bodies are generic;
+    field-level contracts live in the service code and its README.'
+servers:
+- url: http://localhost:3114
+tags:
+- name: entities
+- name: health
+- name: observations
+- name: scan-epochs
+- name: spans
+- name: stats
+- name: topology
+paths:
+  /api/entities:
+    get:
+      tags:
+      - entities
+      operationId: get_entities
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: agent lives above Voyager in the semantics layer. See legacy/identity.py and legacy/losm.py for aspirational
+        code. ENTITIES GET /api/entitie
+  /api/entities/{id}:
+    get:
+      tags:
+      - entities
+      operationId: get_entities_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: GET /api/entities/:id — single entity with drift history
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/entities/by-id/{entityId}:
+    get:
+      tags:
+      - entities
+      operationId: get_entities_by_id_entityId
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'GET /api/entities/by-id/:entityId — lookup by entity_id (UUID) NOTE: must be declared BEFORE /:id to avoid
+        route collision'
+      parameters:
+      - name: entityId
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/health:
+    get:
+      tags:
+      - health
+      operationId: get_health
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/observations/directories:
+    get:
+      tags:
+      - observations
+      operationId: get_observations_directories
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: DIRECTORY OBSERVATIONS GET /api/observations/directories — list directory observations
+  /api/observations/files:
+    get:
+      tags:
+      - observations
+      operationId: get_observations_files
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: FILE OBSERVATIONS GET /api/observations/files — list file observations (paginated, filterable)
+  /api/observations/files/{id}:
+    get:
+      tags:
+      - observations
+      operationId: get_observations_files_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: GET /api/observations/files/:id — single file observation by surrogate id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/observations/files/by-id/{observationId}:
+    get:
+      tags:
+      - observations
+      operationId: get_observations_files_by_id_observationId
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'GET /api/observations/files/by-id/:observationId — lookup by observation_id (UUID) NOTE: must be declared
+        BEFORE /:id to avoid route collisi'
+      parameters:
+      - name: observationId
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/scan-epochs:
+    get:
+      tags:
+      - scan-epochs
+      operationId: get_scan_epochs
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: SCAN EPOCHS GET /api/scan-epochs — list scan epochs (most recent first)
+  /api/scan-epochs/{id}:
+    get:
+      tags:
+      - scan-epochs
+      operationId: get_scan_epochs_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: GET /api/scan-epochs/:id — single scan epoch
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/spans:
+    get:
+      tags:
+      - spans
+      operationId: get_spans
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: METADATA SPANS GET /api/spans — list metadata spans (paginated, filterable)
+  /api/spans/{id}:
+    get:
+      tags:
+      - spans
+      operationId: get_spans_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: GET /api/spans/:id — single metadata span
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/stats:
+    get:
+      tags:
+      - stats
+      operationId: get_stats
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/topology/edge-hints:
+    get:
+      tags:
+      - topology
+      operationId: get_topology_edge_hints
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: OBSERVATION EDGE HINTS GET /api/topology/edge-hints — list observation edge hints
+  /api/topology/signals:
+    get:
+      tags:
+      - topology
+      operationId: get_topology_signals
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: TOPOLOGY SIGNALS GET /api/topology/signals — list topology signals
+  /api/topology/signals/{id}:
+    get:
+      tags:
+      - topology
+      operationId: get_topology_signals_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: GET /api/topology/signals/:id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /health:
+    get:
+      tags:
+      - health
+      operationId: get_health
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    JsonBody:
+      type: object
+      additionalProperties: true
+      description: Generic JSON body (fields are service-specific).
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code (e.g. not_found, validation_failed).
+        message:
+          type: string
+          description: Human-readable error detail.
+      additionalProperties: true
+x-generated-by: nexus/tools/api-docs/gen_openapi.py

@@ -242,7 +242,7 @@ async function createSchema(
                         CHECK(harness IN ('opencode', 'conduit')),
       agent_config     TEXT NOT NULL DEFAULT '{}',
       schedule_type    TEXT NOT NULL DEFAULT 'interval'
-                        CHECK(schedule_type IN ('interval', 'cron')),
+                        CHECK(schedule_type IN ('interval', 'cron', 'manual')),
       schedule_value   INTEGER NOT NULL DEFAULT 3600,
       project_dir      TEXT NOT NULL DEFAULT '/home/codex/dev',
       enabled          INTEGER NOT NULL DEFAULT 1,
@@ -582,6 +582,297 @@ const migrations: Migration[] = [
       const sql = readFileSync(sqlPath, "utf8");
       await exec(sql);
       console.log("[tackle-migrations] v9: Added DEFAULT NOW() to tackle.roles.created_at and updated_at");
+    },
+  },
+  {
+    version: 10,
+    description: "Create tackle.system_logs for operational log persistence (GET/POST/DELETE /logs endpoints)",
+    up: async (exec) => {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.system_logs (
+          id          TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+          timestamp   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          level       TEXT NOT NULL CHECK (level IN ('INFO','WARN','ERROR','DEBUG')),
+          category    TEXT NOT NULL,
+          message     TEXT NOT NULL,
+          source      TEXT,
+          details     JSONB
+        )
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS idx_system_logs_level
+          ON ${TACKLE_SCHEMA}.system_logs (level)
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS idx_system_logs_category
+          ON ${TACKLE_SCHEMA}.system_logs (category)
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS idx_system_logs_timestamp
+          ON ${TACKLE_SCHEMA}.system_logs (timestamp DESC)
+      `);
+      console.log("[tackle-migrations] v10: Created tackle.system_logs table with indexes");
+    },
+  },
+  {
+    version: 11,
+    description: "Register tackle.agent_timeclock — agent clock in/out table. Previously lived in the nebula schema (owned by the timeclock service via SQLAlchemy create_all); moved nebula -> tackle on 2026-08-02 via copy-repoint-drop. Idempotent: no-op where the table already exists (e.g. live DB), creates it on green-field installs. Mirrors the timeclock MCP model (python/timeclock/models.py) and the live table DDL (PK + clock_in/role/status indexes).",
+    up: async (exec) => {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.agent_timeclock (
+          id             UUID        NOT NULL DEFAULT gen_random_uuid(),
+          role           TEXT        NOT NULL,
+          model          TEXT        NOT NULL,
+          session_id     TEXT,
+          clock_in       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          clock_out      TIMESTAMPTZ,
+          status         TEXT        NOT NULL DEFAULT 'active',
+          metadata       JSONB,
+          created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          recorded_on_dt TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          valid_from     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          valid_until    TIMESTAMPTZ NOT NULL DEFAULT '9999-12-31 23:59:59+00'
+        )
+      `);
+      await exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS agent_timeclock_pkey
+          ON ${TACKLE_SCHEMA}.agent_timeclock (id)
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS agent_timeclock_clock_in_idx
+          ON ${TACKLE_SCHEMA}.agent_timeclock (clock_in)
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS agent_timeclock_role_idx
+          ON ${TACKLE_SCHEMA}.agent_timeclock (role)
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS agent_timeclock_status_idx
+          ON ${TACKLE_SCHEMA}.agent_timeclock (status)
+      `);
+      console.log("[tackle-migrations] v11: Registered tackle.agent_timeclock table + indexes");
+    },
+  },
+  {
+    version: 12,
+    description: "Add optional task_slug link to tackle.agent_scheduler — scheduled jobs can attach a task (from tackle.tasks) whose prompt is appended to the role's default persona when the job runs. Loose reference (no FK) so tasks can be deleted; deleteTackleTask clears references.",
+    up: async (exec) => {
+      await exec(`
+        ALTER TABLE ${TACKLE_SCHEMA}.agent_scheduler
+          ADD COLUMN IF NOT EXISTS task_slug TEXT
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS idx_agent_scheduler_task_slug
+          ON ${TACKLE_SCHEMA}.agent_scheduler (task_slug)
+      `);
+      console.log("[tackle-migrations] v12: Added task_slug to tackle.agent_scheduler");
+    },
+  },
+  {
+    version: 13,
+    description: "Allow schedule_type 'manual' in tackle.agent_scheduler — the UI offers on-demand entries; the previous CHECK only allowed interval/cron so saving a manual row failed with a constraint violation.",
+    up: async (exec) => {
+      // Drop ANY existing CHECK on schedule_type regardless of its auto-generated
+      // name, then re-add with 'manual' allowed.
+      await exec(`
+        DO $$
+        DECLARE
+          c record;
+        BEGIN
+          FOR c IN
+            SELECT conname FROM pg_constraint
+            WHERE conrelid = '${TACKLE_SCHEMA}.agent_scheduler'::regclass
+              AND contype = 'c'
+              AND pg_get_constraintdef(oid) ILIKE '%schedule_type%'
+          LOOP
+            EXECUTE format('ALTER TABLE ${TACKLE_SCHEMA}.agent_scheduler DROP CONSTRAINT %I', c.conname);
+          END LOOP;
+        END $$;
+      `);
+      await exec(`
+        ALTER TABLE ${TACKLE_SCHEMA}.agent_scheduler
+          ADD CONSTRAINT agent_scheduler_schedule_type_check
+          CHECK (schedule_type IN ('interval', 'cron', 'manual'))
+      `);
+      console.log("[tackle-migrations] v13: Allowed schedule_type 'manual' in tackle.agent_scheduler");
+    },
+  },
+  {
+    version: 14,
+    description: "ACP v1: Create tackle.projection_configs and seed six v1 projection families (opencode-agent-*, claude-md, gemini-md, agents-md, codex-index, agents-operating-model). Plan 1280.",
+    up: async (exec) => {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.projection_configs (
+          id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          name            TEXT NOT NULL UNIQUE,
+          description     TEXT NOT NULL DEFAULT '',
+          type            TEXT NOT NULL DEFAULT 'deterministic'
+                            CHECK(type IN ('deterministic','inference')),
+          source_query    TEXT NOT NULL DEFAULT '',
+          template        TEXT NOT NULL DEFAULT '',
+          parameter_schema JSONB NOT NULL DEFAULT '{}',
+          target_path     TEXT NOT NULL,
+          schedule        TEXT NOT NULL DEFAULT '',
+          enabled         INTEGER NOT NULL DEFAULT 1,
+          last_rendered_at TIMESTAMPTZ,
+          last_sha256     TEXT,
+          created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+
+      await exec(`
+        CREATE INDEX IF NOT EXISTS idx_projection_configs_enabled
+          ON ${TACKLE_SCHEMA}.projection_configs (enabled)
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS idx_projection_configs_name
+          ON ${TACKLE_SCHEMA}.projection_configs (name)
+      `);
+
+      // Seed the six v1 projection families
+      const now = new Date().toISOString();
+
+      // 1. opencode-agent-* — one file per role in .opencode/agents/
+      await exec(
+        `INSERT INTO ${TACKLE_SCHEMA}.projection_configs (name, description, type, source_query, template, target_path, schedule)
+         VALUES ($1, $2, 'deterministic',
+           'SELECT r.name AS role, r.description AS role_description FROM tackle.roles r ORDER BY r.name',
+           $3,
+           '/home/codex/dev/.opencode/agents/{{role}}.md',
+           '')
+         ON CONFLICT (name) DO NOTHING`,
+        [
+          "opencode-agents",
+          "Agent persona files — one .md per role under .opencode/agents/. Template embeds role name, role description, persona body from tackle.prompts, and procedure cards from tackle.role_memory.",
+          `---
+assumes_role: {{role}}
+description: |
+  {{role_description}}
+mode: primary
+permission:
+  read: allow
+  edit: allow
+  bash: allow
+  task: allow
+---
+{{persona_body}}
+
+## Available Procedure Cards
+
+{{procedures_list}}
+`,
+        ]
+      );
+
+      // 2. claude-md
+      await exec(
+        `INSERT INTO ${TACKLE_SCHEMA}.projection_configs (name, description, type, source_query, template, target_path, schedule)
+         VALUES ($1, $2, 'deterministic', '', $3, '/home/codex/dev/CLAUDE.md', '')
+         ON CONFLICT (name) DO NOTHING`,
+        [
+          "claude-md",
+          "CLAUDE.md — top-level agent baseline for Claude. Currently hand-maintained; projection preserves current content via template fidelity.",
+          `<!-- GENERATED header will be prepended at render time -->
+# CLAUDE.md
+
+> **Version:** (see git history)
+> **Scope:** Agent behavior for /home/codex/dev workspace.
+> This file is a **GENERATED projection** from tackle data.
+> Source: projection:claude-md
+> Do not edit directly — changes will be overwritten on next render.
+
+This file provides baseline agent behavior. Role-specific configuration lives in .opencode/agents/<role>.md (also generated).
+`,
+        ]
+      );
+
+      // 3. gemini-md
+      await exec(
+        `INSERT INTO ${TACKLE_SCHEMA}.projection_configs (name, description, type, source_query, template, target_path, schedule)
+         VALUES ($1, $2, 'deterministic', '', $3, '/home/codex/dev/GEMINI.md', '')
+         ON CONFLICT (name) DO NOTHING`,
+        [
+          "gemini-md",
+          "GEMINI.md — Gemini-specific agent configuration. Projection from tackle data.",
+          `<!-- GENERATED header will be prepended at render time -->
+# GEMINI.md
+
+> **Scope:** Agent behavior for Gemini models in the /home/codex/dev workspace.
+> This file is a **GENERATED projection** from tackle data.
+> Source: projection:gemini-md
+> Do not edit directly.
+
+See CLAUDE.md and AGENTS.md for the governing doctrine. This file contains Gemini-specific overrides.
+`,
+        ]
+      );
+
+      // 4. agents-md
+      await exec(
+        `INSERT INTO ${TACKLE_SCHEMA}.projection_configs (name, description, type, source_query, template, target_path, schedule)
+         VALUES ($1, $2, 'deterministic', '', $3, '/home/codex/dev/AGENTS.md', '')
+         ON CONFLICT (name) DO NOTHING`,
+        [
+          "agents-md",
+          "AGENTS.md — Multi-model agent behavior specification. Projection from tackle data.",
+          `<!-- GENERATED header will be prepended at render time -->
+# AGENTS.md
+
+> **Version:** 2.1 (trimmed 2026-06-24)
+> **Scope:** Agent behavior for /home/codex/dev workspace.
+> This file is a **GENERATED projection** from tackle data.
+> Source: projection:agents-md
+> Do not edit directly.
+
+See CLAUDE.md for the full governing doctrine.
+`,
+        ]
+      );
+
+      // 5. codex-index
+      await exec(
+        `INSERT INTO ${TACKLE_SCHEMA}.projection_configs (name, description, type, source_query, template, target_path, schedule)
+         VALUES ($1, $2, 'deterministic', '', $3, '/home/codex/dev/.codex/INDEX.md', '')
+         ON CONFLICT (name) DO NOTHING`,
+        [
+          "codex-index",
+          ".codex/INDEX.md — Codex-specific index. Projection from tackle data.",
+          `<!-- GENERATED header will be prepended at render time -->
+# Codex Index
+
+> This file is a **GENERATED projection** from tackle data.
+> Source: projection:codex-index
+> Do not edit directly.
+
+Index of Codex-specific configuration and context.
+`,
+        ]
+      );
+
+      // 6. agents-operating-model
+      await exec(
+        `INSERT INTO ${TACKLE_SCHEMA}.projection_configs (name, description, type, source_query, template, target_path, schedule)
+         VALUES ($1, $2, 'deterministic', '', $3, '/home/codex/dev/nexus/.agents/OPERATING_MODEL.md', '')
+         ON CONFLICT (name) DO NOTHING`,
+        [
+          "agents-operating-model",
+          "nexus/.agents/OPERATING_MODEL.md — Nexus operating model. Projection from tackle data.",
+          `<!-- GENERATED header will be prepended at render time -->
+# Nexus Operating Model
+
+> This file is a **GENERATED projection** from tackle data.
+> Source: projection:agents-operating-model
+> Do not edit directly.
+
+## Operating Model
+
+Nexus follows a database-first architecture: canonical state lives in PostgreSQL; filesystem artifacts are derived projections.
+`,
+        ]
+      );
+
+      console.log("[tackle-migrations] v14: Created tackle.projection_configs + seeded 6 projection families");
     },
   },
 ];
@@ -1600,18 +1891,35 @@ BEGIN
     VALUES (
         'planner-create-plan',
         'Planner: Create & Manage Plans',
-        'How to create, propose, update, and promote implementation plans via conduit-mcp.',
+        'How to create, update, and promote implementation plans (via nebula_create_plan), and route DB-change plans to the Engineer before a Builder starts.',
         E'## Creating & Managing Plans\\n\\n'
-        '### Proposed Plan (new idea)\\n'
-        'Use \`conduit-mcp_create_proposed_plan\` with title, project, and goal. '
-        'Issues a PROPOSED receipt; file goes to proposed/.\\n\\n'
-        '### Full Plan (ready for implementation)\\n'
-        'Use \`conduit-mcp_create_plan\` with title, project, goal, filesAffected, '
-        'acceptanceCriteria, and dependencies. Issues a PLAN_CREATE receipt; '
-        'file goes to pending/.\\n\\n'
-        '### Promote Proposed to Planning\\n'
-        'Use \`conduit-mcp_promote_plan\` with the plan number. '
-        'Saves any edits and issues a PLANNING receipt.\\n\\n'
+        '### Create a Plan (ready for implementation)\\n'
+        'Use \`nebula_create_plan\` (nebula-mcp) with title, project, goal, filesAffected, '
+        'acceptanceCriteria, and dependencies. conduit-mcp create_plan / create_proposed_plan '
+        'are REMOVED stubs (TOOL_NOT_FOUND) — do not call them. The plan lands in '
+        'nebula.implementation_plans (status pending) and conduit-mcp auto-bootstraps a '
+        'PLAN_CREATE receipt + builder ticket within ~30s.\\n\\n'
+        '### Proposed / Planning states\\n'
+        'There is no create_proposed_plan tool. Start ideas as a full plan via nebula_create_plan; '
+        'use \`conduit-mcp_revise_plan\` to create a revision copy for planning discussion. '
+        'Use \`conduit-mcp_update_plan\` / \`conduit-mcp_report_plan_metadata\` '
+        'to set filesAffected, acceptanceCriteria, dependencies.\\n\\n'
+        '### ⚠ DB-Change Routing (mandatory rule)\\n'
+        '**Plans that require database changes go to the DBA for the DB work BEFORE a '
+        'Builder starts implementation.** When creating or updating a plan whose goal, '
+        'filesAffected, or acceptance criteria involve schema changes, migrations, DDL, '
+        'seed/data backfills, or index changes:\\n'
+        '1. Write a nebula agent record tagged \`["to:dba", "type:db-change", "planRef:<N>", "status:open"]\` '
+        'describing exactly which database changes are required (tables, columns, '
+        'migrations, data). Use recordType report.\\n'
+        '2. Put the DB change as the FIRST acceptance criterion of the plan so the builder '
+        'knows the schema must exist before implementation.\\n'
+        '3. The DBA posts the proposed alterations to the Assembly Drafts forum '
+        '(slug \`draft\`) and applies them ONLY after admin approval. The Builder '
+        'must not start implementation until the DBA completes the DB change '
+        '(approval + application) and the plan is still pending/ready. If a builder '
+        'ticket is already open for a DB-change plan, escalate via \`type:escalation\` '
+        'to keep sequencing.\\n\\n'
         '### Update Metadata\\n'
         'Use \`conduit-mcp_update_plan\` or \`conduit-mcp_report_plan_metadata\` '
         'to set filesAffected, acceptanceCriteria, dependencies.\\n\\n'
@@ -1619,16 +1927,16 @@ BEGIN
         'Use \`conduit-mcp_revise_plan\` to create a revision copy (issues PLANNING on the new copy).\\n\\n'
         '### Issue Receipts (state transitions)\\n'
         'Use \`conduit-mcp_issue_receipt\` with plan_id, type (PLAN_CREATE|IMPLEMENTATION|'
-        'REVIEW_PASS|REVIEW_REJECT|BLOCK|CANCELLED), and agent_role.\\n\\n'
+        'REVIEW_PASS|REVIEW_REJECT|BLOCK|PLANNING|HOLD|CANCELLED), and agent_role.\\n\\n'
         '### Delete a Plan\\n'
         'Use \`conduit-mcp_delete_plan\` for soft-delete (preserves audit trail). '
         'Use \`conduit-mcp_hard_delete_plan\` (with title confirmation) for permanent removal.',
-        ARRAY['planner', 'plans', 'create', 'manage', 'workflow'],
-        ARRAY['create plan', 'new plan', 'propose plan', 'promote plan', 'delete plan'],
-        ARRAY['conduit-mcp_create_proposed_plan', 'conduit-mcp_create_plan',
-              'conduit-mcp_promote_plan', 'conduit-mcp_update_plan',
-              'conduit-mcp_issue_receipt', 'conduit-mcp_delete_plan',
-              'conduit-mcp_revise_plan']
+        ARRAY['planner', 'plans', 'create', 'manage', 'workflow', 'db-change'],
+        ARRAY['create plan', 'new plan', 'propose plan', 'promote plan', 'delete plan',
+              'database change', 'schema change', 'migration'],
+        ARRAY['nebula_create_plan', 'conduit-mcp_update_plan',
+              'conduit-mcp_revise_plan', 'conduit-mcp_issue_receipt',
+              'conduit-mcp_delete_plan', 'conduit-mcp_hard_delete_plan']
     )
     ON CONFLICT (slug) DO NOTHING
     RETURNING id INTO v_memory_id;
@@ -2449,6 +2757,175 @@ export async function getInspectorDispatch(): Promise<{
   return { tasks: enriched };
 }
 
+// ── Prompts (tackle.prompts) ───────────────────────────────────────
+
+export async function listPrompts(
+  role?: string
+): Promise<any[]> {
+  const params: Record<string, any> = {};
+  let where = "";
+  if (role) { params.role = role; where = "WHERE role = @role"; }
+  return qAll(
+    `SELECT id, role, slug, version, title, body_md, parameter_schema, tags, created_at, updated_at
+     FROM prompts ${where} ORDER BY role, slug, version DESC`,
+    params
+  );
+}
+
+export async function getPromptByRoleSlug(
+  role: string,
+  slug: string
+): Promise<any | undefined> {
+  return qOne(
+    `SELECT id, role, slug, version, title, body_md, parameter_schema, tags, created_at, updated_at
+     FROM prompts WHERE role = @role AND slug = @slug
+     ORDER BY version DESC LIMIT 1`,
+    { role, slug }
+  );
+}
+
+export async function upsertPrompt(data: {
+  id?: string;
+  role: string;
+  slug: string;
+  version?: number;
+  title: string;
+  body_md: string;
+  parameter_schema?: Record<string, any>;
+  tags?: string[];
+}): Promise<any> {
+  const latest = await qOne(
+    "SELECT version FROM prompts WHERE role = @role AND slug = @slug ORDER BY version DESC LIMIT 1",
+    { role: data.role, slug: data.slug }
+  );
+  const version = data.version || (latest ? latest.version + 1 : 1);
+
+  if (data.id) {
+    const rows = await qRun(
+      `UPDATE prompts SET role = @role, slug = @slug, version = @version,
+       title = @title, body_md = @body_md,
+       parameter_schema = @ps::jsonb, tags = @tags, updated_at = NOW()
+       WHERE id = @id`,
+      { id: data.id, role: data.role, slug: data.slug, version,
+        title: data.title, body_md: data.body_md,
+        ps: JSON.stringify(data.parameter_schema || {}),
+        tags: data.tags || [] }
+    );
+    if (rows > 0) {
+      return { id: data.id, role: data.role, slug: data.slug, version };
+    }
+    // ID not found — fall through to insert
+  }
+
+  const result = await q(
+    `INSERT INTO prompts (role, slug, version, title, body_md, parameter_schema, tags)
+     VALUES (@role, @slug, @version, @title, @body_md, @ps::jsonb, @tags)
+     ON CONFLICT (role, slug, version) DO UPDATE
+     SET title = EXCLUDED.title, body_md = EXCLUDED.body_md,
+         parameter_schema = EXCLUDED.parameter_schema, tags = EXCLUDED.tags,
+         updated_at = NOW()
+     RETURNING id`,
+    { role: data.role, slug: data.slug, version,
+      title: data.title, body_md: data.body_md,
+      ps: JSON.stringify(data.parameter_schema || {}),
+      tags: data.tags || [] }
+  );
+  return { id: result.rows[0].id, role: data.role, slug: data.slug, version };
+}
+
+// ── Tool Access (tackle.role_tool_access) ───────────────────────────
+
+export async function listToolAccess(role?: string): Promise<any[]> {
+  const params: Record<string, any> = {};
+  let where = "";
+  if (role) { params.role = role; where = "WHERE role = @role"; }
+  return qAll(
+    `SELECT id, role, mcp_id, tool_slug, created_at
+     FROM role_tool_access ${where} ORDER BY role, tool_slug`,
+    params
+  );
+}
+
+export async function updateToolAccess(
+  id: string,
+  data: { allowed: boolean }
+): Promise<any | undefined> {
+  if (data.allowed === false) {
+    await qRun("DELETE FROM role_tool_access WHERE id = @id", { id });
+    return { id, deleted: true };
+  }
+  return qOne("SELECT id, role, mcp_id, tool_slug FROM role_tool_access WHERE id = @id", { id });
+}
+
+// ── Tasks (extend) ──────────────────────────────────────────────────
+
+export async function upsertTackleTask(data: {
+  id?: string;
+  role: string;
+  task_slug: string;
+  scope?: string;
+  acceptance_criteria?: string[];
+  prompt_id: string;
+  active?: boolean;
+}): Promise<any> {
+  return qOne(
+    `INSERT INTO tasks (role, task_slug, scope, acceptance_criteria, prompt_id, active)
+     VALUES (@role, @slug, @scope, @ac, @pid, @active)
+     ON CONFLICT (role, task_slug) DO UPDATE
+     SET scope = EXCLUDED.scope, acceptance_criteria = EXCLUDED.acceptance_criteria,
+         prompt_id = EXCLUDED.prompt_id, active = EXCLUDED.active, updated_at = NOW()
+     RETURNING *`,
+    { role: data.role, slug: data.task_slug, scope: data.scope || '',
+      ac: data.acceptance_criteria || [], pid: data.prompt_id,
+      active: data.active !== false }
+  );
+}
+
+/**
+ * Delete a task by (role, task_slug). The tasks table only guarantees
+ * task_slug uniqueness WITHIN a role (UNIQUE(role, task_slug)), so the
+ * delete is scoped by role to avoid collateral damage to a same-slug
+ * task belonging to another role. Because agent_scheduler references
+ * tasks by task_slug (loose link, no FK — migration v12), any scheduler
+ * entries pointing at the task have their task_slug cleared so scheduled
+ * jobs gracefully fall back to the role's default persona only.
+ */
+export async function deleteTackleTask(taskSlug: string, role?: string): Promise<boolean> {
+  if (role) {
+    await qRun(
+      "UPDATE agent_scheduler SET task_slug = NULL WHERE task_slug = @slug AND role = @role",
+      { slug: taskSlug, role }
+    );
+  } else {
+    await qRun(
+      "UPDATE agent_scheduler SET task_slug = NULL WHERE task_slug = @slug",
+      { slug: taskSlug }
+    );
+  }
+  const params: Record<string, any> = { slug: taskSlug };
+  let where = "task_slug = @slug";
+  if (role) {
+    params.role = role;
+    where += " AND role = @role";
+  }
+  const changes = await qRun(`DELETE FROM tasks WHERE ${where}`, params);
+  return changes > 0;
+}
+
+// ── Role Checkpoints ────────────────────────────────────────────────
+
+export async function getRoleCheckpoints(): Promise<Record<string, { role: string; last_active: string }>> {
+  const rows = await qAll(
+    `SELECT role, MAX(as_of_dt) as last_active
+     FROM role_memory GROUP BY role ORDER BY role`
+  );
+  const result: Record<string, any> = {};
+  for (const r of rows) {
+    result[r.role] = { role: r.role, last_active: r.last_active };
+  }
+  return result;
+}
+
 export interface AgentSchedulerRow {
   id: number;
   role: string;
@@ -2458,6 +2935,7 @@ export interface AgentSchedulerRow {
   schedule_type: string;
   schedule_value: number;
   project_dir: string;
+  task_slug: string | null;
   enabled: number;
   last_run_at: string | null;
   last_run_status: string | null;
@@ -2474,15 +2952,50 @@ export async function getSchedulerEntry(id: number): Promise<AgentSchedulerRow |
   return qOne("SELECT * FROM agent_scheduler WHERE id = @id", { id });
 }
 
+// ── Scheduler coercion helpers ─────────────────────────────────────
+// agent_scheduler stores `enabled` and `schedule_value` as INTEGER
+// columns, but tackle-ui sends `enabled: true/false` (boolean) and
+// schedule values as strings. Coerce to the DB types here so live mode
+// matches mock mode instead of failing with integer-cast errors.
+function toEnabledInt(v: unknown, dflt: number): number {
+  if (v === undefined || v === null || v === "") return dflt;
+  if (v === true || v === 1 || v === "1" || v === "true") return 1;
+  if (v === false || v === 0 || v === "0" || v === "false") return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : dflt;
+}
+
+// ── Schedule value coercion ────────────────────────────────────────
+// agent_scheduler.schedule_value is INTEGER seconds. The UI sends
+// durations like "15m", "1h", "90" or cron strings; cron strings cannot
+// be expressed as seconds so they fall back to the default (the runner
+// only re-fires interval entries anyway). Durations ARE parseable, so
+// "15m" stores 900 instead of silently collapsing to 3600.
+function toScheduleSeconds(v: unknown, dflt: number): number {
+  if (v === undefined || v === null || v === "") return dflt;
+  if (typeof v === "number") return Number.isFinite(v) && v >= 1 ? v : dflt;
+  const s = String(v).trim();
+  const m = /^(\d+)(ms|s|m|h|d)?$/.exec(s);
+  if (m) {
+    const n = parseInt(m[1], 10);
+    const mult: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400, ms: 0.001 };
+    const secs = n * (mult[m[2] || "s"]);
+    if (secs >= 1 && Number.isFinite(secs)) return Math.round(secs);
+  }
+  const n2 = Number(v);
+  return Number.isFinite(n2) && n2 >= 1 ? n2 : dflt;
+}
+
 export async function createSchedulerEntry(data: {
   role: string; model_id?: string; harness?: string;
-  agent_config?: string; schedule_type?: string; schedule_value?: number;
-  project_dir?: string; enabled?: number;
+  agent_config?: string; schedule_type?: string; schedule_value?: number | string;
+  project_dir?: string; task_slug?: string | null;
+  enabled?: number | boolean | string;
 }): Promise<AgentSchedulerRow> {
   const now = new Date().toISOString();
   const row = await qOne(`
-    INSERT INTO agent_scheduler (role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, enabled, metadata, created_at, updated_at)
-    VALUES (@role, @model_id, @harness, @agent_config, @schedule_type, @schedule_value, @project_dir, @enabled, '{}', @now, @now)
+    INSERT INTO agent_scheduler (role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, task_slug, enabled, metadata, created_at, updated_at)
+    VALUES (@role, @model_id, @harness, @agent_config, @schedule_type, @schedule_value, @project_dir, @task_slug, @enabled, '{}', @now, @now)
     RETURNING *
   `, {
     role: data.role,
@@ -2490,9 +3003,10 @@ export async function createSchedulerEntry(data: {
     harness: data.harness ?? "opencode",
     agent_config: data.agent_config ?? "{}",
     schedule_type: data.schedule_type ?? "interval",
-    schedule_value: data.schedule_value ?? 3600,
+    schedule_value: toScheduleSeconds(data.schedule_value, 3600),
     project_dir: data.project_dir ?? "/home/codex/dev",
-    enabled: data.enabled ?? 1,
+    task_slug: data.task_slug ?? null,
+    enabled: toEnabledInt(data.enabled, 1),
     now,
   });
   return row;
@@ -2500,19 +3014,23 @@ export async function createSchedulerEntry(data: {
 
 export async function updateSchedulerEntry(id: number, data: Partial<{
   role: string; model_id: string | null; harness: string;
-  agent_config: string; schedule_type: string; schedule_value: number;
-  project_dir: string; enabled: number; last_run_at: string;
+  agent_config: string; schedule_type: string; schedule_value: number | string;
+  project_dir: string; enabled: number | boolean | string; last_run_at: string;
   last_run_status: string; metadata: string;
 }>): Promise<AgentSchedulerRow | undefined> {
   const now = new Date().toISOString();
   const sets: string[] = ["updated_at = @now"];
   const params: Record<string, any> = { id, now };
   const fields = ["role", "model_id", "harness", "agent_config", "schedule_type",
-    "schedule_value", "project_dir", "enabled", "last_run_at", "last_run_status", "metadata"];
+    "schedule_value", "project_dir", "task_slug", "enabled", "last_run_at", "last_run_status", "metadata"];
   for (const f of fields) {
     if ((data as any)[f] !== undefined) {
       sets.push(`${f} = @${f}`);
-      params[f] = (data as any)[f];
+      params[f] = f === "enabled"
+        ? toEnabledInt((data as any)[f], 1)
+        : f === "schedule_value"
+        ? toScheduleSeconds((data as any)[f], 3600)
+        : (data as any)[f];
     }
   }
   return qOne(
@@ -2526,10 +3044,54 @@ export async function deleteSchedulerEntry(id: number): Promise<boolean> {
   return changes > 0;
 }
 
-export async function getDueSchedulerEntries(): Promise<AgentSchedulerRow[]> {
-  return qAll(`
+/**
+ * Due scheduler entry, enriched with the prompt payload an agent needs to
+ * start the run: the role's DEFAULT persona (latest `opencode-persona`)
+ * as base_prompt_body, the attached task's template body as
+ * task_prompt_body, and assembled_prompt = base + appended task prompt.
+ * When no task is attached, assembled_prompt === base_prompt_body.
+ */
+export interface DueSchedulerEntry extends AgentSchedulerRow {
+  base_prompt_body: string | null;
+  task_prompt_body: string | null;
+  assembled_prompt: string | null;
+}
+
+async function resolveSchedulerPrompt(
+  entry: AgentSchedulerRow
+): Promise<Pick<DueSchedulerEntry, "base_prompt_body" | "task_prompt_body" | "assembled_prompt">> {
+  // Default system prompt for the role: latest `opencode-persona` template.
+  const persona = await getPromptByRoleSlug(entry.role, "opencode-persona");
+  const base = persona?.body_md ?? null;
+
+  // Attached task (if any): resolve its bound template (latest version of
+  // that (role, slug)) and append its body to the base persona.
+  let taskBody: string | null = null;
+  if (entry.task_slug) {
+    const task = await getTackleTask(entry.task_slug);
+    if (task?.prompt_role && task?.prompt_slug) {
+      const p = await getPromptByRoleSlug(task.prompt_role, task.prompt_slug);
+      taskBody = p?.body_md ?? null;
+    }
+  }
+
+  let assembled: string | null = base;
+  if (taskBody) {
+    // Exact contract: base persona + separator + appended task prompt.
+    // No trim() — the seeded persona bodies carry meaningful leading
+    // whitespace/control chars that must survive verbatim.
+    assembled = base
+      ? `${base}\n\n---\n\n## Attached Task: ${entry.task_slug}\n\n${taskBody}`
+      : `## Attached Task: ${entry.task_slug}\n\n${taskBody}`;
+  }
+  return { base_prompt_body: base, task_prompt_body: taskBody, assembled_prompt: assembled };
+}
+
+export async function getDueSchedulerEntries(): Promise<DueSchedulerEntry[]> {
+  const rows = await qAll(`
     SELECT * FROM agent_scheduler
     WHERE enabled = 1
+      AND schedule_type <> 'manual'
       AND (
         last_run_at IS NULL
         OR (
@@ -2539,6 +3101,10 @@ export async function getDueSchedulerEntries(): Promise<AgentSchedulerRow[]> {
       )
     ORDER BY last_run_at ASC NULLS FIRST
   `);
+  const enriched = await Promise.all(
+    rows.map(async (row) => ({ ...row, ...(await resolveSchedulerPrompt(row)) }))
+  );
+  return enriched;
 }
 
 // ── Snapshot / Import / Export / Validate ─────────────────────────
@@ -2768,6 +3334,7 @@ export interface ResolvedFallbackModel {
   priority: number;
   model_identifier: string;
   provider_type: string;
+  provider_name: string;
   provider_id: string;
   api_key: string | null;
   endpoint_url: string | null;
@@ -2821,6 +3388,7 @@ export async function getResolvedFallbackModels(role: string): Promise<ResolvedF
     `SELECT cb.priority,
             m.model_identifier,
             p.type          AS provider_type,
+            p.name          AS provider_name,
             p.api_key,
             cb.endpoint_url,  -- bundle-level override
             p.id            AS provider_id,
@@ -2843,6 +3411,7 @@ export async function getResolvedFallbackModels(role: string): Promise<ResolvedF
     priority: row.priority,
     model_identifier: row.model_identifier,
     provider_type: row.provider_type ?? "",
+    provider_name: row.provider_name ?? "",
     provider_id: row.provider_id ?? "",
     api_key: row.api_key ?? null,
     endpoint_url: row.endpoint_url ?? null,
@@ -2982,4 +3551,168 @@ export async function seedDefaultAIConfig(force?: boolean): Promise<{
   };
 }
 
+// ── System Logs ──────────────────────────────────────────────────
 
+export interface SystemLogRow {
+  id: string;
+  timestamp: string;
+  level: string;
+  category: string;
+  message: string;
+  source?: string;
+  details?: any;
+}
+
+export async function insertLog(params: {
+  level: string;
+  category: string;
+  message: string;
+  source?: string;
+  details?: any;
+}): Promise<void> {
+  await qRun(
+    `INSERT INTO system_logs (level, category, message, source, details)
+     VALUES (@level, @category, @message, @source, @details)`,
+    params
+  );
+}
+
+export async function queryLogs(params: {
+  level?: string;
+  category?: string;
+  search?: string;
+  since?: string;
+  limit?: number;
+}): Promise<{ total: number; filtered_count: number; logs: SystemLogRow[] }> {
+  const conditions: string[] = [];
+  const vals: Record<string, any> = {};
+
+  if (params.level && params.level !== 'ALL') {
+    const levels = params.level.toUpperCase().split(',');
+    conditions.push(`level = ANY(ARRAY[${levels.map((_, i) => `@level${i}`).join(', ')}])`);
+    levels.forEach((l, i) => { vals[`level${i}`] = l; });
+  }
+  if (params.category && params.category !== 'ALL') {
+    const cats = params.category.toUpperCase().split(',');
+    conditions.push(`category = ANY(ARRAY[${cats.map((_, i) => `@cat${i}`).join(', ')}])`);
+    cats.forEach((c, i) => { vals[`cat${i}`] = c; });
+  }
+  if (params.search) {
+    vals.search = `%${params.search.toLowerCase()}%`;
+    conditions.push(`(LOWER(message) LIKE @search OR LOWER(category) LIKE @search OR LOWER(COALESCE(source,'')) LIKE @search)`);
+  }
+  if (params.since) {
+    vals.since = params.since;
+    conditions.push(`timestamp > @since`);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const limitNum = Math.min(Math.max(1, params.limit || 100), 500);
+
+  const total = await qOne(`SELECT COUNT(*)::int AS count FROM system_logs`);
+  const filtered = await qOne(
+    `SELECT COUNT(*)::int AS count FROM system_logs ${where}`,
+    vals
+  );
+  const logs = await qAll(
+    `SELECT * FROM system_logs ${where} ORDER BY timestamp DESC LIMIT @limit`,
+    { ...vals, limit: limitNum }
+  );
+
+  return {
+    total: total?.count || 0,
+    filtered_count: filtered?.count || 0,
+    logs,
+  };
+}
+
+export async function clearLogs(): Promise<void> {
+  await qRun(`DELETE FROM system_logs`);
+}
+
+// ── Projection Configs (ACP v1, plan 1280) ────────────────────────
+
+export interface ProjectionConfig {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  source_query: string;
+  template: string;
+  parameter_schema: any;
+  target_path: string;
+  schedule: string;
+  enabled: number;
+  last_rendered_at: string | null;
+  last_sha256: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function listProjections(): Promise<ProjectionConfig[]> {
+  return qAll(`SELECT * FROM tackle.projection_configs ORDER BY name`);
+}
+
+export async function getProjection(id: string): Promise<ProjectionConfig | undefined> {
+  return qOne(`SELECT * FROM tackle.projection_configs WHERE id = @id`, { id });
+}
+
+export async function createProjection(params: {
+  name: string;
+  description: string;
+  type: string;
+  source_query: string;
+  template: string;
+  parameter_schema: any;
+  target_path: string;
+  schedule: string;
+  enabled: number;
+}): Promise<ProjectionConfig> {
+  const row = await qOne(
+    `INSERT INTO tackle.projection_configs (name, description, type, source_query, template, parameter_schema, target_path, schedule, enabled)
+     VALUES (@name, @description, @type, @source_query, @template, @parameter_schema, @target_path, @schedule, @enabled)
+     RETURNING *`,
+    params
+  );
+  return row;
+}
+
+export async function updateProjection(id: string, updates: Record<string, any>): Promise<ProjectionConfig | undefined> {
+  const setters: string[] = [];
+  const vals: Record<string, any> = { id };
+  for (const [k, v] of Object.entries(updates)) {
+    setters.push(`${k} = @${k}`);
+    vals[k] = v;
+  }
+  setters.push("updated_at = NOW()");
+  return qOne(
+    `UPDATE tackle.projection_configs SET ${setters.join(", ")} WHERE id = @id RETURNING *`,
+    vals
+  );
+}
+
+/** Get the latest opencode-persona body for a role from tackle.prompts. */
+export async function getPersonaForRole(role: string): Promise<string | null> {
+  const row = await qOne(
+    `SELECT body_md FROM tackle.prompts
+     WHERE role = @role AND slug = 'opencode-persona'
+     ORDER BY version DESC LIMIT 1`,
+    { role }
+  );
+  return row?.body_md || null;
+}
+
+/** Get procedure card summaries for a role from tackle.role_memory → tackle.memory. */
+export async function getProceduresForRole(role: string): Promise<string | null> {
+  const rows = await qAll(
+    `SELECT m.title, m.summary, m.slug
+     FROM tackle.role_memory rm
+     JOIN tackle.memory m ON m.id = rm.memory_id
+     WHERE rm.role = @role
+       AND (rm.expiration_dt IS NULL OR rm.expiration_dt > NOW())
+     ORDER BY m.slug`,
+    { role }
+  );
+  if (!rows.length) return null;
+  return rows.map((r: any) => `- **${r.title}** (\`${r.slug}\`): ${r.summary}`).join("\n");
+}

@@ -163,3 +163,19 @@ the unit during a Redis maintenance window.
 | `src/db.ts` | PostgreSQL connection + `fetchLatestPrompts()` + `fetchActiveTasks()` |
 | `src/redis.ts` | Redis connection + key helpers (`prompt:proc:`, `prompt:idx:`, `task:idx:`) |
 | `src/sync.ts` | `syncAll()` — reads PG, writes all keys in one Redis pipeline |
+
+
+---
+
+## REST API & OpenAPI
+
+- Endpoint inventory: [`API.md`](./API.md) (generated from source route registrations)
+- OpenAPI 3.0 spec: [`openapi.yaml`](./openapi.yaml) (generated from source route registrations)
+
+Regenerate after route changes:
+
+```bash
+cd nexus
+python3 tools/api-docs/extract_routes.py --out /tmp/api_inventory.json
+python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json
+```

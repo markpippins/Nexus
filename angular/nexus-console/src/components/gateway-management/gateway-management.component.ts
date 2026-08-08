@@ -27,7 +27,7 @@ import { BrokerProfile } from '../../models/broker-profile.model.js';
                       <h3 class="font-bold text-[rgb(var(--color-text-prominent))] group-hover:text-[rgb(var(--color-accent-solid-bg))] transition-colors">
                         {{ profile.name }}
                       </h3>
-                      <p class="text-xs text-[rgb(var(--color-text-muted))] truncate max-w-[200px]" [title]="profile.brokerUrl">
+                      <p class="text-sm text-[rgb(var(--color-text-muted))] truncate max-w-[200px]" [title]="profile.brokerUrl">
                         {{ profile.brokerUrl || 'No Gateway URL' }}
                       </p>
                     </div>
@@ -67,13 +67,13 @@ import { BrokerProfile } from '../../models/broker-profile.model.js';
                 <div class="grid grid-cols-2 gap-4 mt-4">
                   <div class="flex flex-col">
                     <span class="text-[10px] uppercase tracking-wider text-[rgb(var(--color-text-subtle))]">Status</span>
-                    <span class="text-xs font-medium" [class.text-[rgb(var(--color-success-text))]]="isMounted(profile.id)" [class.text-[rgb(var(--color-text-muted))]]="!isMounted(profile.id)">
+                    <span class="text-sm font-medium" [class.text-[rgb(var(--color-success-text))]]="isMounted(profile.id)" [class.text-[rgb(var(--color-text-muted))]]="!isMounted(profile.id)">
                       {{ isMounted(profile.id) ? 'Mounted' : 'Disconnected' }}
                     </span>
                   </div>
                    <div class="flex flex-col">
                     <span class="text-[10px] uppercase tracking-wider text-[rgb(var(--color-text-subtle))]">Auto-Connect</span>
-                    <span class="text-xs font-medium text-[rgb(var(--color-text-base))]">
+                    <span class="text-sm font-medium text-[rgb(var(--color-text-base))]">
                       {{ profile.autoConnect ? 'Enabled' : 'Disabled' }}
                     </span>
                   </div>
@@ -82,7 +82,7 @@ import { BrokerProfile } from '../../models/broker-profile.model.js';
               <div class="px-5 py-3 bg-[rgb(var(--color-surface-hover-subtle))] border-t border-[rgb(var(--color-border-muted))] rounded-b-xl flex justify-end">
                 <button
                   (click)="editGateway.emit(profile.name)"
-                  class="text-xs font-bold text-[rgb(var(--color-accent-solid-bg))] hover:underline uppercase tracking-wide"
+                  class="text-sm font-bold text-[rgb(var(--color-accent-solid-bg))] hover:underline uppercase tracking-wide"
                 >
                   Configure Gateway
                 </button>

@@ -43,18 +43,28 @@ export async function runMigration() {
       const statements = sql
         .split(';')
         .map(s => s.trim())
-        .filter(s => s.length > 0 && !s.startsWith('--'));
+        .filter(s => s.length > 0);
+      let applied = 0, skipped = 0, failed = 0;
       for (const stmt of statements) {
-        await client.query(stmt);
+        try {
+          await client.query(stmt);
+          applied++;
+        } catch (err) {
+          const msg = err.message || '';
+          if (msg.includes('already exists')) {
+            skipped++; // idempotent — expected on re-runs
+          } else {
+            failed++;
+            console.error('[assembly-srv] Migration statement failed:', msg);
+          }
+        }
       }
-      console.log(`[assembly-srv] Migration applied from ${migrationPath}`);
+      console.log(`[assembly-srv] Migration applied from ${migrationPath} (applied=${applied}, skipped=${skipped}, failed=${failed})`);
     } else {
       console.warn(`[assembly-srv] Migration file not found: ${migrationPath}`);
     }
   } catch (err) {
-    if (!err.message?.includes('already exists')) {
-      console.error('[assembly-srv] Migration error:', err.message);
-    }
+    console.error('[assembly-srv] Migration runner error:', err.message);
   } finally {
     client.release();
   }

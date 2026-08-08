@@ -19,7 +19,7 @@ import { ComponentConfig } from '../../models/component-config.js';
               {{ state.isEditingExisting() ? 'Edit Component' : 'New Component' }}
             </h2>
             @if (form.parentId) {
-              <p class="text-xs text-[rgb(var(--color-text-muted))]">Extends: {{ state.getParentName(form.parentId) }}</p>
+              <p class="text-sm text-[rgb(var(--color-text-muted))]">Extends: {{ state.getParentName(form.parentId) }}</p>
             }
           </div>
           
@@ -27,20 +27,20 @@ import { ComponentConfig } from '../../models/component-config.js';
             @if (state.isEditingExisting() && !form.isSystem) {
               <button 
                 (click)="state.deleteCurrent()" 
-                class="text-[rgb(var(--color-danger-text))] text-xs px-3 hover:underline"
+                class="text-[rgb(var(--color-danger-text))] text-sm px-3 hover:underline"
               >
                 Delete
               </button>
             }
             <button 
               (click)="state.cancel()" 
-              class="text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))] text-xs px-3 hover:underline"
+              class="text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))] text-sm px-3 hover:underline"
             >
               Cancel
             </button>
             <button 
               (click)="onSave()" 
-              class="bg-[rgb(var(--color-success-solid-bg))] hover:bg-[rgb(var(--color-success-solid-bg-hover))] text-white px-4 py-1 rounded text-xs font-bold"
+              class="bg-[rgb(var(--color-success-solid-bg))] hover:bg-[rgb(var(--color-success-solid-bg-hover))] text-white px-4 py-1 rounded text-sm font-bold"
             >
               Save
             </button>
@@ -52,10 +52,10 @@ import { ComponentConfig } from '../../models/component-config.js';
           
           <!-- Identity Section -->
           <section class="space-y-3">
-            <h3 class="text-xs font-bold text-[rgb(var(--color-accent-text))] uppercase tracking-wider border-b border-[rgb(var(--color-border-muted))] pb-1">Identity</h3>
+            <h3 class="text-sm font-bold text-[rgb(var(--color-accent-text))] uppercase tracking-wider border-b border-[rgb(var(--color-border-muted))] pb-1">Identity</h3>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs text-[rgb(var(--color-text-muted))] mb-1">Label Name</label>
+                <label class="block text-sm text-[rgb(var(--color-text-muted))] mb-1">Label Name</label>
                 <input 
                   [ngModel]="form.name" 
                   (ngModelChange)="state.updateField('name', $event)" 
@@ -63,7 +63,7 @@ import { ComponentConfig } from '../../models/component-config.js';
                 >
               </div>
               <div>
-                <label class="block text-xs text-[rgb(var(--color-text-muted))] mb-1">Category</label>
+                <label class="block text-sm text-[rgb(var(--color-text-muted))] mb-1">Category</label>
                 <input 
                   [ngModel]="form.category" 
                   (ngModelChange)="state.updateField('category', $event)"
@@ -72,7 +72,7 @@ import { ComponentConfig } from '../../models/component-config.js';
               </div>
             </div>
             <div>
-              <label class="block text-xs text-[rgb(var(--color-text-muted))] mb-1">Description</label>
+              <label class="block text-sm text-[rgb(var(--color-text-muted))] mb-1">Description</label>
               <textarea 
                 [ngModel]="form.description" 
                 (ngModelChange)="state.updateField('description', $event)"
@@ -84,10 +84,10 @@ import { ComponentConfig } from '../../models/component-config.js';
 
           <!-- Visuals Section -->
           <section class="space-y-3">
-            <h3 class="text-xs font-bold text-[rgb(var(--color-accent-text))] uppercase tracking-wider border-b border-[rgb(var(--color-border-muted))] pb-1">Visuals</h3>
+            <h3 class="text-sm font-bold text-[rgb(var(--color-accent-text))] uppercase tracking-wider border-b border-[rgb(var(--color-border-muted))] pb-1">Visuals</h3>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs text-[rgb(var(--color-text-muted))] mb-1">Geometry / Shape</label>
+                <label class="block text-sm text-[rgb(var(--color-text-muted))] mb-1">Geometry / Shape</label>
                 <select 
                   [ngModel]="form.geometry" 
                   (ngModelChange)="state.updateField('geometry', $event)"
@@ -103,7 +103,7 @@ import { ComponentConfig } from '../../models/component-config.js';
                 </select>
               </div>
               <div>
-                <label class="block text-xs text-[rgb(var(--color-text-muted))] mb-1">Color</label>
+                <label class="block text-sm text-[rgb(var(--color-text-muted))] mb-1">Color</label>
                 <div class="flex gap-2">
                   <input 
                     type="color" 
@@ -111,11 +111,11 @@ import { ComponentConfig } from '../../models/component-config.js';
                     (input)="onColorChange($event)" 
                     class="h-8 w-12 bg-transparent cursor-pointer rounded border border-[rgb(var(--color-border-muted))]"
                   >
-                  <span class="text-xs font-mono self-center text-[rgb(var(--color-text-muted))]">{{ colorHexStr() }}</span>
+                  <span class="text-sm font-mono self-center text-[rgb(var(--color-text-muted))]">{{ colorHexStr() }}</span>
                 </div>
               </div>
               <div class="col-span-2">
-                <label class="block text-xs text-[rgb(var(--color-text-muted))] mb-1">Scale ({{ form.scale }}x)</label>
+                <label class="block text-sm text-[rgb(var(--color-text-muted))] mb-1">Scale ({{ form.scale }}x)</label>
                 <input 
                   type="range" 
                   min="0.5" 
@@ -131,10 +131,10 @@ import { ComponentConfig } from '../../models/component-config.js';
 
           <!-- Rules Section -->
           <section class="space-y-3">
-            <h3 class="text-xs font-bold text-[rgb(var(--color-accent-text))] uppercase tracking-wider border-b border-[rgb(var(--color-border-muted))] pb-1">Behavior & Rules</h3>
+            <h3 class="text-sm font-bold text-[rgb(var(--color-accent-text))] uppercase tracking-wider border-b border-[rgb(var(--color-border-muted))] pb-1">Behavior & Rules</h3>
             
             <div>
-              <label class="block text-xs text-[rgb(var(--color-text-muted))] mb-2">Allowed Outbound Connections</label>
+              <label class="block text-sm text-[rgb(var(--color-text-muted))] mb-2">Allowed Outbound Connections</label>
               <div class="bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-muted))] rounded p-2 max-h-40 overflow-y-auto grid grid-cols-1 gap-1">
                 <label class="flex items-center gap-2 text-sm hover:bg-[rgb(var(--color-surface-hover))] p-1 rounded cursor-pointer">
                   <input type="checkbox" [checked]="isAllowedAll()" (change)="toggleAllowed('all')">

@@ -4,6 +4,7 @@
         cir-arl cir-verify install-hooks \
         test-db-setup test-db-reset test \
         mesh-test \
+        apidocs-extract apidocs-gen apidocs-validate apidocs-regen \
         mcp-start mcp-stop mcp-restart mcp-status mcp-watch
 
 # ─── CIR-1: Full pipeline (read-only) ─────────────────────────────────────────
@@ -165,6 +166,35 @@ mcp-watch:
 mesh-test:
 	@echo "[mesh-test] running mesh-register probe tests..."
 	@python3 -m pytest bin/tests/test_mesh_register_probe.py -v
+
+# ─── API docs (tools/api-docs) ───────────────────────────────────────────────
+# Backed by nexus/.github/workflows/apidocs.yml — same commands locally and
+# in CI. Extracts the live route inventory from source and verifies every
+# committed *-srv openapi.yaml still matches it.
+#
+#   make apidocs-validate   # CI gate: exit 1 on drift
+#   make apidocs-regen      # refresh openapi.yaml + API.md after route changes
+#   make apidocs-gen        # generate only (SKIP_FASTAPI=1 avoids the live
+#                           #   vision-srv /openapi.json fetch, for CI)
+
+APIDOCS_INV := /tmp/api_inventory.json
+
+apidocs-extract:
+	@echo "[apidocs] extracting route inventory..."
+	@python3 tools/api-docs/extract_routes.py --out $(APIDOCS_INV)
+
+apidocs-gen:
+	@echo "[apidocs] generating openapi.yaml + API.md..."
+	@python3 tools/api-docs/gen_openapi.py --inventory $(APIDOCS_INV) $(if $(SKIP_FASTAPI),--skip-fastapi,)
+
+apidocs-validate:
+	@$(MAKE) apidocs-extract
+	@echo "[apidocs] drift check..."
+	@python3 tools/api-docs/check_drift.py
+
+apidocs-regen:
+	@$(MAKE) apidocs-extract
+	@$(MAKE) apidocs-gen
 
 # ─── Git hooks ────────────────────────────────────────────────────────────────
 

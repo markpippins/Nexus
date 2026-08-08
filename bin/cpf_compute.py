@@ -28,6 +28,10 @@ import logging
 import subprocess
 import sys
 from datetime import datetime
+from pathlib import Path
+
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 log = logging.getLogger("cpf_compute")
 
@@ -36,7 +40,10 @@ DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "cpf_compute.log"),
+    ],
 )
 
 
@@ -98,7 +105,7 @@ def fetch_candidates(candidate_id: str | None = None) -> list[dict]:
 
 def fetch_all_deps() -> dict[str, list[str]]:
     """Load all dependency edges in one query. Returns {candidate_id: [dep_id, ...]}."""
-    sql = "SELECT row_to_json(r)::text FROM (SELECT candidate_id, depends_on_id FROM nebula.candidate_dependencies) r;"
+    sql = "SELECT row_to_json(r)::text FROM (SELECT candidate_id, depends_on_id FROM nebula.candidate_dependencies WHERE valid_until > now()) r;"
     rc, out = psql(sql)
     if rc != 0 or not out:
         return {}

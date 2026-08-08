@@ -291,6 +291,15 @@ async function serveTarget(target: BridgeTarget): Promise<void> {
     console.error(`  Health:        http://127.0.0.1:${target.port}/health`);
   });
 
+  httpServer.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`mcp-bridge:${target.name}: port ${target.port} already in use, exiting (code EADDRINUSE)`);
+    } else {
+      console.error(`mcp-bridge:${target.name}: listen error:`, err.message);
+    }
+    process.exit(1);
+  });
+
   // Best-effort session tracking for clean teardown. We don't keep a
   // registry of child transports because each served target owns exactly
   // one child over the lifetime of the bridge process; if the child

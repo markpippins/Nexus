@@ -104,7 +104,7 @@
 
 - **`nexus/bin/redis-health-monitor.sh`** — Redis-specific health watcher (predates unified monitor, may be legacy)
 - **`nexus/bin/mongodb-health-monitor.sh`** — MongoDB-specific health watcher (predates unified monitor, may be legacy)
-- **`nexus/typescript/utils/circuit-breaker.ts`** — TypeScript `HealthMonitor` class with circuit-breaker pattern for image-server (8081), file-system-server (4040), broker-gateway (8081). 3-failure threshold, 30s reset, 10s monitoring interval. **Not deployed as a standalone service** — imported as a utility by other services.
+- **`nexus/typescript/utils/circuit-breaker.ts`** — TypeScript `HealthMonitor` class with circuit-breaker pattern for image-server (8081), secure-file-system-server (4040), broker-gateway (8081). 3-failure threshold, 30s reset, 10s monitoring interval. **Not deployed as a standalone service** — imported as a utility by other services.
 
 ### Health monitor boundary rules
 

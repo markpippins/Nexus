@@ -50,19 +50,19 @@ NODE_ENV=production`;
           </button>
         </div>
 
-        <p className="text-xs text-zinc-300 font-sans">
+        <p className="text-sm text-zinc-300 font-sans">
           This Conduit UI frontend connects seamlessly to your live PostgreSQL <code className="text-cyan-300 font-mono">nexus</code> database, WRP Kernel API server, and MCP agent cluster.
         </p>
 
         {/* Environment Configuration Box */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-bold text-zinc-400 uppercase">
+            <span className="text-sm font-mono font-bold text-zinc-400 uppercase">
               1. Environment Variables (.env)
             </span>
             <button
               onClick={handleCopy}
-              className="text-xs font-mono text-emerald-400 hover:underline flex items-center gap-1"
+              className="text-sm font-mono text-emerald-400 hover:underline flex items-center gap-1"
             >
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copied ? 'Copied!' : 'Copy Config'}</span>
@@ -75,7 +75,7 @@ NODE_ENV=production`;
         </div>
 
         {/* Backend Execution Commands */}
-        <div className="space-y-2 font-mono text-xs">
+        <div className="space-y-2 font-mono text-sm">
           <span className="font-bold text-zinc-400 uppercase">2. Conduit Orchestrator Commands</span>
           <div className="bg-zinc-950 p-3 rounded border border-zinc-800 space-y-1.5 text-zinc-300 text-[11px]">
             <div><span className="text-zinc-500"># Run full orchestrator loop:</span> python3 main.py --all</div>
@@ -87,7 +87,7 @@ NODE_ENV=production`;
         <div className="pt-2 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold rounded"
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-sm font-bold rounded"
           >
             Got it, return to Control Plane
           </button>

@@ -54,17 +54,16 @@ export const NAV_ITEMS: NavItemOrSeparator[] = [
     title: 'Cascade Event Monitor',
     iconPath: 'M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605',
   },
-  {
-    type: 'item', key: 'tackle-ui',
-    label: 'Tackle',
-    title: 'Tackle',
-    iconPath: 'M8 10h.01M16 10h.01M9 20h6M12 16v4M8 6h8a2 2 0 012 2v8a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2Z',
-  },
-
   // ── Separator ─────────────────────────────────────────────────
   { type: 'separator' },
 
   // ── Control planes & dashboards ───────────────────────────────
+  {
+    type: 'item', key: 'throttler-ui',
+    label: 'Throttler',
+    title: 'Throttler File Manager',
+    iconPath: 'M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z',
+  },
   {
     type: 'item', key: 'nebula-cp',
     label: 'Nebula Control Plane',
@@ -72,10 +71,29 @@ export const NAV_ITEMS: NavItemOrSeparator[] = [
     iconPath: 'M9.75 17.25v-.75a2.25 2.25 0 012.25-2.25h.75a2.25 2.25 0 012.25 2.25v.75M12 12a3 3 0 100-6 3 3 0 000 6zM3 5.25a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 5.25v9a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 14.25v-9z',
   },
   {
+    type: 'item', key: 'semantics-ui',
+    label: 'Semantics UI',
+    title: 'Semantics Database Explorer',
+    // Heroicons v2 'book-open' icon — a stylised open book.
+    iconPath: 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25',
+  },
+  {
+    type: 'item', key: 'barbie',
+    label: 'Barbie',
+    title: 'Platform Operations Dashboard',
+    iconPath: 'M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z',
+  },
+  {
     type: 'item', key: 'wind-ui',
     label: 'Wind Dashboard',
     title: 'Wind Dashboard',
     iconPath: 'M9.59 4.59A2 2 0 1111 8H2m10.59 11.41A2 2 0 1014 16H2m15.73-8.27A2.5 2.5 0 1119.5 12H2',
+  },
+  {
+    type: 'item', key: 'conduit-ui',
+    label: 'Conduit',
+    title: 'Conduit Control Plane',
+    iconPath: 'M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182',
   },
   {
     type: 'item', key: 'execution-ui',
@@ -105,7 +123,24 @@ export const NAV_ITEMS: NavItemOrSeparator[] = [
   // ── Separator ─────────────────────────────────────────────────
   { type: 'separator' },
 
-  // ── Cognitive tools ───────────────────────────────────────────
+  // ── Database tools ────────────────────────────────────────────
+  {
+    type: 'item', key: 'data-explorer',
+    label: 'Data Explorer',
+    title: 'Data Explorer - SQL database tool',
+    iconPath: 'M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125v-3.75',
+  },
+
+  // ── Separator ─────────────────────────────────────────────────
+  { type: 'separator' },
+
+  // ── Cognitive & AI tools ──────────────────────────────────────
+  {
+    type: 'item', key: 'tackle-ui',
+    label: 'Tackle',
+    title: 'Tackle',
+    iconPath: 'M8 10h.01M16 10h.01M9 20h6M12 16v4M8 6h8a2 2 0 012 2v8a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2Z',
+  },
   {
     type: 'item', key: 'duality',
     label: 'Duality',

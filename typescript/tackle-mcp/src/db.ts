@@ -240,7 +240,7 @@ async function createSchema(
                         CHECK(harness IN ('opencode', 'conduit')),
       agent_config     TEXT NOT NULL DEFAULT '{}',
       schedule_type    TEXT NOT NULL DEFAULT 'interval'
-                        CHECK(schedule_type IN ('interval', 'cron')),
+                        CHECK(schedule_type IN ('interval', 'cron', 'manual')),
       schedule_value   INTEGER NOT NULL DEFAULT 3600,
       project_dir      TEXT NOT NULL DEFAULT '/home/codex/dev',
       enabled          INTEGER NOT NULL DEFAULT 1,
@@ -2264,6 +2264,7 @@ export interface AgentSchedulerRow {
   schedule_type: string;
   schedule_value: number;
   project_dir: string;
+  task_slug: string | null;
   enabled: number;
   last_run_at: string | null;
   last_run_status: string | null;
@@ -2280,15 +2281,34 @@ export async function getSchedulerEntry(id: number): Promise<AgentSchedulerRow |
   return qOne("SELECT * FROM agent_scheduler WHERE id = @id", { id });
 }
 
+// schedule_value is INTEGER seconds; the UI/agents may send durations like
+// "15m" or "1h" — parse them so they store the intended seconds instead of
+// silently falling back to the default (cron strings are unparseable as
+// seconds and keep the default; the runner only re-fires interval entries).
+function toScheduleSeconds(v: unknown, dflt: number): number {
+  if (v === undefined || v === null || v === "") return dflt;
+  if (typeof v === "number") return Number.isFinite(v) && v >= 1 ? v : dflt;
+  const s = String(v).trim();
+  const m = /^(\d+)(ms|s|m|h|d)?$/.exec(s);
+  if (m) {
+    const n = parseInt(m[1], 10);
+    const mult: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400, ms: 0.001 };
+    const secs = n * (mult[m[2] || "s"]);
+    if (secs >= 1 && Number.isFinite(secs)) return Math.round(secs);
+  }
+  const n2 = Number(v);
+  return Number.isFinite(n2) && n2 >= 1 ? n2 : dflt;
+}
+
 export async function createSchedulerEntry(data: {
   role: string; model_id?: string; harness?: string;
-  agent_config?: string; schedule_type?: string; schedule_value?: number;
-  project_dir?: string; enabled?: number;
+  agent_config?: string; schedule_type?: string; schedule_value?: number | string;
+  project_dir?: string; task_slug?: string | null; enabled?: number;
 }): Promise<AgentSchedulerRow> {
   const now = new Date().toISOString();
   const row = await qOne(`
-    INSERT INTO agent_scheduler (role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, enabled, metadata, created_at, updated_at)
-    VALUES (@role, @model_id, @harness, @agent_config, @schedule_type, @schedule_value, @project_dir, @enabled, '{}', @now, @now)
+    INSERT INTO agent_scheduler (role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, task_slug, enabled, metadata, created_at, updated_at)
+    VALUES (@role, @model_id, @harness, @agent_config, @schedule_type, @schedule_value, @project_dir, @task_slug, @enabled, '{}', @now, @now)
     RETURNING *
   `, {
     role: data.role,
@@ -2296,8 +2316,9 @@ export async function createSchedulerEntry(data: {
     harness: data.harness ?? "opencode",
     agent_config: data.agent_config ?? "{}",
     schedule_type: data.schedule_type ?? "interval",
-    schedule_value: data.schedule_value ?? 3600,
+    schedule_value: toScheduleSeconds(data.schedule_value, 3600),
     project_dir: data.project_dir ?? "/home/codex/dev",
+    task_slug: data.task_slug ?? null,
     enabled: data.enabled ?? 1,
     now,
   });
@@ -2306,19 +2327,21 @@ export async function createSchedulerEntry(data: {
 
 export async function updateSchedulerEntry(id: number, data: Partial<{
   role: string; model_id: string | null; harness: string;
-  agent_config: string; schedule_type: string; schedule_value: number;
-  project_dir: string; enabled: number; last_run_at: string;
+  agent_config: string; schedule_type: string; schedule_value: number | string;
+  project_dir: string; task_slug: string | null; enabled: number; last_run_at: string;
   last_run_status: string; metadata: string;
 }>): Promise<AgentSchedulerRow | undefined> {
   const now = new Date().toISOString();
   const sets: string[] = ["updated_at = @now"];
   const params: Record<string, any> = { id, now };
   const fields = ["role", "model_id", "harness", "agent_config", "schedule_type",
-    "schedule_value", "project_dir", "enabled", "last_run_at", "last_run_status", "metadata"];
+    "schedule_value", "project_dir", "task_slug", "enabled", "last_run_at", "last_run_status", "metadata"];
   for (const f of fields) {
     if ((data as any)[f] !== undefined) {
       sets.push(`${f} = @${f}`);
-      params[f] = (data as any)[f];
+      params[f] = f === "schedule_value"
+        ? toScheduleSeconds((data as any)[f], 3600)
+        : (data as any)[f];
     }
   }
   return qOne(
@@ -2332,13 +2355,74 @@ export async function deleteSchedulerEntry(id: number): Promise<boolean> {
   return changes > 0;
 }
 
-export async function getDueSchedulerEntries(): Promise<AgentSchedulerRow[]> {
-  return qAll(`
+/**
+ * Due scheduler entry, enriched with the prompt payload an agent needs to
+ * start the run: the role's DEFAULT persona (latest `opencode-persona`)
+ * as base_prompt_body, the attached task's template body as
+ * task_prompt_body, and assembled_prompt = base + appended task prompt.
+ * When no task is attached, assembled_prompt === base_prompt_body.
+ */
+export interface DueSchedulerEntry extends AgentSchedulerRow {
+  base_prompt_body: string | null;
+  task_prompt_body: string | null;
+  assembled_prompt: string | null;
+}
+
+// Latest version of a (role, slug) prompt template body.
+async function resolvePromptBody(role: string, slug: string): Promise<string | null> {
+  const row = await qOne(
+    `SELECT DISTINCT ON (role, slug) body_md
+     FROM prompts
+     WHERE role = @role AND slug = @slug
+     ORDER BY role, slug, version DESC
+     LIMIT 1`,
+    { role, slug }
+  );
+  return row?.body_md ?? null;
+}
+
+async function resolveSchedulerPrompt(
+  entry: AgentSchedulerRow
+): Promise<Pick<DueSchedulerEntry, "base_prompt_body" | "task_prompt_body" | "assembled_prompt">> {
+  // Default system prompt for the role: latest `opencode-persona` template.
+  const base = await resolvePromptBody(entry.role, "opencode-persona");
+
+  // Attached task (if any): resolve its bound template and append its body.
+  let taskBody: string | null = null;
+  if (entry.task_slug) {
+    const task = await qOne(
+      `SELECT p.role AS prompt_role, p.slug AS prompt_slug
+       FROM tasks t
+       LEFT JOIN prompts p ON p.id = t.prompt_id
+       WHERE t.task_slug = @slug
+       ORDER BY t.active DESC, t.updated_at DESC
+       LIMIT 1`,
+      { slug: entry.task_slug }
+    );
+    if (task?.prompt_role && task?.prompt_slug) {
+      taskBody = await resolvePromptBody(task.prompt_role, task.prompt_slug);
+    }
+  }
+
+  let assembled: string | null = base;
+  if (taskBody) {
+    // Exact contract: base persona + separator + appended task prompt.
+    // No trim() — the seeded persona bodies carry meaningful leading
+    // whitespace/control chars that must survive verbatim.
+    assembled = base
+      ? `${base}\n\n---\n\n## Attached Task: ${entry.task_slug}\n\n${taskBody}`
+      : `## Attached Task: ${entry.task_slug}\n\n${taskBody}`;
+  }
+  return { base_prompt_body: base, task_prompt_body: taskBody, assembled_prompt: assembled };
+}
+
+export async function getDueSchedulerEntries(): Promise<DueSchedulerEntry[]> {
+  const rows = await qAll(`
     SELECT * FROM agent_scheduler
     WHERE enabled = 1
+      AND schedule_type <> 'manual'
       AND (
         last_run_at IS NULL
-        OR last_run_at = ''
         OR (
           schedule_type = 'interval'
           AND EXTRACT(EPOCH FROM NOW() - last_run_at::timestamp) >= schedule_value
@@ -2346,6 +2430,10 @@ export async function getDueSchedulerEntries(): Promise<AgentSchedulerRow[]> {
       )
     ORDER BY last_run_at ASC NULLS FIRST
   `);
+  const enriched = await Promise.all(
+    rows.map(async (row) => ({ ...row, ...(await resolveSchedulerPrompt(row)) }))
+  );
+  return enriched;
 }
 
 // ── Snapshot / Import / Export / Validate ─────────────────────────
@@ -2575,6 +2663,7 @@ export interface ResolvedFallbackModel {
   priority: number;
   model_identifier: string;
   provider_type: string;
+  provider_name: string;
   provider_id: string;
   api_key: string | null;
   endpoint_url: string | null;
@@ -2628,6 +2717,7 @@ export async function getResolvedFallbackModels(role: string): Promise<ResolvedF
     `SELECT cb.priority,
             m.model_identifier,
             p.type          AS provider_type,
+            p.name          AS provider_name,
             p.api_key,
             cb.endpoint_url,  -- bundle-level override
             p.id            AS provider_id,
@@ -2650,6 +2740,7 @@ export async function getResolvedFallbackModels(role: string): Promise<ResolvedF
     priority: row.priority,
     model_identifier: row.model_identifier,
     provider_type: row.provider_type ?? "",
+    provider_name: row.provider_name ?? "",
     provider_id: row.provider_id ?? "",
     api_key: row.api_key ?? null,
     endpoint_url: row.endpoint_url ?? null,

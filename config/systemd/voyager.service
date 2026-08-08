@@ -1,0 +1,35 @@
+[Unit]
+Description=Voyager — Filesystem Acquisition Layer (continuous scanner)
+After=network.target redis.service
+Wants=redis.service
+
+# Prerequisites:
+#   1. Install Python dependencies in the .venv:
+#        cd /home/codex/dev/nexus/python/voyager
+#        .venv/bin/pip install pydantic nats-py redis
+#   2. Ensure NATS is reachable (set NATS_URL in the env file or below).
+#   3. Set VOYAGER_SCAN_PATH to the directory to scan (default: /home/codex/dev/nexus).
+
+[Service]
+Type=simple
+ExecStart=/home/codex/dev/nexus/python/voyager/.venv/bin/python /home/codex/dev/nexus/python/voyager/src/main.py --continuous --path /home/codex/dev/nexus
+User=codex
+Group=codex
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=30s
+TimeoutStopSec=10s
+
+# Environment (read by main.py via os.getenv)
+Environment=NATS_URL=nats://localhost:4222
+Environment=REDIS_URL=redis://localhost:6379
+Environment=PG_DSN=postgresql://pguser:pgpass@localhost:5432/nexus
+# Ignore rules (comma-separated) — defaults are applied if not set
+Environment=VOYAGER_IGNORE_DIRS=.git,node_modules,__pycache__,.venv,venv,dist,target,.mypy_cache,.pytest_cache,.tox,.idea,.vscode,.DS_Store,build,egg-info,eggs,.angular
+Environment=VOYAGER_IGNORE_EXTENSIONS=.pyc,.pyo,.o,.so,.class,.dll,.dylib,.exe,.bin,.zip,.tar,.gz,.xz,.bz2,.7z,.rar,.png,.jpg,.jpeg,.gif,.bmp,.ico,.svg,.mp3,.mp4,.avi,.mov,.webm,.ttf,.woff,.woff2,.eot,.map,.lock
+
+# Hardening
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

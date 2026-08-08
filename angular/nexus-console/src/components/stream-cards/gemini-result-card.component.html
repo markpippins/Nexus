@@ -1,6 +1,13 @@
 <div 
   class="w-40 h-40 flex flex-col bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-800 dark:to-indigo-900/50 border border-[rgb(var(--color-border-base))] rounded-lg shadow-md p-3 group relative hover:shadow-xl transition-shadow duration-300 overflow-hidden"
   [title]="result().text">
+  @if (sourceMagnetPath(); as magnetSegment) {
+    <button
+      (click)="onMagnetClick($event, magnetSegment)"
+      title="Navigate to magnet: {{ magnetSegment.join(' › ') }}"
+      class="absolute top-1 left-1 z-10 text-[10px] truncate max-w-[60px] px-1.5 py-0.5 rounded-sm bg-black/30 text-white/80 hover:bg-black/50 hover:text-white transition-colors"
+    >{{ magnetSegment[magnetSegment.length - 1] }}</button>
+  }
   <div class="flex items-center space-x-2 flex-shrink-0">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-500" viewBox="0 0 20 20" fill="currentColor">
       <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" />

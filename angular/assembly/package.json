@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "ng serve --port 4204",
+    "dev": "node dev.js",
     "build": "ng build",
+    "start": "node server.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

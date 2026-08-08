@@ -25,7 +25,7 @@
             <div class="edit-form">
               <div class="form-row">
                 <label>Type</label>
-                <select [(ngModel)]="editForm().type" class="form-input">
+                <select [ngModel]="editForm().type" (ngModelChange)="updateEditFormType($event)" class="form-input">
                   <option value="link">🔗 Link</option>
                   <option value="separator">➖ Separator</option>
                 </select>
@@ -33,16 +33,16 @@
               @if (editForm().type === 'link') {
                 <div class="form-row">
                   <label>URL</label>
-                  <input type="text" [(ngModel)]="editForm().address" placeholder="https://..." class="form-input" />
+                  <input type="text" [ngModel]="editForm().address" (ngModelChange)="updateEditFormAddress($event)" placeholder="https://..." class="form-input" />
                 </div>
                 <div class="form-row-inline">
                   <div class="form-row">
                     <label>Image</label>
-                    <input type="text" [(ngModel)]="editForm().imagename" placeholder="short-name" class="form-input" />
+                    <input type="text" [ngModel]="editForm().imagename" (ngModelChange)="updateEditFormImageName($event)" placeholder="short-name" class="form-input" />
                   </div>
                   <div class="form-row">
                     <label>Text (optional)</label>
-                    <input type="text" [(ngModel)]="editForm().text" placeholder="Display text" class="form-input" />
+                    <input type="text" [ngModel]="editForm().text" (ngModelChange)="updateEditFormText($event)" placeholder="Display text" class="form-input" />
                   </div>
                 </div>
               }
@@ -89,7 +89,7 @@
       <h3>Add</h3>
       <div class="form-row">
         <label>Type</label>
-        <select [(ngModel)]="newType()" class="form-input">
+        <select [ngModel]="newType()" (ngModelChange)="updateNewType($event)" class="form-input">
           <option value="link">🔗 Link</option>
           <option value="separator">➖ Separator</option>
         </select>
@@ -97,16 +97,16 @@
       @if (newType() === 'link') {
         <div class="form-row">
           <label>URL</label>
-          <input type="text" [(ngModel)]="newLink().address" placeholder="https://..." class="form-input" />
+          <input type="text" [ngModel]="newLink().address" (ngModelChange)="updateNewLinkAddress($event)" placeholder="https://..." class="form-input" />
         </div>
         <div class="form-row-inline">
           <div class="form-row">
             <label>Image Name</label>
-            <input type="text" [(ngModel)]="newLink().imagename" placeholder="short-name" class="form-input" />
+            <input type="text" [ngModel]="newLink().imagename" (ngModelChange)="updateNewLinkImageName($event)" placeholder="short-name" class="form-input" />
           </div>
           <div class="form-row">
             <label>Text (optional)</label>
-            <input type="text" [(ngModel)]="newLink().text" placeholder="Display text" class="form-input" />
+            <input type="text" [ngModel]="newLink().text" (ngModelChange)="updateNewLinkText($event)" placeholder="Display text" class="form-input" />
           </div>
         </div>
       }

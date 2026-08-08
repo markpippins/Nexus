@@ -61,7 +61,7 @@ const SUPPORTS_OPEN_QUESTIONS = new Set([
           </button>
         </div>
 
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">
           <ng-container *ngIf="canOpenQuestion; else reportDesc">
             Create a new post in <span class="font-medium text-gray-700 dark:text-gray-300">Issues</span> linked to
             <span class="font-medium text-gray-700 dark:text-gray-300">{{ objectTitle || 'Untitled' }}</span>.
@@ -74,7 +74,7 @@ const SUPPORTS_OPEN_QUESTIONS = new Set([
 
         <form id="raise-question-form" (ngSubmit)="submit()" class="space-y-3">
           <div>
-            <label [attr.for]="titleId" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+            <label [attr.for]="titleId" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
             <input
               #titleInput
               [id]="titleId"
@@ -87,7 +87,7 @@ const SUPPORTS_OPEN_QUESTIONS = new Set([
             />
           </div>
           <div>
-            <label [attr.for]="bodyId" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Body</label>
+            <label [attr.for]="bodyId" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Body</label>
             <textarea
               [id]="bodyId"
               name="rq-body"
@@ -101,12 +101,12 @@ const SUPPORTS_OPEN_QUESTIONS = new Set([
         </form>
 
         <div class="flex items-center justify-end gap-2 mt-4">
-          <button type="button" (click)="close()" class="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors">Cancel</button>
+          <button type="button" (click)="close()" class="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors">Cancel</button>
           <button
             type="submit"
             form="raise-question-form"
             [disabled]="submitting() || !title().trim() || !body().trim()"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             [class.bg-primary-600]="canOpenQuestion"
             [class.hover:bg-primary-700]="canOpenQuestion"
             [class.bg-red-600]="!canOpenQuestion"
@@ -120,7 +120,7 @@ const SUPPORTS_OPEN_QUESTIONS = new Set([
           </button>
         </div>
 
-        <div *ngIf="error()" class="mt-3 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30 rounded px-3 py-2">{{ error() }}</div>
+        <div *ngIf="error()" class="mt-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30 rounded px-3 py-2">{{ error() }}</div>
       </div>
     </div>
   `,

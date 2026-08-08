@@ -32,7 +32,7 @@ import { BrokerProfileService } from '../../services/broker-profile.service';
               }
             </select>
             @if (userForm.get('profileId')?.invalid && userForm.get('profileId')?.touched) {
-              <p class="mt-1 text-xs text-red-500">Please select a profile.</p>
+              <p class="mt-1 text-sm text-red-500">Please select a profile.</p>
             }
           </div>
         </div>
@@ -49,7 +49,7 @@ import { BrokerProfileService } from '../../services/broker-profile.service';
             class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-background))] text-[rgb(var(--color-text-base))] px-3 py-2"
           />
           @if (userForm.get('email')?.invalid && userForm.get('email')?.touched) {
-            <p class="mt-1 text-xs text-red-500">
+            <p class="mt-1 text-sm text-red-500">
               @if (userForm.get('email')?.errors?.['required']) {
                 Email is required
               } @else if (userForm.get('email')?.errors?.['email']) {
@@ -71,7 +71,7 @@ import { BrokerProfileService } from '../../services/broker-profile.service';
             class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-background))] text-[rgb(var(--color-text-base))] px-3 py-2"
           />
           @if (userForm.get('alias')?.invalid && userForm.get('alias')?.touched) {
-            <p class="mt-1 text-xs text-red-500">
+            <p class="mt-1 text-sm text-red-500">
               @if (userForm.get('alias')?.errors?.['required']) {
                 Username is required
               } @else if (userForm.get('alias')?.errors?.['minlength']) {
@@ -93,7 +93,7 @@ import { BrokerProfileService } from '../../services/broker-profile.service';
             class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-background))] text-[rgb(var(--color-text-base))] px-3 py-2"
           />
           @if (userForm.get('identifier')?.invalid && userForm.get('identifier')?.touched) {
-            <p class="mt-1 text-xs text-red-500">Identifier is required</p>
+            <p class="mt-1 text-sm text-red-500">Identifier is required</p>
           }
         </div>
       </div>

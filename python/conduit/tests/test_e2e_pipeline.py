@@ -14,6 +14,12 @@ from datetime import datetime
 
 import psycopg2
 
+from tests.test_helpers import (
+    cleanup_orphaned_test_schemas,
+    create_test_schema,
+    drop_test_schema,
+)
+
 # ── Set env vars BEFORE importing main (which reads them at module load) ──
 os.environ["PIPELINE_LOCK_PATH"] = "/tmp/pipeline-e2e-test.lock"
 os.environ["PIPELINE_WATCHDOG_STALE"] = "86400"
@@ -28,6 +34,12 @@ if not _DSN:
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # _dispatch_one removed — replaced by Temporal PlanExecutionWorkflow
 from db_adapter import DBAdapter
+
+# Clean up any orphaned test schemas from previous crashed runs
+_ORPHANED = cleanup_orphaned_test_schemas(_DSN)
+if _ORPHANED:
+    print(f"Cleaned up {_ORPHANED} orphaned test schema(s) from previous runs",
+          file=sys.stderr)
 
 
 def _iso_now() -> str:
@@ -47,19 +59,25 @@ class TestE2EPipeline(unittest.TestCase):
         pass
 
     def setUp(self):
-        self.schema_name = f"test_e2e_{os.urandom(4).hex()}"
         self._raw_conn = psycopg2.connect(_DSN)
         self._raw_cur = self._raw_conn.cursor()
 
-        self._raw_cur.execute(f"CREATE SCHEMA {self.schema_name}")
-        self._raw_cur.execute(f"SET search_path TO {self.schema_name}")
+        try:
+            self.schema_name = create_test_schema(self._raw_conn, "test_e2e")
 
-        self._create_schema()
-        self._seed_plan()
-        self._raw_conn.commit()
+            self._create_schema()
+            self._seed_plan()
+            self._raw_conn.commit()
 
-        self.db = DBAdapter(schema=self.schema_name)
-        self._receipt_counter = 0
+            self.db = DBAdapter(schema=self.schema_name)
+            self._receipt_counter = 0
+        except Exception:
+            # Clean up the schema if setup fails mid-way
+            if hasattr(self, 'schema_name') and self.schema_name:
+                drop_test_schema(_DSN, self.schema_name)
+            self._raw_cur.close()
+            self._raw_conn.close()
+            raise
 
     def tearDown(self):
         lock_path = os.environ.get("PIPELINE_LOCK_PATH", "/tmp/pipeline-e2e-test.lock")
@@ -69,15 +87,19 @@ class TestE2EPipeline(unittest.TestCase):
             except OSError:
                 pass
 
-        self._raw_cur.close()
-        self._raw_conn.close()
+        # Close the test connection first (releases locks on test schema)
+        try:
+            self._raw_cur.close()
+        except Exception:
+            pass
+        try:
+            self._raw_conn.close()
+        except Exception:
+            pass
 
-        cleanup = psycopg2.connect(_DSN)
-        cleanup.set_isolation_level(0)
-        cur = cleanup.cursor()
-        cur.execute(f"DROP SCHEMA {self.schema_name} CASCADE")
-        cur.close()
-        cleanup.close()
+        # Drop the test schema using a fresh connection (avoids lock issues)
+        if hasattr(self, 'schema_name') and self.schema_name:
+            drop_test_schema(_DSN, self.schema_name)
 
     def _create_schema(self):
         c = self._raw_cur

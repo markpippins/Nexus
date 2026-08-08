@@ -1,0 +1,34 @@
+[Unit]
+Description=Secure File System Server — secure file system operations (service-broker)
+Documentation=https://github.com/nexus/typescript/secure-file-system-server
+After=network.target
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/typescript/secure-file-system-server
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=FS_SERVER_PORT=4040
+Environment=FS_ROOT_DIR=/home/codex/dev/nexus/typescript/secure-file-system-server/root
+Environment=NODE_ENV=production
+Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr/bin:/bin
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/bun run fs-serv.ts
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart behavior ───────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=3
+
+# ── Hardening ──────────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/codex/dev/nexus/typescript/secure-file-system-server
+
+[Install]
+WantedBy=default.target

@@ -20,11 +20,21 @@ import psycopg2
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from db_adapter import DBAdapter
-
+from tests.test_helpers import (
+    cleanup_orphaned_test_schemas,
+    create_test_schema,
+    drop_test_schema,
+)
 
 _DSN = os.environ.get("CONDUIT_PG_DSN", "")
 if not _DSN:
     raise RuntimeError("CONDUIT_PG_DSN must be set to run tests (PG is mandatory)")
+
+# Clean up any orphaned test schemas from previous crashed runs
+_ORPHANED = cleanup_orphaned_test_schemas(_DSN)
+if _ORPHANED:
+    print(f"Cleaned up {_ORPHANED} orphaned test schema(s) from previous runs",
+          file=sys.stderr)
 
 
 def _iso_now() -> str:
@@ -35,29 +45,40 @@ class TestPlanLifecycle(unittest.TestCase):
     """Full plan lifecycle: PLAN_CREATE → IMPLEMENTATION → REVIEW_PASS."""
 
     def setUp(self):
-        self.schema_name = f"test_lifecycle_{os.urandom(4).hex()}"
         self._raw_conn = psycopg2.connect(_DSN)
         self._raw_cur = self._raw_conn.cursor()
 
-        self._raw_cur.execute(f"CREATE SCHEMA {self.schema_name}")
-        self._raw_cur.execute(f"SET search_path TO {self.schema_name}")
+        try:
+            self.schema_name = create_test_schema(self._raw_conn, "test_lifecycle")
 
-        self._create_schema()
-        self._seed_plan()
-        self._raw_conn.commit()
+            self._create_schema()
+            self._seed_plan()
+            self._raw_conn.commit()
 
-        self.db = DBAdapter(schema=self.schema_name)
-        self._receipt_counter = 0
+            self.db = DBAdapter(schema=self.schema_name)
+            self._receipt_counter = 0
+        except Exception:
+            # Clean up the schema if setup fails mid-way
+            if hasattr(self, 'schema_name') and self.schema_name:
+                drop_test_schema(_DSN, self.schema_name)
+            self._raw_cur.close()
+            self._raw_conn.close()
+            raise
 
     def tearDown(self):
-        self._raw_cur.close()
-        self._raw_conn.close()
-        cleanup = psycopg2.connect(_DSN)
-        cleanup.set_isolation_level(0)
-        cur = cleanup.cursor()
-        cur.execute(f"DROP SCHEMA {self.schema_name} CASCADE")
-        cur.close()
-        cleanup.close()
+        # Close the test connection first (releases locks on test schema)
+        try:
+            self._raw_cur.close()
+        except Exception:
+            pass
+        try:
+            self._raw_conn.close()
+        except Exception:
+            pass
+
+        # Drop the test schema using a fresh connection (avoids lock issues)
+        if hasattr(self, 'schema_name') and self.schema_name:
+            drop_test_schema(_DSN, self.schema_name)
 
     def _create_schema(self):
         c = self._raw_cur

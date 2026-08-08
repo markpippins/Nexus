@@ -14,9 +14,11 @@ interface GeminiResult {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class GeminiResultCardComponent {
-  result = input.required<GeminiResult>();
+  result = input.required<GeminiResult & { sourceMagnetPath?: string[] }>();
   isBookmarked = input(false);
+  sourceMagnetPath = input<string[]>();
   bookmarkToggled = output<GeminiResult>();
+  navigateToMagnet = output<string[]>();
 
   truncatedText = computed(() => {
     const text = this.result().text;
@@ -28,5 +30,11 @@ export class GeminiResultCardComponent {
 
   onToggleBookmark(): void {
     this.bookmarkToggled.emit(this.result());
+  }
+
+  onMagnetClick(event: MouseEvent, path: string[]): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.navigateToMagnet.emit(path);
   }
 }

@@ -4,11 +4,15 @@
 #
 # PURPOSE:
 #   Runs the full harvest ingestion pipeline for HTML chat transcripts
-#   sitting in ~/dev/chats/. Two stages:
+#   sitting in ~/dev/chats/. Two stages + substance self-heal:
 #
 #   Stage 1 — batch_harvest_to_db.py
 #     Runs Dockling (deterministic parser) on unprocessed HTML files,
 #     inserts structured docklang into nebula.harvests via the Nebula API.
+#
+#   Stage 1.5 — substance_backfill.py
+#     Segments harvests that have docklang discourse_units but no
+#     conversation_snapshot (idempotent; heals the old corpus in place).
 #
 #   Stage 2 — batch_file_candidates.py
 #     Reads docklang from unprocessed harvests, sends them through Gemini
@@ -44,6 +48,7 @@ set -euo pipefail
 
 APPLY_MODE="false"         # "true" to actually insert; "false" for dry-run
 STAGE1_LIMIT=5              # max HTML files to process per run
+STAGE1_5_LIMIT=50           # max substance-less harvests to backfill per run
 STAGE2_LIMIT=5              # max unfiled harvests to process per run
 STAGE2_BATCH=3              # harvests per Gemini call
 SPECIFIC_FILES=()           # optional: specific filenames for Stage 1
@@ -52,9 +57,21 @@ SPECIFIC_FILES=()           # optional: specific filenames for Stage 1
 
 ROVER_DIR="/home/codex/dev/nexus/python/rover"
 BIN_DIR="/home/codex/dev/nexus/bin"
+LOG_DIR="/home/codex/dev/nexus/logs"
 VENV_ACTIVATE="${ROVER_DIR}/.venv/bin/activate"
 STAGE1="${BIN_DIR}/batch_harvest_to_db.py"
+STAGE1_5="${BIN_DIR}/substance_backfill.py"
 STAGE2="${BIN_DIR}/batch_file_candidates.py"
+
+# ── Log files (rotated: timestamped per run) ────────────────────────────
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+STAGE1_LOG="${LOG_DIR}/harvest-pipeline-stage1-${TIMESTAMP}.log"
+STAGE1_5_LOG="${LOG_DIR}/harvest-pipeline-stage1_5-${TIMESTAMP}.log"
+STAGE2_LOG="${LOG_DIR}/harvest-pipeline-stage2-${TIMESTAMP}.log"
+PIPELINE_LOG="${LOG_DIR}/harvest-pipeline-${TIMESTAMP}.log"
+
+# Ensure log directory exists (idempotent — mkdir -p is safe if it already exists or is missing)
+mkdir -p "$LOG_DIR"
 
 # ── Parse CLI flags ─────────────────────────────────────────────────────
 
@@ -70,11 +87,16 @@ while [[ $# -gt 0 ]]; do
             ;;
         --limit)
             STAGE1_LIMIT="$2"
+            STAGE1_5_LIMIT="$2"
             STAGE2_LIMIT="$2"
             shift 2
             ;;
         --stage1-limit)
             STAGE1_LIMIT="$2"
+            shift 2
+            ;;
+        --stage1_5-limit)
+            STAGE1_5_LIMIT="$2"
             shift 2
             ;;
         --stage2-limit)
@@ -95,7 +117,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -h|--help)
             echo "Usage: $0 [--apply] [--dry-run] [--limit N] [--stage1-limit N]"
-            echo "          [--stage2-limit N] [--batch N] [--files name...]"
+            echo "          [--stage1_5-limit N] [--stage2-limit N] [--batch N] [--files name...]"
             exit 0
             ;;
         *)
@@ -158,11 +180,21 @@ check_prereqs() {
         exit 1
     fi
     log_info "  ✓ Stage 2 script found"
+
+    if [[ ! -f "$STAGE1_5" ]]; then
+        log_error "Stage 1.5 script not found: ${STAGE1_5}"
+        exit 1
+    fi
+    log_info "  ✓ Stage 1.5 script found"
 }
 
 # ── Main ────────────────────────────────────────────────────────────────
 
 main() {
+    # Redirect all output (stdout+stderr) to both terminal and the pipeline log.
+    # Python subprocess output is already tee'd to per-stage logs.
+    exec > >(tee "$PIPELINE_LOG") 2>&1
+
     separator
     log_info "Harvest Pipeline — Stage 1 + Stage 2"
     log_info "APPLY_MODE = ${APPLY_MODE}"
@@ -194,11 +226,11 @@ main() {
         for f in "${SPECIFIC_FILES[@]}"; do
             log_info "  • $f"
         done
-        python3 "$STAGE1" "${STAGE1_ARGS[@]}" "${SPECIFIC_FILES[@]}" 2>&1
+        python3 "$STAGE1" "${STAGE1_ARGS[@]}" "${SPECIFIC_FILES[@]}" 2>&1 | tee "$STAGE1_LOG"
     else
         # Discover and process unharvested by recency
         log_info "Discovering unharvested HTML files (limit: ${STAGE1_LIMIT}) ..."
-        python3 "$STAGE1" "${STAGE1_ARGS[@]}" --limit "${STAGE1_LIMIT}" 2>&1
+        python3 "$STAGE1" "${STAGE1_ARGS[@]}" --limit "${STAGE1_LIMIT}" 2>&1 | tee "$STAGE1_LOG"
     fi
 
     local stage1_exit=$?
@@ -206,6 +238,31 @@ main() {
 
     if [[ "$stage1_exit" -ne 0 ]]; then
         log_warn "Stage 1 exited with code ${stage1_exit}"
+    fi
+
+    # ── Stage 1.5: Substance Backfill ───────────────────────────────
+    # Heals the old corpus: harvests that have docklang discourse_units
+    # but no conversation_snapshot get segmented in place (idempotent).
+    # Runs every cycle so any harvest whose snapshot insert failed is
+    # eventually recovered. Skips harvests that already have substance.
+    separator
+    log_info "STAGE 1.5/2: Substance Backfill → conversation_snapshots"
+    log_info "  (Segments harvests lacking substance content, limit: ${STAGE1_5_LIMIT})"
+    separator
+
+    STAGE1_5_ARGS=()
+    if [[ "$APPLY_MODE" != "true" ]]; then
+        STAGE1_5_ARGS+=("--dry-run")
+    fi
+    STAGE1_5_ARGS+=("--limit" "${STAGE1_5_LIMIT}")
+
+    python3 "$STAGE1_5" "${STAGE1_5_ARGS[@]}" 2>&1 | tee "$STAGE1_5_LOG"
+
+    local stage1_5_exit=$?
+    echo ""
+
+    if [[ "$stage1_5_exit" -ne 0 ]]; then
+        log_warn "Stage 1.5 exited with code ${stage1_5_exit}"
     fi
 
     # ── Stage 2: Gemini → Candidates ──────────────────────────────────
@@ -229,7 +286,7 @@ main() {
         log_info "  Publishing harvests to Assembly forum (--publish)"
     fi
 
-    python3 "$STAGE2" "${STAGE2_ARGS[@]}" 2>&1
+    python3 "$STAGE2" "${STAGE2_ARGS[@]}" 2>&1 | tee "$STAGE2_LOG"
 
     local stage2_exit=$?
     echo ""
@@ -247,6 +304,7 @@ main() {
         done
     else
         log_info "Stage 1 limit: ${STAGE1_LIMIT}"
+        log_info "Stage 1.5 limit: ${STAGE1_5_LIMIT}  (substance backfill)"
         log_info "Stage 2 limit: ${STAGE2_LIMIT}  (batch: ${STAGE2_BATCH})"
     fi
 
@@ -257,12 +315,12 @@ main() {
         log_info "Example: $0 --apply --limit 3"
     fi
 
-    if [[ "$stage1_exit" -ne 0 || "$stage2_exit" -ne 0 ]]; then
-        log_warn "Some stages had non-zero exit codes (S1=${stage1_exit}, S2=${stage2_exit})"
+    if [[ "$stage1_exit" -ne 0 || "$stage1_5_exit" -ne 0 || "$stage2_exit" -ne 0 ]]; then
+        log_warn "Some stages had non-zero exit codes (S1=${stage1_exit}, S1.5=${stage1_5_exit}, S2=${stage2_exit})"
     fi
 
     separator
-    exit $(( stage1_exit | stage2_exit ))
+    exit $(( stage1_exit | stage1_5_exit | stage2_exit ))
 }
 
 main "$@"

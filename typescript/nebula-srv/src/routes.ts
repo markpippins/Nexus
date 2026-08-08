@@ -54,16 +54,20 @@ async function createSpawnsPlanCrossRef(
   if (!hasPlanRef(planRef)) return null;
   const planRefStr = String(planRef).trim();
   const { rows: [xref] } = await client.query(
-    `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+    `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
      SELECT 'harvest_candidate', $1, 'plan', $2, 'spawns_plan', $3
      WHERE NOT EXISTS (
-       SELECT 1 FROM nebula.cross_references
+       SELECT 1 FROM nebula.cross_references_history
        WHERE source_type = 'harvest_candidate'
          AND source_id = $1
          AND target_type = 'plan'
          AND target_id = $2
          AND rel_type = 'spawns_plan'
+         AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
      )
+     ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
+       WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
+     DO NOTHING
      RETURNING *`,
     [candidateId, planRefStr, JSON.stringify(extraMetadata || {})]
   );
@@ -197,6 +201,21 @@ async function getUnusedColor(systemId: string, pool: Pool): Promise<string> {
   return COLOR_PALETTE[0]; // all used — pick first
 }
 
+
+// ── Pagination helper — supports both page/pageSize and limit/offset ──
+function parsePagination(query: any): { offset: number; limit: number; page: number; pageSize: number } {
+  const rawLimit = query.limit !== undefined ? parseInt(String(query.limit), 10) : NaN;
+  const rawOffset = query.offset !== undefined ? parseInt(String(query.offset), 10) : NaN;
+  if (!isNaN(rawLimit) || !isNaN(rawOffset)) {
+    const limit = Math.min(100, Math.max(1, isNaN(rawLimit) ? 100 : rawLimit));
+    const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
+    return { offset, limit, page: Math.floor(offset / limit) + 1, pageSize: limit };
+  }
+  const page = Math.max(1, parseInt(String(query.page || '1'), 10));
+  const pageSize = Math.min(100, Math.max(1, parseInt(String(query.pageSize || '100'), 10)));
+  return { offset: (page - 1) * pageSize, limit: pageSize, page, pageSize };
+}
+
 export function createRoutes(pool: Pool): Router {
   const router = Router();
 
@@ -207,9 +226,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/systems — full nested hierarchy with pagination
   router.get('/systems', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [countResult, { rows: systems }] = await Promise.all([
         pool.query('SELECT COUNT(*)::int AS total FROM systems'),
@@ -240,10 +257,16 @@ export function createRoutes(pool: Pool): Router {
             features: feats.map((f: any) => ({ ...camelCaseRow(f), subsystemId: f.subsystem_id })),
           });
         }
+        // External IDs (cross-schema junction)
+        const { rows: externalIds } = await pool.query(
+          'SELECT * FROM system_external_ids WHERE system_id = $1 ORDER BY source_schema, source_table',
+          [sys.id]
+        );
         result.push({
           ...camelCaseRow(sys),
           folders: folders.map((f: any) => ({ ...f, id: f.id, name: f.name, category: f.category, note: f.note })),
           subsystems,
+          externalIds: externalIds.map((eid: any) => camelCaseRow(eid)),
         });
       }
       res.json({
@@ -260,11 +283,11 @@ export function createRoutes(pool: Pool): Router {
   // POST /api/systems
   router.post('/systems', async (req: Request, res: Response) => {
     try {
-      const { name, description = '', readme = null, architecture = null } = req.body;
+      const { name, description = '', readme = null, architecture = null, path = null } = req.body;
       if (!name) return res.status(400).json({ error: 'name is required' });
       const { rows: [sys] } = await pool.query(
-        'INSERT INTO systems (name, description, readme, architecture) VALUES ($1, $2, $3, $4) RETURNING *',
-        [name, description, readme, architecture]
+        'INSERT INTO systems (name, description, readme, architecture, path) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [name, description, readme, architecture, path]
       );
       res.status(201).json({ ...toEpochMs(sys, 'created_at'), folders: [], subsystems: [] });
     } catch (err: any) {
@@ -276,7 +299,7 @@ export function createRoutes(pool: Pool): Router {
   router.patch('/systems/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { name, description, readme, architecture } = req.body;
+      const { name, description, readme, architecture, path } = req.body;
       const sets: string[] = [];
       const vals: any[] = [];
       let i = 1;
@@ -284,6 +307,7 @@ export function createRoutes(pool: Pool): Router {
       if (description !== undefined) { sets.push(`description = $${i++}`); vals.push(description); }
       if (readme !== undefined) { sets.push(`readme = $${i++}`); vals.push(readme); }
       if (architecture !== undefined) { sets.push(`architecture = $${i++}`); vals.push(architecture); }
+      if (path !== undefined) { sets.push(`path = $${i++}`); vals.push(path); }
       if (sets.length === 0) return res.json({ ok: true });
       vals.push(id);
       const { rows: [sys] } = await pool.query(
@@ -291,7 +315,7 @@ export function createRoutes(pool: Pool): Router {
         vals
       );
       if (!sys) return res.status(404).json({ error: 'System not found' });
-      res.json({ ...toEpochMs(sys, 'created_at'), name: sys.name, description: sys.description, readme: sys.readme, architecture: sys.architecture });
+      res.json({ ...toEpochMs(sys, 'created_at'), name: sys.name, description: sys.description, readme: sys.readme, architecture: sys.architecture, path: sys.path });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -340,10 +364,16 @@ export function createRoutes(pool: Pool): Router {
           features: feats.map((f: any) => ({ ...toEpochMs(f, 'created_at'), subsystemId: f.subsystem_id })),
         });
       }
+      // External IDs (cross-schema junction)
+      const { rows: externalIds } = await pool.query(
+        'SELECT * FROM system_external_ids WHERE system_id = $1 ORDER BY source_schema, source_table',
+        [sys.id]
+      );
       res.json({
         ...toEpochMs(sys, 'created_at'),
         folders: folders.map((f: any) => ({ ...f, id: f.id, name: f.name, category: f.category, note: f.note })),
         subsystems,
+        externalIds: externalIds.map((eid: any) => camelCaseRow(eid)),
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -357,13 +387,13 @@ export function createRoutes(pool: Pool): Router {
   // POST /api/subsystems
   router.post('/subsystems', async (req: Request, res: Response) => {
     try {
-      const { systemId, name, description = '', readme = null } = req.body;
+      const { systemId, name, description = '', readme = null, path = null } = req.body;
       if (!systemId || !name) return res.status(400).json({ error: 'systemId and name are required' });
       // Server-side color deduplication (Plan 0093)
       const color = await getUnusedColor(systemId, pool);
       const { rows: [sub] } = await pool.query(
-        'INSERT INTO subsystems (system_id, name, description, readme, color) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [systemId, name, description, readme, color]
+        'INSERT INTO subsystems (system_id, name, description, readme, color, path) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [systemId, name, description, readme, color, path]
       );
       res.status(201).json({
         ...toEpochMs(sub, 'created_at'),
@@ -379,7 +409,7 @@ export function createRoutes(pool: Pool): Router {
   router.patch('/subsystems/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { name, description, readme, color } = req.body;
+      const { name, description, readme, color, path } = req.body;
       const sets: string[] = [];
       const vals: any[] = [];
       let i = 1;
@@ -387,6 +417,7 @@ export function createRoutes(pool: Pool): Router {
       if (description !== undefined) { sets.push(`description = $${i++}`); vals.push(description); }
       if (readme !== undefined) { sets.push(`readme = $${i++}`); vals.push(readme); }
       if (color !== undefined) { sets.push(`color = $${i++}`); vals.push(color); }
+      if (path !== undefined) { sets.push(`path = $${i++}`); vals.push(path); }
       if (sets.length === 0) return res.json({ ok: true });
       vals.push(id);
       const { rows: [sub] } = await pool.query(
@@ -394,7 +425,7 @@ export function createRoutes(pool: Pool): Router {
         vals
       );
       if (!sub) return res.status(404).json({ error: 'Subsystem not found' });
-      res.json({ ...toEpochMs(sub, 'created_at'), systemId: sub.system_id, name: sub.name, description: sub.description, readme: sub.readme, color: sub.color });
+      res.json({ ...toEpochMs(sub, 'created_at'), systemId: sub.system_id, name: sub.name, description: sub.description, readme: sub.readme, color: sub.color, path: sub.path });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -443,11 +474,11 @@ export function createRoutes(pool: Pool): Router {
   // POST /api/features
   router.post('/features', async (req: Request, res: Response) => {
     try {
-      const { subsystemId, name, description = '', readme = null } = req.body;
+      const { subsystemId, name, description = '', readme = null, path = null } = req.body;
       if (!subsystemId || !name) return res.status(400).json({ error: 'subsystemId and name are required' });
       const { rows: [feat] } = await pool.query(
-        'INSERT INTO features (subsystem_id, name, description, readme) VALUES ($1, $2, $3, $4) RETURNING *',
-        [subsystemId, name, description, readme]
+        'INSERT INTO features (subsystem_id, name, description, readme, path) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [subsystemId, name, description, readme, path]
       );
       res.status(201).json({ ...toEpochMs(feat, 'created_at'), subsystemId: feat.subsystem_id });
     } catch (err: any) {
@@ -459,13 +490,14 @@ export function createRoutes(pool: Pool): Router {
   router.patch('/features/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { name, description, readme } = req.body;
+      const { name, description, readme, path } = req.body;
       const sets: string[] = [];
       const vals: any[] = [];
       let i = 1;
       if (name !== undefined) { sets.push(`name = $${i++}`); vals.push(name); }
       if (description !== undefined) { sets.push(`description = $${i++}`); vals.push(description); }
       if (readme !== undefined) { sets.push(`readme = $${i++}`); vals.push(readme); }
+      if (path !== undefined) { sets.push(`path = $${i++}`); vals.push(path); }
       if (sets.length === 0) return res.json({ ok: true });
       vals.push(id);
       const { rows: [feat] } = await pool.query(
@@ -473,7 +505,7 @@ export function createRoutes(pool: Pool): Router {
         vals
       );
       if (!feat) return res.status(404).json({ error: 'Feature not found' });
-      res.json({ ...toEpochMs(feat, 'created_at'), subsystemId: feat.subsystem_id, name: feat.name, description: feat.description, readme: feat.readme });
+      res.json({ ...toEpochMs(feat, 'created_at'), subsystemId: feat.subsystem_id, name: feat.name, description: feat.description, readme: feat.readme, path: feat.path });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -515,9 +547,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/requirements', async (req: Request, res: Response) => {
     try {
       const { systemId, subsystemId, featureId } = req.query;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const clauses: string[] = [];
       const vals: any[] = [];
@@ -630,9 +660,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/requirements/:id/children', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -672,9 +700,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/requirements/:id/dependencies', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -746,16 +772,20 @@ export function createRoutes(pool: Pool): Router {
 
       // Idempotent insert (WHERE NOT EXISTS)
       const { rows: [xref] } = await pool.query(
-        `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+        `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
          SELECT 'requirement', $1, 'requirement', $2, $3, '{}'
          WHERE NOT EXISTS (
-           SELECT 1 FROM nebula.cross_references
+           SELECT 1 FROM nebula.cross_references_history
            WHERE source_type = 'requirement'
              AND source_id = $1
              AND target_type = 'requirement'
              AND target_id = $2
              AND rel_type = $3
+             AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
          )
+         ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
+           WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
+         DO NOTHING
          RETURNING *`,
         [id, targetId, relType]
       );
@@ -771,16 +801,18 @@ export function createRoutes(pool: Pool): Router {
     try {
       const { id, depId } = req.params;
       const { rowCount } = await pool.query(
-        `DELETE FROM nebula.cross_references
+        `UPDATE nebula.cross_references
+         SET valid_until = now()
          WHERE id = $1
            AND source_type = 'requirement'
            AND target_type = 'requirement'
            AND rel_type IN ('req:blocks', 'req:depends_on')
-           AND (source_id = $2 OR target_id = $2)`,
+           AND (source_id = $2 OR target_id = $2)
+           AND valid_until > now()`,
         [depId, id]
       );
       if (rowCount === 0) return res.status(404).json({ error: 'Dependency not found' });
-      res.json({ ok: true });
+      res.json({ expired: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1196,13 +1228,17 @@ export function createRoutes(pool: Pool): Router {
             planNumber = planResult.planNumber;
             // Create cross-reference: requirement → plan (matches existing pattern — let DB defaults handle id/created_at)
             await pool.query(
-              `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+              `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
                SELECT 'requirement', $1, 'plan', $2, 'compiles_to', '{}'::jsonb
                WHERE NOT EXISTS (
-                 SELECT 1 FROM nebula.cross_references
+                 SELECT 1 FROM nebula.cross_references_history
                  WHERE source_type = 'requirement' AND source_id = $1
                    AND target_type = 'plan' AND target_id = $2 AND rel_type = 'compiles_to'
-               )`,
+                   AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
+               )
+               ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
+                 WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
+               DO NOTHING`,
               [id, planNumber]
             );
           }
@@ -1262,9 +1298,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/sessions — list with pagination
   router.get('/sessions', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -1281,7 +1315,7 @@ export function createRoutes(pool: Pool): Router {
         parentName: r.parent_name,
       }));
 
-      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1467,9 +1501,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/workspaces — list all workspace paths with pagination
   router.get('/workspaces', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -1494,7 +1526,7 @@ export function createRoutes(pool: Pool): Router {
         subsystemName: r.subsystem_name,
       }));
 
-      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1648,9 +1680,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/plans', async (req: Request, res: Response) => {
     try {
       const { status } = req.query;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const clauses: string[] = [];
       const vals: any[] = [];
@@ -1801,9 +1831,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/systems/:id/implementation-plans', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -1852,9 +1880,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/subsystems/:id/implementation-plans', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -1903,9 +1929,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/features/:id/implementation-plans', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -1975,10 +1999,11 @@ export function createRoutes(pool: Pool): Router {
 
   // ── Helper: upsert audit files into DB (bulk, with stale cleanup) ──
   async function syncAuditFilesToDb(): Promise<{ id: string; filePath: string; content: string; sizeBytes: number; recordedOn: string }[]> {
-    const scanned = scanAuditDir(AUDIT_ROOT, AUDIT_ROOT);
-    const scannedPaths = new Set(scanned.map(f => f.filePath));
-    const client = await pool.connect();
+    let client: import('pg').PoolClient | undefined;
     try {
+      const scanned = scanAuditDir(AUDIT_ROOT, AUDIT_ROOT);
+      const scannedPaths = new Set(scanned.map(f => f.filePath));
+      client = await pool.connect();
       await client.query('BEGIN');
 
       // Remove stale entries (files deleted from disk)
@@ -2026,19 +2051,19 @@ export function createRoutes(pool: Pool): Router {
       await client.query('COMMIT');
       return results;
     } catch (err) {
-      try { await client.query('ROLLBACK'); } catch { /* connection already gone */ }
+      if (client) {
+        try { await client.query('ROLLBACK'); } catch { /* connection already gone */ }
+      }
       throw err;
     } finally {
-      client.release();
+      if (client) client.release();
     }
   }
 
   // GET /api/audit — list all audit files with pagination
   router.get('/audit', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -2138,7 +2163,10 @@ export function createRoutes(pool: Pool): Router {
         count: files.length,
       });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      // Guard against non-Error objects (e.g. PG internal state, symbol-keyed dumps)
+      const message = err?.message ?? String(err ?? 'unknown error');
+      console.error('[audit/sync] failed:', message);
+      res.status(500).json({ error: message });
     }
   });
 
@@ -2242,9 +2270,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/systems/:id/info', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -2524,8 +2550,7 @@ export function createRoutes(pool: Pool): Router {
       const visibilityScope = req.query.visibilityScope as string | undefined;
       const tag = req.query.tag as string | undefined;
       const sort = (req.query.sort as string) || 'created_at';
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const validSorts = ['candidate_count', 'code_blocks', 'turns', 'block_density', 'collaboration', 'created_at', 'tag_frequency', 'keyword_hits'];
       if (!validSorts.includes(sort)) {
@@ -2540,10 +2565,10 @@ export function createRoutes(pool: Pool): Router {
         block_density:    "CASE WHEN jsonb_array_length(h.docklang -> 'discourse_units') > 0 THEN (h.docklang #>> '{stats,total_blocks}')::numeric / jsonb_array_length(h.docklang -> 'discourse_units') ELSE 0 END",
         collaboration:    "(SELECT count(*) FROM jsonb_array_elements(h.docklang -> 'discourse_units') du WHERE du #>> '{heading}' ILIKE '%— user%' OR du #>> '{heading}' ILIKE '%- user%')",
         created_at:       'h.created_at',
-        tag_frequency:    `(SELECT COALESCE(sum(freq), 0) FROM (
-           SELECT count(*) AS freq FROM nebula.harvests h2,
-           unnest(h2.tags) AS t WHERE t = ANY(h.tags) GROUP BY t
-         ) sub)`,
+        tag_frequency:    `(SELECT COALESCE(sum(f.tc), 0)
+           FROM unnest(h.tags) tg
+           JOIN (SELECT t AS tag, count(*) AS tc FROM nebula.harvests h2, unnest(h2.tags) AS t GROUP BY t) f
+             ON f.tag = tg)`,
         keyword_hits:     `(SELECT count(*) FROM jsonb_array_elements(h.docklang -> 'discourse_units') du
             WHERE du #>> '{body}' ILIKE '%' || $1 || '%')`,
       };
@@ -2556,49 +2581,74 @@ export function createRoutes(pool: Pool): Router {
       }
 
       const clauses: string[] = [];
+      const filterParams: any[] = [];
       const params: any[] = [];
       let pi = 1;
       if (sort === 'keyword_hits' && keyword) { params.push(keyword); pi++; }  // keyword is $1
-      if (model) { clauses.push(`h.model = $${pi++}`); params.push(model); }
-      if (version) { clauses.push(`h.version = $${pi++}`); params.push(parseInt(version)); }
-      if (sourceHash) { clauses.push(`h.source_hash = $${pi++}`); params.push(sourceHash); }
-      if (level) { clauses.push(`h.level = $${pi++}`); params.push(parseInt(level)); }
-      if (visibilityScope) { clauses.push(`h.visibility_scope = $${pi++}`); params.push(visibilityScope); }
-      if (tag) { clauses.push(`$${pi++} = ANY(h.tags)`); params.push(tag); }
+      if (model) { clauses.push(`h.model = $${pi++}`); params.push(model); filterParams.push(model); }
+      if (version) { clauses.push(`h.version = $${pi++}`); params.push(parseInt(version)); filterParams.push(parseInt(version)); }
+      if (sourceHash) { clauses.push(`h.source_hash = $${pi++}`); params.push(sourceHash); filterParams.push(sourceHash); }
+      if (level) { clauses.push(`h.level = $${pi++}`); params.push(parseInt(level)); filterParams.push(parseInt(level)); }
+      if (visibilityScope) { clauses.push(`h.visibility_scope = $${pi++}`); params.push(visibilityScope); filterParams.push(visibilityScope); }
+      if (tag) { clauses.push(`$${pi++} = ANY(h.tags)`); params.push(tag); filterParams.push(tag); }
       const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
 
-      const dataQuery = `
-        SELECT h.id, h.source_path, h.source_filename, h.model,
-               h.total_candidates, h.tags, h.metadata, h.created_at,
-               h.level, h.visibility_scope,
-               h.source_hash, h.file_size, h.version, h.run_metadata,
-               COALESCE((h.docklang #>> '{stats,by_type,code}')::int, 0) AS code_blocks,
-               COALESCE(jsonb_array_length(h.docklang -> 'discourse_units'), 0) AS turns,
-               CASE WHEN jsonb_array_length(h.docklang -> 'discourse_units') > 0
-                    THEN (h.docklang #>> '{stats,total_blocks}')::numeric / jsonb_array_length(h.docklang -> 'discourse_units')
-                    ELSE 0 END AS blocks_per_turn,
-               (SELECT count(*) FROM jsonb_array_elements(h.docklang -> 'discourse_units') du
-                WHERE du #>> '{heading}' ILIKE '%— user%' OR du #>> '{heading}' ILIKE '%- user%') AS user_turns,
-               ${sort === 'keyword_hits' ? sortExpr.keyword_hits + ' AS keyword_hits' : '0::bigint AS keyword_hits'},
-               ${sort === 'tag_frequency' ? sortExpr.tag_frequency + ' AS tag_frequency' : '0::bigint AS tag_frequency'}
-        FROM nebula.harvests h
-        ${where}
-        ORDER BY ${sortExpr[sort]} DESC NULLS LAST
-        LIMIT $${pi} OFFSET $${pi + 1}`;
+      // Count-query WHERE: renumber clause placeholders to start at $1 (each clause has
+      // exactly one placeholder) so the count statement matches filterParams ordering.
+      const countWhere = clauses.length > 0
+        ? 'WHERE ' + clauses.map((c, i) => c.replace(/\$\d+/, `$${i + 1}`)).join(' AND ')
+        : '';
 
-      // Parallel count query with same filters (no sort expression needed)
-      const countParams = params.slice(0, pi - 1); // exclude pagination params since they're not yet pushed
-      const countQuery = `SELECT COUNT(*)::int AS total FROM nebula.harvests h ${where}`;
+      // NOTE (2026-07-31): restructured to inner-select + LIMIT first, then compute the
+      // expensive docklang analytics only on the returned page. Previously the per-row
+      // JSONB subqueries (user_turns etc.) ran across ALL harvests before LIMIT applied,
+      // making /api/harvests take ~22s and time out in the Nebula UI.
+      const dataQuery = `
+        SELECT s.id, s.source_path, s.source_filename, s.model,
+               s.total_candidates, s.tags, s.metadata, s.created_at,
+               s.level, s.visibility_scope,
+               s.source_hash, s.file_size, s.version, s.run_metadata,
+               COALESCE((s.docklang #>> '{stats,by_type,code}')::int, 0) AS code_blocks,
+               COALESCE(jsonb_array_length(s.docklang -> 'discourse_units'), 0) AS turns,
+               CASE WHEN jsonb_array_length(s.docklang -> 'discourse_units') > 0
+                    THEN (s.docklang #>> '{stats,total_blocks}')::numeric / jsonb_array_length(s.docklang -> 'discourse_units')
+                    ELSE 0 END AS blocks_per_turn,
+               (SELECT count(*) FROM jsonb_array_elements(s.docklang -> 'discourse_units') du
+                WHERE du #>> '{heading}' ILIKE '%— user%' OR du #>> '{heading}' ILIKE '%- user%') AS user_turns,
+               ${sort === 'keyword_hits' ? "(SELECT count(*) FROM jsonb_array_elements(s.docklang -> 'discourse_units') du WHERE du #>> '{body}' ILIKE '%' || $1 || '%') AS keyword_hits" : '0::bigint AS keyword_hits'},
+               ${sort === 'tag_frequency' ? "(SELECT COALESCE(sum(freq), 0) FROM (SELECT count(*) AS freq FROM nebula.harvests h2, unnest(h2.tags) AS t WHERE t = ANY(s.tags) GROUP BY t) sub) AS tag_frequency" : '0::bigint AS tag_frequency'}
+        FROM (
+          SELECT h.id, h.source_path, h.source_filename, h.model,
+                 h.total_candidates, h.tags, h.metadata, h.created_at,
+                 h.level, h.visibility_scope,
+                 h.source_hash, h.file_size, h.version, h.run_metadata,
+                 h.docklang
+          FROM nebula.harvests h
+          ${where}
+          ORDER BY ${sortExpr[sort]} DESC NULLS LAST
+          LIMIT $${pi} OFFSET $${pi + 1}
+        ) s`;
+
+      // Parallel count query with same filters (no sort expression needed).
+      // NOTE (2026-07-31): countParams must contain ONLY the WHERE-clause params — the
+      // sort-only keyword param ($1) used for keyword_hits caused a bind mismatch
+      // ("supplies 1 parameters, but prepared statement requires 0") whenever the
+      // keyword filter was absent.
+      const countQuery = `SELECT COUNT(*)::int AS total FROM nebula.harvests h ${countWhere}`;
 
       params.push(pageSize, (page - 1) * pageSize);
       const [dataResult, countResult] = await Promise.all([
         pool.query(dataQuery, params),
-        pool.query(countQuery, countParams),
+        pool.query(countQuery, filterParams),
       ]);
 
       const items = dataResult.rows.map(camelCaseRow);
       const total = parseInt(countResult.rows[0].total, 10);
-      res.json({ items, total, page, pageSize, sort });
+      // Dual-shape response: {items,total} is the canonical paginated shape;
+      // {harvests,count} is the legacy shape the nebula-ui DataService reads
+      // (listHarvests → fetchHarvests sets this.harvests.set(data.harvests || [])).
+      // Same backward-compat pattern as the harvest-candidates endpoints.
+      res.json({ items, harvests: items, total, count: total, page, pageSize, sort });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -2881,14 +2931,14 @@ export function createRoutes(pool: Pool): Router {
       const { id } = req.params;
       await client.query('BEGIN');
       // Manual cascade: harvest_candidates has no FK because harvests is a view
-      await client.query('DELETE FROM nebula.harvest_candidates WHERE harvest_id = $1', [id]);
-      const { rowCount } = await client.query('DELETE FROM nebula.harvests WHERE id = $1', [id]);
+      await client.query('UPDATE nebula.harvest_candidates SET valid_until = now() WHERE harvest_id = $1 AND valid_until > now()', [id]);
+      const { rowCount } = await client.query('UPDATE nebula.harvests SET valid_until = now() WHERE id = $1 AND valid_until > now()', [id]);
       if (rowCount === 0) {
         await client.query('ROLLBACK');
         return res.status(404).json({ error: 'Harvest not found' });
       }
       await client.query('COMMIT');
-      res.json({ ok: true });
+      res.json({ expired: true });
     } catch (err: any) {
       await client.query('ROLLBACK');
       res.status(500).json({ error: err.message });
@@ -2906,9 +2956,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/plans/:planRef/candidates', async (req: Request, res: Response) => {
     try {
       const { planRef } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -2941,7 +2989,7 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ planRef, items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ planRef, items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -2952,9 +3000,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/systems/:id/harvest-candidates', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -2978,7 +3024,9 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ systemId: id, items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      const items = dataResult.rows.map(camelCaseRow);
+      const total = parseInt(countResult.rows[0].total, 10);
+      res.json({ systemId: id, items, candidates: items, total, count: total, page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -2989,9 +3037,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/subsystems/:id/harvest-candidates', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3015,7 +3061,9 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ subsystemId: id, items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      const items = dataResult.rows.map(camelCaseRow);
+      const total = parseInt(countResult.rows[0].total, 10);
+      res.json({ subsystemId: id, items, candidates: items, total, count: total, page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3026,9 +3074,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/features/:id/harvest-candidates', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3052,7 +3098,9 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ featureId: id, items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      const items = dataResult.rows.map(camelCaseRow);
+      const total = parseInt(countResult.rows[0].total, 10);
+      res.json({ featureId: id, items, candidates: items, total, count: total, page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3067,9 +3115,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/intent-records — list ALL intent records with pagination
   router.get('/intent-records', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3085,7 +3131,7 @@ export function createRoutes(pool: Pool): Router {
         pool.query('SELECT COUNT(*)::int AS total FROM nebula.intent_records'),
       ]);
 
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3094,9 +3140,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/systems/:id/intent-records', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3119,7 +3163,7 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3129,9 +3173,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/subsystems/:id/intent-records', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3154,7 +3196,7 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3164,9 +3206,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/features/:id/intent-records', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3189,7 +3229,7 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3218,9 +3258,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/agendas — list ALL agendas (unscoped, when no hierarchy selected)
   router.get('/agendas', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3242,7 +3280,7 @@ export function createRoutes(pool: Pool): Router {
         pool.query('SELECT COUNT(*)::int AS total FROM nebula.agendas'),
       ]);
 
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3277,9 +3315,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/systems/:id/agendas', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3325,7 +3361,7 @@ export function createRoutes(pool: Pool): Router {
         a.item_count = agendaItems.length;
       }
 
-      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3335,9 +3371,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/subsystems/:id/agendas', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3382,7 +3416,7 @@ export function createRoutes(pool: Pool): Router {
         a.item_count = agendaItems.length;
       }
 
-      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3392,9 +3426,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/features/:id/agendas', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3439,7 +3471,7 @@ export function createRoutes(pool: Pool): Router {
         a.item_count = agendaItems.length;
       }
 
-      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3455,7 +3487,7 @@ export function createRoutes(pool: Pool): Router {
       const sourceId = req.query.sourceId as string;
       if (!sourceId) return res.status(400).json({ error: 'sourceId query parameter is required' });
       const { rowCount } = await pool.query(
-        `DELETE FROM nebula.agenda_items WHERE agenda_id = $1 AND (source_id = $2 OR source_id IN (SELECT id FROM nebula.intent_records WHERE candidate_id = $2))`,
+        `UPDATE nebula.agenda_items SET valid_until = now() WHERE agenda_id = $1 AND (source_id = $2 OR source_id IN (SELECT id FROM nebula.intent_records WHERE candidate_id = $2)) AND valid_until > now()`,
         [id, sourceId]
       );
       if (rowCount === 0) return res.status(404).json({ error: 'Agenda item not found' });
@@ -3507,9 +3539,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/specifications — list ALL specification revisions (unscoped, from nebula.specifications versioned snapshots)
   router.get('/specifications', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3534,7 +3564,7 @@ export function createRoutes(pool: Pool): Router {
         pool.query('SELECT COUNT(*)::int AS total FROM nebula.active_specifications'),
       ]);
 
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3572,9 +3602,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/systems/:id/specifications', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3615,7 +3643,7 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3625,9 +3653,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/subsystems/:id/specifications', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3668,7 +3694,7 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3678,9 +3704,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/features/:id/specifications', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3721,7 +3745,7 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3736,9 +3760,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/work-requests — list ALL work requests with pagination
   router.get('/work-requests', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3751,7 +3773,7 @@ export function createRoutes(pool: Pool): Router {
         pool.query('SELECT COUNT(*)::int AS total FROM nebula.work_requests'),
       ]);
 
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3777,9 +3799,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/systems/:id/work-requests', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3808,7 +3828,7 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3818,9 +3838,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/subsystems/:id/work-requests', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3849,7 +3867,7 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3859,9 +3877,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/features/:id/work-requests', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -3890,7 +3906,7 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3899,9 +3915,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/harvest-candidates', async (req: Request, res: Response) => {
     try {
       const { harvestId, systemId, subsystemId, featureId } = req.query;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const clauses: string[] = [];
       const vals: any[] = [];
@@ -3935,9 +3949,13 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
+      const items = dataResult.rows.map(camelCaseRow);
+      const total = parseInt(countResult.rows[0].total, 10);
       res.json({
-        items: dataResult.rows.map(camelCaseRow),
-        total: parseInt(countResult.rows[0].total, 10),
+        items,
+        candidates: items,
+        total,
+        count: total,
         page,
         pageSize,
       });
@@ -3954,6 +3972,66 @@ export function createRoutes(pool: Pool): Router {
         'SELECT * FROM nebula.harvest_candidates WHERE id = $1', [id]
       );
       if (!row) return res.status(404).json({ error: 'Harvest candidate not found' });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── /candidates alias — mirrors /harvest-candidates for Assembly UI ──────
+
+  router.get('/candidates', async (req: Request, res: Response) => {
+    try {
+      const { harvestId, systemId, subsystemId, featureId } = req.query;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
+
+      const clauses: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      if (harvestId) { clauses.push(`hc.harvest_id = $${i++}`); vals.push(harvestId); }
+      if (systemId) { clauses.push(`hc.system_id = $${i++}`); vals.push(systemId); }
+      if (subsystemId) { clauses.push(`hc.subsystem_id = $${i++}`); vals.push(subsystemId); }
+      if (featureId) { clauses.push(`hc.feature_id = $${i++}`); vals.push(featureId); }
+
+      const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description, hc.status, hc.tags,
+                  hc.system_id, hc.subsystem_id, hc.feature_id,
+                  hc.work_request_id, hc.completed,
+                  hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
+                  h.source_filename AS harvest_source
+           FROM nebula.harvest_candidates hc
+           LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
+           ${where}
+           ORDER BY hc.created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
+          [...vals, pageSize, offset]
+        ),
+        pool.query(
+          `SELECT COUNT(*)::int AS total
+           FROM nebula.harvest_candidates hc
+           LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
+           ${where}`,
+          vals
+        ),
+      ]);
+
+      const items = dataResult.rows.map(camelCaseRow);
+      const total = parseInt(countResult.rows[0].total, 10);
+      res.json({ items, total, page, pageSize, limit, offset });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/candidates/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [row] } = await pool.query(
+        'SELECT * FROM nebula.harvest_candidates WHERE id = $1', [id]
+      );
+      if (!row) return res.status(404).json({ error: 'Candidate not found' });
       res.json(row);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -4126,16 +4204,20 @@ export function createRoutes(pool: Pool): Router {
       if (hasPlanRef(planRef)) {
         const planRefStr = String(planRef).trim();
         const { rows: [rcr] } = await client.query(
-          `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+          `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
            SELECT 'requirement', $1, 'plan', $2, 'req:spawns_plan', $3
            WHERE NOT EXISTS (
-             SELECT 1 FROM nebula.cross_references
+             SELECT 1 FROM nebula.cross_references_history
              WHERE source_type = 'requirement'
                AND source_id = $1
                AND target_type = 'plan'
                AND target_id = $2
                AND rel_type = 'req:spawns_plan'
+               AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
            )
+           ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
+             WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
+           DO NOTHING
            RETURNING *`,
           [requirement.id, planRefStr, JSON.stringify({
             candidateId: candidate.id,
@@ -4292,16 +4374,20 @@ export function createRoutes(pool: Pool): Router {
         await client.query('BEGIN');
         for (const req of reqs) {
           const { rowCount } = await client.query(
-          `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+          `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
            SELECT 'specification', $1, 'requirement', $2, 'spec:defines_req', '{}'::jsonb
            WHERE NOT EXISTS (
-             SELECT 1 FROM nebula.cross_references
+             SELECT 1 FROM nebula.cross_references_history
              WHERE source_type = 'specification'
                AND source_id = $1
                AND target_type = 'requirement'
                AND target_id = $2
                AND rel_type = 'spec:defines_req'
-           )`,
+               AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
+           )
+           ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
+             WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
+           DO NOTHING`,
           [id, req.id]
         );
         linked += rowCount ?? 0;
@@ -4328,9 +4414,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/specs — paginated list of spec items (flattened agenda_items)
   router.get('/specs', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -4365,7 +4449,7 @@ export function createRoutes(pool: Pool): Router {
         updatedAt: new Date(row.item_updated_at).toISOString(),
       }));
 
-      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -4536,7 +4620,7 @@ export function createRoutes(pool: Pool): Router {
         try {
           const { stdout } = await execFileAsync(
             pythonBin,
-            [scriptPath, searchQuery, '--limit', '15', '--json'],
+            [scriptPath, searchQuery, '--limit', '15', '--layers', 'harvest,kg', '--json'],
             { timeout: 60000, maxBuffer: 10 * 1024 * 1024 }
           );
 
@@ -4665,9 +4749,17 @@ export function createRoutes(pool: Pool): Router {
   router.get('/agent-records', async (req: Request, res: Response) => {
     try {
       const { type, role, systemId, subsystemId, featureId, planRef, tag, search, createdAfter, createdBefore, level, visibilityScope } = req.query;
+      // Pagination: support both REST convention (page/pageSize) and the
+      // MCP client convention (limit/offset, used by nebula-mcp tools).
       const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const limitParam = parseInt(String(req.query.limit ?? ''), 10);
+      const offsetParam = parseInt(String(req.query.offset ?? ''), 10);
+      const pageSize = Number.isFinite(limitParam)
+        ? Math.min(500, Math.max(1, limitParam))
+        : Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = Number.isFinite(offsetParam)
+        ? Math.max(0, offsetParam)
+        : (page - 1) * pageSize;
 
       const clauses: string[] = [];
       const vals: any[] = [];
@@ -4891,9 +4983,9 @@ export function createRoutes(pool: Pool): Router {
   router.delete('/agent-records/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { rowCount } = await pool.query('DELETE FROM nebula.agent_records WHERE id = $1', [id]);
+      const { rowCount } = await pool.query('UPDATE nebula.agent_records SET valid_until = now() WHERE id = $1 AND valid_until > now()', [id]);
       if (rowCount === 0) return res.status(404).json({ error: 'Agent record not found' });
-      res.json({ ok: true });
+      res.json({ expired: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -4947,9 +5039,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/projections — list all projection configs
   router.get('/projections', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -5014,9 +5104,15 @@ export function createRoutes(pool: Pool): Router {
             const safeVal = val.replace(/\$/g, '$$$$');
             content = content.replace(new RegExp(`\\{\\{${escapedKey}\\}\\}`, 'g'), safeVal);
           }
-          const targetPath = proj.target_path
-            .replace(/\{\{id\}\}/g, row.id || '')
-            .replace(/\{\{name\}\}/g, row.name || row.title || 'unknown');
+          // Substitute every {{key}} in the target path (id, name, slug, …) —
+          // same escaping discipline as the content template.
+          let targetPath = proj.target_path;
+          for (const [key, value] of Object.entries(row)) {
+            const val = value === null ? '' : String(value);
+            const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const safeVal = val.replace(/\$/g, '$$$$');
+            targetPath = targetPath.replace(new RegExp(`\\{\\{${escapedKey}\\}\}`, 'g'), safeVal);
+          }
 
           const absPath = path.resolve(AUDIT_ROOT, targetPath);
           if (!absPath.startsWith(AUDIT_ROOT)) {
@@ -5042,9 +5138,9 @@ export function createRoutes(pool: Pool): Router {
   router.delete('/projections/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { rowCount } = await pool.query('DELETE FROM nebula.projections WHERE id = $1', [id]);
+      const { rowCount } = await pool.query('UPDATE nebula.projections SET valid_until = now() WHERE id = $1 AND valid_until > now()', [id]);
       if (rowCount === 0) return res.status(404).json({ error: 'Projection not found' });
-      res.json({ ok: true });
+      res.json({ expired: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -5077,10 +5173,15 @@ export function createRoutes(pool: Pool): Router {
       }
 
       const { rows: [row] } = await pool.query(
-        `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
+           WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
+         DO NOTHING
+         RETURNING *`,
         [sourceType, sourceId, targetType, targetId, relType, JSON.stringify(metadata || {})]
       );
+      if (!row) return res.status(409).json({ error: 'Cross-reference already exists' });
       res.status(201).json(toEpochMs(row, 'created_at'));
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -5091,9 +5192,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/cross-references', async (req: Request, res: Response) => {
     try {
       const { sourceType, sourceId, targetType, targetId, relType } = req.query;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const clauses: string[] = [];
       const vals: any[] = [];
@@ -5139,13 +5238,16 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
-  // DELETE /api/cross-references/:id
+  // DELETE /api/cross-references/:id — soft-delete (expire)
   router.delete('/cross-references/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { rowCount } = await pool.query('DELETE FROM nebula.cross_references WHERE id = $1', [id]);
+      const { rowCount } = await pool.query(
+        'UPDATE nebula.cross_references SET valid_until = now() WHERE id = $1 AND valid_until > now()',
+        [id]
+      );
       if (rowCount === 0) return res.status(404).json({ error: 'Cross-reference not found' });
-      res.status(204).send();
+      res.json({ expired: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -5232,9 +5334,7 @@ export function createRoutes(pool: Pool): Router {
         knowledgeEntityId, nebulaHarvestId, nebulaCandidateId,
         linkType, provenance, minConfidence, maxConfidence,
       } = req.query;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const clauses: string[] = [];
       const vals: any[] = [];
@@ -5357,9 +5457,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/conversations — paginated list of conversation snapshots
   router.get('/conversations', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '20'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -5668,9 +5766,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/knowledge/entities', async (req: Request, res: Response) => {
     try {
       const { section, entity_type, search } = req.query;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const conditions: string[] = [];
       const filterParams: any[] = [];
@@ -5728,9 +5824,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/knowledge/entities/:section/:entityId/relations', async (req: Request, res: Response) => {
     try {
       const { section, entityId } = req.params;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [outbound, inbound, outboundCount, inboundCount] = await Promise.all([
         pool.query(
@@ -5787,9 +5881,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/knowledge/edges', async (req: Request, res: Response) => {
     try {
       const { source_section, source_id, target_section, target_id, relation_type } = req.query;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const conditions: string[] = [];
       const filterParams: any[] = [];
@@ -5826,7 +5918,7 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -5884,9 +5976,7 @@ export function createRoutes(pool: Pool): Router {
       const {
         intent_id, status, search,
       } = req.query;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const conditions: string[] = ['deleted_at IS NULL'];
       const filterParams: any[] = [];
@@ -5990,7 +6080,7 @@ export function createRoutes(pool: Pool): Router {
       const { id } = req.params;
       const now = new Date().toISOString();
       const { rows: [row] } = await pool.query(
-        'UPDATE nebula.op_registry SET deleted_at = $2, updated_at = $2 WHERE id = $1 AND deleted_at IS NULL RETURNING *',
+        'UPDATE nebula.op_registry SET deleted_at = $2, updated_at = $2, valid_until = $2 WHERE id = $1 AND deleted_at IS NULL RETURNING *',
         [id, now]
       );
       if (!row) return res.status(404).json({ error: `Registry entry ${id} not found` });
@@ -6168,9 +6258,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/knowledge/cross-references — list cross-references for graph overlay with pagination. Also includes harvest_candidate spawn-plan cross-references from nebula.cross_references.
   router.get('/knowledge/cross-references', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       // Union knowledge cross-references with harvest_candidate spawn-plan xrefs
       const xrefSubquery = `(
@@ -6388,9 +6476,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/conduit/deleted-plans — shortcut to find all soft-deleted plans
   router.get('/conduit/deleted-plans', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -6462,9 +6548,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/execution/requests', async (req: Request, res: Response) => {
     try {
       const { status } = req.query;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const clauses: string[] = [];
       const filterParams: any[] = [];
@@ -6784,9 +6868,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/execution/receipts', async (req: Request, res: Response) => {
     try {
       const { requestId, type } = req.query;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const clauses: string[] = [];
       const filterParams: any[] = [];
@@ -6850,15 +6932,29 @@ export function createRoutes(pool: Pool): Router {
   //  OPEN QUESTIONS
   // ════════════════════════════════════════════════════════════════
 
-  // GET /api/open-questions?requirementId=&candidateId=&status=
+  // GET /api/open-questions?requirementId=&candidateId=&status=&entityType=&entityId=
   router.get('/open-questions', async (req: Request, res: Response) => {
     try {
-      const { requirementId, candidateId, status } = req.query;
+      const { requirementId, candidateId, status, entityType, entityId } = req.query;
       const clauses: string[] = [];
       const vals: any[] = [];
       let i = 1;
       if (requirementId) { clauses.push(`requirement_id = $${i++}`); vals.push(requirementId); }
       if (candidateId) { clauses.push(`candidate_id = $${i++}`); vals.push(candidateId); }
+      // Entity-scoped filter (e.g. specification-detail / work-request-detail views)
+      // joins through nebula.open_question_entities, which holds current-valid
+      // (entity_type, entity_id) → open_question_id links. Both params must be
+      // present; otherwise the filter is ignored to match prior behavior.
+      if (entityType && entityId) {
+        clauses.push(`EXISTS (
+          SELECT 1 FROM nebula.open_question_entities oqe
+          WHERE oqe.open_question_id = oq.id
+            AND oqe.entity_type = $${i++}
+            AND oqe.entity_id = $${i++}
+            AND oqe.valid_until > now()
+        )`);
+        vals.push(entityType, entityId);
+      }
       if (status) { clauses.push(`status = $${i++}`); vals.push(status); }
       else { clauses.push(`status = 'OPEN'`); }
       const where = 'WHERE ' + clauses.join(' AND ');
@@ -6879,15 +6975,19 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
-  // GET /api/open-questions/:id/answers — list all answers for a question
+  // GET /api/open-questions/:id/answers — list only currently-valid answers
+  // Queries the open_question_answers VIEW (which enforces bitemporal
+  // filtering). Excludes temporal housekeeping columns from the response.
   router.get('/open-questions/:id/answers', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const { rows } = await pool.query(
-        `SELECT id, question_id, role, answer, confidence, reasoning, answered_at
+        `SELECT id, question_id, role, answer, confidence, reasoning,
+                version, answered_at
          FROM nebula.open_question_answers
          WHERE question_id = $1
-         ORDER BY answered_at ASC`, [id]
+         ORDER BY version DESC, answered_at DESC`,
+        [id]
       );
       res.json({ answers: rows, count: rows.length });
     } catch (err: any) {
@@ -6895,7 +6995,9 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
-  // POST /api/open-questions/:id/answers — add a new answer to a question
+  // POST /api/open-questions/:id/answers — record answer via stored procedure
+  // The procedure handles: expire old answer, version increment, INSERT,
+  // answered_by pointer update, and pg_notify('open_question_answered').
   router.post('/open-questions/:id/answers', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
@@ -6912,15 +7014,14 @@ export function createRoutes(pool: Pool): Router {
         res.status(404).json({ error: 'Question not found' });
         return;
       }
-      // Insert answer
+
       const { rows } = await pool.query(
-        `INSERT INTO nebula.open_question_answers (question_id, role, answer, confidence, reasoning)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, question_id, role, answer, confidence, reasoning, answered_at`,
+        `SELECT out_id AS id, out_question_id AS question_id, out_role AS role,
+                out_answer AS answer, out_confidence AS confidence, out_reasoning AS reasoning,
+                out_version AS version, out_answered_at AS answered_at
+         FROM nebula.record_answer($1, $2, $3, $4, $5)`,
         [id, role, answer, confidence || 'MEDIUM', reasoning || null]
       );
-      // Note: legacy single-answer columns (resolution, answered_by, answered_at)
-      // have been removed from the schema. Answers live in open_question_answers only.
       res.status(201).json(rows[0]);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -6997,19 +7098,21 @@ export function createRoutes(pool: Pool): Router {
         res.status(400).json({ error: 'answer and answeredBy are required' });
         return;
       }
-      // Insert into answers table (upsert: one answer per role per question)
-      await pool.query(
-        `INSERT INTO nebula.open_question_answers (question_id, role, answer, confidence, reasoning)
-         VALUES ($1, $2, $3, 'MEDIUM', NULL)
-         ON CONFLICT (question_id, role) DO UPDATE
-         SET answer = EXCLUDED.answer,
-             confidence = EXCLUDED.confidence,
-             reasoning = EXCLUDED.reasoning,
-             answered_at = now()`,
-        [id, answeredBy, answer]
+      // Insert into answers table — append-only, versioned (AGENTS.md I4)
+      const versionResult = await pool.query(
+        `SELECT COALESCE(MAX(version), 0) + 1 AS next_version
+         FROM nebula.open_question_answers
+         WHERE question_id = $1 AND role = $2`,
+        [id, answeredBy]
       );
-      // Open questions no longer store single-answer columns (resolution, answered_by, answered_at).
-      // The update now only sets updated_at. Answers are tracked in open_question_answers.
+      const nextVersion = versionResult.rows[0].next_version;
+
+      await pool.query(
+        `INSERT INTO nebula.open_question_answers (question_id, role, answer, confidence, reasoning, version)
+         VALUES ($1, $2, $3, 'MEDIUM', NULL, $4)`,
+        [id, answeredBy, answer, nextVersion]
+      );
+      // The AFTER INSERT trigger updates open_questions.answered_by automatically.
       const { rows } = await pool.query(
         `UPDATE nebula.open_questions
          SET updated_at = now()
@@ -7064,9 +7167,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/roles — list all roles (governance roles with capabilities)
   router.get('/roles', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query('SELECT * FROM nebula.roles ORDER BY name ASC LIMIT $1 OFFSET $2', [pageSize, offset]),
@@ -7154,9 +7255,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/intents — list with pagination
   router.get('/intents', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -7186,7 +7285,7 @@ export function createRoutes(pool: Pool): Router {
         updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
       }));
 
-      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -7229,9 +7328,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/assessments — list with pagination
   router.get('/assessments', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -7260,7 +7357,7 @@ export function createRoutes(pool: Pool): Router {
         createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
       }));
 
-      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -7302,9 +7399,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/observations — list with pagination
   router.get('/observations', async (req: Request, res: Response) => {
     try {
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
@@ -7328,7 +7423,7 @@ export function createRoutes(pool: Pool): Router {
         createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
       }));
 
-      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -7386,7 +7481,7 @@ export function createRoutes(pool: Pool): Router {
                ELSE qe.entity_id::text
              END AS entity_title
            FROM nebula.open_question_entities qe
-           WHERE qe.open_question_id = oq.id
+           WHERE qe.open_question_id = oq.id AND qe.valid_until > now()
            ORDER BY qe.entity_type
            LIMIT 1
          ) link ON true
@@ -7480,7 +7575,7 @@ export function createRoutes(pool: Pool): Router {
       const { rows } = await pool.query(
         `SELECT id, open_question_id, role, participated_at, contribution
          FROM nebula.deliberation_participants
-         WHERE open_question_id = $1
+         WHERE open_question_id = $1 AND valid_until > now()
          ORDER BY participated_at ASC`,
         [req.params.id]
       );
@@ -7534,7 +7629,7 @@ export function createRoutes(pool: Pool): Router {
       const { rows } = await pool.query(
         `SELECT id, candidate_id, depends_on_id, created_at
          FROM nebula.candidate_dependencies
-         WHERE candidate_id = $1
+         WHERE candidate_id = $1 AND valid_until > now()
          ORDER BY created_at ASC`,
         [req.params.id]
       );
@@ -7706,7 +7801,7 @@ export function createRoutes(pool: Pool): Router {
         postsResult, requirementsResult, agendasResult, candidatesResult,
         harvestsResult, oqResult, intentsResult, assessmentsResult,
         observationsResult, agentRecordsResult, specificationsResult, plansResult,
-        usersResult,
+        usersResult, toDoThreadsResult,
       ] = await Promise.all([
         pool.query('SELECT COUNT(*)::int AS total FROM assembly.posts'),
         pool.query('SELECT COUNT(*)::int AS total FROM nebula.requirements'),
@@ -7721,6 +7816,7 @@ export function createRoutes(pool: Pool): Router {
         pool.query('SELECT COUNT(*)::int AS total FROM nebula.specifications'),
         pool.query('SELECT COUNT(*)::int AS total FROM nebula.plan_status WHERE id IS NOT NULL AND id != \'\''),
         pool.query('SELECT COUNT(*)::int AS total FROM assembly.users'),
+        pool.query("SELECT COUNT(*)::int AS total FROM assembly.thread_list_v WHERE forum_slug = 'to-do'"),
       ]);
 
       res.json({
@@ -7737,6 +7833,7 @@ export function createRoutes(pool: Pool): Router {
         specifications: specificationsResult.rows[0].total,
         plans: plansResult.rows[0].total,
         users: usersResult.rows[0].total,
+        toDoThreads: toDoThreadsResult.rows[0].total,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -7751,9 +7848,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/architect-specs', async (req: Request, res: Response) => {
     try {
       const { requirement_id } = req.query;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const conditions: string[] = [];
       const params: any[] = [];
@@ -7820,7 +7915,7 @@ export function createRoutes(pool: Pool): Router {
     try {
       const { id } = req.params;
       const { rowCount } = await pool.query(
-        'DELETE FROM nebula.architect_specs WHERE id = $1',
+        'UPDATE nebula.architect_specs SET valid_until = now() WHERE id = $1 AND valid_until > now()',
         [id]
       );
       if (rowCount === 0) return res.status(404).json({ error: 'Architect spec not found' });
@@ -7838,9 +7933,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/artifact-provenance', async (req: Request, res: Response) => {
     try {
       const { subject_type, subject_id, source_type, source_id } = req.query;
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
-      const offset = (page - 1) * pageSize;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const conditions: string[] = [];
       const params: any[] = [];
@@ -7916,11 +8009,11 @@ export function createRoutes(pool: Pool): Router {
     try {
       const { id } = req.params;
       const { rowCount } = await pool.query(
-        'DELETE FROM nebula.artifact_provenance WHERE id = $1',
+        'UPDATE nebula.artifact_provenance SET valid_until = now() WHERE id = $1 AND valid_until > now()',
         [id]
       );
       if (rowCount === 0) return res.status(404).json({ error: 'Provenance record not found' });
-      res.json({ ok: true });
+      res.json({ expired: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -7997,7 +8090,7 @@ export function createRoutes(pool: Pool): Router {
                 hc.compilation_readiness, hc.completed, hc.tags,
                 COALESCE(sys.name, '(none)') AS system_name,
                 COALESCE(sub.name, '(none)') AS subsystem_name,
-                (SELECT count(*)::int FROM nebula.candidate_dependencies cd WHERE cd.candidate_id = hc.id) AS dep_count
+                (SELECT count(*)::int FROM nebula.candidate_dependencies cd WHERE cd.candidate_id = hc.id AND cd.valid_until > now()) AS dep_count
          FROM nebula.harvest_candidates hc
          LEFT JOIN nebula.systems sys ON sys.id = hc.system_id
          LEFT JOIN nebula.subsystems sub ON sub.id = hc.subsystem_id
@@ -8143,6 +8236,293 @@ export function createRoutes(pool: Pool): Router {
         if (success) refreshed.push(name);
       }
       res.json({ ok: true, refreshed, skipped, errors });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  SYSTEM INVENTORY (unified cross-schema view)
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/systems/:id/inventory — unified inventory joining
+  // nebula.systems → system_external_ids → terrain / registry / semantics.
+  // Returns all external ID links for a system, each resolved with its
+  // source-layer details (terrain service, registry peer, semantics asset).
+  router.get('/systems/:id/inventory', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params as { id: string };
+
+      // Validate UUID format before hitting the DB
+      const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRe.test(id)) {
+        return res.status(400).json({ error: 'invalid_id', message: `'${id}' is not a valid UUID` });
+      }
+
+      // 1. Fetch the system
+      const { rows: [sys] } = await pool.query(
+        'SELECT id, name, description, path FROM systems WHERE id = $1',
+        [id],
+      );
+      if (!sys) return res.status(404).json({ error: 'System not found' });
+
+      // 2. Fetch all external IDs with resolved source-layer data.
+      //    LEFT JOIN terrain + registry (via service_identity_map) and
+      //    semantics in a single query so each row carries its relevant
+      //    resolved details. Rows where the source_schema doesn't match
+      //    get NULLs for that layer's columns.
+      const { rows } = await pool.query(
+        `SELECT
+           sei.id,
+           sei.source_schema AS "sourceSchema",
+           sei.source_table AS "sourceTable",
+           sei.source_id AS "sourceId",
+           sei.match_confidence AS "matchConfidence",
+           sei.match_method AS "matchMethod",
+           sei.role_in_system AS "roleInSystem",
+           sei.notes,
+           -- terrain layer
+           trs.id AS "terrainId",
+           trs.name AS "terrainName",
+           trs.port AS "terrainPort",
+           trs.status AS "terrainStatus",
+           trs.health_check_url AS "terrainHealthCheckUrl",
+           trs.workspace_path AS "terrainWorkspacePath",
+           trs.is_internal AS "terrainIsInternal",
+           -- registry layer (via service_identity_map from terrain)
+           rs.id AS "registryId",
+           rs.name AS "registryName",
+           rs.default_port AS "registryPort",
+           rs.status AS "registryStatus",
+           rs.description AS "registryDescription",
+           rs.version AS "registryVersion",
+           rs.repository_url AS "registryRepositoryUrl",
+           -- semantics layer
+           ca.id AS "assetId",
+           ca.canonical_asset_id AS "canonicalAssetId",
+           ca.asset_kind AS "assetKind",
+           ca.validity_start AS "assetValidityStart",
+           ca.validity_end AS "assetValidityEnd"
+         FROM nebula.system_external_ids sei
+         LEFT JOIN terrain.runnable_services trs
+           ON sei.source_schema = 'terrain'
+          AND sei.source_table = 'runnable_services'
+          AND trs.id::text = sei.source_id
+         LEFT JOIN registry.service_identity_map sim
+           ON sim.terrain_service_id = trs.id
+          AND sim.valid_until = '9999-12-31 00:00:00+00'
+         LEFT JOIN registry.services rs
+           ON rs.id = sim.registry_service_id
+         LEFT JOIN semantics.canonical_asset ca
+           ON sei.source_schema = 'semantics'
+          AND sei.source_table = 'canonical_asset'
+          AND ca.id::text = sei.source_id
+          AND ca.expired_at IS NULL
+         WHERE sei.system_id = $1
+           AND sei.recorded_until_dt = '9999-12-31 23:59:59+00'
+         ORDER BY sei.source_schema, sei.source_table, trs.name NULLS LAST`,
+        [id],
+      );
+
+      // 3. Assemble: each row gets its resolved source-layer object
+      const externalIds = rows.map((r: any) => {
+        const entry: any = {
+          id: r.id,
+          sourceSchema: r.sourceSchema,
+          sourceTable: r.sourceTable,
+          sourceId: r.sourceId,
+          matchConfidence: r.matchConfidence,
+          matchMethod: r.matchMethod,
+          roleInSystem: r.roleInSystem,
+          notes: r.notes,
+        };
+
+        if (r.terrainId !== null) {
+          entry.terrain = {
+            id: r.terrainId,
+            name: r.terrainName,
+            port: r.terrainPort,
+            status: r.terrainStatus,
+            healthCheckUrl: r.terrainHealthCheckUrl,
+            workspacePath: r.terrainWorkspacePath,
+            isInternal: r.terrainIsInternal,
+          };
+        }
+
+        if (r.registryId !== null) {
+          entry.registry = {
+            id: r.registryId,
+            name: r.registryName,
+            port: r.registryPort,
+            status: r.registryStatus,
+            description: r.registryDescription,
+            version: r.registryVersion,
+            repositoryUrl: r.registryRepositoryUrl,
+          };
+        }
+
+        if (r.assetId !== null) {
+          entry.semantics = {
+            id: r.assetId,
+            canonicalAssetId: r.canonicalAssetId,
+            assetKind: r.assetKind,
+            validityStart: r.assetValidityStart,
+            validityEnd: r.assetValidityEnd,
+          };
+        }
+
+        return entry;
+      });
+
+      // 4. Aggregate counts
+      const counts = {
+        totalExternalIds: externalIds.length,
+        terrainServices: externalIds.filter((e: any) => e.terrain).length,
+        registryServices: externalIds.filter((e: any) => e.registry).length,
+        semanticsAssets: externalIds.filter((e: any) => e.semantics).length,
+        roles: [...new Set(externalIds.map((e: any) => e.roleInSystem).filter(Boolean))] as string[],
+      };
+
+      res.json({
+        system: { id: sys.id, name: sys.name, description: sys.description, path: sys.path },
+        externalIds,
+        counts,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: 'inventory_failed', message: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  SYSTEM EXTERNAL IDS (cross-schema junction)
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/systems/:id/external-ids — list all external mappings for a system
+  router.get('/systems/:id/external-ids', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { offset, limit, page, pageSize } = parsePagination(req.query);
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          'SELECT * FROM system_external_ids WHERE system_id = $1 ORDER BY source_schema, source_table LIMIT $2 OFFSET $3',
+          [id, pageSize, offset]
+        ),
+        pool.query('SELECT COUNT(*)::int AS total FROM system_external_ids WHERE system_id = $1', [id]),
+      ]);
+
+      res.json({
+        items: dataResult.rows.map((r: any) => camelCaseRow(r)),
+        total: parseInt(countResult.rows[0].total, 10),
+        page,
+        pageSize,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/systems/:id/external-ids — create a new external ID mapping
+  router.post('/systems/:id/external-ids', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { sourceSchema, sourceTable, sourceId, matchConfidence = 1.0, matchMethod = 'manual', notes = null, roleInSystem = null } = req.body;
+      if (!sourceSchema || !sourceTable || !sourceId) {
+        return res.status(400).json({ error: 'sourceSchema, sourceTable, and sourceId are required' });
+      }
+      // Verify system exists
+      const { rows: [sys] } = await pool.query('SELECT id FROM systems WHERE id = $1', [id]);
+      if (!sys) return res.status(404).json({ error: 'System not found' });
+
+      const { rows: [eid] } = await pool.query(
+        `INSERT INTO system_external_ids_history (system_id, source_schema, source_table, source_id, match_confidence, match_method, role_in_system, notes, recorded_on_dt, recorded_until_dt)
+         SELECT $1, $2, $3, $4, $5, $6, $7, $8, NOW(), '9999-12-31 23:59:59+00'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM system_external_ids_history
+           WHERE system_id = $1 AND source_schema = $2 AND source_table = $3
+             AND source_id = $4 AND role_in_system IS NOT DISTINCT FROM $7
+             AND recorded_until_dt = '9999-12-31 23:59:59+00'
+         )
+         RETURNING *`,
+        [id, sourceSchema, sourceTable, sourceId, matchConfidence, matchMethod, roleInSystem, notes]
+      );
+
+      if (!eid) {
+        return res.status(409).json({ error: `Mapping already exists for system ${id} → (${sourceSchema}, ${sourceTable}, ${sourceId}) with role ${roleInSystem || '(none)'}` });
+      }
+
+      res.status(201).json(camelCaseRow(eid));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/systems/:id/external-ids/:eid — soft-expire a mapping
+  router.delete('/systems/:id/external-ids/:eid', async (req: Request, res: Response) => {
+    try {
+      const { id, eid } = req.params;
+      const { rowCount } = await pool.query(
+        `UPDATE system_external_ids_history
+         SET recorded_until_dt = NOW()
+         WHERE id = $1::uuid AND system_id = $2::uuid
+           AND recorded_until_dt = '9999-12-31 23:59:59+00'`,
+        [eid, id]
+      );
+      if (rowCount === 0) return res.status(404).json({ error: 'External ID mapping not found' });
+      res.json({ expired: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/external-ids — reverse lookup: find which nebula system owns a given external ID
+  router.get('/external-ids', async (req: Request, res: Response) => {
+    try {
+      const { sourceSchema, sourceTable, sourceId } = req.query;
+      if (!sourceSchema || !sourceTable || !sourceId) {
+        return res.status(400).json({ error: 'sourceSchema, sourceTable, and sourceId query params are required' });
+      }
+      const { rows } = await pool.query(
+        `SELECT eid.*, sys.name AS system_name, sys.description AS system_description
+         FROM system_external_ids eid
+         JOIN systems sys ON sys.id = eid.system_id
+         WHERE eid.source_schema = $1 AND eid.source_table = $2 AND eid.source_id = $3`,
+        [sourceSchema, sourceTable, sourceId]
+      );
+      if (rows.length === 0) {
+        return res.status(404).json({ error: `No system found for ${sourceSchema}.${sourceTable} id=${sourceId}` });
+      }
+      // Return all matches (multi-role is allowed now)
+      res.json({ items: rows.map((r: any) => camelCaseRow(r)), total: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PATCH /api/external-ids/:id — update confidence, method, notes, or role_in_system
+  router.patch('/external-ids/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { matchConfidence, matchMethod, notes, roleInSystem, systemId } = req.body;
+      const sets: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      if (matchConfidence !== undefined) { sets.push(`match_confidence = $${i++}`); vals.push(matchConfidence); }
+      if (matchMethod !== undefined) { sets.push(`match_method = $${i++}`); vals.push(matchMethod); }
+      if (notes !== undefined) { sets.push(`notes = $${i++}`); vals.push(notes); }
+      if (roleInSystem !== undefined) { sets.push(`role_in_system = $${i++}`); vals.push(roleInSystem); }
+      if (systemId !== undefined) { sets.push(`system_id = $${i++}`); vals.push(systemId); }
+      if (sets.length === 0) return res.json({ ok: true });
+      vals.push(id);
+      const { rows: [eid] } = await pool.query(
+        `UPDATE system_external_ids_history
+         SET ${sets.join(', ')}
+         WHERE id = $${i}::uuid AND recorded_until_dt = '9999-12-31 23:59:59+00'
+         RETURNING *`,
+        vals
+      );
+      if (!eid) return res.status(404).json({ error: 'External ID mapping not found' });
+      res.json(camelCaseRow(eid));
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

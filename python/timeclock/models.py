@@ -16,7 +16,7 @@ class Base(DeclarativeBase):
 
 class AgentTimeclock(Base):
     __tablename__ = "agent_timeclock"
-    __table_args__ = {"schema": "nebula"}
+    __table_args__ = {"schema": "tackle"}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     role = Column(Text, nullable=False, index=True)

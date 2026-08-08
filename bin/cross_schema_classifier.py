@@ -18,13 +18,20 @@ import json
 import logging
 import subprocess
 import sys
+from pathlib import Path
 
 import psycopg2
+
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "cross_schema_classifier.log"),
+    ],
 )
 log = logging.getLogger("cross_schema_v2")
 

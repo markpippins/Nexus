@@ -105,7 +105,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     <div className="p-6 space-y-4 font-sans text-zinc-100 overflow-y-auto max-w-7xl mx-auto">
       {/* Top Banner: Integrity Warning / Health Summary */}
       {staleLeasesCount > 0 && (
-        <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-amber-300 font-mono text-xs shadow-sm">
+        <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-amber-300 font-mono text-sm shadow-sm">
           <div className="flex items-center gap-2.5">
             <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 shrink-0">
               <AlertTriangle className="w-5 h-5" />
@@ -139,7 +139,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onClick={() => setCurrentTab('requests')}
           className="p-4 bg-[#18181b] hover:bg-[#202024] border border-[#27272a] hover:border-blue-500/50 rounded-xl transition-all cursor-pointer group shadow-sm flex flex-col justify-between"
         >
-          <div className="text-xs text-zinc-500 font-medium uppercase tracking-wider flex items-center justify-between">
+          <div className="text-sm text-zinc-500 font-medium uppercase tracking-wider flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <FileCode2 className="w-4 h-4 text-blue-400" />
               READY REQUESTS
@@ -159,7 +159,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onClick={() => setCurrentTab('leases')}
           className="p-4 bg-[#18181b] hover:bg-[#202024] border border-[#27272a] hover:border-amber-500/50 rounded-xl transition-all cursor-pointer group shadow-sm flex flex-col justify-between"
         >
-          <div className="text-xs text-zinc-500 font-medium uppercase tracking-wider flex items-center justify-between">
+          <div className="text-sm text-zinc-500 font-medium uppercase tracking-wider flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <Clock className="w-4 h-4 text-amber-400" />
               ACTIVE LEASES
@@ -179,7 +179,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onClick={() => setCurrentTab('attempts')}
           className="p-4 bg-[#18181b] hover:bg-[#202024] border border-[#27272a] hover:border-emerald-500/50 rounded-xl transition-all cursor-pointer group shadow-sm flex flex-col justify-between"
         >
-          <div className="text-xs text-zinc-500 font-medium uppercase tracking-wider flex items-center justify-between">
+          <div className="text-sm text-zinc-500 font-medium uppercase tracking-wider flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <PlayCircle className="w-4 h-4 text-emerald-400" />
               RUNNING ATTEMPTS
@@ -199,7 +199,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onClick={() => setCurrentTab('integrity-scan')}
           className="p-4 bg-[#18181b] hover:bg-[#202024] border border-amber-500/30 hover:border-amber-500/60 rounded-xl transition-all cursor-pointer group shadow-sm flex flex-col justify-between"
         >
-          <div className="text-xs text-amber-500 font-bold uppercase tracking-wider flex items-center justify-between">
+          <div className="text-sm text-amber-500 font-bold uppercase tracking-wider flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <ShieldAlert className="w-4 h-4 text-amber-500" />
               INTEGRITY ALERTS
@@ -222,7 +222,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4 text-blue-400" />
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-200">
+              <span className="text-sm font-bold uppercase tracking-wider text-zinc-200">
                 Requests Status Distribution
               </span>
             </div>
@@ -253,7 +253,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
             <div className="flex items-center gap-2">
               <PlayCircle className="w-4 h-4 text-emerald-400" />
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-200">
+              <span className="text-sm font-bold uppercase tracking-wider text-zinc-200">
                 Attempts Outcome Distribution
               </span>
             </div>
@@ -295,7 +295,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
             <div className="flex items-center gap-2">
               <Cpu className="w-4 h-4 text-emerald-400" />
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-200">
+              <span className="text-sm font-bold uppercase tracking-wider text-zinc-200">
                 Executor Fleet Workload & Stale Leases
               </span>
             </div>
@@ -318,7 +318,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   className="p-3.5 bg-[#09090b] border border-[#27272a] hover:border-[#3f3f46] rounded-lg transition-all cursor-pointer flex flex-col justify-between space-y-2"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-zinc-100 truncate">{executor.executor_id}</span>
+                    <span className="font-bold text-sm text-zinc-100 truncate">{executor.executor_id}</span>
                     <span className={`px-1.5 py-0.5 text-[10px] rounded border font-mono ${
                       isStale 
                         ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' 
@@ -354,7 +354,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
               <div className="flex items-center gap-2">
                 <ShieldAlert className="w-4 h-4 text-amber-400" />
-                <span className="text-xs font-bold uppercase tracking-wider text-zinc-200">
+                <span className="text-sm font-bold uppercase tracking-wider text-zinc-200">
                   Integrity Pathologies
                 </span>
               </div>
@@ -372,7 +372,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div 
                   key={item.kind}
                   onClick={() => setCurrentTab('integrity-scan')}
-                  className="p-2.5 bg-[#09090b] border border-[#27272a] hover:border-[#3f3f46] rounded-lg flex items-center justify-between text-xs cursor-pointer"
+                  className="p-2.5 bg-[#09090b] border border-[#27272a] hover:border-[#3f3f46] rounded-lg flex items-center justify-between text-sm cursor-pointer"
                 >
                   <span className="truncate text-zinc-300 text-[11px]">{item.title}</span>
                   <span className={`px-1.5 py-0.2 text-[10px] rounded font-bold ${
@@ -389,7 +389,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <button
             onClick={() => setCurrentTab('integrity-scan')}
-            className="w-full mt-4 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 rounded-lg font-bold text-xs transition-colors flex items-center justify-center gap-2"
+            className="w-full mt-4 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2"
           >
             <span>Launch Full Integrity Scanner</span>
             <ArrowUpRight className="w-3.5 h-3.5" />

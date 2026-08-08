@@ -27,7 +27,6 @@ import { ErrorBannerComponent } from '../error-banner/error-banner.component';
         <div class="w-header">🌐 Servers</div>
         <div class="w-body">
           <div class="agent-line"><span [class.dot-on]="mcpOnline()" [class.dot-off]="!mcpOnline()">●</span> MCP <span class="agent-st">{{ mcpOnline() ? 'ON' : 'OFF' }}</span></div>
-          <div class="agent-line"><span [class.dot-on]="chatOnline()" [class.dot-off]="!chatOnline()">●</span> Chat <span class="agent-st">{{ chatOnline() ? 'ON' : 'OFF' }}</span></div>
         </div>
       </div>
       <!-- Agent Status -->
@@ -81,7 +80,6 @@ export class OverviewDashboardComponent {
   readonly offline = computed(() => this.pipe.offline());
   readonly builder = computed(() => this.pipe.builder());
   readonly mcpOnline = computed(() => this.pipe.mcpOnline());
-  readonly chatOnline = computed(() => this.pipe.chatOnline());
   readonly agents = computed(() => this.pipe.agents().filter(a => a.status !== 'gone'));
   readonly planCounts = computed(() => {
     const s = this.pipe.state();

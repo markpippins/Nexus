@@ -67,6 +67,15 @@ export const toolDefinitions: MCPToolDefinition[] = [
     },
   },
   {
+    name: "bootstrap_unclaimed_plans",
+    description:
+      "Find pending plans without receipts and bootstrap their PLAN_CREATE receipt and builder ticket. Safe to call repeatedly; concurrent calls are single-flight.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
     name: "report_plan_metadata",
     description: "Report or update metadata for a specific plan",
     inputSchema: {
@@ -581,14 +590,15 @@ export const toolDefinitions: MCPToolDefinition[] = [
   {
     name: "runtime_transition",
     description: "Apply a transition event to a WorkRequest. Validates against the state machine. " +
-      "Allowed types: WR_CLAIMED, WR_ACKED, WR_SETTLED, WR_REJECTED, WR_FAILED, WR_NOOP, WR_DEFERRED.",
+      "Allowed types: WR_VALIDATED, WR_CLAIMED, WR_ACKED, WR_SETTLED, WR_REJECTED, WR_FAILED, WR_NOOP, WR_DEFERRED " +
+      "(WR_VALIDATED: VALIDATED→QUEUED — used by the ADR-006 cascade admission subscriber).",
     inputSchema: {
       type: "object",
       properties: {
         wrId: { type: "string", description: "WorkRequest ID" },
         type: {
           type: "string",
-          description: "Event type (WR_CLAIMED, WR_ACKED, WR_SETTLED, WR_REJECTED, WR_FAILED, WR_NOOP, WR_DEFERRED)",
+          description: "Event type (WR_VALIDATED, WR_CLAIMED, WR_ACKED, WR_SETTLED, WR_REJECTED, WR_FAILED, WR_NOOP, WR_DEFERRED)",
         },
         payload: {
           type: "object",
@@ -614,6 +624,13 @@ export function registerToolHandlers(
   return {
     query_conduit_state: async (_args: any) => {
       return watcher.getState();
+    },
+    bootstrap_unclaimed_plans: async (_args: any) => {
+      const result = await watcher.bootstrapUnclaimedPlans();
+      return {
+        ...result,
+        timestamp: new Date().toISOString(),
+      };
     },
     report_plan_metadata: async (args: {
       planId: string;

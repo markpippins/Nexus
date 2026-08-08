@@ -61,6 +61,27 @@ def _get_or_create_session(session_id: str | None) -> str:
         return new_id
 
 
+def _drain_queue(sess: dict) -> None:
+    """Drop stale events left over from a previous request on this session.
+
+    The worker thread always enqueues a trailing ``{"type": "done"}``
+    sentinel (consumed only by the SSE stream path, which reads until
+    ``done``). POST-only chat requests consume exactly one item, so the
+    sentinel — plus any unconsumed response/error items from an
+    interrupted turn — stays in the queue and is what the NEXT request's
+    single ``get()`` pops, producing an empty (or wrong) reply.
+
+    Draining before each new request keeps the queue aligned so the
+    handler's ``get()`` reads THIS request's response.
+    """
+    with _sessions_lock:
+        while True:
+            try:
+                sess["queue"].get_nowait()
+            except queue.Empty:
+                break
+
+
 # ── HTTP Handler ──────────────────────────────────────────────────
 
 class OperatorHandler(BaseHTTPRequestHandler):
@@ -143,6 +164,12 @@ class OperatorHandler(BaseHTTPRequestHandler):
         # Run inference in a background thread, stream via queue
         sess = _sessions[session_id]
         sess["status"] = "processing"
+
+        # A previous request on this session leaves a trailing "done"
+        # sentinel (and possibly unconsumed response/error items) in the
+        # queue. Drain it so this request's single get() reads THIS
+        # request's response instead of stale leftovers.
+        _drain_queue(sess)
 
         def _run():
             try:

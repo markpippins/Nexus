@@ -4,8 +4,11 @@
  * Creates a unique temporary schema, runs initDb() (which calls createSchema()),
  * verifies all tables and columns are created correctly, then drops the schema.
  *
- * This guards against ordering regressions like the role_models migration bug
- * where ALTER TABLE entries referenced a table before its CREATE TABLE ran.
+ * This guards against ordering regressions where ALTER TABLE entries
+ * referenced a table before its CREATE TABLE ran (the historical
+ * role_models migration bug), and against migration DDL depending on
+ * tables that have since been removed (role_config/role_models were
+ * replaced by config_bundle and dropped 2026-08-07).
  *
  * Prerequisites:
  *   - PostgreSQL on localhost:5432 (or CONDUIT_PG_DSN env var)
@@ -57,13 +60,22 @@ describe("createSchema on fresh database", () => {
       );
       const tables = tablesResult.rows.map((r: any) => r.table_name);
 
-      expect(tables).toContain("plans");
-      expect(tables).toContain("receipts");
+      // conduit.plans removed 2026-08-07 (empty legacy table; runtime reads
+      // nebula.plans, the legacy-compat view over nebula.implementation_plans_history)
       expect(tables).toContain("sessions");
       expect(tables).toContain("circuit_breaker");
-      expect(tables).toContain("tickets");
 
-      // ── VECTOR SCHEMA: verify all AI config tables exist ──
+      // tickets & receipts live in the shared vision schema — createSchema
+      // creates them qualified as ${VISION_SCHEMA}.tickets / .receipts
+      const visionTablesResult = await pool.query(
+        `SELECT table_name FROM information_schema.tables
+         WHERE table_schema = 'vision' ORDER BY table_name`
+      );
+      const visionTables = visionTablesResult.rows.map((r: any) => r.table_name);
+      expect(visionTables).toContain("tickets");
+      expect(visionTables).toContain("receipts");
+
+      // ── TACKLE SCHEMA: verify all AI config tables exist ──
       const vectorTablesResult = await pool.query(
         `SELECT table_name FROM information_schema.tables
          WHERE table_schema = 'tackle' ORDER BY table_name`
@@ -101,42 +113,36 @@ describe("createSchema on fresh database", () => {
       expect(harnessCol?.is_nullable).toBe("YES");
 
       // ── VIEWS: plan_status and plans_by_status ──
+      // These views are owned by nebula-srv (migration 040) and live in the
+      // nebula schema — conduit-mcp no longer creates them (createSchema
+      // drops any leftover test-schema views). Runtime reads use
+      // nebula.plan_status / nebula.plans_by_status explicitly.
       const viewsResult = await pool.query(
         `SELECT table_name FROM information_schema.views
-         WHERE table_schema = $1 ORDER BY table_name`,
-        [testSchema]
+         WHERE table_schema = 'nebula' ORDER BY table_name`
       );
       const views = viewsResult.rows.map((r: any) => r.table_name);
 
       expect(views).toContain("plan_status");
       expect(views).toContain("plans_by_status");
 
-      // ── PLANS: verify all columns exist (DDL + migration-added) ──
-      const plansColsResult = await pool.query(
-        `SELECT column_name FROM information_schema.columns
-         WHERE table_schema = $1 AND table_name = 'plans'
-         ORDER BY ordinal_position`,
-        [testSchema]
-      );
-      const plansCols = plansColsResult.rows.map((r: any) => r.column_name);
-      expect(plansCols).toContain("prompt_ref");
-      expect(plansCols).toContain("deleted");
-      expect(plansCols).toContain("notes");
-      expect(plansCols).toContain("priority");
+      // ── PLANS: no longer created on fresh schemas (removed 2026-08-07) ──
+      // Runtime reads nebula.plans; legacy-DB preservation is covered by the
+      // "legacy schema without schema_version" test below.
 
       // ── CIRCUIT_BREAKER: verify all migration-added columns ──
-      const cbColsResult = await pool.query(
+      const cbBreakerColsResult = await pool.query(
         `SELECT column_name FROM information_schema.columns
          WHERE table_schema = $1 AND table_name = 'circuit_breaker'
          ORDER BY ordinal_position`,
         [testSchema]
       );
-      const cbCols = cbColsResult.rows.map((r: any) => r.column_name);
-      expect(cbCols).toContain("paused");
-      expect(cbCols).toContain("max_retries_per_model");
-      expect(cbCols).toContain("retry_delay_seconds");
-      expect(cbCols).toContain("max_fallbacks");
-      expect(cbCols).toContain("push_back_to_pending");
+      const cbBreakerCols = cbBreakerColsResult.rows.map((r: any) => r.column_name);
+      expect(cbBreakerCols).toContain("paused");
+      expect(cbBreakerCols).toContain("max_retries_per_model");
+      expect(cbBreakerCols).toContain("retry_delay_seconds");
+      expect(cbBreakerCols).toContain("max_fallbacks");
+      expect(cbBreakerCols).toContain("push_back_to_pending");
 
       // ── SCHEMA VERSIONING: verify migration records exist ──
       // initDb() runs both v1 (baseline, no-op) and v2 (creates index).
@@ -154,12 +160,11 @@ describe("createSchema on fresh database", () => {
       expect(versions).toContain(7);
       expect(versions).toContain(8);
 
-      // ── V6 COLUMN: verify deadline column exists in tickets ──
+      // ── V6 COLUMN: verify deadline column exists in vision.tickets ──
       const ticketColsResult = await pool.query(
         `SELECT column_name FROM information_schema.columns
-         WHERE table_schema = $1 AND table_name = 'tickets'
-         ORDER BY ordinal_position`,
-        [testSchema]
+         WHERE table_schema = 'vision' AND table_name = 'tickets'
+         ORDER BY ordinal_position`
       );
       const ticketCols = ticketColsResult.rows.map((r: any) => r.column_name);
       expect(ticketCols).toContain("deadline");
@@ -195,11 +200,13 @@ describe("createSchema on fresh database", () => {
     expect(pool1).toBeDefined();
 
     try {
-      // Verify both migrations were applied on first run
+      // Verify all migrations were applied on first run (35 total as of 2026-08-07;
+      // declared out of order in the migrations array, so compare sorted)
       const svAfterFirst = await pool1.query(
         `SELECT version FROM schema_version ORDER BY version`
       );
-      expect(svAfterFirst.rows.map((r: any) => r.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(svAfterFirst.rows.map((r: any) => r.version).sort((a: number, b: number) => a - b))
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);
     } finally {
       await pool1.end();
     }
@@ -214,8 +221,9 @@ describe("createSchema on fresh database", () => {
         `SELECT version FROM schema_version ORDER BY version`
       );
       const versions = svAfterSecond.rows.map((r: any) => r.version);
-      // Still exactly [1, 2] — no duplicate rows from re-applying
-      expect(versions).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+      // Still exactly [1..35] — no duplicate rows from re-applying
+      expect(versions.sort((a: number, b: number) => a - b))
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);
 
       // The v2 index should still exist (not re-created, just still there)
       const indexResult = await pool2.query(
@@ -229,7 +237,7 @@ describe("createSchema on fresh database", () => {
     }
   }, 30000);
 
-  test("schema at v5 correctly applies only v6 when runMigrations runs", async () => {
+  test("schema stripped to v5 correctly replays all pending migrations (v6-v35)", async () => {
     const testSchema = process.env.CONDUIT_PG_SCHEMA!;
     expect(testSchema).toMatch(/^test_conduit_/);
 
@@ -242,55 +250,44 @@ describe("createSchema on fresh database", () => {
       const svBefore = await poolV6.query(
         `SELECT version FROM schema_version ORDER BY version`
       );
-      expect(svBefore.rows.map((r: any) => r.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(svBefore.rows.map((r: any) => r.version).sort((a: number, b: number) => a - b))
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);
     } finally {
       await poolV6.end();
     }
 
     // ── Step 2: Strip back to v5 state ──
     // Remove migration v6's artifacts: drop the deadline column from tickets, delete v6 record.
-    // Also drop v7's constraint change so we can re-test v6 isolation.
+    // v7/v8 are no-ops (role_config/role_models replaced by config_bundle, tables removed
+    // 2026-08-07) — nothing to undo for them; just delete their schema_version rows.
     const adminClient = await adminPool.connect();
     try {
-      await adminClient.query(`SET search_path TO ${testSchema},tackle`);
-      await adminClient.query(`ALTER TABLE tickets DROP COLUMN IF EXISTS deadline`);
-      // Restore the old 4-role CHECK constraint (undo v7)
-      await adminClient.query(`
-        DO $MIGRATE$
-        DECLARE v_conname text;
-        BEGIN
-          SELECT conname INTO v_conname
-          FROM pg_constraint
-          WHERE conrelid = 'tackle.role_config'::regclass AND contype = 'c';
-          IF v_conname IS NOT NULL THEN
-            EXECUTE format('ALTER TABLE tackle.role_config DROP CONSTRAINT %I', v_conname);
-          END IF;
-          ALTER TABLE tackle.role_config ADD CONSTRAINT role_config_role_check
-            CHECK (role IN ('planner','builder','reviewer','critic'));
-        END;
-        $MIGRATE$
-      `);
-      await adminClient.query(`DELETE FROM schema_version WHERE version = 6`);
-      await adminClient.query(`DELETE FROM schema_version WHERE version = 7`);
-      await adminClient.query(`DELETE FROM schema_version WHERE version = 8`);
+      // Strip the schema back to v5 state: remove every schema_version row
+      // above 5. (v6's deadline column lives on the shared vision.tickets
+      // table — createSchema DDL — and cannot be stripped; the migration
+      // itself is replayed idempotently in Step 4.)
+      // Schema-qualified: the admin pool's default search_path does not
+      // include the test schema (a shared public.schema_version exists).
+      await adminClient.query(`DELETE FROM ${testSchema}.schema_version WHERE version > 5`);
     } finally {
       adminClient.release();
     }
 
     // ── Step 3: Verify we're now at v5 state ──
     const svCheck = await adminPool.query(
-      `SELECT version FROM schema_version ORDER BY version`
+      `SELECT version FROM ${testSchema}.schema_version ORDER BY version`
     );
     expect(svCheck.rows.map((r: any) => r.version)).toEqual([1, 2, 3, 4, 5]);
 
+    // deadline is a shared vision.tickets column (createSchema DDL) — it
+    // must NOT be stripped by the v5 rollback.
     const deadlineCheck = await adminPool.query(
       `SELECT EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_schema = $1 AND table_name = 'tickets' AND column_name = 'deadline'
-      ) AS exists`,
-      [testSchema]
+        WHERE table_schema = 'vision' AND table_name = 'tickets' AND column_name = 'deadline'
+      ) AS exists`
     );
-    expect(deadlineCheck.rows[0].exists).toBe(false);
+    expect(deadlineCheck.rows[0].exists).toBe(true);
 
     // Confirm v2, v3, v4, v5 artifacts are still present
     const tagsCheck = await adminPool.query(
@@ -305,20 +302,15 @@ describe("createSchema on fresh database", () => {
     const notesCheck = await adminPool.query(
       `SELECT EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_schema = $1 AND table_name = 'plans' AND column_name = 'notes'
+        WHERE table_schema = $1 AND table_name = 'sessions' AND column_name = 'notes'
       ) AS exists`,
       [testSchema]
     );
-    expect(notesCheck.rows[0].exists).toBe(true);
+    expect(notesCheck.rows[0].exists).toBe(false);
 
-    const priorityCheck = await adminPool.query(
-      `SELECT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema = $1 AND table_name = 'plans' AND column_name = 'priority'
-      ) AS exists`,
-      [testSchema]
-    );
-    expect(priorityCheck.rows[0].exists).toBe(true);
+    // NOTE: plans-table checks removed — conduit.plans is no longer created on
+    // fresh schemas (2026-08-07). Legacy-DB plans preservation is covered by
+    // the "legacy schema without schema_version" test below.
 
     const indexCheck = await adminPool.query(
       `SELECT indexname FROM pg_indexes
@@ -336,26 +328,26 @@ describe("createSchema on fresh database", () => {
       const svResult = await poolV5.query(
         `SELECT version FROM schema_version ORDER BY version`
       );
-      // v6 and v7 should both be applied from v5 baseline
-      expect(svResult.rows.map((r: any) => r.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+      // v6..v35 should all be re-applied from the v5 baseline (replay path)
+      expect(svResult.rows.map((r: any) => r.version).sort((a: number, b: number) => a - b))
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);
 
-      // deadline column should exist now (added by v6)
+      // deadline column exists on shared vision.tickets (createSchema DDL;
+      // v6 replay is a no-op on fresh schemas)
       const ticketCols = await poolV5.query(
         `SELECT column_name FROM information_schema.columns
-         WHERE table_schema = $1 AND table_name = 'tickets'
-         ORDER BY ordinal_position`,
-        [testSchema]
+         WHERE table_schema = 'vision' AND table_name = 'tickets'
+         ORDER BY ordinal_position`
       );
       const ticketNames = ticketCols.rows.map((r: any) => r.column_name);
       expect(ticketNames).toContain("deadline");
 
-      // Verify deadline column metadata (nullable TEXT)
+      // Verify deadline column metadata (TIMESTAMPTZ)
       const deadlineMeta = await poolV5.query(
         `SELECT data_type, is_nullable FROM information_schema.columns
-         WHERE table_schema = $1 AND table_name = 'tickets' AND column_name = 'deadline'`,
-        [testSchema]
+         WHERE table_schema = 'vision' AND table_name = 'tickets' AND column_name = 'deadline'`
       );
-      expect(deadlineMeta.rows[0].data_type).toBe("text");
+      expect(deadlineMeta.rows[0].data_type).toBe("timestamp with time zone");
       expect(deadlineMeta.rows[0].is_nullable).toBe("YES");
 
       // v2, v3, v4, v5 artifacts survive (not duplicated or lost)
@@ -367,14 +359,8 @@ describe("createSchema on fresh database", () => {
       );
       expect(sessCols.rows.map((r: any) => r.column_name)).toContain("tags");
 
-      const plansCols = await poolV5.query(
-        `SELECT column_name FROM information_schema.columns
-         WHERE table_schema = $1 AND table_name = 'plans'
-         ORDER BY ordinal_position`,
-        [testSchema]
-      );
-      expect(plansCols.rows.map((r: any) => r.column_name)).toContain("priority");
-      expect(plansCols.rows.map((r: any) => r.column_name)).toContain("notes");
+      // NOTE: plans-table column checks removed — conduit.plans is no longer
+      // created on fresh schemas (2026-08-07).
 
       const indexResult = await poolV5.query(
         `SELECT indexname FROM pg_indexes
@@ -408,11 +394,10 @@ describe("createSchema on fresh database", () => {
 
       // Strip all migration artifacts left by tests 1 and 2 so we start from
       // a pure legacy state. Dependencies must be dropped in order:
-      // views (which depend on plans.*) → column → index → schema_version.
+      // views → index → schema_version. (No plans ALTERs here — test 1 no
+      // longer creates conduit.plans; the legacy plans is created fresh below.)
       await adminClient.query(`DROP VIEW IF EXISTS plans_by_status`);
       await adminClient.query(`DROP VIEW IF EXISTS plan_status CASCADE`);
-      await adminClient.query(`ALTER TABLE plans DROP COLUMN IF EXISTS notes`);
-      await adminClient.query(`ALTER TABLE plans DROP COLUMN IF EXISTS priority`);
       await adminClient.query(`DROP INDEX IF EXISTS idx_sessions_created_at`);
       await adminClient.query(`DROP TABLE IF EXISTS schema_version`);
 
@@ -569,29 +554,6 @@ describe("createSchema on fresh database", () => {
           created_at       TEXT NOT NULL,
           updated_at       TEXT NOT NULL
         );
-
-        CREATE TABLE IF NOT EXISTS tackle.role_config (
-          id            TEXT PRIMARY KEY,
-          role          TEXT NOT NULL UNIQUE CHECK(role IN (
-                           'planner','builder','reviewer','critic'
-                         )),
-          provider_id   TEXT NOT NULL REFERENCES tackle.providers(id),
-          harness_id    TEXT NOT NULL REFERENCES tackle.harnesses(id),
-          model_id      TEXT NOT NULL REFERENCES tackle.models(id),
-          extra_params  TEXT NOT NULL DEFAULT '{}',
-          created_at    TEXT NOT NULL,
-          updated_at    TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS tackle.role_models (
-          id          TEXT PRIMARY KEY,
-          role        TEXT NOT NULL REFERENCES tackle.role_config(role) ON DELETE CASCADE,
-          model_id    TEXT NOT NULL REFERENCES tackle.models(id),
-          priority    INTEGER NOT NULL DEFAULT 0,
-          provider_id TEXT REFERENCES tackle.providers(id),
-          harness_id  TEXT REFERENCES tackle.harnesses(id),
-          UNIQUE(role, model_id)
-        );
       `);
 
       // Legacy views — drop first in case a previous test left them
@@ -686,23 +648,34 @@ describe("createSchema on fresh database", () => {
     try {
       // ── Step 3: Verify all migrations applied to the legacy schema ──
 
-      // schema_version should have [1, 2, 3] — baseline recorded, v2 index, v3 notes
+      // schema_version should be [1..35] — initDb bootstrapped the legacy
+      // schema through the full chain (v7/v8 role_config no-ops; v24/v30
+      // legacy-view guards; v17 v18-shape guard; v3/v4 plans guards).
       const svResult = await pool.query(
         `SELECT version FROM schema_version ORDER BY version`
       );
-      expect(svResult.rows.map((r: any) => r.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(svResult.rows.map((r: any) => r.version))
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);
 
-      // v7/v8: role_config CHECK constraint migrations are now no-ops
-      // (table replaced by config_bundle). Verify the table still exists
-      // from the pre-migration DDL and has the original CHECK.
-      const rcConstraint = await pool.query(
-        `SELECT conname, pg_get_constraintdef(oid) AS constraint_def
-         FROM pg_constraint
-         WHERE conrelid = 'tackle.role_config'::regclass AND contype = 'c'`
+      // v7/v8: role_config CHECK constraint migrations are no-ops
+      // (table replaced by config_bundle, tables removed 2026-08-07).
+      // Verify the no-op replay does NOT recreate the removed tables.
+      const rcTableCheck = await pool.query(
+        `SELECT EXISTS (
+           SELECT 1 FROM pg_class c
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE n.nspname = 'tackle' AND c.relname = 'role_config'
+         ) AS exists`
       );
-      // Should still exist from the pre-migration DDL (wasn't dropped)
-      // but the no-op migrations didn't modify it.
-      expect(rcConstraint.rows.length).toBeGreaterThanOrEqual(0);
+      expect(rcTableCheck.rows[0].exists).toBe(false);
+      const rmTableCheck = await pool.query(
+        `SELECT EXISTS (
+           SELECT 1 FROM pg_class c
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE n.nspname = 'tackle' AND c.relname = 'role_models'
+         ) AS exists`
+      );
+      expect(rmTableCheck.rows[0].exists).toBe(false);
 
       // v6: deadline column should exist now
       const ticketCols = await pool.query(

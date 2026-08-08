@@ -57,7 +57,7 @@ export function ThemeToggle({ storageKey }: ThemeToggleProps) {
   return (
     <button
       onClick={cycle}
-      className="fixed top-2 right-2 z-50 w-7 h-7 rounded-md flex items-center justify-center bg-gray-800/60 hover:bg-gray-700 text-gray-400 hover:text-gray-200 transition-all text-xs"
+      className="fixed top-2 right-2 z-50 w-7 h-7 rounded-md flex items-center justify-center bg-gray-800/60 hover:bg-gray-700 text-gray-400 hover:text-gray-200 transition-all text-sm"
       title={`Theme: ${theme} (click to cycle)`}
     >
       {THEME_ICONS[theme]}

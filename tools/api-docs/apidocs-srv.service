@@ -1,0 +1,34 @@
+[Unit]
+Description=API Docs Index — Swagger UI + ReDoc over all *-srv OpenAPI specs (port 3180)
+Documentation=https://github.com/nexus/tools/api-docs
+After=network.target
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/tools/api-docs
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=PYTHONUNBUFFERED=1
+Environment=PATH=/home/codex/opt/anaconda3/bin:/usr/local/bin:/usr/bin:/bin
+
+# ── Executable ─────────────────────────────────────────────────────────
+# HTTPS on 0.0.0.0:8443 (self-signed cert auto-generated into tools/api-docs/certs/)
+# alongside plain HTTP on 127.0.0.1:3180 for localhost tooling/health checks.
+ExecStart=/home/codex/opt/anaconda3/bin/python3 /home/codex/dev/nexus/tools/api-docs/serve_docs.py --host 127.0.0.1 --port 3180 --tls-cert /home/codex/dev/nexus/tools/api-docs/certs/apidocs-selfsigned.crt --tls-key /home/codex/dev/nexus/tools/api-docs/certs/apidocs-selfsigned.key
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart behavior ───────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=3
+
+# ── Hardening ──────────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/codex/dev/nexus/tools/api-docs
+
+[Install]
+WantedBy=default.target

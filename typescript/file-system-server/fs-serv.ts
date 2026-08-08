@@ -6,6 +6,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import * as winston from 'winston';
+import { startHeartbeat } from 'heartbeat-client';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,6 +37,19 @@ const logger = winston.createLogger({
 dotenv.config({ path: path.resolve(__dirname, '.env.local') });
 
 const PORT = process.env.FS_SERVER_PORT || 4040;
+
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: Error & { code?: string }) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`file-system-server: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[file-system-server] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[file-system-server] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
 
 // --- NEW: Allow command-line override for root directory ---
 // Usage: node server.js [rootDir]
@@ -493,4 +507,20 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
     logger.info(`Server listening on port ${PORT}`, { port: PORT });
     logger.info(`File system root is ${FS_ROOT_DIR}`, { fsRootDir: FS_ROOT_DIR });
+
+    startHeartbeat({
+      serviceId: 115,
+      serviceName: 'file-system-server',
+      interval: 30,
+      log: (...args: any[]) => console.log(new Date().toISOString(), '[heartbeat file-system-server]', ...args),
+    });
+});
+
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    logger.error(`file-system-server: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+  } else {
+    logger.error('file-system-server: listen error:', err.message);
+  }
+  process.exit(1);
 });

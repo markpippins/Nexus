@@ -6,6 +6,8 @@ import {
   RegistryStatusEvent,
   HealthState,
 } from '../../services/registry-status.service.js';
+import { TerrainService, TerrainServiceStatus } from '../../services/terrain.service.js';
+import { LocalConfigService } from '../../services/local-config.service.js';
 
 type SortField = 'name' | 'status' | 'heartbeat' | 'responseTime';
 type FilterType = 'all' | HealthState;
@@ -36,7 +38,7 @@ type FilterType = 'all' | HealthState;
             </span>
             <div>
               <h2 class="text-xl font-semibold text-[rgb(var(--color-text-base))]">System Health</h2>
-              <p class="text-xs text-[rgb(var(--color-text-muted))]">
+              <p class="text-sm text-[rgb(var(--color-text-muted))]">
                 @if (connected()) {
                   <span class="text-green-500">●</span> Live
                   @if (lastSnapshotAt(); as t) {
@@ -54,7 +56,7 @@ type FilterType = 'all' | HealthState;
           <div class="flex items-center gap-2">
             <button
               (click)="reconnect()"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors"
               [class.text-green-500]="!connected()"
               [class.bg-green-500/10]="!connected()"
               [class.text-[rgb(var(--color-text-muted))]]="connected()"
@@ -102,25 +104,25 @@ type FilterType = 'all' | HealthState;
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div class="p-4 bg-[rgb(var(--color-surface-muted))] rounded-xl border border-[rgb(var(--color-border-muted))] cursor-pointer" (click)="filterType.set('all')" [class.ring-2]="filterType() === 'all'" [class.ring-[rgb(var(--color-accent-ring))]]="filterType() === 'all'">
               <div class="flex items-center justify-between mb-1">
-                <span class="text-xs font-medium text-[rgb(var(--color-text-muted))]">Total Services</span>
+                <span class="text-sm font-medium text-[rgb(var(--color-text-muted))]">Total Services</span>
                 <span class="text-2xl font-bold text-[rgb(var(--color-text-base))]">{{ totalCount() }}</span>
               </div>
             </div>
             <div class="p-4 bg-green-500/5 rounded-xl border border-green-500/20 cursor-pointer" (click)="filterType.set('HEALTHY')" [class.ring-2]="filterType() === 'HEALTHY'" [class.ring-green-500]="filterType() === 'HEALTHY'">
               <div class="flex items-center justify-between mb-1">
-                <span class="text-xs font-medium text-green-600">Healthy</span>
+                <span class="text-sm font-medium text-green-600">Healthy</span>
                 <span class="text-2xl font-bold text-green-500">{{ healthyCount() }}</span>
               </div>
             </div>
             <div class="p-4 bg-yellow-500/5 rounded-xl border border-yellow-500/20 cursor-pointer" (click)="filterType.set('DEGRADED')" [class.ring-2]="filterType() === 'DEGRADED'" [class.ring-yellow-500]="filterType() === 'DEGRADED'">
               <div class="flex items-center justify-between mb-1">
-                <span class="text-xs font-medium text-yellow-600">Degraded</span>
+                <span class="text-sm font-medium text-yellow-600">Degraded</span>
                 <span class="text-2xl font-bold text-yellow-500">{{ degradedCount() }}</span>
               </div>
             </div>
             <div class="p-4 bg-red-500/5 rounded-xl border border-red-500/20 cursor-pointer" (click)="filterType.set('UNHEALTHY')" [class.ring-2]="filterType() === 'UNHEALTHY'" [class.ring-red-500]="filterType() === 'UNHEALTHY'">
               <div class="flex items-center justify-between mb-1">
-                <span class="text-xs font-medium text-red-500">Unhealthy</span>
+                <span class="text-sm font-medium text-red-500">Unhealthy</span>
                 <span class="text-2xl font-bold text-red-500">{{ unhealthyCount() }}</span>
               </div>
             </div>
@@ -130,28 +132,28 @@ type FilterType = 'all' | HealthState;
           <div class="flex items-center gap-2 mb-4 pb-3 border-b border-[rgb(var(--color-border-base))]">
             <div class="flex gap-1 flex-wrap">
               <button (click)="filterType.set('all')"
-                class="px-2.5 py-1 text-xs rounded-md transition-colors"
+                class="px-2.5 py-1 text-sm rounded-md transition-colors"
                 [class.bg-[rgb(var(--color-surface-hover))]]="filterType() === 'all'"
                 [class.text-[rgb(var(--color-text-base))]]="filterType() === 'all'"
                 [class.text-[rgb(var(--color-text-muted))]]="filterType() !== 'all'"
               >All</button>
               <button (click)="filterType.set('OFFLINE')"
-                class="px-2.5 py-1 text-xs rounded-md transition-colors"
+                class="px-2.5 py-1 text-sm rounded-md transition-colors"
                 [class.bg-red-500/10]="filterType() === 'OFFLINE'"
                 [class.text-red-500]="filterType() === 'OFFLINE'"
                 [class.text-[rgb(var(--color-text-muted))]]="filterType() !== 'OFFLINE'"
               >Offline</button>
               <button (click)="filterType.set('UNKNOWN')"
-                class="px-2.5 py-1 text-xs rounded-md transition-colors"
+                class="px-2.5 py-1 text-sm rounded-md transition-colors"
                 [class.bg-gray-500/10]="filterType() === 'UNKNOWN'"
                 [class.text-gray-500]="filterType() === 'UNKNOWN'"
                 [class.text-[rgb(var(--color-text-muted))]]="filterType() !== 'UNKNOWN'"
               >Unknown</button>
             </div>
             <span class="mx-2 text-[rgb(var(--color-text-subtle))]">|</span>
-            <label class="text-xs text-[rgb(var(--color-text-muted))]">Sort:</label>
+            <label class="text-sm text-[rgb(var(--color-text-muted))]">Sort:</label>
             <select (change)="onSortChange($event)"
-              class="text-xs bg-[rgb(var(--color-surface-muted))] border border-[rgb(var(--color-border-muted))] rounded px-2 py-1 text-[rgb(var(--color-text-base))]">
+              class="text-sm bg-[rgb(var(--color-surface-muted))] border border-[rgb(var(--color-border-muted))] rounded px-2 py-1 text-[rgb(var(--color-text-base))]">
               <option value="name">Name</option>
               <option value="status">Status</option>
               <option value="heartbeat">Last Heartbeat</option>
@@ -184,6 +186,28 @@ type FilterType = 'all' | HealthState;
                         [class.animate-pulse]="svc.healthState === 'UNHEALTHY' || svc.healthState === 'OFFLINE'"
                       ></span>
                       <span class="font-medium text-sm text-[rgb(var(--color-text-base))] truncate">{{ svc.serviceName }}</span>
+                      <!-- Terrain live probe status -->
+                      @if (terrainProbeStatuses().get(svc.serviceName); as probeStatus) {
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium"
+                          [class.bg-green-500/10]="probeStatus === 'ON'"
+                          [class.text-green-600]="probeStatus === 'ON'"
+                          [class.bg-red-500/10]="probeStatus === 'OFFLINE'"
+                          [class.text-red-500]="probeStatus === 'OFFLINE'"
+                          [class.bg-yellow-500/10]="probeStatus === 'DEGRADED'"
+                          [class.text-yellow-600]="probeStatus === 'DEGRADED'"
+                          [class.bg-gray-500/10]="probeStatus !== 'ON' && probeStatus !== 'OFFLINE' && probeStatus !== 'DEGRADED'"
+                          [class.text-gray-500]="probeStatus !== 'ON' && probeStatus !== 'OFFLINE' && probeStatus !== 'DEGRADED'"
+                          title="Terrain probe: {{ probeStatus }}"
+                        >
+                          <span class="w-1.5 h-1.5 rounded-full"
+                            [class.bg-green-500]="probeStatus === 'ON'"
+                            [class.bg-red-500]="probeStatus === 'OFFLINE'"
+                            [class.bg-yellow-500]="probeStatus === 'DEGRADED'"
+                            [class.bg-gray-400]="probeStatus !== 'ON' && probeStatus !== 'OFFLINE' && probeStatus !== 'DEGRADED'"
+                          ></span>
+                          probe:{{ probeStatus }}
+                        </span>
+                      }
                     </div>
                     @if (svc.version) {
                       <span class="ml-4 text-[10px] text-[rgb(var(--color-text-muted))] font-mono">v{{ svc.version }}</span>
@@ -280,7 +304,7 @@ type FilterType = 'all' | HealthState;
                       </div>
                       <div class="flex-1 min-w-0 pb-2">
                         <div class="flex items-center justify-between">
-                          <span class="font-medium text-xs text-[rgb(var(--color-text-base))]">{{ evt.serviceName }}</span>
+                          <span class="font-medium text-sm text-[rgb(var(--color-text-base))]">{{ evt.serviceName }}</span>
                           <span class="text-[10px] text-[rgb(var(--color-text-subtle))]">{{ evt.changedAt | date:'HH:mm:ss' }}</span>
                         </div>
                         <div class="text-[10px] text-[rgb(var(--color-text-muted))]">
@@ -298,7 +322,7 @@ type FilterType = 'all' | HealthState;
                 </div>
               } @else {
                 <div class="p-6 text-center text-[rgb(var(--color-text-muted))] bg-[rgb(var(--color-surface-muted))] rounded-lg border border-[rgb(var(--color-border-muted))]">
-                  <p class="text-xs">No status transitions recorded yet</p>
+                  <p class="text-sm">No status transitions recorded yet</p>
                 </div>
               }
             </div>
@@ -319,7 +343,7 @@ type FilterType = 'all' | HealthState;
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-green-500 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd" />
                       </svg>
-                      <span class="text-xs font-medium text-[rgb(var(--color-text-base))] flex-1">{{ hb.serviceName }}</span>
+                      <span class="text-sm font-medium text-[rgb(var(--color-text-base))] flex-1">{{ hb.serviceName }}</span>
                       @if (hb.version) {
                         <span class="text-[10px] text-[rgb(var(--color-text-muted))] font-mono">v{{ hb.version }}</span>
                       }
@@ -329,7 +353,7 @@ type FilterType = 'all' | HealthState;
                 </div>
               } @else {
                 <div class="p-6 text-center text-[rgb(var(--color-text-muted))] bg-[rgb(var(--color-surface-muted))] rounded-lg border border-[rgb(var(--color-border-muted))]">
-                  <p class="text-xs">No heartbeat activity yet</p>
+                  <p class="text-sm">No heartbeat activity yet</p>
                 </div>
               }
             </div>
@@ -365,6 +389,8 @@ type FilterType = 'all' | HealthState;
 })
 export class SystemHealthComponent implements OnDestroy {
   private statusService = inject(RegistryStatusService);
+  private terrainService = inject(TerrainService);
+  private localConfigService = inject(LocalConfigService);
 
   /** Base URL of the service-registry (e.g. http://localhost:8085) */
   baseUrl = input.required<string>();
@@ -398,6 +424,9 @@ export class SystemHealthComponent implements OnDestroy {
     const select = event.target as HTMLSelectElement;
     this.sortField.set(select.value as SortField);
   }
+
+  /** Live probe statuses from terrain, keyed by service name */
+  terrainProbeStatuses = signal<Map<string, TerrainServiceStatus>>(new Map());
 
   /** Currently expanded service (shows history) */
   expandedService = signal<string | null>(null);
@@ -465,6 +494,8 @@ export class SystemHealthComponent implements OnDestroy {
       const url = this.baseUrl();
       if (url) {
         this.connect(url);
+        this.fetchTerrainProbes();
+        this.startProbePolling();
       }
     });
   }
@@ -484,6 +515,7 @@ export class SystemHealthComponent implements OnDestroy {
     const url = this.baseUrl();
     if (url) {
       this.connect(url);
+      this.fetchTerrainProbes();
     }
   }
 
@@ -519,7 +551,42 @@ export class SystemHealthComponent implements OnDestroy {
     return count;
   }
 
+  /** Fetch live probe results from terrain and match by service name. */
+  private async fetchTerrainProbes(): Promise<void> {
+    const terrainUrl = this.localConfigService.terrainServerUrl();
+    if (!terrainUrl) return;
+    try {
+      const summary = await this.terrainService.getHealthSummary(terrainUrl);
+      const probeMap = new Map<string, TerrainServiceStatus>();
+      for (const srv of summary.mcpServers) {
+        if (srv.liveStatus) probeMap.set(srv.name, srv.liveStatus);
+      }
+      for (const srv of summary.runnableServices) {
+        if (srv.liveStatus) probeMap.set(srv.name, srv.liveStatus);
+      }
+      this.terrainProbeStatuses.set(probeMap);
+    } catch {
+      // Silently ignore terrain probe fetch failures
+    }
+  }
+
+  /** Periodic terrain probe poll (30s) */
+  private probeInterval: ReturnType<typeof setInterval> | null = null;
+
+  private startProbePolling(): void {
+    this.stopProbePolling();
+    this.probeInterval = setInterval(() => this.fetchTerrainProbes(), 30_000);
+  }
+
+  private stopProbePolling(): void {
+    if (this.probeInterval) {
+      clearInterval(this.probeInterval);
+      this.probeInterval = null;
+    }
+  }
+
   ngOnDestroy(): void {
     this.statusService.disconnect();
+    this.stopProbePolling();
   }
 }

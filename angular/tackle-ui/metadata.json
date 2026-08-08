@@ -1,0 +1,6 @@
+{
+  "name": "Tackle Inference Configurator",
+  "description": "Sleek inference configuration platform for AI providers, harnesses, models, config bundles, roles, tasks, memory procedures, and circuit breaker recovery settings.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,7 +1,14 @@
 <div 
   class="w-40 h-40 group relative rounded-lg shadow-md overflow-hidden"
   [title]="result().description + '\nby ' + result().photographer">
-  <a href="#" (click)="openLink($event)">
+  @if (sourceMagnetPath(); as magnetSegment) {
+    <button
+      (click)="onMagnetClick($event, magnetSegment)"
+      title="Navigate to magnet: {{ magnetSegment.join(' › ') }}"
+      class="absolute top-1 left-1 z-20 text-[10px] truncate max-w-[60px] px-1.5 py-0.5 rounded-sm bg-black/40 text-white/80 hover:bg-black/60 hover:text-white transition-colors"
+    >{{ magnetSegment[magnetSegment.length - 1] }}</button>
+  }
+  <a [attr.href]="result().url || null" target="_blank" rel="noopener noreferrer" (click)="openLink($event)" [class.pointer-events-none]="!result().url">
     <img [src]="result().thumbnailUrl" [alt]="result().description" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105">
   </a>
   <div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent pointer-events-none"></div>

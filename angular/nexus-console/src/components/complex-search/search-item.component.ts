@@ -16,7 +16,7 @@ import { SearchItem } from '../../models/google-custom-search.model.js';
             </div>
           }
           <div class="flex-grow min-w-0">
-            <a [href]="it.link" target="_blank" rel="noopener noreferrer" class="text-[rgb(var(--color-accent-text))] text-xs truncate block">{{ it.displayLink }}</a>
+            <a [href]="it.link" target="_blank" rel="noopener noreferrer" class="text-[rgb(var(--color-accent-text))] text-sm truncate block">{{ it.displayLink }}</a>
             <a [href]="it.link" target="_blank" rel="noopener noreferrer">
               <h3 class="text-xl font-semibold text-[rgb(var(--color-text-base))] hover:text-[rgb(var(--color-accent-text))] transition-colors mt-1" [innerHTML]="it.htmlTitle"></h3>
             </a>

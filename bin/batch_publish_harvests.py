@@ -19,19 +19,33 @@ import json
 import logging
 import subprocess
 import sys
+import os
 import time
 import urllib.request
 import urllib.error
+from pathlib import Path
+
+# Add rover source dir so `assembly_publish` is importable without PYTHONPATH
+# (matches the pattern in analyst_answer_questions.py /
+# architect_process_todo.py).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "python", "rover"))
+
+from assembly_publish import publish_harvest_to_forum
 
 log = logging.getLogger("batch_publish")
 
-ASSEMBLY_MCP_URL = "http://localhost:3112"
 DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
+
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "batch_publish_harvests.log"),
+    ],
 )
 
 
@@ -43,41 +57,9 @@ def psql(sql: str, timeout: int = 30) -> tuple[int, str]:
     return result.returncode, result.stdout.strip()
 
 
-def assembly_mcp_call(method: str, params: dict) -> dict:
-    payload = json.dumps({
-        "jsonrpc": "2.0",
-        "id": "1",
-        "method": method,
-        "params": params,
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        ASSEMBLY_MCP_URL,
-        data=payload,
-        headers={"Content-Type": "application/json"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            return json.loads(r.read().decode())
-    except urllib.error.HTTPError as e:
-        body_text = e.read().decode() if e.fp else "(no body)"
-        log.error("  Assembly MCP %s: %s", method, body_text[:500])
-        return {"error": True, "status": e.code, "body": body_text[:500]}
-    except Exception as e:
-        log.error("  Assembly MCP call failed: %s", e)
-        return {"error": True}
-
-
-def publish_harvest_to_forum(harvest_id: str) -> bool:
-    result = assembly_mcp_call("tools/call", {
-        "name": "assembly_publish_harvest",
-        "arguments": {"harvest_id": harvest_id},
-    })
-    if isinstance(result, dict) and result.get("error"):
-        return False
-    content = result.get("result", {}).get("content", [])
-    if content:
-        log.info("  Forum post result: %s", content[0].get("text", "")[:200])
-    return True
+# publish_harvest_to_forum is imported from assembly_publish (rover dir).
+# It targets assembly-srv REST on port 3107 directly — the old MCP path
+# (ASSEMBLY_MCP_URL=3112 service-broker) was broken; see agent record 0a932f14.
 
 
 def get_unpublished_harvests(limit: int | None = None) -> list[dict]:

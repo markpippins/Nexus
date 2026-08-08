@@ -29,7 +29,7 @@ type FunnelTab = 'ready' | 'promoted';
         <div class="flex items-center h-full px-4 gap-1">
           <button
             (click)="activeTab.set('ready')"
-            class="h-full px-4 text-xs font-medium transition-colors border-b-2"
+            class="h-full px-4 text-sm font-medium transition-colors border-b-2"
             [class.border-[rgb(var(--color-accent-ring))]]="activeTab() === 'ready'"
             [class.text-[rgb(var(--color-text-base))]]="activeTab() === 'ready'"
             [class.border-transparent]="activeTab() !== 'ready'"
@@ -43,7 +43,7 @@ type FunnelTab = 'ready' | 'promoted';
           </button>
           <button
             (click)="activeTab.set('promoted')"
-            class="h-full px-4 text-xs font-medium transition-colors border-b-2"
+            class="h-full px-4 text-sm font-medium transition-colors border-b-2"
             [class.border-[rgb(var(--color-accent-ring))]]="activeTab() === 'promoted'"
             [class.text-[rgb(var(--color-text-base))]]="activeTab() === 'promoted'"
             [class.border-transparent]="activeTab() !== 'promoted'"
@@ -121,10 +121,10 @@ type FunnelTab = 'ready' | 'promoted';
                     [class.opacity-50]="activeBandMin() !== null && activeBandMin() !== band.min"
                   >
                     <div class="flex items-center justify-between mb-1">
-                      <span class="text-xs font-medium text-[rgb(var(--color-text-muted))]">
+                      <span class="text-sm font-medium text-[rgb(var(--color-text-muted))]">
                         {{ band.label }}
                       </span>
-                      <span class="text-xs text-[rgb(var(--color-text-base))] font-mono">{{ band.count }}</span>
+                      <span class="text-sm text-[rgb(var(--color-text-base))] font-mono">{{ band.count }}</span>
                     </div>
                     <div class="h-7 bg-[rgb(var(--color-surface-muted))] rounded-md overflow-hidden">
                       <div
@@ -151,7 +151,7 @@ type FunnelTab = 'ready' | 'promoted';
             <div class="flex flex-wrap items-center gap-3 mb-6 p-4 bg-[rgb(var(--color-surface-muted))] rounded-xl border border-[rgb(var(--color-border-muted))]">
               <!-- Threshold Slider -->
               <div class="flex items-center gap-3 flex-1 min-w-[200px]">
-                <label class="text-xs text-[rgb(var(--color-text-muted))] whitespace-nowrap">Threshold:</label>
+                <label class="text-sm text-[rgb(var(--color-text-muted))] whitespace-nowrap">Threshold:</label>
                 <input
                   type="range"
                   min="0"
@@ -161,13 +161,13 @@ type FunnelTab = 'ready' | 'promoted';
                   (input)="onThresholdChange($event)"
                   class="flex-1 h-1.5 accent-green-500"
                 />
-                <span class="text-xs font-mono font-medium text-[rgb(var(--color-text-base))] w-10 text-right">{{ threshold() | percent:'1.0-0' }}</span>
+                <span class="text-sm font-mono font-medium text-[rgb(var(--color-text-base))] w-10 text-right">{{ threshold() | percent:'1.0-0' }}</span>
               </div>
 
               <!-- System Filter -->
               <select
                 (change)="onSystemFilterChange($event)"
-                class="text-xs bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-muted))] rounded px-2 py-1.5 text-[rgb(var(--color-text-base))]"
+                class="text-sm bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-muted))] rounded px-2 py-1.5 text-[rgb(var(--color-text-base))]"
               >
                 <option value="">All Systems</option>
                 @for (sys of systemNames(); track sys) {
@@ -178,7 +178,7 @@ type FunnelTab = 'ready' | 'promoted';
               <!-- Status Filter -->
               <select
                 (change)="onStatusFilterChange($event)"
-                class="text-xs bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-muted))] rounded px-2 py-1.5 text-[rgb(var(--color-text-base))]"
+                class="text-sm bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-muted))] rounded px-2 py-1.5 text-[rgb(var(--color-text-base))]"
               >
                 <option value="">All Statuses</option>
                 <option value="pending">Pending</option>

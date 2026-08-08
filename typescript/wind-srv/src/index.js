@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { routes } from './routes/index.js';
 import { errorHandler } from './error-handler.js';
+import { startHeartbeat } from 'heartbeat-client';
 
 dotenv.config({ path: '../../.env' });
 dotenv.config({ path: '.env' });
@@ -76,6 +77,13 @@ const server = app.listen(PORT, () => {
   console.log(`  /api/instances, /api/tickets, /api/receipts, /api/validate, /api/v-roles,`);
   console.log(`  /api/events, /api/event-types`);
 
+  startHeartbeat({
+    serviceId: 122,
+    serviceName: 'wind-srv',
+    interval: 30,
+    log: (...args) => console.log(new Date().toISOString(), '[heartbeat wind-srv]', ...args),
+  });
+
   // ── Background Services ──────────────────────────────────────
 
   // Start the event processor (polls unconsumed events every 5s)
@@ -100,6 +108,13 @@ const server = app.listen(PORT, () => {
     console.log('[wind-srv] NATS listener started');
   }).catch(err => {
     console.error('[wind-srv] Failed to start NATS listener:', err.message);
+  });
+
+  // Start the PG notification listener (bridges trigger→NATS for WRP events)
+  import('./pg-notify-listener.js').then(async ({ startPgNotifyListener }) => {
+    registerCleanup(await startPgNotifyListener());
+  }).catch(err => {
+    console.error('[wind-srv] Failed to start PG notify listener:', err.message);
   });
 });
 

@@ -11,6 +11,19 @@ loadEnv();
 // Port 3112 is taken by service-broker-mcp. assembly-srv runs on 3107.
 const PORT = parseInt(process.env.ASSEMBLY_MCP_PORT || "3113", 10);
 
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: Error & { code?: string }) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`assembly-mcp: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[assembly-mcp] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[assembly-mcp] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -74,9 +87,18 @@ app.get("/state", async (_req, res) => {
 // ── Start ───────────────────────────────────────────────────────────
 async function main() {
   console.log(`[assembly-mcp] Starting (no SQL dependency — delegates to assembly-srv at port 3107)...`);
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`[assembly-mcp] Server running on http://localhost:${PORT}`);
     console.log(`[assembly-mcp] MCP endpoint: POST http://localhost:${PORT}/`);
+  });
+
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`assembly-mcp: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    } else {
+      console.error('assembly-mcp: listen error:', err.message);
+    }
+    process.exit(1);
   });
 }
 

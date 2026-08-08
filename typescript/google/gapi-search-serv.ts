@@ -9,6 +9,19 @@ import * as path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const PORT = process.env.SEARCH_SERVER_PORT || 8082;
+
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: any) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`gapi-search: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[gapi-search] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[gapi-search] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const SEARCH_ENGINE_ID = process.env.SEARCH_ENGINE_ID;
 

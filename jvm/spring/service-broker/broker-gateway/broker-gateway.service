@@ -16,6 +16,10 @@ Environment=JAVA_HOME=/usr
 Environment=MAVEN_OPTS=-Xmx512m
 Environment=PATH=/usr/bin:/bin:/usr/local/bin
 
+# Shared secrets — gitignored .env file with GOOGLE_SEARCH_API_KEY, GOOGLE_SEARCH_ENGINE_ID
+# Spring Boot maps GOOGLE_SEARCH_API_KEY → google.search.api.key
+EnvironmentFile=/home/codex/dev/nexus/.env
+
 # ── Executable ─────────────────────────────────────────────────────────
 ExecStart=/usr/bin/mvn spring-boot:run
 ExecReload=/bin/kill -HUP $MAINPID

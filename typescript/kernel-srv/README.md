@@ -70,3 +70,19 @@ that conduit already listens to. Adding more listeners does not affect kernel
 write throughput — `LISTEN` is multiplexed per-session. The unified
 observability layer should be one subscriber listening across all pg_notify
 channels (PEB, Vision, Conduit, kernel), not four separate polling loops.
+
+
+---
+
+## REST API & OpenAPI
+
+- Endpoint inventory: [`API.md`](./API.md) (generated from source route registrations)
+- OpenAPI 3.0 spec: [`openapi.yaml`](./openapi.yaml) (generated from source route registrations)
+
+Regenerate after route changes:
+
+```bash
+cd nexus
+python3 tools/api-docs/extract_routes.py --out /tmp/api_inventory.json
+python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json
+```

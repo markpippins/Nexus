@@ -190,6 +190,7 @@ def _call_ollama(
     payload = {
         "model": model,
         "messages": messages,
+        "stream": False,
         "options": {
             "temperature": temperature,
             "num_predict": max_tokens,

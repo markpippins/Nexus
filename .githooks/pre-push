@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# Pre-push hook with two independent gates:
+#
+# 1. Inline shared-utils sync check: block the push if the inlined copies in
+#    tackle-ui / conduit-ui / wind-ui (angular/*/src/utils) have drifted from
+#    the @nexus/shared-react reference or fail to typecheck.
+#
+# 2. API-docs regeneration gate: if the pushed commits touch route-bearing
+#    service sources, the api-docs toolchain (tools/api-docs/), or any
+#    committed openapi.yaml / API.md, regenerate the OpenAPI specs + endpoint
+#    references in the worktree (check_drift.py --update). If that refresh
+#    produced changes, the push is BLOCKED so the refreshed docs get committed
+#    and ship with the next push.
+#
+# RANGE-AWARE: reads the refs git feeds on stdin and only runs the slow checks
+# when the pushed commits touch the relevant paths. Otherwise it skips in
+# milliseconds. Unresolvable ranges (stale/missing refs, new branches without
+# a merge-base) fall back to running the checks conservatively.
+#
+# One-time setup per clone (commits the hook dir as the hooks path):
+#   git config core.hooksPath .githooks
+#
+# Notes:
+# - The checks gate on the pushed RANGE, not the worktree: uncommitted local
+#   edits are not part of the push and are not checked (run `npm run
+#   check:inline` / `python3 tools/api-docs/check_drift.py` manually to verify
+#   worktree state).
+# - core.hooksPath disables any scripts in .git/hooks/ (none exist here); if
+#   other hooks are ever needed, move them into this dir.
+set -u
+
+ROOT="$(git rev-parse --show-toplevel)"
+PKG="$ROOT/angular/shared-react"
+ZERO="0000000000000000000000000000000000000000"
+
+# Paths that, when touched by a pushed commit, require the full inline check:
+#   - the reference implementation, its check script, and npm wiring
+#   - the inlined copies in the three UIs
+#   - this hook itself
+WATCH_RE='^(angular/shared-react/(utils/|scripts/|package\.json)|angular/(tackle-ui|conduit-ui|wind-ui)/src/utils/|\.githooks/pre-push)'
+
+# Paths that, when touched, require the api-docs refresh:
+#   - the api-docs toolchain (extractor / generators / docs)
+#   - route-bearing service sources (Express + FastAPI)
+#   - the semantics-srv registry generator
+#   - committed specs / endpoint references / this hook
+WATCH_RE_API='^(tools/api-docs/|\.githooks/pre-push$|.*/openapi\.yaml$|.*/API\.md$|typescript/[^/]+-srv/src/|typescript/semantics-srv/scripts/|python/[^/]+-srv/src/)'
+
+# ---------------------------------------------------------------------------
+# Gate 1 — inline shared-utils sync check
+# ---------------------------------------------------------------------------
+
+# Skip on minimal clones without the package or npm — the hook is a safety
+# net, not a hard requirement for environments that can't run it.
+if [ ! -f "$PKG/package.json" ] || ! command -v npm >/dev/null 2>&1; then
+  echo "pre-push: skipping inline sync check (shared-react package or npm not available)" >&2
+  exit 0
+fi
+
+need_check=0
+need_api=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "$local_ref" ] && continue
+  # Deletions push nothing to check.
+  if [ "$local_sha" = "$ZERO" ]; then
+    continue
+  fi
+  # Resolve the base of the range being pushed.
+  if [ "$remote_sha" != "$ZERO" ]; then
+    base="$remote_sha"
+  else
+    # New ref (remote sha unknown to this repo). Prefer the branch's own
+    # remote-tracking ref — the exact state git last knew the remote to have,
+    # same semantics as the non-ZERO case above. Then try the default branch
+    # tip. Only if both fail run the checks conservatively.
+    base=""
+    case "$local_ref" in
+      refs/heads/*)
+        track="refs/remotes/origin/${local_ref#refs/heads/}"
+        if git rev-parse --verify -q "$track" >/dev/null 2>&1; then
+          base="$track"
+        fi
+        ;;
+    esac
+    if [ -z "$base" ]; then
+      base="$(git merge-base "$local_sha" refs/remotes/origin/HEAD 2>/dev/null \
+              || git merge-base "$local_sha" refs/remotes/origin/main 2>/dev/null \
+              || true)"
+    fi
+    if [ -z "$base" ]; then
+      need_check=1
+      need_api=1
+      break
+    fi
+  fi
+  # An empty changed list means the range is clean of watch paths (skip);
+  # a failed diff means the range is unresolvable (run conservatively).
+  # --no-renames: a watch-path file renamed away still shows as a delete of
+  # the watch path (rename detection would only list the new name and could
+  # let a rename-out skip the check).
+  if ! changed="$(git diff --name-only --no-renames "$base" "$local_sha" 2>/dev/null)"; then
+    need_check=1
+    need_api=1
+    break
+  fi
+  if printf '%s\n' "$changed" | grep -qE "$WATCH_RE"; then
+    need_check=1
+  fi
+  if printf '%s\n' "$changed" | grep -qE "$WATCH_RE_API"; then
+    need_api=1
+  fi
+done
+
+if [ "$need_check" -eq 0 ] && [ "$need_api" -eq 0 ]; then
+  echo "pre-push: pushed commits don't touch shared utils, inlined copies, service routes, or api docs — skipping checks"
+  exit 0
+fi
+
+# --- Gate 1: inline sync -------------------------------------------------
+if [ "$need_check" -eq 1 ]; then
+  if ! (cd "$PKG" && npm run check:inline >/dev/null 2>&1); then
+    echo "pre-push check failed: inlined shared utils have drifted from @nexus/shared-react." >&2
+    echo "  Fix: cd angular/shared-react && npm run check:inline" >&2
+    echo "  Then sync the drifted copies from the reference (cp utils/<file>.ts <app>/src/utils/)." >&2
+    exit 1
+  fi
+fi
+
+# --- Gate 2: api-docs refresh --------------------------------------------
+if [ "$need_api" -eq 1 ]; then
+  echo "pre-push: route-bearing sources or api docs touched — refreshing api docs"
+  if ! command -v python3 >/dev/null 2>&1 || [ ! -f "$ROOT/tools/api-docs/check_drift.py" ]; then
+    echo "pre-push: skipping api-docs gate (python3 or tools/api-docs/check_drift.py not available)" >&2
+  elif ! (cd "$ROOT" && python3 tools/api-docs/check_drift.py --update >/dev/null 2>&1); then
+    echo "pre-push check failed: api-docs regeneration could not be reconciled." >&2
+    echo "  Fix: cd nexus && python3 tools/api-docs/check_drift.py --update" >&2
+    exit 1
+  elif [ -n "$(git status --porcelain -- \
+        'typescript/*/openapi.yaml' 'typescript/*/API.md' \
+        'python/*/openapi.yaml' 'python/*/API.md' \
+        'typescript/semantics-srv/scripts/' 'tools/api-docs/' 2>/dev/null)" ]; then
+    echo "pre-push: api docs were stale — regenerated in your worktree." >&2
+    echo "  Commit the refreshed openapi.yaml / API.md files, then push again." >&2
+    exit 1
+  else
+    echo "pre-push: api docs current"
+  fi
+fi
+
+exit 0

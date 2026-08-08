@@ -17,6 +17,8 @@ spring:
     url: jdbc:postgresql://localhost:5432/nexus?currentSchema=peb
     username: ${DB_USER:pguser}
     password: ${DB_PASS:pgpass}
+    hikari:
+      maximum-pool-size: 5
 
   jpa:
     hibernate:

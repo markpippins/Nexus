@@ -1,7 +1,7 @@
 #!/bin/bash
 # bin/start-nexus-uis.sh — manage ALL Nexus UI dev servers via systemd user units
 #
-# All 14 UIs run as systemd --user services, each in its own unit.
+# All 15 UIs run as systemd --user services, each in its own unit.
 # This script provides a unified interface to start/stop/status them.
 #
 # Usage:
@@ -22,12 +22,12 @@ NEXUS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 declare -A UI_PORTS
 
 UI_NAMES=(
-    "nebula-ui"          # 3000
+    "nebula-ui"          # 4210
     "duality-ui"         # 3002
     "view-architect"     # 3003
     "plurality-ui"       # 3004
     "nexus-console"      # 4200
-    "conduit-ui"         # 4201
+    "conduit-ui"         # 4201 (live; mock was :3000, unbound in live mode)
     "tackle-ui"          # 4202
     "cascade-ui"         # 4203
     "angular-assembly"   # 4204
@@ -36,17 +36,21 @@ UI_NAMES=(
     "semantic-kernel-ui" # 4207
     "vision-ui"          # 4208
     "wind-ui"            # 4209
+    "throttler-ui"       # 4211
     "nebula-control-plane" # 4014
     "monaco-judge"        # 4016
     "conduit-ui-legacy"  # 4015
+    "data-explorer-ui"     # 4212
+    "semantics-ui"         # 4213 (live; mock was :3000)
+    "assembly-ui"          # 4214 (live; mock was :3000)
 )
 
-UI_PORTS[nebula-ui]=3000
+UI_PORTS[nebula-ui]=4210
 UI_PORTS[duality-ui]=3002
 UI_PORTS[view-architect]=3003
 UI_PORTS[plurality-ui]=3004
 UI_PORTS[nexus-console]=4200
-UI_PORTS[conduit-ui]=4201
+UI_PORTS[conduit-ui]=4201  # live mode (mock was :3000, intentionally unbound in live mode)
 UI_PORTS[tackle-ui]=4202
 UI_PORTS[cascade-ui]=4203
 UI_PORTS[angular-assembly]=4204
@@ -55,9 +59,13 @@ UI_PORTS[peb-ui]=4206
 UI_PORTS[semantic-kernel-ui]=4207
 UI_PORTS[vision-ui]=4208
 UI_PORTS[wind-ui]=4209
+UI_PORTS[throttler-ui]=4211
 UI_PORTS[nebula-control-plane]=4014
 UI_PORTS[monaco-judge]=4016
 UI_PORTS[conduit-ui-legacy]=4015
+UI_PORTS[data-explorer-ui]=4212
+UI_PORTS[semantics-ui]=4213  # live mode (mock was :3000, intentionally unbound in live mode)
+UI_PORTS[assembly-ui]=4214   # live mode (mock was :3000, intentionally unbound in live mode)
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 

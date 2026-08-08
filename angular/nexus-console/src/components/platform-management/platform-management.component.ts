@@ -102,9 +102,9 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 <td class="px-3 py-1 text-[13px]" [class.text-[rgb(var(--color-text-base))]]="service.status === 'ACTIVE'" [class.text-[rgb(var(--color-text-muted))]]="service.status !== 'ACTIVE'" [class.line-through]="service.status === 'DEPRECATED'">
                                                     @if (service.parentServiceId) {
                                                         <span class="inline-flex items-center gap-1">
-                                                            <span class="text-[rgb(var(--color-text-muted))] text-xs">└─</span>
+                                                            <span class="text-[rgb(var(--color-text-muted))] text-sm">└─</span>
                                                             {{ service.name }}
-                                                            <span class="px-1.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">Sub-module</span>
+                                                            <span class="px-1.5 py-0.5 rounded text-sm bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">Sub-module</span>
                                                         </span>
                                                     } @else {
                                                         {{ service.name }}
@@ -113,7 +113,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ service.type?.name }}</td>
                                                 <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ service.framework?.name }}</td>
                                                 <td class="px-3 py-1 text-[13px]">
-                                                    <span [class]="'px-2 py-0.5 rounded-full text-xs font-medium ' + getServiceStatusClass(service.status)">
+                                                    <span [class]="'px-2 py-0.5 rounded-full text-sm font-medium ' + getServiceStatusClass(service.status)">
                                                         {{ service.status }}
                                                     </span>
                                                 </td>
@@ -128,147 +128,147 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             </tr>
                                         }                                </tbody>
                             </table>
-                            <!-- Pagination -->
-                            @if (totalPages() > 1 || totalItems() > 0) {
-                                <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
-                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
-                                        {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                        </div>
+                        <!-- Pagination -->
+                        @if (totalPages() > 1 || totalItems() > 0) {
+                            <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))] flex-shrink-0">
+                                <div class="text-sm text-[rgb(var(--color-text-muted))]">
+                                    {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="flex items-center gap-1.5">
+                                        <label class="text-sm text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                        <select
+                                            (change)="onPageSizeChange($event)"
+                                            class="px-2 py-1 rounded text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                        >
+                                            @for (s of pageSizes; track s) {
+                                                <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
+                                            }
+                                        </select>
                                     </div>
-                                    <div class="flex items-center gap-3">
-                                        <!-- Rows per page selector -->
-                                        <div class="flex items-center gap-1.5">
-                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
-                                            <select
-                                                (change)="onPageSizeChange($event)"
-                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                    <div class="flex items-center gap-2">
+                                        <button
+                                            (click)="onPrevPage()"
+                                            [disabled]="currentPage() === 0"
+                                            class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
+                                            [class]="currentPage() === 0
+                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                        >
+                                            ← Previous
+                                        </button>
+                                        <span class="text-sm text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                            <span>Page</span>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                [max]="totalPages()"
+                                                [value]="currentPage() + 1"
+                                                (keydown.enter)="goToPage($event)"
+                                                (blur)="goToPage($event)"
+                                                class="w-10 px-1 py-0.5 text-center text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
                                             >
-                                                @for (s of pageSizes; track s) {
-                                                    <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
-                                                }
-                                            </select>
-                                        </div>
-                                        <div class="flex items-center gap-2">
-                                            <button
-                                                (click)="onPrevPage()"
-                                                [disabled]="currentPage() === 0"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                                                [class]="currentPage() === 0
-                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
-                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
-                                            >
-                                                ← Previous
-                                            </button>
-                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
-                                                <span>Page</span>
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    [max]="totalPages()"
-                                                    [value]="currentPage() + 1"
-                                                    (keydown.enter)="goToPage($event)"
-                                                    (blur)="goToPage($event)"
-                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
-                                                >
-                                                <span>of {{ totalPages() }}</span>
-                                            </span>
-                                            <button
-                                                (click)="onNextPage()"
-                                                [disabled]="currentPage() >= totalPages() - 1"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                                                [class]="currentPage() >= totalPages() - 1
-                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
-                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
-                                            >
-                                                Next →
-                                            </button>
-                                        </div>
+                                            <span>of {{ totalPages() }}</span>
+                                        </span>
+                                        <button
+                                            (click)="onNextPage()"
+                                            [disabled]="currentPage() >= totalPages() - 1"
+                                            class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
+                                            [class]="currentPage() >= totalPages() - 1
+                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                        >
+                                            Next →
+                                        </button>
                                     </div>
                                 </div>
-                            }
-                        </div>
+                            </div>
+                        }
                     </div>
                     }
                     @case ('libraries') {
-                        <div class="overflow-x-auto flex-1">
-                            <table class="w-full text-left border-collapse">
-                                <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
-                                    <tr>
-                                        <th (click)="onSort('name')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Name
-                                                @if (sortState().column === 'name') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th (click)="onSort('category')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Category
-                                                @if (sortState().column === 'category') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th (click)="onSort('language')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Language
-                                                @if (sortState().column === 'language') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th (click)="onSort('package')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Package
-                                                @if (sortState().column === 'package') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th (click)="onSort('version')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Version
-                                                @if (sortState().column === 'version') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th class="px-3 py-1.5 font-semibold text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @for (lib of libraries(); track lib.id) {
-                                        <tr tabindex="0" (dblclick)="onEdit(lib)" (keydown.enter)="onEdit(lib)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100 cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
-                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-base))]">{{ lib.name }}</td>
-                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ lib.category?.name || '-' }}</td>
-                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ lib.language?.name || '-' }}</td>
-                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono">{{ lib.packageName || '-' }}</td>
-                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ lib.currentVersion || '-' }}</td>
-                                            <td class="px-3 py-1 text-[13px] text-right">
-                                                <button (click)="onEdit(lib)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-[11px]">Edit</button>
-                                                <button (click)="onDelete(lib)" class="text-red-500 hover:underline text-[11px]">Delete</button>
-                                            </td>
-                                        </tr>
-                                    } @empty {
+                        <div class="flex flex-col h-full">
+                            <div class="overflow-x-auto flex-1">
+                                <table class="w-full text-left border-collapse">
+                                    <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
                                         <tr>
-                                            <td colspan="6" class="py-10 px-3 text-center text-[13px] text-[rgb(var(--color-text-muted))]">No libraries found.</td>
+                                            <th (click)="onSort('name')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Name
+                                                    @if (sortState().column === 'name') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('category')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Category
+                                                    @if (sortState().column === 'category') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('language')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Language
+                                                    @if (sortState().column === 'language') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('package')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Package
+                                                    @if (sortState().column === 'package') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('version')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Version
+                                                    @if (sortState().column === 'version') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th class="px-3 py-1.5 font-semibold text-right">Actions</th>
                                         </tr>
-                                    }
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        @for (lib of libraries(); track lib.id) {
+                                            <tr tabindex="0" (dblclick)="onEdit(lib)" (keydown.enter)="onEdit(lib)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100 cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-base))]">{{ lib.name }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ lib.category?.name || '-' }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ lib.language?.name || '-' }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono">{{ lib.packageName || '-' }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ lib.currentVersion || '-' }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-right">
+                                                    <button (click)="onEdit(lib)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-[11px]">Edit</button>
+                                                    <button (click)="onDelete(lib)" class="text-red-500 hover:underline text-[11px]">Delete</button>
+                                                </td>
+                                            </tr>
+                                        } @empty {
+                                            <tr>
+                                                <td colspan="6" class="py-10 px-3 text-center text-[13px] text-[rgb(var(--color-text-muted))]">No libraries found.</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
                             <!-- Pagination -->
                             @if (totalPages() > 1 || totalItems() > 0) {
-                                <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
-                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))] flex-shrink-0">
+                                    <div class="text-sm text-[rgb(var(--color-text-muted))]">
                                         {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                     </div>
                                     <div class="flex items-center gap-3">
-                                        <!-- Rows per page selector -->
                                         <div class="flex items-center gap-1.5">
-                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <label class="text-sm text-[rgb(var(--color-text-muted))]">Rows:</label>
                                             <select
                                                 (change)="onPageSizeChange($event)"
-                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                                class="px-2 py-1 rounded text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
                                             >
                                                 @for (s of pageSizes; track s) {
                                                     <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
@@ -279,14 +279,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             <button
                                                 (click)="onPrevPage()"
                                                 [disabled]="currentPage() === 0"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                                 [class]="currentPage() === 0
                                                     ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                     : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
                                             >
                                                 ← Previous
                                             </button>
-                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                            <span class="text-sm text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
                                                 <span>Page</span>
                                                 <input
                                                     type="number"
@@ -295,14 +295,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     [value]="currentPage() + 1"
                                                     (keydown.enter)="goToPage($event)"
                                                     (blur)="goToPage($event)"
-                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                    class="w-10 px-1 py-0.5 text-center text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
                                                 >
                                                 <span>of {{ totalPages() }}</span>
                                             </span>
                                             <button
                                                 (click)="onNextPage()"
                                                 [disabled]="currentPage() >= totalPages() - 1"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                                 [class]="currentPage() >= totalPages() - 1
                                                     ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                     : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
@@ -316,77 +316,78 @@ import { LookupItem } from '../../services/platform-management.service.js';
                         </div>
                     }
                     @case ('frameworks') {
-                         <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
-                                    <tr>
-                                        <th (click)="onSort('name')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Name
-                                                @if (sortState().column === 'name') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th (click)="onSort('category')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Category
-                                                @if (sortState().column === 'category') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th (click)="onSort('language')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Language
-                                                @if (sortState().column === 'language') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th (click)="onSort('version')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Version
-                                                @if (sortState().column === 'version') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th class="px-3 py-1.5 font-semibold text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @for (fw of frameworks(); track fw.id) {
-                                        <tr tabindex="0" (dblclick)="onEdit(fw)" (keydown.enter)="onEdit(fw)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100 cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
-                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-base))]">{{ fw.name }}</td>
-                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ fw.category?.name }}</td>
-                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ fw.language?.name }}</td>
-                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ fw.currentVersion || fw.latestVersion || '-' }}</td>
-                                            <td class="px-3 py-1 text-[13px] text-right">
-                                                <button (click)="onEdit(fw)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-[11px]">Edit</button>
-                                                <button (click)="onDelete(fw)" class="text-red-500 hover:underline text-[11px]">Delete</button>
-                                            </td>
-                                        </tr>
-                                    } @empty {
+                        <div class="flex flex-col h-full">
+                            <div class="overflow-x-auto flex-1">
+                                <table class="w-full text-left border-collapse">
+                                    <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
                                         <tr>
-                                            <td colspan="5" class="py-10 px-3 text-center text-[13px] text-[rgb(var(--color-text-muted))]">No frameworks found.</td>
+                                            <th (click)="onSort('name')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Name
+                                                    @if (sortState().column === 'name') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('category')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Category
+                                                    @if (sortState().column === 'category') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('language')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Language
+                                                    @if (sortState().column === 'language') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('version')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Version
+                                                    @if (sortState().column === 'version') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th class="px-3 py-1.5 font-semibold text-right">Actions</th>
                                         </tr>
-                                    }
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        @for (fw of frameworks(); track fw.id) {
+                                            <tr tabindex="0" (dblclick)="onEdit(fw)" (keydown.enter)="onEdit(fw)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100 cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-base))]">{{ fw.name }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ fw.category?.name }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ fw.language?.name }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ fw.currentVersion || fw.latestVersion || '-' }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-right">
+                                                    <button (click)="onEdit(fw)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-[11px]">Edit</button>
+                                                    <button (click)="onDelete(fw)" class="text-red-500 hover:underline text-[11px]">Delete</button>
+                                                </td>
+                                            </tr>
+                                        } @empty {
+                                            <tr>
+                                                <td colspan="5" class="py-10 px-3 text-center text-[13px] text-[rgb(var(--color-text-muted))]">No frameworks found.</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
                             <!-- Pagination -->
                             @if (totalPages() > 1 || totalItems() > 0) {
-                                <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
-                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))] flex-shrink-0">
+                                    <div class="text-sm text-[rgb(var(--color-text-muted))]">
                                         {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                     </div>
                                     <div class="flex items-center gap-3">
-                                        <!-- Rows per page selector -->
                                         <div class="flex items-center gap-1.5">
-                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <label class="text-sm text-[rgb(var(--color-text-muted))]">Rows:</label>
                                             <select
                                                 (change)="onPageSizeChange($event)"
-                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                                class="px-2 py-1 rounded text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
                                             >
                                                 @for (s of pageSizes; track s) {
                                                     <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
@@ -397,14 +398,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             <button
                                                 (click)="onPrevPage()"
                                                 [disabled]="currentPage() === 0"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                                 [class]="currentPage() === 0
                                                     ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                     : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
                                             >
                                                 ← Previous
                                             </button>
-                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                            <span class="text-sm text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
                                                 <span>Page</span>
                                                 <input
                                                     type="number"
@@ -413,14 +414,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     [value]="currentPage() + 1"
                                                     (keydown.enter)="goToPage($event)"
                                                     (blur)="goToPage($event)"
-                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                    class="w-10 px-1 py-0.5 text-center text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
                                                 >
                                                 <span>of {{ totalPages() }}</span>
                                             </span>
                                             <button
                                                 (click)="onNextPage()"
                                                 [disabled]="currentPage() >= totalPages() - 1"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                                 [class]="currentPage() >= totalPages() - 1
                                                     ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                     : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
@@ -434,100 +435,101 @@ import { LookupItem } from '../../services/platform-management.service.js';
                         </div>
                     }
                     @case ('deployments') {
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
-                                    <tr>
-                                        <th (click)="onSort('service')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Service
-                                                @if (sortState().column === 'service') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th (click)="onSort('environment')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Environment
-                                                @if (sortState().column === 'environment') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th (click)="onSort('server')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Server
-                                                @if (sortState().column === 'server') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th (click)="onSort('status')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Status
-                                                @if (sortState().column === 'status') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th (click)="onSort('version')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Version
-                                                @if (sortState().column === 'version') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th class="px-3 py-1.5 font-semibold text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @for (d of deployments(); track d.id) {
-                                        <tr tabindex="0" (dblclick)="onEdit(d)" (keydown.enter)="onEdit(d)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100 cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
-                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-base))]">
-                                                @if (d.service?.parentServiceId) {
-                                                    <span class="inline-flex items-center gap-1">
-                                                        <span class="text-[rgb(var(--color-text-muted))] text-xs">└─</span>
-                                                        {{ d.service?.name }}
-                                                        <span class="px-1.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">Sub-module</span>
-                                                    </span>
-                                                } @else {
-                                                    {{ d.service?.name }}
-                                                }
-                                            </td>
-                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ d.environment }}</td>
-                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ d.server?.hostname }}</td>
-                                            <td class="px-3 py-1 text-[13px]">
-                                                 <span [class]="'px-2 py-0.5 rounded-full text-xs font-medium ' + getStatusClass(d.status)">
-                                                    {{ d.status }}
-                                                </span>
-                                            </td>
-                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ d.version }}</td>
-                                            <td class="px-3 py-1 text-[13px] text-right">
-                                                <button (click)="onEdit(d)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-[11px]">Edit</button>
-                                                <button (click)="onDelete(d)" class="text-red-500 hover:underline text-[11px]">Delete</button>
-                                            </td>
-                                        </tr>
-                                    } @empty {
+                        <div class="flex flex-col h-full">
+                            <div class="overflow-x-auto flex-1">
+                                <table class="w-full text-left border-collapse">
+                                    <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
                                         <tr>
-                                            <td colspan="6" class="py-10 px-3 text-center text-[13px] text-[rgb(var(--color-text-muted))]">No deployments found.</td>
+                                            <th (click)="onSort('service')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Service
+                                                    @if (sortState().column === 'service') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('environment')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Environment
+                                                    @if (sortState().column === 'environment') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('server')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Server
+                                                    @if (sortState().column === 'server') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('status')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Status
+                                                    @if (sortState().column === 'status') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('version')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Version
+                                                    @if (sortState().column === 'version') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th class="px-3 py-1.5 font-semibold text-right">Actions</th>
                                         </tr>
-                                    }
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        @for (d of deployments(); track d.id) {
+                                            <tr tabindex="0" (dblclick)="onEdit(d)" (keydown.enter)="onEdit(d)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100 cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-base))]">
+                                                    @if (d.service?.parentServiceId) {
+                                                        <span class="inline-flex items-center gap-1">
+                                                            <span class="text-[rgb(var(--color-text-muted))] text-sm">└─</span>
+                                                            {{ d.service?.name }}
+                                                            <span class="px-1.5 py-0.5 rounded text-sm bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">Sub-module</span>
+                                                        </span>
+                                                    } @else {
+                                                        {{ d.service?.name }}
+                                                    }
+                                                </td>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ d.environment }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ d.server?.hostname }}</td>
+                                                <td class="px-3 py-1 text-[13px]">
+                                                     <span [class]="'px-2 py-0.5 rounded-full text-sm font-medium ' + getStatusClass(d.status)">
+                                                        {{ d.status }}
+                                                    </span>
+                                                </td>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ d.version }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-right">
+                                                    <button (click)="onEdit(d)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-[11px]">Edit</button>
+                                                    <button (click)="onDelete(d)" class="text-red-500 hover:underline text-[11px]">Delete</button>
+                                                </td>
+                                            </tr>
+                                        } @empty {
+                                            <tr>
+                                                <td colspan="6" class="py-10 px-3 text-center text-[13px] text-[rgb(var(--color-text-muted))]">No deployments found.</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
                             <!-- Pagination -->
                             @if (totalPages() > 1 || totalItems() > 0) {
-                                <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
-                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))] flex-shrink-0">
+                                    <div class="text-sm text-[rgb(var(--color-text-muted))]">
                                         {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                     </div>
                                     <div class="flex items-center gap-3">
-                                        <!-- Rows per page selector -->
                                         <div class="flex items-center gap-1.5">
-                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <label class="text-sm text-[rgb(var(--color-text-muted))]">Rows:</label>
                                             <select
                                                 (change)="onPageSizeChange($event)"
-                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                                class="px-2 py-1 rounded text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
                                             >
                                                 @for (s of pageSizes; track s) {
                                                     <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
@@ -538,14 +540,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             <button
                                                 (click)="onPrevPage()"
                                                 [disabled]="currentPage() === 0"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                                 [class]="currentPage() === 0
                                                     ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                     : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
                                             >
                                                 ← Previous
                                             </button>
-                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                            <span class="text-sm text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
                                                 <span>Page</span>
                                                 <input
                                                     type="number"
@@ -554,14 +556,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     [value]="currentPage() + 1"
                                                     (keydown.enter)="goToPage($event)"
                                                     (blur)="goToPage($event)"
-                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                    class="w-10 px-1 py-0.5 text-center text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
                                                 >
                                                 <span>of {{ totalPages() }}</span>
                                             </span>
                                             <button
                                                 (click)="onNextPage()"
                                                 [disabled]="currentPage() >= totalPages() - 1"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                                 [class]="currentPage() >= totalPages() - 1
                                                     ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                     : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
@@ -633,64 +635,63 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                         }
                                 </tbody>
                             </table>
-                            <!-- Pagination -->
-                            @if (totalPages() > 1 || totalItems() > 0) {
-                                <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
-                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
-                                        {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                        </div>
+                        <!-- Pagination -->
+                        @if (totalPages() > 1 || totalItems() > 0) {
+                            <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))] flex-shrink-0">
+                                <div class="text-sm text-[rgb(var(--color-text-muted))]">
+                                    {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="flex items-center gap-1.5">
+                                        <label class="text-sm text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                        <select
+                                            (change)="onPageSizeChange($event)"
+                                            class="px-2 py-1 rounded text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                        >
+                                            @for (s of pageSizes; track s) {
+                                                <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
+                                            }
+                                        </select>
                                     </div>
-                                    <div class="flex items-center gap-3">
-                                        <!-- Rows per page selector -->
-                                        <div class="flex items-center gap-1.5">
-                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
-                                            <select
-                                                (change)="onPageSizeChange($event)"
-                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                    <div class="flex items-center gap-2">
+                                        <button
+                                            (click)="onPrevPage()"
+                                            [disabled]="currentPage() === 0"
+                                            class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
+                                            [class]="currentPage() === 0
+                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                        >
+                                            ← Previous
+                                        </button>
+                                        <span class="text-sm text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                            <span>Page</span>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                [max]="totalPages()"
+                                                [value]="currentPage() + 1"
+                                                (keydown.enter)="goToPage($event)"
+                                                (blur)="goToPage($event)"
+                                                class="w-10 px-1 py-0.5 text-center text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
                                             >
-                                                @for (s of pageSizes; track s) {
-                                                    <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
-                                                }
-                                            </select>
-                                        </div>
-                                        <div class="flex items-center gap-2">
-                                            <button
-                                                (click)="onPrevPage()"
-                                                [disabled]="currentPage() === 0"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                                                [class]="currentPage() === 0
-                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
-                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
-                                            >
-                                                ← Previous
-                                            </button>
-                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
-                                                <span>Page</span>
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    [max]="totalPages()"
-                                                    [value]="currentPage() + 1"
-                                                    (keydown.enter)="goToPage($event)"
-                                                    (blur)="goToPage($event)"
-                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
-                                                >
-                                                <span>of {{ totalPages() }}</span>
-                                            </span>
-                                            <button
-                                                (click)="onNextPage()"
-                                                [disabled]="currentPage() >= totalPages() - 1"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                                                [class]="currentPage() >= totalPages() - 1
-                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
-                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
-                                            >
-                                                Next →
-                                            </button>
-                                        </div>
+                                            <span>of {{ totalPages() }}</span>
+                                        </span>
+                                        <button
+                                            (click)="onNextPage()"
+                                            [disabled]="currentPage() >= totalPages() - 1"
+                                            class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
+                                            [class]="currentPage() >= totalPages() - 1
+                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                        >
+                                            Next →
+                                        </button>
                                     </div>
                                 </div>
-                            }
-                        </div>
+                            </div>
+                        }
                     </div>
                 }
                 @case ('categories') {
@@ -783,63 +784,63 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                         }
                                     </tbody>
                                 </table>
-                                <!-- Pagination -->
-                                @if (totalPages() > 1 || totalItems() > 0) {
-                                    <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
-                                        <div class="text-xs text-[rgb(var(--color-text-muted))]">
-                                            {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                            </div>
+                            <!-- Pagination -->
+                            @if (totalPages() > 1 || totalItems() > 0) {
+                                <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))] flex-shrink-0">
+                                    <div class="text-sm text-[rgb(var(--color-text-muted))]">
+                                        {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex items-center gap-1.5">
+                                            <label class="text-sm text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <select
+                                                (change)="onPageSizeChange($event)"
+                                                class="px-2 py-1 rounded text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                            >
+                                                @for (s of pageSizes; track s) {
+                                                    <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
+                                                }
+                                            </select>
                                         </div>
-                                        <div class="flex items-center gap-3">
-                                            <div class="flex items-center gap-1.5">
-                                                <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
-                                                <select
-                                                    (change)="onPageSizeChange($event)"
-                                                    class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                        <div class="flex items-center gap-2">
+                                            <button
+                                                (click)="onPrevPage()"
+                                                [disabled]="currentPage() === 0"
+                                                class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
+                                                [class]="currentPage() === 0
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                ← Previous
+                                            </button>
+                                            <span class="text-sm text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                                <span>Page</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    [max]="totalPages()"
+                                                    [value]="currentPage() + 1"
+                                                    (keydown.enter)="goToPage($event)"
+                                                    (blur)="goToPage($event)"
+                                                    class="w-10 px-1 py-0.5 text-center text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
                                                 >
-                                                    @for (s of pageSizes; track s) {
-                                                        <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
-                                                    }
-                                                </select>
-                                            </div>
-                                            <div class="flex items-center gap-2">
-                                                <button
-                                                    (click)="onPrevPage()"
-                                                    [disabled]="currentPage() === 0"
-                                                    class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                                                    [class]="currentPage() === 0
-                                                        ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
-                                                        : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
-                                                >
-                                                    ← Previous
-                                                </button>
-                                                <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
-                                                    <span>Page</span>
-                                                    <input
-                                                        type="number"
-                                                        min="1"
-                                                        [max]="totalPages()"
-                                                        [value]="currentPage() + 1"
-                                                        (keydown.enter)="goToPage($event)"
-                                                        (blur)="goToPage($event)"
-                                                        class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
-                                                    >
-                                                    <span>of {{ totalPages() }}</span>
-                                                </span>
-                                                <button
-                                                    (click)="onNextPage()"
-                                                    [disabled]="currentPage() >= totalPages() - 1"
-                                                    class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                                                    [class]="currentPage() >= totalPages() - 1
-                                                        ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
-                                                        : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
-                                                >
-                                                    Next →
-                                                </button>
-                                            </div>
+                                                <span>of {{ totalPages() }}</span>
+                                            </span>
+                                            <button
+                                                (click)="onNextPage()"
+                                                [disabled]="currentPage() >= totalPages() - 1"
+                                                class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
+                                                [class]="currentPage() >= totalPages() - 1
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                Next →
+                                            </button>
                                         </div>
                                     </div>
-                                }
-                            </div>
+                                </div>
+                            }
                         </div>
                     }
                     @default {

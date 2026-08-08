@@ -1,7 +1,6 @@
-import { Component, ChangeDetectionStrategy, input, output, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ImageSearchResult } from '../../models/image-search-result.model.js';
-import { WebviewService } from '../../services/webview.service.js';
 
 @Component({
   selector: 'app-image-result-card',
@@ -11,18 +10,27 @@ import { WebviewService } from '../../services/webview.service.js';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ImageResultCardComponent {
-  result = input.required<ImageSearchResult>();
+  result = input.required<ImageSearchResult & { sourceMagnetPath?: string[] }>();
   isBookmarked = input(false);
+  sourceMagnetPath = input<string[]>();
   bookmarkToggled = output<ImageSearchResult>();
-
-  private webviewService = inject(WebviewService);
+  navigateToMagnet = output<string[]>();
 
   onToggleBookmark(): void {
     this.bookmarkToggled.emit(this.result());
   }
 
-  openLink(event: MouseEvent): void {
+  onMagnetClick(event: MouseEvent, path: string[]): void {
+    event.stopPropagation();
     event.preventDefault();
-    this.webviewService.open(this.result().url, this.result().description);
+    this.navigateToMagnet.emit(path);
+  }
+
+  openLink(event: MouseEvent): void {
+    if (!this.result().url) {
+      event.preventDefault();
+      console.warn('ImageResultCard: no url to open for', this.result().description);
+    }
+    // else: browser handles native navigation via target="_blank"
   }
 }

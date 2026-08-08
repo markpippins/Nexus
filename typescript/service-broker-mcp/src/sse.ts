@@ -5,6 +5,12 @@ import * as http from "http";
 
 const PORT = parseInt(process.env.SERVICE_BROKER_MCP_PORT || "3112", 10);
 
+process.on('uncaughtException', (err: any) => {
+  if (err.code === 'EADDRINUSE') { console.error(`mcp-bridge: port ${PORT} already in use`); process.exit(1); }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') { return; }
+  console.error('uncaughtException:', err.message);
+});
+
 async function main() {
   const server = new McpServer({
     name: "service-broker-mcp",

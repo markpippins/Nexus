@@ -136,16 +136,37 @@
 
     <build>
         <plugins>
+            <!--
+                Copy runtime deps to target/libs/ during `prepare-package` so the
+                thin jar's manifest Class-Path resolves.
+
+                The helidon-applications parent (4.3.2) defines this same execution
+                in <pluginManagement> — but pluginManagement only configures plugins
+                that are ACTUALLY declared in the project's <plugins>, so we must
+                declare it here for the binding to fire. A previous version of this
+                pom bound it to <phase>install</phase> instead of prepare-package,
+                which meant `mvn package` produced the thin jar WITHOUT target/libs/
+                and `java -jar` failed with ClassNotFoundException: io.helidon.Main.
+                We now bind it to prepare-package so `mvn package` alone is sufficient.
+
+                Rebuild with: mvn package -DskipTests
+            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <executions>
                     <execution>
                         <id>copy-libs</id>
-                        <phase>install</phase>
+                        <phase>prepare-package</phase>
                         <goals>
                             <goal>copy-dependencies</goal>
                         </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/libs</outputDirectory>
+                            <includeScope>runtime</includeScope>
+                            <!-- Helidon default: exclude okio (square/okio#1306) -->
+                            <excludeArtifactIds>okio</excludeArtifactIds>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

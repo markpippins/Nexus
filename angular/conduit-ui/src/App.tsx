@@ -2,11 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { AddressBar, AppTheme } from './components/layout/AddressBar';
 import { Sidebar } from './components/layout/Sidebar';
 import { MainDashboard } from './components/dashboard/MainDashboard';
-import { ArtifactPipeline } from './components/artifacts/ArtifactPipeline';
+
+// REST Spec Views
+import { DeltaIngestionView } from './components/delta/DeltaIngestionView';
+import { StateInspectionView } from './components/state/StateInspectionView';
+import { ReplayEngineView } from './components/replay/ReplayEngineView';
+import { ReceiptsLedgerView } from './components/receipts/ReceiptsLedgerView';
+import { AgentSessionsView } from './components/sessions/AgentSessionsView';
+import { CircuitBreakerView } from './components/breaker/CircuitBreakerView';
+import { AdminCatalogView } from './components/admin/AdminCatalogView';
+
+// Legacy Views (for backward compatibility)
 import { ProcessKanban } from './components/kanban/ProcessKanban';
 import { DeliberationSurface } from './components/deliberation/DeliberationSurface';
-import { HierarchicalTree } from './components/architecture/HierarchicalTree';
-import { ReceiptsAuditLog } from './components/execution/ReceiptsAuditLog';
 import { ModelChainControl } from './components/modelchain/ModelChainControl';
 
 import { IntegrationModal } from './components/modals/IntegrationModal';
@@ -16,20 +24,11 @@ import { DetailDrawer } from './components/modals/DetailDrawer';
 
 import { apiService } from './services/apiService';
 import {
-  HTMLHarvest,
-  CandidateItem,
-  IntentRecord,
-  RequirementSpec,
-  SystemCanonicalSpec,
-  DeliberationAgenda,
   ImplementationPlan,
   WorkRequestDCO,
-  WRPKernelDelta,
-  SystemNode,
   ModelChainConfig,
   SystemStatus,
-  PlanLifecycleStatus,
-  AgentRole,
+  HTMLHarvest,
 } from './types/conduit';
 
 export default function App() {
@@ -46,47 +45,122 @@ export default function App() {
   };
 
   // Domain State
-  const [status, setStatus] = useState<SystemStatus>(apiService.getSystemStatus() as any);
+  const [status, setStatus] = useState<SystemStatus>({
+    pgConnected: true,
+    pgDsn: 'postgresql://nexus_admin:***@postgres.internal.nexus:5432/nexus',
+    pgSchema: 'conduit',
+    wrpKernelActive: true,
+    wrpKernelUrl: 'http://localhost:3103',
+    mcpServerUrl: 'http://localhost:3100',
+    activeLeasesCount: 2,
+    circuitBreakerTripped: false,
+    lastSyncTimestamp: new Date().toISOString(),
+  });
+
   const [isMockMode, setIsMockMode] = useState<boolean>(apiService.isMockMode());
-  const [harvests, setHarvests] = useState<HTMLHarvest[]>([]);
-  const [candidates, setCandidates] = useState<CandidateItem[]>([]);
-  const [intents, setIntents] = useState<IntentRecord[]>([]);
-  const [requirements, setRequirements] = useState<RequirementSpec[]>([]);
-  const [specs, setSpecs] = useState<SystemCanonicalSpec[]>([]);
-  const [agendas, setAgendas] = useState<DeliberationAgenda[]>([]);
+  const [receiptsCount, setReceiptsCount] = useState<number>(0);
+  const [sessionsCount, setSessionsCount] = useState<number>(0);
+  const [identitiesCount, setIdentitiesCount] = useState<number>(0);
+  const [lineageEventsCount, setLineageEventsCount] = useState<number>(0);
+
   const [plans, setPlans] = useState<ImplementationPlan[]>([]);
   const [workRequests, setWorkRequests] = useState<WorkRequestDCO[]>([]);
-  const [kernelDeltas, setKernelDeltas] = useState<WRPKernelDelta[]>([]);
-  const [systemNodes, setSystemNodes] = useState<SystemNode[]>([]);
   const [modelChains, setModelChains] = useState<ModelChainConfig[]>([]);
 
   // Modals & Drawers
   const [isIntegrationGuideOpen, setIsIntegrationGuideOpen] = useState(false);
   const [isNewHarvestOpen, setIsNewHarvestOpen] = useState(false);
   const [isNewPlanOpen, setIsNewPlanOpen] = useState(false);
-  const [selectedPlanForDrawer, setSelectedPlanForDrawer] = useState<ImplementationPlan | null>(
-    null
-  );
-  const [selectedHarvestForDrawer, setSelectedHarvestForDrawer] = useState<HTMLHarvest | null>(
-    null
-  );
+  const [selectedPlanForDrawer, setSelectedPlanForDrawer] = useState<ImplementationPlan | null>(null);
+  const [selectedHarvestForDrawer, setSelectedHarvestForDrawer] = useState<HTMLHarvest | null>(null);
 
-  // Load all state from API service
+  // Sync data from API Service
   const refreshAllData = async () => {
-    const st = await apiService.getSystemStatus();
-    setStatus(st);
-    setHarvests(await apiService.getHarvests());
-    setCandidates(await apiService.getCandidates());
-    setIntents(await apiService.getIntents());
-    setRequirements(await apiService.getRequirements());
-    setSpecs(await apiService.getCanonicalSpecs());
-    setAgendas(await apiService.getDeliberationAgendas());
-    setPlans(await apiService.getPlans());
-    setWorkRequests(await apiService.getWorkRequests());
-    setKernelDeltas(await apiService.getKernelDeltas());
-    setSystemNodes(await apiService.getSystemNodes());
-    setModelChains(await apiService.getModelChains());
+    try {
+      const st = await apiService.getSystemStatus();
+      setStatus(st);
+
+      const [stateSummary, sessions, identities, lineage, mc] = await Promise.all([
+        apiService.getStateSummary(),
+        apiService.getSessions(),
+        apiService.getAdminIdentities(),
+        apiService.getLineageEvents(),
+        apiService.getModelChains(),
+      ]);
+
+      setReceiptsCount(stateSummary.receipt_count);
+      setSessionsCount(sessions.length);
+      setIdentitiesCount(identities.total);
+      setLineageEventsCount(lineage.count);
+      setModelChains(mc);
+
+      // Create dummy plans for legacy kanban view compatibility
+      const dummyPlans: ImplementationPlan[] = [
+        {
+          id: 'plan_0053',
+          ticketId: 'TCK-2026-0053',
+          title: 'Plan 0053 — Auth Module',
+          description: 'OAuth2 / OIDC authentication flow & RBAC middleware',
+          status: 'ACTIVE',
+          currentRole: 'planner',
+          modelChain: ['gemini-2.5-pro', 'claude-3-5-sonnet'],
+          activeModel: 'gemini-2.5-pro',
+          costUsd: 1.25,
+          tokenCount: 45000,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          retryAttempts: 0,
+          receipts: [],
+        },
+        {
+          id: 'plan_0054',
+          ticketId: 'TCK-2026-0054',
+          title: 'Plan 0054 — Storage Engine',
+          description: 'PostgreSQL & Drizzle schema migration for WRP Kernel',
+          status: 'PLANNING',
+          currentRole: 'builder',
+          modelChain: ['claude-3-5-sonnet'],
+          activeModel: 'claude-3-5-sonnet',
+          costUsd: 3.5,
+          tokenCount: 92000,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          retryAttempts: 1,
+          receipts: [],
+        },
+      ];
+      setPlans(dummyPlans);
+
+      const dummyWRs: WorkRequestDCO[] = [
+        {
+          id: 'WR-001',
+          planId: 'plan_0053',
+          leaseOwnerPid: 'sess-1001',
+          attemptStatus: 'IN_PROGRESS',
+          leaseExpiresAt: new Date(Date.now() + 600000).toISOString(),
+          promptSha256: 'a1b2c3d4...',
+          costLimitUsd: 5.0,
+        },
+      ];
+      setWorkRequests(dummyWRs);
+    } catch (e) {
+      console.error('Data refresh error', e);
+    }
   };
+
+  // On mount, check if the server is in live mode (CONDUIT_LIVE_MODE=true).
+  // If so, disable mock so the client fetches real data from proxied backends.
+  useEffect(() => {
+    let cancelled = false;
+    const init = async () => {
+      const isLive = await apiService.initializeMode();
+      if (!cancelled) {
+        setIsMockMode(!isLive);
+      }
+    };
+    init();
+    return () => { cancelled = true; };
+  }, []); // run once on mount
 
   useEffect(() => {
     refreshAllData();
@@ -108,161 +182,6 @@ export default function App() {
     const next = !isMockMode;
     apiService.setMockMode(next);
     setIsMockMode(next);
-  };
-
-  // Handlers for Artifact Pipeline Actions
-  const handleIngestHarvest = async (data: {
-    title: string;
-    rawHtmlContent: string;
-    author: string;
-    tags: string[];
-  }) => {
-    await apiService.addHarvest(data);
-    await refreshAllData();
-  };
-
-  const handleExtractCandidates = async (harvestId: string) => {
-    await apiService.addCandidate({
-      harvestId,
-      title: 'Auto-Extracted Candidate: WorkRequest Isolation',
-      description: 'Extracted actionable requirement from HTML transcript review.',
-      severity: 'HIGH',
-      category: 'architecture',
-      suggestedSystem: 'nexus.conduit.executor_cloud',
-    });
-    await refreshAllData();
-  };
-
-  const handlePromoteCandidate = async (candidateId: string) => {
-    await apiService.promoteCandidateToIntent(candidateId, {
-      systemId: 'SYS-CONDUIT',
-      subsystemId: 'SUB-EXECUTOR',
-      summary: 'Promoted Candidate to Intent Record',
-      targetOutcome: 'Full implementation under ADR-006 lease control.',
-    });
-    await refreshAllData();
-  };
-
-  const handlePromoteIntent = async (intentId: string) => {
-    const target = intents.find((i) => i.id === intentId);
-    await apiService.promoteIntentToRequirement(
-      intentId,
-      target?.summary || 'New Promoted Requirement',
-      `REQ-${Math.floor(100 + Math.random() * 900)}`,
-      ['Target criteria 1 met', 'Receipt chain verified']
-    );
-    await refreshAllData();
-  };
-
-  const handleCanonicalizeReq = async (reqId: string) => {
-    const req = requirements.find((r) => r.id === reqId);
-    await apiService.canonicalizeRequirement(reqId, {
-      systemName: req?.codeName || 'nexus.canonical.system',
-      subsystemName: 'core_subsystem',
-      architectureSummary: 'Canonicalized architecture spec from requirements decomposition.',
-      apiContracts: ['dispatch_work_request()', 'issue_execution_receipt()'],
-    });
-    await refreshAllData();
-  };
-
-  // Handlers for Plan Actions
-  const handleProposeNewPlan = async (title: string, description: string) => {
-    const plansList = await apiService.getPlans();
-    const newPlanId = `plan_00${78 + plansList.length}`;
-    const newTicketId = `TCK-2026-00${78 + plansList.length}`;
-
-    const newPlan: ImplementationPlan = {
-      id: newPlanId,
-      ticketId: newTicketId,
-      title,
-      description,
-      status: 'PROPOSED',
-      currentRole: 'planner',
-      modelChain: ['claude-3-5-sonnet', 'gemini-1.5-pro'],
-      activeModel: 'claude-3-5-sonnet',
-      costUsd: 0.0,
-      tokenCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      retryAttempts: 0,
-      receipts: [
-        {
-          id: `RCP-${newPlanId}-1`,
-          ticketId: newTicketId,
-          receiptType: 'PROPOSED',
-          issuedAt: new Date().toISOString(),
-          payload: { title, proposedBy: 'UserControlPlane' },
-          hash: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
-        },
-      ],
-    };
-
-    plansList.unshift(newPlan);
-    localStorage.setItem('nexus_plans_v1', JSON.stringify(plansList));
-    await refreshAllData();
-  };
-
-  const handleAdvancePlanStatus = async (
-    planId: string,
-    currentStatus: PlanLifecycleStatus
-  ) => {
-    const statusSequence: PlanLifecycleStatus[] = [
-      'PROPOSED',
-      'PLANNING',
-      'PENDING',
-      'ACTIVE',
-      'COMPLETED',
-    ];
-
-    const currentIdx = statusSequence.indexOf(currentStatus);
-    if (currentIdx !== -1 && currentIdx < statusSequence.length - 1) {
-      const nextStatus = statusSequence[currentIdx + 1];
-      const roleMap: Record<PlanLifecycleStatus, AgentRole> = {
-        PROPOSED: 'planner',
-        PLANNING: 'planner',
-        PENDING: 'builder',
-        ACTIVE: 'builder',
-        COMPLETED: 'reviewer',
-        BLOCKED: 'builder',
-      };
-
-      await apiService.updatePlanStatus(planId, nextStatus, roleMap[nextStatus]);
-      await refreshAllData();
-    }
-  };
-
-  // Handlers for Deliberation Actions
-  const handleCreateAgenda = async () => {
-    const spec = specs.length > 0 ? specs[0].id : 'SPEC-CONDUIT-001';
-    await apiService.createDeliberationAgenda(
-      spec,
-      'Deliberation Round: WRP Kernel Replay Optimization',
-      'planner'
-    );
-    await refreshAllData();
-  };
-
-  const handleVoteAgenda = async (
-    agendaId: string,
-    agentId: string,
-    vote: 'APPROVE' | 'REJECT' | 'NEUTRAL',
-    comments: string,
-    feasibilityScore: number
-  ) => {
-    await apiService.addDeliberationVote(
-      agendaId,
-      agentId,
-      vote,
-      comments,
-      feasibilityScore
-    );
-    await refreshAllData();
-  };
-
-  const handlePromoteAgendaToPlan = async (agendaId: string) => {
-    await apiService.promoteAgendaToPlan(agendaId);
-    await refreshAllData();
-    setActiveTab('kanban_boards');
   };
 
   return (
@@ -296,11 +215,10 @@ export default function App() {
           activeTab={activeTab}
           onSelectTab={handleSelectTab}
           counts={{
-            harvests: harvests.length,
-            candidates: candidates.length,
-            plans: plans.length,
-            agendas: agendas.length,
-            workRequests: workRequests.length,
+            receipts: receiptsCount,
+            sessions: sessionsCount,
+            identities: identitiesCount,
+            events: lineageEventsCount,
           }}
         />
 
@@ -320,56 +238,48 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'artifact_pipeline' && (
-            <ArtifactPipeline
-              harvests={harvests}
-              candidates={candidates}
-              intents={intents}
-              requirements={requirements}
-              specs={specs}
-              onAddHarvestClick={() => setIsNewHarvestOpen(true)}
-              onExtractCandidates={handleExtractCandidates}
-              onPromoteCandidate={handlePromoteCandidate}
-              onPromoteIntent={handlePromoteIntent}
-              onCanonicalizeReq={handleCanonicalizeReq}
-              onViewRawHarvest={(harvest) => setSelectedHarvestForDrawer(harvest)}
-            />
-          )}
+          {activeTab === 'delta_ingestion' && <DeltaIngestionView />}
 
+          {activeTab === 'state_inspection' && <StateInspectionView />}
+
+          {activeTab === 'replay_engine' && <ReplayEngineView />}
+
+          {activeTab === 'receipts_ledger' && <ReceiptsLedgerView />}
+
+          {activeTab === 'agent_sessions' && <AgentSessionsView />}
+
+          {activeTab === 'circuit_breaker' && <CircuitBreakerView />}
+
+          {activeTab === 'admin_catalog' && <AdminCatalogView />}
+
+          {/* Legacy Tab Fallbacks */}
           {activeTab === 'kanban_boards' && (
             <ProcessKanban
               plans={plans}
-              harvests={harvests}
-              candidates={candidates}
-              intents={intents}
-              requirements={requirements}
-              specs={specs}
+              harvests={[]}
+              candidates={[]}
+              intents={[]}
+              requirements={[]}
+              specs={[]}
               onSelectPlan={(plan) => setSelectedPlanForDrawer(plan)}
-              onAdvancePlanStatus={handleAdvancePlanStatus}
+              onAdvancePlanStatus={() => {}}
               onProposeNewPlan={() => setIsNewPlanOpen(true)}
             />
           )}
 
           {activeTab === 'deliberation' && (
             <DeliberationSurface
-              agendas={agendas}
-              onCreateAgenda={handleCreateAgenda}
-              onVote={handleVoteAgenda}
-              onPromoteToPlan={handlePromoteAgendaToPlan}
+              agendas={[]}
+              onCreateAgenda={() => {}}
+              onVote={() => {}}
+              onPromoteToPlan={() => {}}
             />
-          )}
-
-          {activeTab === 'architecture' && <HierarchicalTree nodes={systemNodes} />}
-
-          {activeTab === 'execution_authority' && (
-            <ReceiptsAuditLog workRequests={workRequests} kernelDeltas={kernelDeltas} />
           )}
 
           {activeTab === 'model_chain' && (
             <ModelChainControl
               modelChains={modelChains}
-              onUpdateChain={async (cfg) => {
-                await apiService.updateModelChain(cfg);
+              onUpdateChain={async () => {
                 await refreshAllData();
               }}
             />
@@ -386,13 +296,42 @@ export default function App() {
       <NewHarvestModal
         isOpen={isNewHarvestOpen}
         onClose={() => setIsNewHarvestOpen(false)}
-        onSubmit={handleIngestHarvest}
+        onSubmit={async () => {}}
       />
 
       <NewPlanModal
         isOpen={isNewPlanOpen}
         onClose={() => setIsNewPlanOpen(false)}
-        onSubmit={handleProposeNewPlan}
+        onSubmit={(newTitle, newDesc) => {
+          const newTicketId = `WRP-${Math.floor(100 + Math.random() * 900)}`;
+          const newPlanId = `plan_${String(plans.length + 54).padStart(4, '0')}`;
+          const newPlanObj: ImplementationPlan = {
+            id: newPlanId,
+            ticketId: newTicketId,
+            title: newTitle,
+            description: newDesc,
+            currentRole: 'planner',
+            modelChain: ['gemini-2.5-pro', 'gemini-2.5-flash'],
+            activeModel: 'gemini-2.5-pro',
+            status: 'ACTIVE',
+            costUsd: 0.12,
+            tokenCount: 45000,
+            retryAttempts: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            receipts: [
+              {
+                id: `rcp_gen_${Date.now().toString().slice(-6)}`,
+                ticketId: newTicketId,
+                receiptType: 'PROPOSED',
+                issuedAt: new Date().toISOString(),
+                payload: { action: 'Plan Proposed via Template Modal', title: newTitle },
+                hash: `0x${Math.random().toString(16).substring(2, 14)}`,
+              },
+            ],
+          };
+          setPlans((prev) => [newPlanObj, ...prev]);
+        }}
       />
 
       <DetailDrawer

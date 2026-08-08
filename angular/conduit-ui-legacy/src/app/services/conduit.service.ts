@@ -36,7 +36,6 @@ export class ConduitService {
 
   /** Server health indicators (v081) */
   readonly mcpOnline = signal<boolean>(true);
-  readonly chatOnline = signal<boolean>(false);
 
   /** Whether conduit orchestration is paused (v073 — workflow control) */
   readonly conduitPaused = signal(false);
@@ -510,10 +509,7 @@ export class ConduitService {
         next: () => this.mcpOnline.set(true),
         error: () => this.mcpOnline.set(false),
       });
-      this.http.get('/chat/config', { context: silentContext, responseType: 'json' }).subscribe({
-        next: () => this.chatOnline.set(true),
-        error: () => this.chatOnline.set(false),
-      });
+
     };
     probe();
     this.healthProbeTimer = setInterval(probe, 30000);

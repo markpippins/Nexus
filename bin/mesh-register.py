@@ -184,7 +184,7 @@ CANDIDATES: tuple[Candidate, ...] = (
             "validation. vision-mcp proxies to this service."
         ),
         startup="systemd: systemctl --user start vision-srv-py.service",
-        workspace_path="nexus/python/vision/vision-srv",
+        workspace_path="nexus/python/vision-srv",
     ),
     Candidate(
         name="tackle-srv",
@@ -265,17 +265,33 @@ CANDIDATES: tuple[Candidate, ...] = (
     ),
     Candidate(
         name="file-system-server",
+        port=4042,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:4042/health",
+        description=(
+            "Node.js file system proxy server for edit-ui. Provides CRUD "
+            "operations over a remote filesystem root directory (ls, cd, "
+            "mkdir, rmdir, newfile, deletefile, rename, copy, move). "
+            "Consumer: angular/edit-ui (port 4042)."
+        ),
+        startup="systemd: systemctl --user start file-system-server.service",
+        workspace_path="nexus/typescript/file-system-server",
+    ),
+    Candidate(
+        name="secure-file-system-server",
         port=4040,
         kind="runnable_service",
         service_type="Express",
         health_url="http://localhost:4040/health",
         description=(
-            "Node.js file system proxy server. Provides CRUD operations "
-            "over a remote filesystem root directory (ls, cd, mkdir, rmdir, "
-            "newfile, deletefile, rename, copy, move)."
+            "Secure Node.js file system proxy server for service-broker. "
+            "Provides CRUD operations over a remote filesystem root "
+            "directory. Consumer: jvm/spring/service-broker/file-service "
+            "via broker-gateway restfs.api.url (port 4040)."
         ),
-        startup="cd typescript/file-system-server && bash start.sh",
-        workspace_path="nexus/typescript/file-system-server",
+        startup="systemd: systemctl --user start secure-file-system-server.service",
+        workspace_path="nexus/typescript/secure-file-system-server",
     ),
     Candidate(
         name="terrain-mcp",
@@ -340,7 +356,7 @@ CANDIDATES: tuple[Candidate, ...] = (
             "vision services on port 8003. Systemd-managed."
         ),
         startup="systemd: systemctl --user start vision-srv-py.service",
-        workspace_path="nexus/python/vision/vision-srv",
+        workspace_path="nexus/python/vision-srv",
     ),
     Candidate(
         name="role-memory-srv",
@@ -489,6 +505,48 @@ CANDIDATES: tuple[Candidate, ...] = (
         ),
         startup="systemd: systemctl --user start conduit-srv.service",
         workspace_path="nexus/typescript/conduit-srv",
+    ),
+    Candidate(
+        name="apidocs-srv",
+        port=3180,
+        kind="runnable_service",
+        service_type="Python Service",
+        health_url="http://localhost:3180/health",
+        description=(
+            "API docs index — Swagger UI + ReDoc over all *-srv OpenAPI "
+            "specs. Plain HTTP on 127.0.0.1:3180 (localhost tooling); "
+            "HTTPS listener on 0.0.0.0:8443 (self-signed cert, "
+            "auto-generated) for LAN clients. Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start apidocs-srv.service",
+        workspace_path="nexus/tools/api-docs",
+    ),
+    Candidate(
+        name="semantics-srv",
+        port=3160,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:3160/health",
+        description=(
+            "REST API over the semantics.* Postgres schema (type-level "
+            "semantic topology legend). Sends service-registry heartbeats "
+            "via heartbeat-client (id 60, 30s). Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start semantics-srv.service",
+        workspace_path="nexus/typescript/semantics-srv",
+    ),
+    Candidate(
+        name="semantics-mcp",
+        port=3161,
+        kind="mcp_server",
+        transport_type="streamable-http",
+        health_url="http://localhost:3161/health",
+        description=(
+            "Semantics MCP server (streamable HTTP on 3161) — exposes the "
+            "semantics.* legend to MCP clients via semantics-srv."
+        ),
+        startup="systemd: systemctl --user start semantics-mcp.service",
+        workspace_path="nexus/typescript/semantics-mcp",
     ),
 )
 

@@ -5,6 +5,19 @@ import { startHeartbeat } from "heartbeat-client";
 
 const PORT = parseInt(process.env.PORT || "3109", 10);
 
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: Error & { code?: string }) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`knowledge-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[knowledge-srv] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[knowledge-srv] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
+
 const app = express();
 
 app.use(cors());
@@ -43,7 +56,7 @@ app.get("/health", async (_req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`knowledge-srv listening on http://localhost:${PORT}`);
   console.log(`  Entities:        http://localhost:${PORT}/knowledge/entities`);
   console.log(`  Edges:           http://localhost:${PORT}/knowledge/edges`);
@@ -53,15 +66,19 @@ app.listen(PORT, () => {
   console.log(`  Health:          http://localhost:${PORT}/health`);
 
   // Register with service-registry (port 8085) via heartbeat-client.
-  // serviceId 109 = knowledge-srv (port-derived placeholder; chosen as
-  // 100 + (port % 100) so it's easy to remember until the registry
-  // reveals its real ID convention). Send a heartbeat every 30s; if the
-  // service-registry doesn't add / bump our row, the registry will return
-  // 404 and the heartbeat will silently retry (handled inside heartbeat-client).
   startHeartbeat({
     serviceId: 109,
     serviceName: "knowledge-srv",
     interval: 30,
     log: (...args: any[]) => console.log(new Date().toISOString(), "[heartbeat knowledge-srv]", ...args),
   });
+});
+
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`knowledge-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+  } else {
+    console.error('knowledge-srv: listen error:', err.message);
+  }
+  process.exit(1);
 });

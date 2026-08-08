@@ -18,14 +18,26 @@ import logging
 import re
 import subprocess
 import sys
+import os
 from pathlib import Path
 
+# Add rover source dir so `event_emitter` is importable without PYTHONPATH
+# (matches the pattern in analyst_answer_questions.py /
+# architect_process_todo.py).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "python", "rover"))
+
 from event_emitter import emit_harvest_captured
+
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "insert_missing_harvests.log"),
+    ],
 )
 log = logging.getLogger("insert_missing")
 
@@ -316,11 +328,14 @@ def process_one(slug: str) -> bool:
         )
 
         # Cascade event: harvest.captured
+        # NOTE: emit_harvest_captured(harvest_id, title, source, **kwargs) forwards
+        # **kwargs to emit_event(), whose signature does NOT accept `source_file`
+        # or `total_candidates`. Passing them raised TypeError, which the try/except
+        # below swallowed silently. Drop both stray kwargs; the event still
+        # fires correctly with harvest_id (→ aggregate_id) + source.
         try:
             emit_harvest_captured(
                 harvest_id=result["id"],
-                source_file=result["filename"],
-                total_candidates=result["candidates"],
                 source="rover.insert_missing_harvests",
             )
         except Exception as e:

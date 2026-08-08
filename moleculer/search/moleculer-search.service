@@ -13,9 +13,10 @@ WorkingDirectory=/home/codex/dev/nexus/moleculer/search
 # ── Environment ────────────────────────────────────────────────────────
 Environment=NODE_ENV=production
 Environment=SERVICE_PORT=4050
-Environment=GOOGLE_API_KEY=AIzaSyAfVHkNv8-YVyz1eSitseZLTHcXW4NTyI4
-Environment=GOOGLE_SEARCH_ENGINE_ID=e44fd2743cc9e49c8
 Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr/bin:/bin
+
+# Shared secrets — gitignored .env file with GOOGLE_API_KEY, GOOGLE_SEARCH_ENGINE_ID
+EnvironmentFile=/home/codex/dev/nexus/.env
 
 # ── Executable ─────────────────────────────────────────────────────────
 ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/npx moleculer-runner services/**/*.service.ts

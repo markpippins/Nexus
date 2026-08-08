@@ -25,10 +25,12 @@ ALL_SERVICES=(
 
     # Core backends
     "service-registry.service"  # port 8085 — service discovery
-    "broker-gateway.service"    # port 8081 — service broker gateway
+    "broker-gateway.service"    # port 8081 — service broker gateway (Spring Boot)
+    "quarkus-broker-gateway.service"  # port 8091 — service broker gateway (Quarkus)
+    "helidon-user-access-service.service"  # port 9093 — user access control (Helidon MP)
     "terrain.service"          # port 8084 — topology registry
     "file-system-server.service"        # port 4042 — file system operations (edit-ui)
-    "secure-file-system-server.service" # port 4041 — secure file system operations (service-broker)
+    "secure-file-system-server.service" # port 4040 — secure file system operations (service-broker)
     "ui-event-bus.service"     # port 3200 — cross-app UI event bus (SSE)
     "peb-kernel.service"       # port 8080 — engineering brain
     "kernel-srv.service"       # port 8100 — Semantic Kernel REST API (wraps sys_transition, sys_issue_receipt, v_* views; SSE over pg_notify)
@@ -38,6 +40,7 @@ ALL_SERVICES=(
     "wrp-bridge-daemon.service" # conduit→kernel sync
     "cascade-kernel-subscriber.service" # pg_notify → NATS (kernel transitions)
     "cascade-obs-subscriber.service"   # pg_notify → NATS (PEB governance + Vision lifecycle)
+    "cascade-admission-subscriber.service" # NATS → WR_VALIDATED + execution.requests mirror (ADR-006)
 
     # API servers
     "vision-srv-py.service"    # port 8003 — Vision Python
@@ -54,6 +57,7 @@ ALL_SERVICES=(
 
     # Operator + MCP servers
     "operator-svc.service"     # port 3018 — Operator host personality
+    "conduit-kernel.service"   # port 3103 — WRP kernel FastAPI (sessions/breaker/receipts/admin/delta/replay)
     "conduit-mcp.service"      # port 3100 — work request orchestration
     "conduit-srv.service"      # port 3104 — conduit REST API (extracted from conduit-mcp)
     "pty-srv.service"          # port 3120 — WebSocket PTY bridge for xterm.js
@@ -61,7 +65,9 @@ ALL_SERVICES=(
     "nebula-mcp.service"       # stdio  — Nebula MCP (on-demand; clients spawn independently)
     "terrain-mcp.service"      # stdio  — Terrain topology MCP (on-demand; clients spawn independently)
     "tackle-srv.service"      # port 3410 — tackle AI config & memory REST API
-    "tackle-mcp.service"       # port 3400 — AI config registry MCP (→ tackle-srv)    "knowledge-srv.service"    # port 3109 — knowledge REST API (graph_entities, graph_edges, xrefs, migrations)
+    "tackle-mcp.service"       # port 3400 — AI config registry MCP (→ tackle-srv)
+    "tackle-prompt-sync-srv.service" # port 3501 — PG→Redis sync for prompt/task registry (feeds tackle-prompt-bridge + tackle-mcp /prompts/get)
+    "knowledge-srv.service"    # port 3109 — knowledge REST API (graph_entities, graph_edges, xrefs, migrations)
     "peb-srv.service"          # port 3111 — PEB observability REST API
     "cpf-api.service"          # port 3108 — CPF funnel data API
     "atlas.service"            # port 8090 — graph views persistence
@@ -73,12 +79,18 @@ ALL_SERVICES=(
     "moleculer-search.service"  # port 4050 — Moleculer Search API (Google, registry)
     "ui-tools.service"          # port 3125 — UI Tools CRUD API (statusbar links)
     "ui-tools-mcp.service"       # port 3136 — UI Tools MCP (agent-facing link management)
+    "semantics-srv.service"      # port 3160 — semantics REST API (semantics.* schema — type-level legend)
+    "semantics-mcp.service"      # port 3161 — semantics MCP (→ semantics-srv)
+    "apidocs-srv.service"        # port 3180 — API docs index (Swagger UI + ReDoc over all *-srv specs)
 
     # API servers (non-UI services)
     "wind-srv.service"         # port 3300 — Wind IDE workflow API
+    "mildred-dam-api.service"   # port 3140 — Mildred Digital Asset Management
+    "voyager-srv.service"       # port 3114 — Voyager REST API (filesystem acquisition queries)
+    "voyager.service"           # no port — Filesystem acquisition layer (NATS-backed)
 
     # UI dev servers (Angular/Vite — managed via systemd, not tmux)
-    "nebula-ui.service"         # port 3000 — Nebula RMS UI
+    "nebula-ui.service"         # port 4210 — Nebula RMS UI
     "duality-ui.service"        # port 3002 — Duality UI
     "view-architect.service"    # port 3003 — View Architect UI
     "plurality-ui.service"      # port 3004 — Plurality UI
@@ -100,9 +112,11 @@ SERVICE_PORTS=(
     ["mongodb.service"]="27017"
     ["service-registry.service"]="8085"
     ["broker-gateway.service"]="8081"
+    ["quarkus-broker-gateway.service"]="8091"
+    ["helidon-user-access-service.service"]="9093"
     ["terrain.service"]="8084"
     ["file-system-server.service"]="4042"
-    ["secure-file-system-server.service"]="4041"
+    ["secure-file-system-server.service"]="4040"
     ["ui-event-bus.service"]="3200"
     ["peb-kernel.service"]="8080"
     ["kernel-srv.service"]="8100"
@@ -110,6 +124,7 @@ SERVICE_PORTS=(
     ["cascade-srv.service"]="3106"
     ["role-memory-srv.service"]="3500"
     # wrp-bridge-daemon — no HTTP health endpoint
+    # cascade-admission-subscriber — no HTTP health endpoint
     ["vision-srv-py.service"]="8003"
     ["losm-host.service"]="8006"
     # image-server — no HTTP health endpoint
@@ -117,6 +132,7 @@ SERVICE_PORTS=(
     ["address-tts-mcp.service"]="3105"
     ["assembly-srv.service"]="3107"
     ["assembly-mcp.service"]="3113"
+    ["conduit-kernel.service"]="3103"
     ["conduit-mcp.service"]="3100"
     ["conduit-srv.service"]="3104"
     ["nebula-mcp-sse.service"]="3102"
@@ -124,6 +140,7 @@ SERVICE_PORTS=(
     # terrain-mcp.service — stdio, on-demand (no port)
     ["tackle-srv.service"]="3410"
     ["tackle-mcp.service"]="3400"
+    ["tackle-prompt-sync-srv.service"]="3501"
     ["knowledge-srv.service"]="3109"
     ["peb-srv.service"]="3111"
     ["operator-svc.service"]="3018"
@@ -135,11 +152,17 @@ SERVICE_PORTS=(
     ["tools-aggregator.service"]="3210"
     ["service-broker-mcp.service"]="3112"
     ["wind-srv.service"]="3300"
+    ["mildred-dam-api.service"]="3140"
+    ["voyager-srv.service"]="3114"
+    # voyager.service — no HTTP health endpoint (NATS-based)
     ["substance.service"]="3115"
     ["moleculer-search.service"]="4050"
     ["ui-tools.service"]="3125"
     ["ui-tools-mcp.service"]="3136"
-    ["nebula-ui.service"]="3000"
+    ["semantics-srv.service"]="3160"
+    ["semantics-mcp.service"]="3161"
+    ["apidocs-srv.service"]="3180"
+    ["nebula-ui.service"]="4210"
     ["duality-ui.service"]="3002"
     ["view-architect.service"]="3003"
     ["plurality-ui.service"]="3004"
@@ -171,6 +194,9 @@ SERVICE_HEALTH_PATHS=(
     ["semantic-kernel-ui.service"]="/"
     # Other services with non-standard health paths
     ["terrain.service"]="/api/v1/platform/health"
+    ["quarkus-broker-gateway.service"]="/api/health"
+    ["mildred-dam-api.service"]="/api/health"
+    ["voyager-srv.service"]="/api/health"
 )
 
 # Docker-based services (verified via docker ps instead of port check)
@@ -290,14 +316,20 @@ cmd_status_all() {
                 sub="tracking"  # Normal state for on-demand stdio MCP servers
                 health="OK (on-demand)"
             fi
-        # Docker services: verify container liveness
+        # Docker services: container liveness is the source of truth.
+        # NOTE: do NOT short-circuit on `[[ "$sub" == "running" ]]` — systemd's
+        # SubState lags actual container liveness during teardown, which caused
+        # a false "OK (docker)" report while the container was already gone.
+        # See audit record ef2ef768 (2026-08-03).
         elif _in_array "$svc" "${DOCKER_SERVICES[@]}"; then
             local container
             container=$(_docker_container_for "$svc")
-            if [[ "$sub" == "running" ]] || _docker_container_running "$container"; then
+            if _docker_container_running "$container"; then
                 health="OK (docker)"
             elif [[ "$active" == "active" ]]; then
-                health="⚠ systemd active, container?"
+                # systemd says active but the container is missing — surface
+                # the divergence instead of hiding it as "OK".
+                health="⚠ systemd active, container missing"
             else
                 health="DOWN"
             fi

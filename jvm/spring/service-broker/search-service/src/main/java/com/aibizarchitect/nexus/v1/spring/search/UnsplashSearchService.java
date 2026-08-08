@@ -23,33 +23,54 @@ public class UnsplashSearchService {
     private static final Logger log = LoggerFactory.getLogger(UnsplashSearchService.class);
 
     private final RestTemplate restTemplate;
-
     private final SearchResultsCacheRepository cacheRepository;
+    private final SearchRateLimiter rateLimiter;
 
     // Unsplash API key - in a real implementation, this should be configured via
     // properties
     private String unsplashApiKey = "YOUR_UNSPLASH_ACCESS_KEY_HERE";
 
     private static final long CACHE_TTL_MINUTES = 30; // Cache TTL in minutes
+    private static final String SERVICE_KEY = "unsplash";
 
-    public UnsplashSearchService(RestTemplate restTemplate, SearchResultsCacheRepository cacheRepository) {
+    public UnsplashSearchService(RestTemplate restTemplate,
+                                 SearchResultsCacheRepository cacheRepository,
+                                 SearchRateLimiter rateLimiter) {
         this.restTemplate = restTemplate;
         this.cacheRepository = cacheRepository;
-        log.info("UnsplashSearchService initialized with MongoDB cache");
+        this.rateLimiter = rateLimiter;
+        log.info("UnsplashSearchService initialized with MongoDB cache + Redis rate limiter");
     }
 
     @BrokerOperation("searchImages")
     public SearchResult searchImages(@BrokerParam("token") String token, @BrokerParam("query") String query) {
-        log.info("Unsplash image search query received: {}", query);
+        return searchImages(token, query, false);
+    }
 
-        // First, check if we have a cached result for this query in MongoDB
+    @BrokerOperation("forceSearchImages")
+    public SearchResult forceSearchImages(@BrokerParam("token") String token, @BrokerParam("query") String query) {
+        return searchImages(token, query, true);
+    }
+
+    private SearchResult searchImages(String token, String query, boolean forceRefresh) {
+        log.info("Unsplash image search query received: {} (forceRefresh={})", query, forceRefresh);
+
+        // ── Rate-limit check ──────────────────────────────────────────
+        if (!forceRefresh && rateLimiter.isRateLimited(SERVICE_KEY, query)) {
+            SearchResultsCacheEntry cachedEntry = findAnyCacheEntry(query);
+            if (cachedEntry != null) {
+                log.info("Rate-limited — returning MongoDB-cached Unsplash result for query: {}", query);
+                return buildResult(cachedEntry);
+            }
+            log.info("Rate-limited but no MongoDB cache entry — falling through to fresh search");
+        }
+
+        // ── Fresh cache check ────────────────────────────────────────
         SearchResultsCacheEntry cachedEntry = findValidCacheEntry(query);
         if (cachedEntry != null) {
-            log.info("Returning cached result from MongoDB for Unsplash query: {}", query);
-            SearchResult result = new SearchResult();
-            result.setItems(cachedEntry.getItems());
-            result.setRawResponse(cachedEntry.getItems().get(0).getPagemap()); // Simplified for demo
-            return result;
+            log.info("Returning fresh MongoDB-cached Unsplash result for query: {}", query);
+            rateLimiter.markSearched(SERVICE_KEY, query);
+            return buildResult(cachedEntry);
         }
 
         // Validate configuration
@@ -162,6 +183,9 @@ public class UnsplashSearchService {
                 cacheRepository.save(newCacheEntry);
                 log.info("Cached Unsplash search result in MongoDB for query: {}", query);
 
+                // Record rate-limit timestamp
+                rateLimiter.markSearched(SERVICE_KEY, query);
+
                 return result;
             } else {
                 log.error("Unsplash search API returned error: {}", response.getStatusCode());
@@ -177,7 +201,20 @@ public class UnsplashSearchService {
     }
 
     /**
-     * Find a valid cache entry (not expired) for the given query
+     * Find any MongoDB cache entry for the query — even if expired.
+     */
+    private SearchResultsCacheEntry findAnyCacheEntry(String query) {
+        try {
+            var optionalEntry = cacheRepository.findByQuery(query);
+            return optionalEntry.orElse(null);
+        } catch (Exception e) {
+            log.warn("Error accessing Unsplash cache for query {}: {}", query, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Find a valid (non-expired) cache entry. Deletes expired entries.
      */
     private SearchResultsCacheEntry findValidCacheEntry(String query) {
         try {
@@ -187,7 +224,6 @@ public class UnsplashSearchService {
                 if (!entry.isExpired()) {
                     return entry;
                 } else {
-                    // Entry is expired, remove it
                     cacheRepository.deleteById(entry.getId());
                     log.info("Removed expired Unsplash cache entry for query: {}", query);
                 }
@@ -195,7 +231,16 @@ public class UnsplashSearchService {
             return null;
         } catch (Exception e) {
             log.warn("Error accessing Unsplash cache for query {}: {}", query, e.getMessage());
-            return null; // Return null to proceed with fresh search
+            return null;
         }
+    }
+
+    private SearchResult buildResult(SearchResultsCacheEntry entry) {
+        SearchResult result = new SearchResult();
+        result.setItems(entry.getItems());
+        if (entry.getItems() != null && !entry.getItems().isEmpty()) {
+            result.setRawResponse(entry.getItems().get(0).getPagemap());
+        }
+        return result;
     }
 }

@@ -1,26 +1,42 @@
 # Assembly (Angular)
 
-Modern, tight Angular reimplementation of the Assembly deliberation UI.
+Modern Angular reimplementation of the Assembly deliberation UI.
 
-## Development
+## Development modes
+
+Assembly follows the runtime-mode pattern used by `tackle-ui`:
 
 ```bash
-bun install
-bun run dev
+cp .env.example .env
+npm install
+npm run dev
 ```
 
-The dev server runs on **http://localhost:4204**.
+Set `ASSEMBLY_MODE=mock` for a backend-free refinement workspace. Mock mode:
 
-## Backend
+- runs the Angular UI at **http://localhost:3000** by default;
+- starts an in-memory API fixture server on an internal port;
+- serves representative data for the list/detail views;
+- supports local forum posts, comments, open questions, forum management, and feed actions;
+- requires no Nexus backend services.
 
-The UI expects `assembly-srv` to be running at `http://localhost:3107`.
-The dev proxy is configured in `proxy.conf.json`.
+Set `ASSEMBLY_MODE=live` when working against Nexus services. Live mode keeps the
+terrain-designated **http://localhost:4204** UI port and proxies `/api` to
+`assembly-srv` at `http://localhost:3107` and `/nebula` to `nebula-srv` at
+`http://localhost:3101`.
 
-## Features
+`PORT`, `MOCK_API_PORT`, `API_TARGET`, and `NEBULA_TARGET` may be overridden in
+`.env` or the shell. Shell environment values take precedence over `.env`.
 
-- Tight Microsoft Office/Gmail-style layout with minimal margins
-- Collapsible sidebar navigation with live entity counts
-- List views for all top-level business objects
-- "Raise Question" action on every top-level object that creates an Open Question linked back to the object
-- No visible raw IDs (titles and descriptions only)
-- Nebula color theme (primary purple, gray scale)
+## Production-style server
+
+Build the Angular bundle and serve it with the selected runtime mode:
+
+```bash
+npm run build
+ASSEMBLY_MODE=mock npm start
+```
+
+The production-style server serves the built bundle and the same mock/live API
+boundary. `npm run dev` is the preferred workflow for UI refinement because it
+keeps Angular hot reload enabled.

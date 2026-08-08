@@ -1,0 +1,19 @@
+[Unit]
+Description=Cascade Admission Subscriber — NATS work_request.created → WR_VALIDATED + execution.requests mirror (ADR-006)
+Documentation=https://github.com/nexus/python/cascade
+After=network.target
+# NOTE: no BindsTo/PartOf coupling to conduit-mcp — the daemon must survive
+# conduit-mcp restarts (ADR-006 AC). nats-py reconnect handles NATS restarts.
+
+[Service]
+Type=simple
+WorkingDirectory=/home/codex/dev/nexus/python/cascade
+EnvironmentFile=/home/codex/dev/nexus/python/cascade/.env
+ExecStart=/home/codex/opt/anaconda3/bin/python3 admission_subscriber.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

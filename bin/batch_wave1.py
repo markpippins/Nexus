@@ -71,10 +71,16 @@ def simple_html_to_md(html_path: str) -> str:
 from qwen_extract import chunk_text
 
 # ── logging ───────────────────────────────────────────────────────────
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "batch_wave1.log"),
+    ],
 )
 log = logging.getLogger("batch-wave1")
 

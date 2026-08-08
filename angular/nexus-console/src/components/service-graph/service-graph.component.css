@@ -40,7 +40,7 @@
 }
 
 .mode-switcher button {
-  padding: 6px 12px;
+  padding: 6px 10px;
   border-radius: 3px;
   font-size: 12px;
   color: #94a3b8;
@@ -48,6 +48,9 @@
   border: none;
   cursor: pointer;
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  line-height: 1;
 }
 
 .mode-switcher button:hover {

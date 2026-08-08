@@ -4,7 +4,7 @@
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `PORT` | 4040 | Service port |
+| `PORT` | 4042 | Service port |
 | `FILES_ROOT` | ./data/files | Root directory for file storage |
 | `DIRECTORY_LISTING` | false | Enable directory listing |
 | `MAX_FILE_SIZE_MB` | 500 | Maximum upload file size in MB |
@@ -14,7 +14,7 @@
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | 4040 | Service port |
+| `PORT` | 4042 | Service port |
 | `FILES_ROOT` | ./data/files | File storage root path |
 | `MAX_FILE_SIZE_MB` | 500 | Maximum upload file size |
 | `ALLOW_DIRECTORY_LISTING` | false | Enable directory listing |
@@ -28,8 +28,8 @@
 | `npm start` | Start the service |
 | `npm run dev` | Start with live reload (nodemon) |
 | `npm test` | Run tests |
-| `curl http://localhost:4040/files/README.md` | Fetch a file |
-| `curl -X POST -F "file=@test.txt" http://localhost:4040/files/uploads/test.txt` | Upload a file |
+| `curl http://localhost:4042/files/README.md` | Fetch a file |
+| `curl -X POST -F "file=@test.txt" http://localhost:4042/files/uploads/test.txt` | Upload a file |
 
 ## Troubleshooting
 

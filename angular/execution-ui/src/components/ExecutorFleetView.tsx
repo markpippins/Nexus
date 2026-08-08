@@ -38,7 +38,7 @@ export const ExecutorFleetView: React.FC<ExecutorFleetViewProps> = ({
   return (
     <div className="p-4 space-y-4 font-sans text-slate-200 overflow-y-auto max-w-7xl mx-auto">
       {/* Executor Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 font-mono text-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 font-mono text-sm">
         {summaryList.map(executor => {
           const isSelected = selectedExecutorId === executor.executor_id;
           const isStale = executor.health_status === 'STALE_LEASES';
@@ -101,12 +101,12 @@ export const ExecutorFleetView: React.FC<ExecutorFleetViewProps> = ({
                 </span>
               </div>
             </div>
-            <span className="text-xs text-slate-400">
+            <span className="text-sm text-slate-400">
               Last heartbeat: {new Date(executorDetail.summary.last_heartbeat).toLocaleTimeString()}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             {/* Active Leases List */}
             <div className="p-3 bg-slate-950 border border-slate-800 rounded space-y-2">
               <span className="font-bold text-slate-300 flex items-center gap-1.5 border-b border-slate-800 pb-1">

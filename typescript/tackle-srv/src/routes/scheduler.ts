@@ -48,12 +48,12 @@ schedulerRouter.get("/:id", async (req, res) => {
 
 schedulerRouter.post("/", async (req, res) => {
   try {
-    const { role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, enabled } = req.body || {};
+    const { role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, task_slug, enabled } = req.body || {};
     if (!role) {
       res.status(400).json({ error: "role is required" });
       return;
     }
-    const entry = await createSchedulerEntry({ role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, enabled });
+    const entry = await createSchedulerEntry({ role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, task_slug, enabled });
     res.json({ created: true, entry });
   } catch (e: any) {
     res.status(500).json({ error: e.message });

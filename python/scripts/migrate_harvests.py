@@ -25,7 +25,7 @@ DB_CONFIG = {
     "user": "pguser",
     "password": "pgpass",
     "database": "nexus",
-    "options": "-c search_path=nebula,public_old",
+    "options": "-c search_path=nebula",
 }
 
 HARVESTS_DIR = "/home/codex/dev/nexus/audit/ROVER/processed/harvests"

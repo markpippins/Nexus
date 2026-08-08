@@ -46,12 +46,12 @@ export const ReceiptsAuditLog: React.FC<ReceiptsAuditLogProps> = ({
               Execution Authority (ADR-006) & Receipt Audit Trail
             </h1>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-sm text-zinc-400 mt-1">
             Mutual exclusion leases, attempt logs, cryptographic receipt hashes, and WRP Kernel replay state.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-zinc-950 p-1 rounded-md border border-zinc-800 font-mono text-xs">
+        <div className="flex items-center gap-2 bg-zinc-950 p-1 rounded-md border border-zinc-800 font-mono text-sm">
           <button
             onClick={() => setActiveTab('requests')}
             className={`px-3 py-1 rounded font-semibold transition-colors ${
@@ -79,13 +79,13 @@ export const ReceiptsAuditLog: React.FC<ReceiptsAuditLogProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Work Request Table (2 cols) */}
           <div className="lg:col-span-2 bg-zinc-900/90 border border-zinc-800 rounded-lg overflow-hidden shadow-md">
-            <div className="p-3 border-b border-zinc-800 bg-zinc-950/50 flex items-center justify-between font-mono text-xs">
+            <div className="p-3 border-b border-zinc-800 bg-zinc-950/50 flex items-center justify-between font-mono text-sm">
               <span className="text-zinc-300 font-bold uppercase">ADR-006 Dispatched Work Requests</span>
               <span className="text-amber-400">Total: {workRequests.length}</span>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse font-sans text-xs">
+              <table className="w-full text-left border-collapse font-sans text-sm">
                 <thead>
                   <tr className="bg-zinc-950 text-zinc-400 font-mono uppercase tracking-wider border-b border-zinc-800">
                     <th className="py-2.5 px-3 font-semibold">WR ID / Plan</th>
@@ -157,14 +157,14 @@ export const ReceiptsAuditLog: React.FC<ReceiptsAuditLogProps> = ({
               <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
                 <div className="flex items-center gap-2">
                   <Terminal className="w-4 h-4 text-emerald-400" />
-                  <span className="font-mono text-xs font-bold text-zinc-200">
+                  <span className="font-mono text-sm font-bold text-zinc-200">
                     DCO Input/Output Inspector
                   </span>
                 </div>
-                <span className="font-mono text-xs text-emerald-400">{selectedWr.id}</span>
+                <span className="font-mono text-sm text-emerald-400">{selectedWr.id}</span>
               </div>
 
-              <div className="space-y-1 text-xs font-mono">
+              <div className="space-y-1 text-sm font-mono">
                 <div className="flex justify-between text-zinc-400">
                   <span>Attempt ID:</span>
                   <span className="text-zinc-200">{selectedWr.attemptId}</span>
@@ -183,7 +183,7 @@ export const ReceiptsAuditLog: React.FC<ReceiptsAuditLogProps> = ({
 
               {/* DCO Input Payload Code Box */}
               <div className="space-y-1">
-                <span className="text-xs font-mono font-bold text-zinc-400 block">
+                <span className="text-sm font-mono font-bold text-zinc-400 block">
                   DCO Input Payload (YAML/JSON):
                 </span>
                 <pre className="bg-zinc-950 p-3 rounded border border-zinc-800 text-[11px] font-mono text-emerald-300 overflow-x-auto max-h-48 leading-relaxed">
@@ -194,7 +194,7 @@ export const ReceiptsAuditLog: React.FC<ReceiptsAuditLogProps> = ({
               {/* DCO Output Result */}
               {selectedWr.outputResult && (
                 <div className="space-y-1">
-                  <span className="text-xs font-mono font-bold text-zinc-400 block">
+                  <span className="text-sm font-mono font-bold text-zinc-400 block">
                     Execution Result Event:
                   </span>
                   <pre className="bg-zinc-950 p-3 rounded border border-zinc-800 text-[11px] font-mono text-cyan-300 overflow-x-auto max-h-48 leading-relaxed">
@@ -227,7 +227,7 @@ export const ReceiptsAuditLog: React.FC<ReceiptsAuditLogProps> = ({
               )}
             </div>
           ) : (
-            <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-8 text-center text-zinc-500 font-mono text-xs">
+            <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-8 text-center text-zinc-500 font-mono text-sm">
               Select a work request to inspect DCO payload details.
             </div>
           )}
@@ -242,21 +242,21 @@ export const ReceiptsAuditLog: React.FC<ReceiptsAuditLogProps> = ({
               <h2 className="text-sm font-mono font-bold uppercase text-zinc-200">
                 WRP Kernel Runtime Replay Delta Sequence
               </h2>
-              <p className="text-xs text-zinc-400">
+              <p className="text-sm text-zinc-400">
                 Deterministic reduction state pipeline served from FastAPI at port 3103
               </p>
             </div>
 
             <button
               onClick={() => alert('WRP Kernel delta replay initiated from sequence 1042.')}
-              className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-zinc-950 font-mono text-xs font-bold rounded flex items-center gap-1.5 transition-all shadow-md"
+              className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-zinc-950 font-mono text-sm font-bold rounded flex items-center gap-1.5 transition-all shadow-md"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Replay Snapshot From Seq #1042</span>
             </button>
           </div>
 
-          <div className="space-y-3 font-mono text-xs">
+          <div className="space-y-3 font-mono text-sm">
             {kernelDeltas.map((delta) => (
               <div
                 key={delta.sequenceId}

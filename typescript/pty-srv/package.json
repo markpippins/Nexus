@@ -1,7 +1,7 @@
 {
   "name": "pty-srv",
   "version": "1.0.0",
-  "description": "WebSocket PTY server — bridges xterm.js in the browser to real shell processes on the host",
+  "description": "WebSocket PTY server \u2014 bridges xterm.js in the browser to real shell processes on the host",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -9,6 +9,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "heartbeat-client": "file:../heartbeat-client",
     "node-pty": "^1.1.0",
     "ws": "^8.18.0"
   },

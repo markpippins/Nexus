@@ -16,6 +16,12 @@ import sys
 import time
 import urllib.request
 import urllib.error
+from pathlib import Path
+
+from nebula_utils import unwrap_systems_response
+
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 log = logging.getLogger("batch_cross_refs")
 
@@ -24,7 +30,10 @@ NEBULA_API = "http://localhost:3101/api"
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "batch_create_cross_references.log"),
+    ],
 )
 
 
@@ -72,7 +81,11 @@ def main():
     log.info("Existing classified_as cross-refs: %d", len(existing_pairs))
     
     # Step 3: Fetch hierarchy for metadata context
-    systems_data = nebula_get("/systems")
+    systems_data_raw = nebula_get("/systems?pageSize=100")
+    systems_data = unwrap_systems_response(systems_data_raw)
+    if systems_data is None:
+        log.error("Unexpected /systems response: %s", type(systems_data_raw).__name__)
+        return 1
     sys_by_id = {}
     for s in systems_data:
         sys_by_id[s["id"]] = s["name"]

@@ -77,7 +77,7 @@ export const Header: React.FC<HeaderProps> = ({
           className="flex items-center gap-2 px-3 py-1 cursor-pointer group"
         >
           <div className="flex flex-col">
-            <span className="text-xs font-bold tracking-wider font-mono text-zinc-100 flex items-center gap-1.5">
+            <span className="text-sm font-bold tracking-wider font-mono text-zinc-100 flex items-center gap-1.5">
               NEXUS <span className="text-zinc-600">//</span> EXECUTION-SRV
             </span>
             <span className="text-[10px] font-mono text-emerald-400 leading-tight">
@@ -97,7 +97,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Middle: Interactive Bento Addressbar & Breadcrumbs */}
       <div className="flex-1 max-w-xl mx-4 hidden md:flex items-center">
-        <div className="w-full flex items-center bg-[#18181b] border border-[#27272a] rounded-md px-3 py-1 text-xs font-mono text-zinc-300 focus-within:border-blue-500 transition-colors">
+        <div className="w-full flex items-center bg-[#18181b] border border-[#27272a] rounded-md px-3 py-1 text-sm font-mono text-zinc-300 focus-within:border-blue-500 transition-colors">
           <Terminal className="w-3.5 h-3.5 text-blue-400 mr-2 shrink-0" />
           <span className="text-zinc-500 select-none mr-1">GET</span>
           <span className="text-blue-400 mr-1">/api/execution</span>
@@ -120,7 +120,7 @@ export const Header: React.FC<HeaderProps> = ({
         {hasPathologies && (
           <button
             onClick={() => setCurrentTab('integrity-scan')}
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 text-xs font-mono transition-colors"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 text-sm font-mono transition-colors"
             title="Pathologies / Stale active leases detected"
           >
             <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
@@ -132,7 +132,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="relative">
           <button
             onClick={() => setShowConfigDropdown(!showConfigDropdown)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono border transition-colors ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-mono border transition-colors ${
               config.useMock 
                 ? 'bg-purple-950/40 border-purple-800/60 text-purple-300 hover:bg-purple-900/40' 
                 : 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300 hover:bg-emerald-900/40'
@@ -143,7 +143,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {showConfigDropdown && (
-            <div className="absolute right-0 mt-2 w-72 bg-[#18181b] border border-[#27272a] rounded-xl shadow-2xl p-3 z-50 font-sans text-xs">
+            <div className="absolute right-0 mt-2 w-72 bg-[#18181b] border border-[#27272a] rounded-xl shadow-2xl p-3 z-50 font-sans text-sm">
               <div className="flex items-center justify-between font-mono font-semibold text-zinc-200 mb-2 border-b border-[#27272a] pb-1.5">
                 <span>Data Engine Config</span>
                 <span className="text-[10px] text-zinc-400">execution-srv</span>
@@ -171,7 +171,7 @@ export const Header: React.FC<HeaderProps> = ({
                   value={config.baseUrl}
                   onChange={handleBaseUrlChange}
                   disabled={config.useMock}
-                  className="w-full bg-[#09090b] border border-[#27272a] rounded px-2 py-1 text-zinc-200 font-mono text-xs focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                  className="w-full bg-[#09090b] border border-[#27272a] rounded px-2 py-1 text-zinc-200 font-mono text-sm focus:outline-none focus:border-blue-500 disabled:opacity-50"
                   placeholder="/api/execution"
                 />
               </div>
@@ -233,7 +233,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Integration README Button */}
         <button
           onClick={onOpenReadme}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#18181b] hover:bg-[#27272a] border border-[#27272a] text-zinc-300 text-xs font-mono transition-colors"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#18181b] hover:bg-[#27272a] border border-[#27272a] text-zinc-300 text-sm font-mono transition-colors"
           title="View Integration Deployment Guide"
         >
           <BookOpen className="w-3.5 h-3.5 text-blue-400" />

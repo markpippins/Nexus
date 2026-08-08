@@ -1,0 +1,36 @@
+[Unit]
+Description=Semantics MCP — MCP server for the semantics.* schema (port 3161), delegates to semantics-srv REST
+Documentation=https://github.com/nexus/typescript/semantics-mcp
+After=network.target semantics-srv.service
+Wants=semantics-srv.service
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/typescript/semantics-mcp
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=SEMANTICS_MCP_PORT=3161
+Environment=SEMANTICS_MCP_SERVICE_ID=61
+Environment=SEMANTICS_SRV_URL=http://localhost:3160
+Environment=NODE_ENV=production
+Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr/bin:/bin
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/npx tsx src/index.ts
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart behavior ───────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=3
+
+# ── Hardening ──────────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/codex/dev/nexus/typescript/semantics-mcp /home/codex/.npm
+
+[Install]
+WantedBy=default.target

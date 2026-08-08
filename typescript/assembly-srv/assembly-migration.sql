@@ -77,6 +77,19 @@ ALTER TABLE assembly.post_artifact_refs ADD CONSTRAINT post_artifact_refs_artifa
     'harvest', 'harvest_candidate'
   ));
 
+-- 8. Add sort_order to assembly.forums for drag-to-reorder support
+ALTER TABLE assembly.forums ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+-- Backfill sort_order based on current name ordering for existing rows
+UPDATE assembly.forums f
+SET sort_order = t.new_order
+FROM (
+  SELECT id, row_number() OVER (ORDER BY name ASC) - 1 AS new_order
+  FROM assembly.forums
+  WHERE expiration_dt = 'infinity'::timestamptz OR expiration_dt > now()
+) t
+WHERE f.id = t.id AND f.sort_order IS DISTINCT FROM t.new_order;
+
 -- 7. Seed Harvest Candidates forum (idempotent)
 INSERT INTO assembly.forums (id, name, slug, description)
 VALUES (gen_random_uuid(), 'Harvest Candidates', 'harvest-candidates',
@@ -98,8 +111,31 @@ ALTER TABLE assembly.forums
   ADD COLUMN IF NOT EXISTS expiration_dt TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT 'infinity'::timestamptz;
 
 -- 9a. Partial index over the dominant "live + unbounded" case. Filters
---     that resolve to this predicate hit the index; finite-future expirations
+--     that resolve to this predicate hit the index. Finite-future expirations
 --     are rare and fall through to the seqscan or other indexes as needed.
 CREATE INDEX IF NOT EXISTS idx_forums_live_unbounded
   ON assembly.forums(expiration_dt)
   WHERE expiration_dt = 'infinity'::timestamptz;
+
+-- 10. Capture posting agent role + model on posts and comments.
+--     Agents pass "role" and "model" in the create request body. The API
+--     persists them here so every post is attributable to (role, model)
+--     even when the author alias is a shared bot (e.g. Rover).
+ALTER TABLE assembly.posts    ADD COLUMN IF NOT EXISTS role  TEXT;
+ALTER TABLE assembly.posts    ADD COLUMN IF NOT EXISTS model TEXT;
+ALTER TABLE assembly.comments ADD COLUMN IF NOT EXISTS role  TEXT;
+ALTER TABLE assembly.comments ADD COLUMN IF NOT EXISTS model TEXT;
+
+-- Backfill role from the author alias for known agent roles (model is
+-- unknowable for historical posts and stays NULL).
+UPDATE assembly.posts p
+SET role = u.alias
+FROM assembly.users u
+WHERE u.id = p.posted_by_id AND p.role IS NULL
+  AND u.alias IN ('sysadmin','architect','planner','engineer','reviewer','critic','analyst','inspector');
+
+UPDATE assembly.comments c
+SET role = u.alias
+FROM assembly.users u
+WHERE u.id = c.posted_by_id AND c.role IS NULL
+  AND u.alias IN ('sysadmin','architect','planner','engineer','reviewer','critic','analyst','inspector');

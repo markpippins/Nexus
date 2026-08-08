@@ -6,32 +6,7 @@ export const feedRouter = Router();
 
 feedRouter.get('/', async (_req, res, next) => {
   try {
-    const result = await pool.query(`
-      SELECT
-        p.id AS post_id,
-        p.text,
-        p.created,
-        u.id AS user_id,
-        u.alias,
-        u.avatar_url,
-        f.id AS forum_id,
-        f.slug AS forum_slug,
-        f.name AS forum_name,
-        (
-          WITH RECURSIVE tree AS (
-            SELECT id FROM assembly.comments WHERE post_id = p.id
-            UNION ALL
-            SELECT c.id FROM assembly.comments c
-            JOIN tree t ON c.parent_id = t.id
-          )
-          SELECT COUNT(*) FROM tree
-        ) AS comment_count
-      FROM assembly.posts p
-      JOIN assembly.users u ON u.id = p.posted_by_id
-      LEFT JOIN assembly.forums f ON f.id = p.forum_uuid AND (f.expiration_dt = 'infinity'::timestamptz OR f.expiration_dt > now())
-      ORDER BY p.created DESC
-      LIMIT 50
-    `);
+    const result = await pool.query('SELECT post_id, text, created, user_id, alias, avatar_url, forum_id, forum_slug, forum_name, comment_count FROM assembly.feed_posts_v LIMIT 50');
 
     const posts = result.rows.map(row => ({
       id: row.post_id,
@@ -60,7 +35,7 @@ feedRouter.delete('/:id', async (req, res, next) => {
     const { id } = req.params;
 
     const result = await pool.query(
-      `DELETE FROM assembly.posts WHERE id = $1 RETURNING id`,
+      'SELECT * FROM assembly.soft_delete_thread($1)',
       [id]
     );
 
@@ -70,6 +45,7 @@ feedRouter.delete('/:id', async (req, res, next) => {
 
     res.json({ id: result.rows[0].id });
   } catch (err) {
+    if (err.code === 'P0002') throw new NotFoundError('Post not found');
     next(err);
   }
 });

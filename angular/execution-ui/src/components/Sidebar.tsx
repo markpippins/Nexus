@@ -119,7 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   key={item.id}
                   onClick={() => setCurrentTab(item.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-sans transition-all group ${
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-sans transition-all group ${
                     isActive
                       ? 'bg-[#18181b] text-blue-400 border border-[#27272a] font-medium'
                       : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b] border border-transparent'
@@ -158,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   key={item.id}
                   onClick={() => setCurrentTab(item.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-sans transition-all group ${
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-sans transition-all group ${
                     isActive
                       ? 'bg-[#18181b] text-blue-400 border border-[#27272a] font-medium'
                       : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b] border border-transparent'
@@ -185,7 +185,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Bottom Panel: Schema Quick Overview */}
-      <div className="p-3 border-t border-[#27272a] bg-[#0c0c0e] text-xs font-mono space-y-2">
+      <div className="p-3 border-t border-[#27272a] bg-[#0c0c0e] text-sm font-mono space-y-2">
         <div className="flex items-center justify-between text-zinc-500 text-[10px] font-bold tracking-wider uppercase">
           <span className="flex items-center gap-1">
             <Database className="w-3 h-3 text-zinc-400" />

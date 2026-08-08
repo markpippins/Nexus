@@ -124,4 +124,14 @@ export class LinkEditorDialogComponent {
       this.saving.set(false);
     }
   }
+
+  // ── Template-safe helpers for ngModelChange on signals ──────────
+  updateNewType(type: string): void { this.newType.set(type as 'link' | 'separator'); }
+  updateNewLinkAddress(address: string): void { this.newLink.update(v => ({...v, address})); }
+  updateNewLinkImageName(imagename: string): void { this.newLink.update(v => ({...v, imagename})); }
+  updateNewLinkText(text: string): void { this.newLink.update(v => ({...v, text})); }
+  updateEditFormType(type: string): void { this.editForm.update(v => ({...v, type: type as 'link' | 'separator'})); }
+  updateEditFormAddress(address: string): void { this.editForm.update(v => ({...v, address})); }
+  updateEditFormImageName(imagename: string): void { this.editForm.update(v => ({...v, imagename})); }
+  updateEditFormText(text: string): void { this.editForm.update(v => ({...v, text})); }
 }

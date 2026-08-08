@@ -6,6 +6,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import * as winston from 'winston';
+import { startHeartbeat } from 'heartbeat-client';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,7 +20,7 @@ const logger = winston.createLogger({
     winston.format.splat(),
     winston.format.json()
   ),
-  defaultMeta: { service: 'file-system-server' },
+  defaultMeta: { service: 'secure-file-system-server' },
   transports: [
     new winston.transports.Console({
       format: winston.format.combine(
@@ -36,6 +37,19 @@ const logger = winston.createLogger({
 dotenv.config({ path: path.resolve(__dirname, '.env.local') });
 
 const PORT = process.env.FS_SERVER_PORT || 4040;
+
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: Error & { code?: string }) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`secure-fs-server: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[secure-fs-server] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[secure-fs-server] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
 
 // --- NEW: Allow command-line override for root directory ---
 // Usage: node server.js [rootDir]
@@ -106,7 +120,7 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
                 status: 'UP',
-                service: 'file-system-server',
+                service: 'secure-file-system-server',
                 timestamp: new Date().toISOString(),
                 details: {
                     fsRootDir: FS_ROOT_DIR,
@@ -119,7 +133,7 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(503, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
                 status: 'DOWN',
-                service: 'file-system-server',
+                service: 'secure-file-system-server',
                 timestamp: new Date().toISOString(),
                 error: 'File system root directory not accessible'
             }));
@@ -383,4 +397,22 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
     logger.info(`Server listening on port ${PORT}`, { port: PORT });
     logger.info(`File system root is ${FS_ROOT_DIR}`, { fsRootDir: FS_ROOT_DIR });
+
+    // 30s heartbeats to service-registry (registry.services id 53).
+    // Mirrors src/server.ts; the deployed entrypoint runs fs-serv.ts via `bun run`.
+    startHeartbeat({
+      serviceId: 53,
+      serviceName: 'secure-file-system-server',
+      interval: 30,
+      log: (...args: any[]) => console.log(new Date().toISOString(), '[heartbeat secure-file-system-server]', ...args),
+    });
+});
+
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    logger.error(`secure-fs-server: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+  } else {
+    logger.error('secure-fs-server: listen error:', err.message);
+  }
+  process.exit(1);
 });

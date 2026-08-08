@@ -1,6 +1,7 @@
 import * as http from 'http';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { startHeartbeat } from 'heartbeat-client';
 import { createRestFsService } from './fs-service-impl.js';
 import { createRestFsServiceRouter } from '../../tsp-output/server/js/src/generated/http/router.js';
 
@@ -8,6 +9,19 @@ import { createRestFsServiceRouter } from '../../tsp-output/server/js/src/genera
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const PORT = process.env.FS_SERVER_PORT || 4040;
+
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: any) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`secure-fs-server: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[secure-fs-server] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[secure-fs-server] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
 
 // Allow command-line override for root directory
 const cliRootArg = process.argv[2];
@@ -60,7 +74,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       status: 'UP',
-      service: 'file-system-server',
+      service: 'secure-file-system-server',
       timestamp: new Date().toISOString(),
       details: {
         fsRootDir: FS_ROOT_DIR,
@@ -78,4 +92,20 @@ server.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
   console.log(`File system root is ${FS_ROOT_DIR}`);
   console.log(`TypeSpec routes: /list, /cd, /mkdir, /rmdir, /touch, /rm, /rename, /rename-item, /copy, /move, /move-items, /has-file, /has-folder`);
+
+  startHeartbeat({
+    serviceId: 53, // registry.services id (was 116 = substance — wrong)
+    serviceName: 'secure-file-system-server',
+    interval: 30,
+    log: (...args: any[]) => console.log(new Date().toISOString(), '[heartbeat secure-file-system-server]', ...args),
+  });
+});
+
+server.on('error', (err: any) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`secure-fs-server: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+  } else {
+    console.error('secure-fs-server: listen error:', err.message);
+  }
+  process.exit(1);
 });

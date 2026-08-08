@@ -27,9 +27,18 @@ import logging
 import subprocess
 import sys
 import os
+from pathlib import Path
+
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Add parent directory to path so tackle.harness is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+# Add rover source dir so the deferred `from event_emitter import ...`
+# calls inside this script resolve without PYTHONPATH (matches the pattern
+# used by analyst_answer_questions.py and the other rover-bin scripts).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "python", "rover"))
 
 import uuid as uuidlib
 from datetime import datetime, timezone
@@ -46,7 +55,10 @@ DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "architect_process_todo.log"),
+    ],
 )
 
 

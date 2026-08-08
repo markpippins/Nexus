@@ -32,13 +32,6 @@ public interface ConduitMcpPort {
     JsonNode getWorkRequest(String wrId);
 
     /**
-     * List all work requests with their folded states.
-     * 
-     * @return array of work request states
-     */
-    JsonNode listWorkRequests();
-
-    /**
      * Apply a transition to a work request.
      * 
      * @param wrId the work request ID

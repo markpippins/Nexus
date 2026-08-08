@@ -3,6 +3,7 @@ import cors from 'cors';
 import { Pool } from 'pg';
 import { createRoutes } from './routes';
 import { startNotifyListener, isNotifyAlive, subscribe, stopNotifyListener } from './notify';
+import { startHeartbeat } from 'heartbeat-client';
 
 // ── PostgreSQL Connection ──────────────────────────────────────────
 // Same convention as nebula-srv. We do NOT set search_path here so
@@ -44,6 +45,19 @@ export { subscribe };
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 8100;
 
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: Error & { code?: string }) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`kernel-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[kernel-srv] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[kernel-srv] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
+
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
@@ -71,6 +85,22 @@ app.get('/api/health', healthHandler);
 // ── Start ─────────────────────────────────────────────────────────
 const server = app.listen(PORT, () => {
   console.log(`kernel-srv listening on http://localhost:${PORT}`);
+
+  startHeartbeat({
+    serviceId: 113,
+    serviceName: 'kernel-srv',
+    interval: 30,
+    log: (...args: any[]) => console.log(new Date().toISOString(), '[heartbeat kernel-srv]', ...args),
+  });
+});
+
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`kernel-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+  } else {
+    console.error('kernel-srv: listen error:', err.message);
+  }
+  process.exit(1);
 });
 
 // ── Graceful shutdown ──────────────────────────────────────────────

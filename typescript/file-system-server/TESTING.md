@@ -4,7 +4,7 @@ This test suite verifies the functionality of the file-system-server.
 
 ## Running the Tests
 
-1. Ensure the file-system-server is running on port 4040:
+1. Ensure the file-system-server is running on port 4042:
    ```bash
    cd /mnt/c/dev/WORK/atomic/node/file-system-server
    FS_ROOT_DIR=/tmp/test-fs-root npx tsx fs-serv.ts
@@ -56,7 +56,7 @@ The test suite also verifies proper error handling for:
 ```typescript
 import { FileSystemServerTester } from './test-fs-server';
 
-const tester = new FileSystemServerTester(4040);
+const tester = new FileSystemServerTester(4042);
 
 // Health check
 await tester.healthCheck();

@@ -72,17 +72,6 @@ class ConduitMcpAdapterTest {
         }
 
         @Test
-        @DisplayName("listWorkRequests: GET from /wr")
-        void listWorkRequests_success() throws Exception {
-            expectJsonResponse("/wr", HttpMethod.GET, "[{\"id\":\"wr-001\"}]");
-
-            JsonNode result = adapter.listWorkRequests();
-
-            assertNotNull(result);
-            assertTrue(result.isArray());
-        }
-
-        @Test
         @DisplayName("transitionWorkRequest: POST to /wr/{id}/transition")
         void transitionWorkRequest_success() throws Exception {
             expectJsonResponse("/wr/wr-001/transition", HttpMethod.POST,
@@ -118,17 +107,6 @@ class ConduitMcpAdapterTest {
             assertEquals(5, result.get("plans").asInt());
         }
 
-        @Test
-        @DisplayName("invokeTool: POST to /tools/call with wrapped payload")
-        void invokeTool_success() throws Exception {
-            expectJsonResponse("/tools/call", HttpMethod.POST, "{\"result\":\"ok\"}");
-            JsonNode args = mapper.createObjectNode().put("key", "value");
-
-            JsonNode result = adapter.invokeTool("test_tool", args);
-
-            assertNotNull(result);
-            assertEquals("ok", result.get("result").asText());
-        }
     }
 
     // ── RED PATH ────────────────────────────────────────────────

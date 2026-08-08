@@ -79,6 +79,16 @@ EVENT_TEMPLATES: dict[str, tuple[str, int, str]] = {
         3,
         Persona.DEBUG,
     ),
+    "WR_SETTLED": (
+        "Work request {id} completed",
+        6,
+        Persona.MONITOR,
+    ),
+    "WR_NOOP": (
+        "Work request {id} requires no action",
+        2,
+        Persona.DEBUG,
+    ),
     "WR_REJECTED": (
         "Work request {id} rejected{reason}",
         7,

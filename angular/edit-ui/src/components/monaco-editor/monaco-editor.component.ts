@@ -26,7 +26,7 @@ declare const monaco: any;
       <div class="flex items-center h-9 bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] flex-shrink-0 overflow-x-auto">
         @for (tab of openFiles(); track tab.path; let i = $index) {
           <div
-            class="flex items-center h-full px-3 text-xs border-r border-[rgb(var(--color-border-base))] cursor-pointer flex-shrink-0 max-w-[200px]"
+            class="flex items-center h-full px-3 text-sm border-r border-[rgb(var(--color-border-base))] cursor-pointer flex-shrink-0 max-w-[200px]"
             [class.bg-[rgb(var(--color-background))]]="tab.path === activeFile()"
             [class.border-b-2]="tab.path === activeFile()"
             [class.border-b-[rgb(var(--color-accent-ring))]]="tab.path === activeFile()"

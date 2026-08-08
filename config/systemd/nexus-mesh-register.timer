@@ -1,0 +1,14 @@
+[Unit]
+Description=Terrain Mesh Registration (every 5 minutes)
+
+[Timer]
+# OnCalendar provides a robust steady-state cadence (fires at :00/:05/:10...)
+# regardless of when the timer is started — OnBootSec/OnUnitActiveSec alone
+# leave a late-started timer unarmed (NextElapse=infinity, Trigger: n/a).
+OnCalendar=*:0/5
+OnBootSec=30s
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

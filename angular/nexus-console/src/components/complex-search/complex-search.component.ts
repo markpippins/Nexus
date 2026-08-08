@@ -67,22 +67,22 @@ export interface ComplexSearchParams {
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 mt-4">
               
               <div>
-                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Number of Results <code class="text-xs text-cyan-400">num</code></label>
+                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Number of Results <code class="text-sm text-cyan-400">num</code></label>
                 <input type="number" min="1" max="10" [value]="num()" (input)="num.set(+$any($event.target).value)" class="w-full mt-1 bg-[rgb(var(--color-surface-muted))] border border-[rgb(var(--color-border-muted))] rounded-lg p-2 text-[rgb(var(--color-text-base))]">
               </div>
               <div>
-                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Start Index <code class="text-xs text-cyan-400">start</code></label>
+                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Start Index <code class="text-sm text-cyan-400">start</code></label>
                 <input type="number" min="1" [value]="start()" (input)="start.set(+$any($event.target).value)" class="w-full mt-1 bg-[rgb(var(--color-surface-muted))] border border-[rgb(var(--color-border-muted))] rounded-lg p-2 text-[rgb(var(--color-text-base))]">
               </div>
               <div>
-                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Safe Search <code class="text-xs text-cyan-400">safe</code></label>
+                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Safe Search <code class="text-sm text-cyan-400">safe</code></label>
                 <select (change)="safe.set($any($event.target).value)" [value]="safe()" class="w-full mt-1 bg-[rgb(var(--color-surface-muted))] border border-[rgb(var(--color-border-muted))] rounded-lg p-2 text-[rgb(var(--color-text-base))]">
                   <option value="active">Active</option>
                   <option value="off">Off</option>
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Language Restrict <code class="text-xs text-cyan-400">lr</code></label>
+                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Language Restrict <code class="text-sm text-cyan-400">lr</code></label>
                 <select (change)="languageRestrict.set($any($event.target).value)" [value]="languageRestrict()" class="w-full mt-1 bg-[rgb(var(--color-surface-muted))] border border-[rgb(var(--color-border-muted))] rounded-lg p-2 text-[rgb(var(--color-text-base))]">
                   @for(lang of languages; track lang.code) {
                     <option [value]="lang.code">{{ lang.name }}</option>
@@ -90,31 +90,31 @@ export interface ComplexSearchParams {
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Country Restrict <code class="text-xs text-cyan-400">cr</code></label>
+                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Country Restrict <code class="text-sm text-cyan-400">cr</code></label>
                 <input type="text" [value]="countryRestrict()" (input)="countryRestrict.set($any($event.target).value)" class="w-full mt-1 bg-[rgb(var(--color-surface-muted))] border border-[rgb(var(--color-border-muted))] rounded-lg p-2 text-[rgb(var(--color-text-base))]" placeholder="e.g., countryUS">
               </div>
               <div>
-                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Site Search <code class="text-xs text-cyan-400">siteSearch</code></label>
+                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Site Search <code class="text-sm text-cyan-400">siteSearch</code></label>
                 <input type="text" [value]="siteSearch()" (input)="siteSearch.set($any($event.target).value)" class="w-full mt-1 bg-[rgb(var(--color-surface-muted))] border border-[rgb(var(--color-border-muted))] rounded-lg p-2 text-[rgb(var(--color-text-base))]" placeholder="e.g., developers.google.com">
               </div>
               <div>
-                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Exact Terms <code class="text-xs text-cyan-400">exactTerms</code></label>
+                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Exact Terms <code class="text-sm text-cyan-400">exactTerms</code></label>
                 <input type="text" [value]="exactTerms()" (input)="exactTerms.set($any($event.target).value)" class="w-full mt-1 bg-[rgb(var(--color-surface-muted))] border border-[rgb(var(--color-border-muted))] rounded-lg p-2 text-[rgb(var(--color-text-base))]" placeholder="e.g., \`Angular signals\`">
               </div>
               <div>
-                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Exclude Terms <code class="text-xs text-cyan-400">excludeTerms</code></label>
+                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Exclude Terms <code class="text-sm text-cyan-400">excludeTerms</code></label>
                 <input type="text" [value]="excludeTerms()" (input)="excludeTerms.set($any($event.target).value)" class="w-full mt-1 bg-[rgb(var(--color-surface-muted))] border border-[rgb(var(--color-border-muted))] rounded-lg p-2 text-[rgb(var(--color-text-base))]" placeholder="e.g., AngularJS">
               </div>
               <div>
-                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">OR Terms <code class="text-xs text-cyan-400">orTerms</code></label>
+                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">OR Terms <code class="text-sm text-cyan-400">orTerms</code></label>
                 <input type="text" [value]="orTerms()" (input)="orTerms.set($any($event.target).value)" class="w-full mt-1 bg-[rgb(var(--color-surface-muted))] border border-[rgb(var(--color-border-muted))] rounded-lg p-2 text-[rgb(var(--color-text-base))]" placeholder="e.g., tutorial guide">
               </div>
               <div>
-                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">File Type <code class="text-xs text-cyan-400">fileType</code></label>
+                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">File Type <code class="text-sm text-cyan-400">fileType</code></label>
                 <input type="text" [value]="fileType()" (input)="fileType.set($any($event.target).value)" class="w-full mt-1 bg-[rgb(var(--color-surface-muted))] border border-[rgb(var(--color-border-muted))] rounded-lg p-2 text-[rgb(var(--color-text-base))]" placeholder="e.g., pdf">
               </div>
               <div>
-                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Date Restrict <code class="text-xs text-cyan-400">dateRestrict</code></label>
+                <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Date Restrict <code class="text-sm text-cyan-400">dateRestrict</code></label>
                 <input type="text" [value]="dateRestrict()" (input)="dateRestrict.set($any($event.target).value)" class="w-full mt-1 bg-[rgb(var(--color-surface-muted))] border border-[rgb(var(--color-border-muted))] rounded-lg p-2 text-[rgb(var(--color-text-base))]" placeholder="e.g., d[7], m[3], y[1]">
               </div>
             </div>

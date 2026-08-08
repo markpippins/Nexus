@@ -17,11 +17,11 @@ function renderMarkdown(content: string): string {
 
   // Code blocks
   html = html.replace(/```([\s\S]*?)```/g, (_, code) => {
-    return `<pre class="bg-gray-900 text-gray-100 rounded p-3 overflow-x-auto text-xs my-2"><code>${code.trim()}</code></pre>`;
+    return `<pre class="bg-gray-900 text-gray-100 rounded p-3 overflow-x-auto text-sm my-2"><code>${code.trim()}</code></pre>`;
   });
 
   // Inline code
-  html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-100 text-primary-700 px-1 py-0.5 rounded text-xs font-mono">$1</code>');
+  html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-100 text-primary-700 px-1 py-0.5 rounded text-sm font-mono">$1</code>');
 
   // Headers
   html = html.replace(/^### (.*$)/gim, '<h3 class="text-sm font-semibold text-gray-900 mt-3 mb-1">$1</h3>');
