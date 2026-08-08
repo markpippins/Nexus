@@ -26,7 +26,7 @@
         <tr *ngFor="let item of sortedItems()">
           <td>
             <a [routerLink]="['/conversations', item.id]" class="app-link">{{ item.sourceFilename || 'Untitled' }}</a>
-            <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ item.conversationId }}</div>
+            <div *ngIf="item.conversationId" class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-mono"><span class="text-[10px] text-gray-400">ID:</span> #{{ item.conversationId.slice(0, 8) }}</div>
           </td>
           <td class="text-xs text-gray-600 dark:text-gray-400">{{ item.captureMode || '—' }}</td>
           <td class="text-xs text-gray-500 dark:text-gray-400">{{ formatDate(item.createdAt) }}</td>

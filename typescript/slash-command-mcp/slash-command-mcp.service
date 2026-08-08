@@ -1,0 +1,36 @@
+[Unit]
+Description=Slash-Command MCP — Phase-2 DSL MCP (port 3220): command_lookup / command_execute / command_completions over mcp.command_registry, executes via tools-aggregator
+Documentation=https://github.com/nexus/typescript/slash-command-mcp
+After=network.target tools-aggregator.service
+Wants=tools-aggregator.service
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/typescript/slash-command-mcp
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=SLASH_MCP_PORT=3220
+Environment=SLASH_MCP_SERVICE_ID=0
+Environment=AGGREGATOR_URL=http://localhost:3210
+Environment=NODE_ENV=production
+Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr/bin:/bin
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/npx tsx src/index.ts
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart behavior ───────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=3
+
+# ── Hardening ──────────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/codex/dev/nexus/typescript/slash-command-mcp /home/codex/.npm
+
+[Install]
+WantedBy=default.target

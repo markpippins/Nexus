@@ -15,6 +15,7 @@ import argparse
 import json
 import logging
 import signal
+import socket
 import sys
 import time
 import urllib.request
@@ -54,17 +55,33 @@ def publish_to_redis(channel: str, data: str, redis_host: str = "localhost", red
         return False
 
 
-def subscribe_sse(url: str, redis_host: str, redis_port: int):
-    """Subscribe to SSE endpoint and publish events to Redis."""
+def subscribe_sse(url: str, redis_host: str, redis_port: int, stop_check=None):
+    """Subscribe to SSE endpoint and publish events to Redis.
+
+    Args:
+        stop_check: Optional callable that returns True when shutdown is requested.
+                    Checked between SSE lines so SIGTERM can interrupt the read loop.
+    """
     log.info("Subscribing to SSE: %s", url)
 
     req = urllib.request.Request(url, headers={"Accept": "text/event-stream"})
     event_type = None
     event_data = []
+    old_timeout = socket.getdefaulttimeout()
 
     try:
+        # Set a socket timeout so reads don't block forever — we check stop_check
+        # between lines, but if the SSE stream goes silent we still need to
+        # unblock periodically to respond to SIGTERM.
+        socket.setdefaulttimeout(30)
+
         with urllib.request.urlopen(req, timeout=30) as resp:
             for line in resp:
+                # Check for shutdown signal between every SSE line
+                if stop_check and stop_check():
+                    log.info("Shutdown requested, disconnecting from SSE")
+                    return False
+
                 line = line.decode("utf-8", errors="replace").rstrip("\r\n")
 
                 if line.startswith("event:"):
@@ -85,9 +102,14 @@ def subscribe_sse(url: str, redis_host: str, redis_port: int):
                     event_type = None
                     event_data = []
 
-    except (urllib.error.URLError, urllib.error.HTTPError, OSError) as e:
-        log.warning("SSE connection lost: %s", e)
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError, socket.timeout) as e:
+        if stop_check and stop_check():
+            log.info("SSE connection interrupted by shutdown signal")
+        else:
+            log.warning("SSE connection lost: %s", e)
         return False
+    finally:
+        socket.setdefaulttimeout(old_timeout)
 
     return True
 
@@ -127,12 +149,17 @@ def main():
     log.info("Cascade event bridge started")
 
     while not stop:
-        success = subscribe_sse(args.conduit_url, args.redis_host, args.redis_port)
+        success = subscribe_sse(args.conduit_url, args.redis_host, args.redis_port,
+                                stop_check=lambda: stop)
         if stop:
             break
         if not success:
             log.info("Reconnecting in %ds...", args.reconnect_delay)
-            time.sleep(args.reconnect_delay)
+            # Sleep in small increments so we can respond to SIGTERM quickly
+            for _ in range(args.reconnect_delay):
+                if stop:
+                    break
+                time.sleep(1)
 
     log.info("Cascade event bridge stopped")
 

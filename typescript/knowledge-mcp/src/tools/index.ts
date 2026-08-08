@@ -139,19 +139,36 @@ export function registerTools(server: McpServer) {
 
   server.tool(
     "knowledge_semantic_search",
-    "Unified semantic search across both knowledge.graph_entity_embeddings (curated) and nebula.harvest_candidate_embeddings (harvested) using cosine similarity via nomic-embed-text. Returns merged results with provenance labels.",
+    "Unified semantic search across four pgvector embed layers using cosine similarity via nomic-embed-text: knowledge.graph_entity_embeddings (curated KG entities: work_requests, plans, actors), nebula.harvest_candidate_embeddings (harvested candidates), semantics.source_observation_embeddings (transcripts, session logs, audit docs), and nebula.agent_record_embeddings (agent records). Returns merged results with provenance labels (curated / harvested / observed / agent_record). Optionally restrict layers, agent record types, and a similarity floor via the layers / recordTypes / minSimilarity parameters.",
     {
       query: z.string().describe("Search query string (e.g. 'TypeSpec contract architecture')"),
       limit: z.number().min(1).max(50).optional().default(15).describe("Max results (1-50)"),
+      layers: z.array(z.enum(["harvest", "kg", "observation", "agent"])).optional()
+        .describe("Which embed layers to search. Omit to search all four. 'kg' = curated knowledge-graph entities (work_requests, plans, actors), 'harvest' = harvest candidates, 'observation' = transcripts/session logs/audit docs, 'agent' = agent records."),
+      // Keep in sync with AGENT_RECORD_TYPES in nexus/bin/unified_semantic_search.py.
+      recordTypes: z.array(z.enum(["report", "engineering_log", "architecture_note", "prompt", "assessment", "analysis", "response", "inspection", "decision"])).optional()
+        .describe("Restrict agent-layer results to these record types. Use to suppress noise (e.g. omit 'inspection' to filter out .gitkeep-style inspection records). Only affects the agent layer."),
+      minSimilarity: z.number().min(0).max(1).optional()
+        .describe("Only return results with similarity >= this threshold (e.g. 0.55). Applies across all selected layers."),
     },
     async (args) => {
       const scriptPath = "/home/codex/dev/nexus/bin/unified_semantic_search.py";
       const pythonBin = "/home/codex/dev/nexus/python/rover/.venv/bin/python3";
 
       try {
+        // Omit flags entirely when not specified so the script keeps its defaults.
+        const layersArgs = args.layers && args.layers.length
+          ? ["--layers", args.layers.join(",")]
+          : [];
+        const recordTypesArgs = args.recordTypes && args.recordTypes.length
+          ? ["--record-types", args.recordTypes.join(",")]
+          : [];
+        const minSimArgs = args.minSimilarity !== undefined
+          ? ["--min-similarity", String(args.minSimilarity)]
+          : [];
         const { stdout, stderr } = await execFileAsync(
           pythonBin,
-          [scriptPath, args.query, "--limit", String(args.limit), "--json"],
+          [scriptPath, args.query, "--limit", String(args.limit), ...layersArgs, ...recordTypesArgs, ...minSimArgs, "--json"],
           { timeout: 60000, maxBuffer: 10 * 1024 * 1024 }
         );
 

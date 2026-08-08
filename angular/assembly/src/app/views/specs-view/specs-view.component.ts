@@ -4,6 +4,7 @@ import { RouterLink, ActivatedRoute, Router } from '@angular/router';
 import { DataService, SpecItem, DEFAULT_PAGE_SIZE } from '../../services/data.service';
 import { sortItems, SortDir, toggleSort } from '../../utils/sort';
 import { readSortFromSnapshot, writeSortToQueryParams } from '../../utils/query-sort';
+import { entityRouteForType, formatEntityType } from '../../utils/entity-route';
 import { PageHeaderComponent } from '../../components/page-header/page-header.component';
 import { TableSkeletonComponent } from '../../components/skeleton/table-skeleton.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
@@ -72,5 +73,22 @@ export class SpecsViewComponent implements OnInit {
 
   formatDate(date: string) {
     return new Date(date).toLocaleDateString();
+  }
+
+  sourceRoute(item: SpecItem): string[] | null {
+    if (item.sourceId && item.sourceType) {
+      const route = entityRouteForType(item.sourceType);
+      if (route) return ['/', route, item.sourceId];
+    }
+    return null;
+  }
+
+  formatSourceLabel(item: SpecItem): string {
+    if (!item.sourceType) return '—';
+    const typeLabel = formatEntityType(item.sourceType);
+    if (item.sourceId) {
+      return `${typeLabel} (#${item.sourceId.slice(0, 8)})`;
+    }
+    return typeLabel;
   }
 }

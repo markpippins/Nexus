@@ -30,15 +30,9 @@ npx tsx src/index.ts
 Always use MCP tools, never write files directly:
 
 ```bash
-# Capture an idea (goes to proposed/, issues PROPOSED receipt)
-curl -X POST http://localhost:3100/tools/call \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"create_proposed_plan","arguments":{"title":"My feature"}}'
-
-# Create directly into implementation (goes to pending/, issues PLAN_CREATE)
-curl -X POST http://localhost:3100/tools/call \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"create_plan","arguments":{"title":"My feature"}}'
+# REMOVED from conduit-mcp: create_proposed_plan / create_plan both throw TOOL_NOT_FOUND.
+# Plan creation lives in nebula-mcp → nebula_create_plan (writes nebula.implementation_plans).
+# conduit-mcp still handles update_plan / delete_plan / issue_receipt / unblock_plan.
 ```
 
 ## Environment
@@ -57,8 +51,8 @@ The `.env` loader lives in `src/env.ts` — a shared module. No `dotenv` depende
 
 | Tool | Receipt | Description |
 |------|---------|-------------|
-| `create_proposed_plan` | `PROPOSED` | Capture an idea |
-| `create_plan` | `PLAN_CREATE` | Create directly into pending |
+| ~~`create_proposed_plan`~~ | — | REMOVED (TOOL_NOT_FOUND) — use nebula_create_plan |
+| ~~`create_plan`~~ | — | REMOVED (TOOL_NOT_FOUND) — use nebula_create_plan |
 | `promote_plan` | `PLANNING` | Promote proposed → planning |
 | `revise_plan` | `PLANNING` | Copy completed/blocked for revision |
 | `update_plan` | — | Edit plan metadata (title, goal, files, criteria, deps) |
