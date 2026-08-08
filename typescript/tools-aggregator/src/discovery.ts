@@ -91,9 +91,30 @@ const DEFAULT_SERVICES: MCPServiceConfig[] = [
     required: false,
     protocol: "auto",
   },
+  {
+    // Semantics domain CRUD tools (semantics.* schema). Plain JSON-RPC —
+    // this server rejects the MCP initialize/protocol-header handshake
+    // (HTTP 400), so pin `jsonrpc` instead of `auto` (auto would REST-probe
+    // first, fail, then fall back — works, but adds a wasted round-trip and
+    // a noisy WARN on every discovery).
+    name: "semantics-mcp",
+    baseUrl: process.env.SEMANTICS_MCP_URL || "http://localhost:3161",
+    required: false,
+    protocol: "jsonrpc",
+  },
+  {
+    // UI Tools link management (statusbar links). Same plain-JSON-RPC
+    // transport as semantics-mcp — pin `jsonrpc` for the same reason.
+    name: "ui-tools-mcp",
+    baseUrl: process.env.UI_TOOLS_MCP_URL || "http://localhost:3136",
+    required: false,
+    protocol: "jsonrpc",
+  },
   // Not in DEFAULT_SERVICES:
   //   role-memory-srv — not an MCP; it's the PG→Redis sync engine. The
   //                     `memory_*` tools are already exposed by tackle-mcp.
+  //   tackle-prompt-bridge — not a tool server (prompts, not tools); the
+  //                     `prompts/*` surface is exposed via tackle-mcp.
 ];
 
 // Per-service lock counter so concurrent discoveries don't collide on JSON-RPC ids.

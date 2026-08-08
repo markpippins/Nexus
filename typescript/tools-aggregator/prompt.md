@@ -50,7 +50,7 @@ Content-Type: application/json
 
 **Pipeline Management:**
 - `query_conduit_state` — Get current pipeline state
-- `create_plan` — Create a new implementation plan
+- `nebula_create_plan` — Create a new implementation plan (nebula-mcp; conduit-mcp `create_plan` is REMOVED)
 - `promote_plan` — Move a plan through the pipeline
 - `report_plan_metadata` — Update plan information
 
