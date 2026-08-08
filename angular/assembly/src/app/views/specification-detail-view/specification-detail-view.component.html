@@ -24,7 +24,7 @@
         <div class="min-w-0 flex-1">
           <h1 class="text-lg font-bold text-gray-900 dark:text-gray-100">Revision #{{ specification()!.revisionNumber }}</h1>
           <div class="flex items-center gap-2 mt-2 flex-wrap">
-            <span class="font-mono text-xs text-gray-500 dark:text-gray-400">{{ specification()!.id.slice(0, 8) }}…</span>
+            <span class="px-2 py-0.5 rounded bg-steel-100 dark:bg-steel-800 text-steel-600 dark:text-steel-300 text-xs font-mono">Specification #{{ specification()!.id.slice(0, 8) }}</span>
             <span class="text-xs px-1.5 py-0.5 rounded bg-steel-100 dark:bg-steel-700 text-steel-700 dark:text-steel-300 border border-steel-200 dark:border-steel-600">{{ specification()!.revisionType }}</span>
           </div>
         </div>
@@ -46,8 +46,15 @@
 
         <div *ngIf="specification()!.derivedFrom?.length" class="app-panel p-4">
           <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Derived From</h2>
-          <ul class="space-y-1">
-            <li *ngFor="let source of specification()!.derivedFrom" class="text-sm font-mono text-gray-700 dark:text-gray-300">{{ source }}</li>
+          <ul class="space-y-1.5">
+            <li *ngFor="let source of specification()!.derivedFrom" class="text-sm">
+              <ng-container *ngIf="resolveSourceRoute(source) as route; else plainSource">
+                <a [routerLink]="route" class="app-link font-medium">{{ formatSourceLabel(source) }}</a>
+              </ng-container>
+              <ng-template #plainSource>
+                <span class="font-mono text-xs text-gray-700 dark:text-gray-300">{{ source }}</span>
+              </ng-template>
+            </li>
           </ul>
         </div>
       </div>
@@ -59,7 +66,7 @@
             <div>
               <dt class="text-xs text-gray-500 uppercase">Agenda</dt>
               <dd>
-                <a [routerLink]="['/agendas', specification()!.agendaId]" class="app-link font-mono text-xs">{{ specification()!.agendaId.slice(0, 8) }}…</a>
+                <a [routerLink]="['/agendas', specification()!.agendaId]" class="app-link font-medium">Agenda (#{{ specification()!.agendaId.slice(0, 8) }})</a>
               </dd>
             </div>
             <div>
@@ -77,7 +84,7 @@
             <div *ngIf="specification()!.supersededBy">
               <dt class="text-xs text-gray-500 uppercase">Superseded By</dt>
               <dd>
-                <a [routerLink]="['/specifications', specification()!.supersededBy]" class="app-link font-mono text-xs">{{ specification()!.supersededBy!.slice(0, 8) }}…</a>
+                <a [routerLink]="['/specifications', specification()!.supersededBy]" class="app-link font-medium">Specification (#{{ specification()!.supersededBy!.slice(0, 8) }})</a>
               </dd>
             </div>
           </dl>

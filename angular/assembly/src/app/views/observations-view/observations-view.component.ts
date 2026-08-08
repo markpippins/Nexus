@@ -4,6 +4,7 @@ import { RouterLink, ActivatedRoute, Router } from '@angular/router';
 import { DataService, Observation, DEFAULT_PAGE_SIZE } from '../../services/data.service';
 import { sortItems, SortDir, toggleSort } from '../../utils/sort';
 import { readSortFromSnapshot, writeSortToQueryParams } from '../../utils/query-sort';
+import { entityRouteForType, formatEntityType } from '../../utils/entity-route';
 import { PageHeaderComponent } from '../../components/page-header/page-header.component';
 import { RaiseQuestionComponent } from '../../components/raise-question/raise-question.component';
 import { StatusBadgeComponent } from '../../components/status-badge/status-badge.component';
@@ -85,5 +86,22 @@ export class ObservationsViewComponent implements OnInit {
     } catch {
       return '—';
     }
+  }
+
+  artifactRoute(item: Observation): string[] | null {
+    if (item.sourceArtifactId && item.sourceArtifactType) {
+      const route = entityRouteForType(item.sourceArtifactType);
+      if (route) return ['/', route, item.sourceArtifactId];
+    }
+    return null;
+  }
+
+  formatArtifactLabel(item: Observation): string {
+    if (!item.sourceArtifactType) return '—';
+    const typeLabel = formatEntityType(item.sourceArtifactType);
+    if (item.sourceArtifactId) {
+      return `${typeLabel} (#${item.sourceArtifactId.slice(0, 8)})`;
+    }
+    return typeLabel;
   }
 }

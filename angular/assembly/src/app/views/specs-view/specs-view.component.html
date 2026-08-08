@@ -29,8 +29,20 @@
                 <a [routerLink]="['/specs', item.id]" class="app-link font-medium">{{ item.title || 'Untitled' }}</a>
                 <div *ngIf="item.body" class="text-xs text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">{{ item.body }}</div>
               </td>
-              <td class="text-sm text-gray-600 dark:text-gray-400">{{ item.sourceType || '—' }}</td>
-              <td class="text-sm text-gray-600 dark:text-gray-400">{{ item.agendaTitle || item.agendaStatus || '—' }}</td>
+              <td>
+                <ng-container *ngIf="sourceRoute(item) as route; else plainSource">
+                  <a [routerLink]="route" class="app-link text-xs">{{ formatSourceLabel(item) }}</a>
+                </ng-container>
+                <ng-template #plainSource>
+                  <span class="text-xs text-gray-600 dark:text-gray-400">{{ formatSourceLabel(item) }}</span>
+                </ng-template>
+              </td>
+              <td>
+                <a *ngIf="item.agendaId" [routerLink]="['/agendas', item.agendaId]" class="app-link text-xs font-medium">
+                  {{ item.agendaTitle || ('Agenda #' + item.agendaId.slice(0, 8)) }}
+                </a>
+                <span *ngIf="!item.agendaId" class="text-xs text-gray-600 dark:text-gray-400">{{ item.agendaTitle || item.agendaStatus || '—' }}</span>
+              </td>
               <td class="text-xs text-gray-500 dark:text-gray-400">{{ formatDate(item.createdAt) }}</td>
               <td class="text-right"><app-raise-question objectType="specification" [objectId]="item.id" [objectTitle]="item.title || 'Untitled'"></app-raise-question></td>
             </tr>

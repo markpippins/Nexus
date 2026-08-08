@@ -31,7 +31,14 @@
           <td class="text-xs text-gray-600 dark:text-gray-400 max-w-xs truncate">
             <span class="font-mono">{{ payloadSummary(item.payload) }}</span>
           </td>
-          <td class="text-xs text-gray-600 dark:text-gray-400">{{ item.sourceArtifactType || '—' }}</td>
+          <td>
+            <ng-container *ngIf="artifactRoute(item) as route; else plainArtifact">
+              <a [routerLink]="route" class="app-link text-xs">{{ formatArtifactLabel(item) }}</a>
+            </ng-container>
+            <ng-template #plainArtifact>
+              <span class="text-xs text-gray-600 dark:text-gray-400">{{ formatArtifactLabel(item) }}</span>
+            </ng-template>
+          </td>
           <td>
             <app-status-badge [status]="item.assessed ? 'Assessed' : 'Pending'"></app-status-badge>
           </td>

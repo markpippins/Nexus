@@ -24,7 +24,7 @@
         <div class="min-w-0 flex-1">
           <h1 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ plan()!.title || 'Untitled' }}</h1>
           <div class="flex items-center gap-2 mt-2 flex-wrap">
-            <span class="font-mono text-xs text-gray-500 dark:text-gray-400">{{ plan()!.id.slice(0, 8) }}…</span>
+            <span class="px-2 py-0.5 rounded bg-steel-100 dark:bg-steel-800 text-steel-600 dark:text-steel-300 text-xs font-mono">Plan #{{ plan()!.id.slice(0, 8) }}</span>
             <app-status-badge [status]="plan()!.status"></app-status-badge>
           </div>
         </div>

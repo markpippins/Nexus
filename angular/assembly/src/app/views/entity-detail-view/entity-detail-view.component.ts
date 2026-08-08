@@ -523,13 +523,23 @@ export class EntityDetailViewComponent implements OnInit {
     if (!entity) return [];
     return Object.entries(entity)
       .filter(([key]) => !this.METADATA_EXCLUDED_KEYS.has(key))
-      .map(([key, value]) => ({
-        key: this.formatKey(key),
-        rawKey: key,
-        value,
-        formattedValue: this.formatValue(value),
-        route: this.resolveEntityRoute(key, value)
-      }));
+      .map(([key, value]) => {
+        const route = this.resolveEntityRoute(key, value);
+        let formattedValue = this.formatValue(value);
+        if (route && typeof value === 'string') {
+          const typeSegment = route[1] || '';
+          const typeLabel = formatEntityType(typeSegment);
+          const shortId = value.length > 8 ? value.slice(0, 8) + '…' : value;
+          formattedValue = `${typeLabel} (#${shortId})`;
+        }
+        return {
+          key: this.formatKey(key),
+          rawKey: key,
+          value,
+          formattedValue,
+          route
+        };
+      });
   }
 
   resolveEntityRoute(rawKey: string, value: unknown): string[] | null {
@@ -597,6 +607,18 @@ export class EntityDetailViewComponent implements OnInit {
       }
     }
     return null;
+  }
+
+  formatSourceLabel(item: AgendaItem | Record<string, unknown>): string {
+    const sourceType = this.getItemSourceType(item);
+    const sourceId = this.getItemSourceId(item);
+    if (!sourceType && !sourceId) return '';
+    const label = formatEntityType(sourceType || null);
+    if (sourceId) {
+      const shortId = sourceId.length > 8 ? sourceId.slice(0, 8) + '…' : sourceId;
+      return `${label} (#${shortId})`;
+    }
+    return label;
   }
 
   formatValue(value: unknown): string {

@@ -8,6 +8,8 @@ import { SkeletonComponent } from '../../components/skeleton/skeleton.component'
 import { ErrorStateComponent } from '../../components/error-state/error-state.component';
 import { StatusBadgeComponent } from '../../components/status-badge/status-badge.component';
 
+import { entityRouteForType, formatEntityType } from '../../utils/entity-route';
+
 @Component({
   selector: 'app-specification-detail-view',
   standalone: true,
@@ -64,5 +66,34 @@ export class SpecificationDetailViewComponent implements OnInit {
 
   formatDate(date: string): string {
     return new Date(date).toLocaleString();
+  }
+
+  resolveSourceRoute(source: string): string[] | null {
+    if (!source || !source.trim()) return null;
+    const s = source.trim();
+    const match = s.match(/^(agenda|requirement|candidate|harvest|work_request|specification):(.+)$/i);
+    if (match) {
+      const route = entityRouteForType(match[1]);
+      if (route) return ['/', route, match[2]];
+    }
+    if (s.match(/^[0-9a-fA-F-]{32,36}$/)) {
+      return ['/agendas', s];
+    }
+    return null;
+  }
+
+  formatSourceLabel(source: string): string {
+    if (!source) return '—';
+    const match = source.trim().match(/^(agenda|requirement|candidate|harvest|work_request|specification):(.+)$/i);
+    if (match) {
+      const typeLabel = formatEntityType(match[1]);
+      const id = match[2];
+      const shortId = id.length > 8 ? id.slice(0, 8) + '…' : id;
+      return `${typeLabel} (#${shortId})`;
+    }
+    if (source.length > 12) {
+      return source.slice(0, 8) + '…';
+    }
+    return source;
   }
 }

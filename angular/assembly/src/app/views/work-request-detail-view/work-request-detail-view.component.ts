@@ -40,7 +40,7 @@ import { MarkdownRendererComponent } from '../../components/markdown-renderer/ma
             <div class="min-w-0 flex-1">
               <h1 class="text-lg font-bold text-gray-900">{{ wr()!.title || 'Untitled' }}</h1>
               <div class="flex items-center gap-2 mt-2 flex-wrap">
-                <span class="font-mono text-sm text-gray-500">{{ wr()!.id.slice(0, 8) }}…</span>
+                <span class="px-2 py-0.5 rounded bg-steel-100 dark:bg-steel-800 text-steel-600 dark:text-steel-300 text-xs font-mono">Work Request #{{ wr()!.id.slice(0, 8) }}</span>
                 <app-status-badge [status]="wr()!.status"></app-status-badge>
               </div>
             </div>
@@ -80,12 +80,12 @@ import { MarkdownRendererComponent } from '../../components/markdown-renderer/ma
             <div class="app-panel p-4">
               <h2 class="text-sm font-semibold text-gray-900 mb-2">Source Links</h2>
               <div *ngIf="wr()!.sourceSpecificationId" class="text-sm">
-                <span class="text-gray-500">Specification:</span>
-                <a [routerLink]="['/specifications', wr()!.sourceSpecificationId]" class="app-link font-mono text-sm">{{ wr()!.sourceSpecificationId!.slice(0, 8) }}…</a>
+                <span class="text-gray-500">Specification: </span>
+                <a [routerLink]="['/specifications', wr()!.sourceSpecificationId]" class="app-link font-medium">Specification (#{{ wr()!.sourceSpecificationId!.slice(0, 8) }})</a>
               </div>
               <div *ngIf="wr()!.sourceRequirementId" class="text-sm mt-1">
-                <span class="text-gray-500">Requirement:</span>
-                <a [routerLink]="['/requirements', wr()!.sourceRequirementId]" class="app-link font-mono text-sm">{{ wr()!.sourceRequirementId!.slice(0, 8) }}…</a>
+                <span class="text-gray-500">Requirement: </span>
+                <a [routerLink]="['/requirements', wr()!.sourceRequirementId]" class="app-link font-medium">Requirement (#{{ wr()!.sourceRequirementId!.slice(0, 8) }})</a>
               </div>
               <p *ngIf="!wr()!.sourceSpecificationId && !wr()!.sourceRequirementId" class="text-sm text-gray-500">No upstream sources linked.</p>
             </div>
