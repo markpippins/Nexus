@@ -13,6 +13,7 @@ import { failureRecoveryRouter } from "./routes/failure-recovery";
 import { tasksRouter } from "./routes/tasks";
 import { logsRouter } from "./routes/logs";
 import { healthRouter } from "./routes/health";
+import { projectionsRouter } from "./routes/projections";
 import { insertLog } from "./db";
 import { startHeartbeat } from "heartbeat-client";
 
@@ -79,6 +80,7 @@ app.use("/config/ai/tool-access", toolAccessRouter);
 app.use("/config/failure-recovery", failureRecoveryRouter);
 app.use("/tasks", tasksRouter);
 app.use("/logs", logsRouter);
+app.use("/projections", projectionsRouter);
 app.use("/health", healthRouter);
 
 // ── Start ─────────────────────────────────────────────────────────

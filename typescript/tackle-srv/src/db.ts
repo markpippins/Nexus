@@ -697,6 +697,184 @@ const migrations: Migration[] = [
       console.log("[tackle-migrations] v13: Allowed schedule_type 'manual' in tackle.agent_scheduler");
     },
   },
+  {
+    version: 14,
+    description: "ACP v1: Create tackle.projection_configs and seed six v1 projection families (opencode-agent-*, claude-md, gemini-md, agents-md, codex-index, agents-operating-model). Plan 1280.",
+    up: async (exec) => {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.projection_configs (
+          id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          name            TEXT NOT NULL UNIQUE,
+          description     TEXT NOT NULL DEFAULT '',
+          type            TEXT NOT NULL DEFAULT 'deterministic'
+                            CHECK(type IN ('deterministic','inference')),
+          source_query    TEXT NOT NULL DEFAULT '',
+          template        TEXT NOT NULL DEFAULT '',
+          parameter_schema JSONB NOT NULL DEFAULT '{}',
+          target_path     TEXT NOT NULL,
+          schedule        TEXT NOT NULL DEFAULT '',
+          enabled         INTEGER NOT NULL DEFAULT 1,
+          last_rendered_at TIMESTAMPTZ,
+          last_sha256     TEXT,
+          created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+
+      await exec(`
+        CREATE INDEX IF NOT EXISTS idx_projection_configs_enabled
+          ON ${TACKLE_SCHEMA}.projection_configs (enabled)
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS idx_projection_configs_name
+          ON ${TACKLE_SCHEMA}.projection_configs (name)
+      `);
+
+      // Seed the six v1 projection families
+      const now = new Date().toISOString();
+
+      // 1. opencode-agent-* — one file per role in .opencode/agents/
+      await exec(
+        `INSERT INTO ${TACKLE_SCHEMA}.projection_configs (name, description, type, source_query, template, target_path, schedule)
+         VALUES ($1, $2, 'deterministic',
+           'SELECT r.name AS role, r.description AS role_description FROM tackle.roles r ORDER BY r.name',
+           $3,
+           '/home/codex/dev/.opencode/agents/{{role}}.md',
+           '')
+         ON CONFLICT (name) DO NOTHING`,
+        [
+          "opencode-agents",
+          "Agent persona files — one .md per role under .opencode/agents/. Template embeds role name, role description, persona body from tackle.prompts, and procedure cards from tackle.role_memory.",
+          `---
+assumes_role: {{role}}
+description: |
+  {{role_description}}
+mode: primary
+permission:
+  read: allow
+  edit: allow
+  bash: allow
+  task: allow
+---
+{{persona_body}}
+
+## Available Procedure Cards
+
+{{procedures_list}}
+`,
+        ]
+      );
+
+      // 2. claude-md
+      await exec(
+        `INSERT INTO ${TACKLE_SCHEMA}.projection_configs (name, description, type, source_query, template, target_path, schedule)
+         VALUES ($1, $2, 'deterministic', '', $3, '/home/codex/dev/CLAUDE.md', '')
+         ON CONFLICT (name) DO NOTHING`,
+        [
+          "claude-md",
+          "CLAUDE.md — top-level agent baseline for Claude. Currently hand-maintained; projection preserves current content via template fidelity.",
+          `<!-- GENERATED header will be prepended at render time -->
+# CLAUDE.md
+
+> **Version:** (see git history)
+> **Scope:** Agent behavior for /home/codex/dev workspace.
+> This file is a **GENERATED projection** from tackle data.
+> Source: projection:claude-md
+> Do not edit directly — changes will be overwritten on next render.
+
+This file provides baseline agent behavior. Role-specific configuration lives in .opencode/agents/<role>.md (also generated).
+`,
+        ]
+      );
+
+      // 3. gemini-md
+      await exec(
+        `INSERT INTO ${TACKLE_SCHEMA}.projection_configs (name, description, type, source_query, template, target_path, schedule)
+         VALUES ($1, $2, 'deterministic', '', $3, '/home/codex/dev/GEMINI.md', '')
+         ON CONFLICT (name) DO NOTHING`,
+        [
+          "gemini-md",
+          "GEMINI.md — Gemini-specific agent configuration. Projection from tackle data.",
+          `<!-- GENERATED header will be prepended at render time -->
+# GEMINI.md
+
+> **Scope:** Agent behavior for Gemini models in the /home/codex/dev workspace.
+> This file is a **GENERATED projection** from tackle data.
+> Source: projection:gemini-md
+> Do not edit directly.
+
+See CLAUDE.md and AGENTS.md for the governing doctrine. This file contains Gemini-specific overrides.
+`,
+        ]
+      );
+
+      // 4. agents-md
+      await exec(
+        `INSERT INTO ${TACKLE_SCHEMA}.projection_configs (name, description, type, source_query, template, target_path, schedule)
+         VALUES ($1, $2, 'deterministic', '', $3, '/home/codex/dev/AGENTS.md', '')
+         ON CONFLICT (name) DO NOTHING`,
+        [
+          "agents-md",
+          "AGENTS.md — Multi-model agent behavior specification. Projection from tackle data.",
+          `<!-- GENERATED header will be prepended at render time -->
+# AGENTS.md
+
+> **Version:** 2.1 (trimmed 2026-06-24)
+> **Scope:** Agent behavior for /home/codex/dev workspace.
+> This file is a **GENERATED projection** from tackle data.
+> Source: projection:agents-md
+> Do not edit directly.
+
+See CLAUDE.md for the full governing doctrine.
+`,
+        ]
+      );
+
+      // 5. codex-index
+      await exec(
+        `INSERT INTO ${TACKLE_SCHEMA}.projection_configs (name, description, type, source_query, template, target_path, schedule)
+         VALUES ($1, $2, 'deterministic', '', $3, '/home/codex/dev/.codex/INDEX.md', '')
+         ON CONFLICT (name) DO NOTHING`,
+        [
+          "codex-index",
+          ".codex/INDEX.md — Codex-specific index. Projection from tackle data.",
+          `<!-- GENERATED header will be prepended at render time -->
+# Codex Index
+
+> This file is a **GENERATED projection** from tackle data.
+> Source: projection:codex-index
+> Do not edit directly.
+
+Index of Codex-specific configuration and context.
+`,
+        ]
+      );
+
+      // 6. agents-operating-model
+      await exec(
+        `INSERT INTO ${TACKLE_SCHEMA}.projection_configs (name, description, type, source_query, template, target_path, schedule)
+         VALUES ($1, $2, 'deterministic', '', $3, '/home/codex/dev/nexus/.agents/OPERATING_MODEL.md', '')
+         ON CONFLICT (name) DO NOTHING`,
+        [
+          "agents-operating-model",
+          "nexus/.agents/OPERATING_MODEL.md — Nexus operating model. Projection from tackle data.",
+          `<!-- GENERATED header will be prepended at render time -->
+# Nexus Operating Model
+
+> This file is a **GENERATED projection** from tackle data.
+> Source: projection:agents-operating-model
+> Do not edit directly.
+
+## Operating Model
+
+Nexus follows a database-first architecture: canonical state lives in PostgreSQL; filesystem artifacts are derived projections.
+`,
+        ]
+      );
+
+      console.log("[tackle-migrations] v14: Created tackle.projection_configs + seeded 6 projection families");
+    },
+  },
 ];
 
 /**
@@ -3450,4 +3628,91 @@ export async function queryLogs(params: {
 
 export async function clearLogs(): Promise<void> {
   await qRun(`DELETE FROM system_logs`);
+}
+
+// ── Projection Configs (ACP v1, plan 1280) ────────────────────────
+
+export interface ProjectionConfig {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  source_query: string;
+  template: string;
+  parameter_schema: any;
+  target_path: string;
+  schedule: string;
+  enabled: number;
+  last_rendered_at: string | null;
+  last_sha256: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function listProjections(): Promise<ProjectionConfig[]> {
+  return qAll(`SELECT * FROM tackle.projection_configs ORDER BY name`);
+}
+
+export async function getProjection(id: string): Promise<ProjectionConfig | undefined> {
+  return qOne(`SELECT * FROM tackle.projection_configs WHERE id = @id`, { id });
+}
+
+export async function createProjection(params: {
+  name: string;
+  description: string;
+  type: string;
+  source_query: string;
+  template: string;
+  parameter_schema: any;
+  target_path: string;
+  schedule: string;
+  enabled: number;
+}): Promise<ProjectionConfig> {
+  const row = await qOne(
+    `INSERT INTO tackle.projection_configs (name, description, type, source_query, template, parameter_schema, target_path, schedule, enabled)
+     VALUES (@name, @description, @type, @source_query, @template, @parameter_schema, @target_path, @schedule, @enabled)
+     RETURNING *`,
+    params
+  );
+  return row;
+}
+
+export async function updateProjection(id: string, updates: Record<string, any>): Promise<ProjectionConfig | undefined> {
+  const setters: string[] = [];
+  const vals: Record<string, any> = { id };
+  for (const [k, v] of Object.entries(updates)) {
+    setters.push(`${k} = @${k}`);
+    vals[k] = v;
+  }
+  setters.push("updated_at = NOW()");
+  return qOne(
+    `UPDATE tackle.projection_configs SET ${setters.join(", ")} WHERE id = @id RETURNING *`,
+    vals
+  );
+}
+
+/** Get the latest opencode-persona body for a role from tackle.prompts. */
+export async function getPersonaForRole(role: string): Promise<string | null> {
+  const row = await qOne(
+    `SELECT body_md FROM tackle.prompts
+     WHERE role = @role AND slug = 'opencode-persona'
+     ORDER BY version DESC LIMIT 1`,
+    { role }
+  );
+  return row?.body_md || null;
+}
+
+/** Get procedure card summaries for a role from tackle.role_memory → tackle.memory. */
+export async function getProceduresForRole(role: string): Promise<string | null> {
+  const rows = await qAll(
+    `SELECT m.title, m.summary, m.slug
+     FROM tackle.role_memory rm
+     JOIN tackle.memory m ON m.id = rm.memory_id
+     WHERE rm.role = @role
+       AND (rm.expiration_dt IS NULL OR rm.expiration_dt > NOW())
+     ORDER BY m.slug`,
+    { role }
+  );
+  if (!rows.length) return null;
+  return rows.map((r: any) => `- **${r.title}** (\`${r.slug}\`): ${r.summary}`).join("\n");
 }
