@@ -276,42 +276,10 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
-  // ════════════════════════════════════════════════════════════════
-  //  IDENTITY CANDIDATES
-  // ════════════════════════════════════════════════════════════════
-
-  // GET /api/identity/candidates — list identity candidates
-  router.get('/identity/candidates', async (req: Request, res: Response) => {
-    try {
-      const page = Math.max(1, toNumber(req.query.page, 1));
-      const pageSize = Math.min(100, Math.max(1, toNumber(req.query.pageSize, 50)));
-      const offset = (page - 1) * pageSize;
-      const { minConfidence } = req.query;
-
-      const clauses: string[] = [];
-      const vals: any[] = [];
-      let i = 1;
-      if (minConfidence) { clauses.push(`confidence >= $${i++}`); vals.push(minConfidence); }
-      const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
-
-      const [countResult, { rows }] = await Promise.all([
-        pool.query(`SELECT COUNT(*)::int AS total FROM identity_candidate ${where}`, vals),
-        pool.query(
-          `SELECT * FROM identity_candidate ${where} ORDER BY discovered_at DESC LIMIT $${i} OFFSET $${i + 1}`,
-          [...vals, pageSize, offset]
-        ),
-      ]);
-
-      res.json({
-        items: camelCaseRows(rows),
-        total: countResult.rows[0].total,
-        page,
-        pageSize,
-      });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+  // ── Identity candidates removed (T04: Voyager is physical observer only).
+  //    Entities, drifts, and requirements also pruned — the claim-making
+  //    agent lives above Voyager in the semantics layer.
+  //    See legacy/identity.py and legacy/losm.py for aspirational code.
 
   // ════════════════════════════════════════════════════════════════
   //  ENTITIES
@@ -456,42 +424,7 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
-  // ════════════════════════════════════════════════════════════════
-  //  REQUIREMENT CANDIDATES
-  // ════════════════════════════════════════════════════════════════
-
-  // GET /api/requirements — list requirement candidates (LOSM output)
-  router.get('/requirements', async (req: Request, res: Response) => {
-    try {
-      const page = Math.max(1, toNumber(req.query.page, 1));
-      const pageSize = Math.min(100, Math.max(1, toNumber(req.query.pageSize, 50)));
-      const offset = (page - 1) * pageSize;
-      const { minConfidence } = req.query;
-
-      const clauses: string[] = [];
-      const vals: any[] = [];
-      let i = 1;
-      if (minConfidence) { clauses.push(`confidence >= $${i++}`); vals.push(minConfidence); }
-      const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
-
-      const [countResult, { rows }] = await Promise.all([
-        pool.query(`SELECT COUNT(*)::int AS total FROM requirement_candidate ${where}`, vals),
-        pool.query(
-          `SELECT * FROM requirement_candidate ${where} ORDER BY discovered_at DESC LIMIT $${i} OFFSET $${i + 1}`,
-          [...vals, pageSize, offset]
-        ),
-      ]);
-
-      res.json({
-        items: camelCaseRows(rows),
-        total: countResult.rows[0].total,
-        page,
-        pageSize,
-      });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+  // ── Requirement candidates removed (T04: claim extraction lives above Voyager).
 
   // ════════════════════════════════════════════════════════════════
   //  STATS — summary across all voyager tables
@@ -504,11 +437,7 @@ export function createRoutes(pool: Pool): Router {
         ['directory_observations', 'SELECT COUNT(*)::int FROM directory_observation'],
         ['topology_signals', 'SELECT COUNT(*)::int FROM topology_signal'],
         ['edge_hints', 'SELECT COUNT(*)::int FROM observation_edge_hint'],
-        ['identity_candidates', 'SELECT COUNT(*)::int FROM identity_candidate'],
-        ['entities', 'SELECT COUNT(*)::int FROM entity'],
-        ['entity_drifts', 'SELECT COUNT(*)::int FROM entity_drift'],
         ['metadata_spans', 'SELECT COUNT(*)::int FROM metadata_span'],
-        ['requirement_candidates', 'SELECT COUNT(*)::int FROM requirement_candidate'],
         ['scan_epochs', 'SELECT COUNT(*)::int FROM scan_epoch'],
         ['latest_epoch', 'SELECT id, status, started_at FROM scan_epoch ORDER BY started_at DESC LIMIT 1'],
         ['span_types', "SELECT span_type, COUNT(*)::int FROM metadata_span GROUP BY span_type ORDER BY count DESC"],
