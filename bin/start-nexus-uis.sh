@@ -37,12 +37,13 @@ UI_NAMES=(
     "vision-ui"          # 4208
     "wind-ui"            # 4209
     "throttler-ui"       # 4211
-    "nebula-control-plane" # 4014
+    "nebula-control-plane" # 4014 (live; mock was :3000)
     "monaco-judge"        # 4016
     "conduit-ui-legacy"  # 4015
     "data-explorer-ui"     # 4212
     "semantics-ui"         # 4213 (live; mock was :3000)
     "assembly-ui"          # 4214 (live; mock was :3000)
+    "mildred-ui"           # 4215 (live; mock was :3000)
 )
 
 UI_PORTS[nebula-ui]=4210
@@ -60,12 +61,13 @@ UI_PORTS[semantic-kernel-ui]=4207
 UI_PORTS[vision-ui]=4208
 UI_PORTS[wind-ui]=4209
 UI_PORTS[throttler-ui]=4211
-UI_PORTS[nebula-control-plane]=4014
+UI_PORTS[nebula-control-plane]=4014  # live mode (mock was :3000, intentionally unbound in live mode)
 UI_PORTS[monaco-judge]=4016
 UI_PORTS[conduit-ui-legacy]=4015
 UI_PORTS[data-explorer-ui]=4212
 UI_PORTS[semantics-ui]=4213  # live mode (mock was :3000, intentionally unbound in live mode)
 UI_PORTS[assembly-ui]=4214   # live mode (mock was :3000, intentionally unbound in live mode)
+UI_PORTS[mildred-ui]=4215  # live mode (mock was :3000, intentionally unbound in live mode)
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 

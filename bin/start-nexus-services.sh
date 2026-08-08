@@ -74,6 +74,7 @@ ALL_SERVICES=(
     "execution-srv.service"    # port 3110 — execution observability REST API
     "mcp-bridge.service"       # ports 3131-3134 — generic stdio-to-SSE bridge (knowledge/vision/peb/terrain MCPs)
     "tools-aggregator.service" # port 3210 — unified MCP tool-discovery aggregator
+    "slash-command-mcp.service" # port 3220 — Phase-2 DSL MCP (command_lookup/execute/completions → aggregator)
     "service-broker-mcp.service" # port 3112 — service-broker MCP over SSE (auth/token tools)
     "substance.service"        # port 3115 — Segment Sets API (FastAPI)
     "moleculer-search.service"  # port 4050 — Moleculer Search API (Google, registry)
@@ -88,6 +89,7 @@ ALL_SERVICES=(
     "mildred-dam-api.service"   # port 3140 — Mildred Digital Asset Management
     "voyager-srv.service"       # port 3114 — Voyager REST API (filesystem acquisition queries)
     "voyager.service"           # no port — Filesystem acquisition layer (NATS-backed)
+    "voyager-adapter.service"   # no port — Voyager→Semantics adapter (NATS subscriber)
 
     # UI dev servers (Angular/Vite — managed via systemd, not tmux)
     "nebula-ui.service"         # port 4210 — Nebula RMS UI
@@ -150,6 +152,7 @@ SERVICE_PORTS=(
     ["execution-srv.service"]="3110"
     ["mcp-bridge.service"]="3131"     # one of ports 3131-3134 — any bridge target's /health works
     ["tools-aggregator.service"]="3210"
+    ["slash-command-mcp.service"]="3220"
     ["service-broker-mcp.service"]="3112"
     ["wind-srv.service"]="3300"
     ["mildred-dam-api.service"]="3140"
@@ -289,6 +292,18 @@ cmd_start_all() {
             sleep 0.5
         fi
     done
+    # ── ACP projection render-all (runs after tackle-srv is up) ──
+    if _is_active "tackle-srv.service"; then
+        echo "  Running ACP projection render-all..."
+        if curl -s --max-time 10 -X POST http://localhost:3410/projections/render-all > /dev/null 2>&1; then
+            echo "  ACP render-all: OK"
+        else
+            echo "  ACP render-all: WARNING — tackle-srv reachable but render failed (check logs)"
+        fi
+    else
+        echo "  ACP render-all: SKIPPED (tackle-srv not active)"
+    fi
+
     echo "=== Done ==="
 }
 
