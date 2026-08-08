@@ -6,7 +6,7 @@ uvicorn[standard]==0.24.0
 motor==3.3.2  # Async MongoDB
 redis==5.0.1
 sqlalchemy==2.0.23
-aiomysql==0.2.0
+aiomysql==0.3.0
 
 # Data Validation & Serialization
 pydantic>=2.5.0
@@ -23,7 +23,7 @@ python-magic==0.4.27  # File type detection
 
 # Utilities
 aiofiles==23.2.1  # Async file operations
-python-multipart==0.0.6  # File uploads
+python-multipart==0.0.31  # File uploads
 httpx==0.25.2  # HTTP client for testing
 
 # Development & Monitoring
