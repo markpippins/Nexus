@@ -295,10 +295,13 @@ cmd_start_all() {
     # ── ACP projection render-all (runs after tackle-srv is up) ──
     if _is_active "tackle-srv.service"; then
         echo "  Running ACP projection render-all..."
-        if curl -s --max-time 10 -X POST http://localhost:3410/projections/render-all > /dev/null 2>&1; then
+        # Check HTTP status explicitly: curl exits 0 on HTTP 500 unless
+        # --fail is used, which previously masked render failures as "OK".
+        http_code=$(curl -s --max-time 10 -o /tmp/acp-render-all.out -w "%{http_code}" -X POST http://localhost:3410/projections/render-all 2>/dev/null)
+        if [ "$http_code" = "200" ]; then
             echo "  ACP render-all: OK"
         else
-            echo "  ACP render-all: WARNING — tackle-srv reachable but render failed (check logs)"
+            echo "  ACP render-all: WARNING — render-all returned HTTP ${http_code:-ERR} (see /tmp/acp-render-all.out)"
         fi
     else
         echo "  ACP render-all: SKIPPED (tackle-srv not active)"

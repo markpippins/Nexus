@@ -82,7 +82,7 @@ function route(state: ExecutionState): ExecutionMode {
 - **ACTION**: Trigger the WorkRequest Compiler Pipeline.
 - **SEQUENCE**: 
   1. Use `save_prompt` to save the user's intent to the audit catalog.
-  2. Use `create_proposed_plan` or `create_plan` via the MCP server (http://localhost:3100/tools/call) to create the plan. The MCP server handles file creation, numbering, and receipt issuance automatically.
+  2. Use `nebula_create_plan` (nebula-mcp) to create the plan — conduit-mcp `create_plan`/`create_proposed_plan` are REMOVED (TOOL_NOT_FOUND). The nebula-mcp server handles numbering and record insertion; receipts and tickets are handled downstream by conduit.
   3. Use `update_plan` to write elucidation metadata (filesAffected, acceptanceCriteria, dependencies).
   4. Use `issue_receipt` with type `PLAN_CREATE` to finalize the plan into pending.
 - **RESPONSE**: Inform the user the intent has been compiled into a plan and is ready for implementation.

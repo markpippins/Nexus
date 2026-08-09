@@ -39,6 +39,7 @@ import java.util.concurrent.Executors;
 public class PlatformHealthController {
 
     private static final HttpClient httpClient = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(2))
             .executor(Executors.newVirtualThreadPerTaskExecutor())
             .build();
@@ -165,6 +166,11 @@ public class PlatformHealthController {
      * Fire off an async GET to the given URL. When the response arrives
      * (or the request times out / fails), update {@code itemMap} with
      * the result under the key {@code "liveStatus"}.
+     *
+     * If the probe fails and the URL uses {@code localhost}, the probe
+     * is automatically retried with {@code [::1]} substituted for
+     * {@code localhost}.  This handles Angular dev servers that bind
+     * IPv6 loopback only (ng serve on {@code [::1]:port}).
      */
     private CompletableFuture<Void> probeUrl(String url, Map<String, Object> itemMap) {
         // Normalize the URL if needed — some may not have a scheme
@@ -173,39 +179,60 @@ public class PlatformHealthController {
             normalizedUrl = "http://" + normalizedUrl;
         }
 
-        HttpRequest request;
-        try {
-            request = HttpRequest.newBuilder()
-                    .uri(URI.create(normalizedUrl))
-                    .timeout(PROBE_TIMEOUT)
-                    .GET()
-                    .build();
-        } catch (Exception e) {
-            itemMap.put("liveStatus", "UNKNOWN");
-            return CompletableFuture.completedFuture(null);
+        // Try the original URL first
+        CompletableFuture<String> firstProbe = doProbe(normalizedUrl);
+
+        // If it fails and uses localhost, retry with [::1] (Angular dev servers
+        // bind IPv6-only; localhost may resolve IPv4 on this system)
+        if (normalizedUrl.contains("localhost") && !normalizedUrl.contains("[::1]")) {
+            String ipv6Url = normalizedUrl.replace("localhost", "[::1]");
+            firstProbe = firstProbe.thenCompose(status -> {
+                if ("OFFLINE".equals(status)) {
+                    return doProbe(ipv6Url);
+                }
+                return CompletableFuture.completedFuture(status);
+            });
         }
 
-        return CompletableFuture
-                .supplyAsync(() -> {
-                    try {
-                        HttpResponse<Void> response = httpClient.send(
-                                request, HttpResponse.BodyHandlers.discarding());
-                        int code = response.statusCode();
-                        if (code >= 200 && code < 400) {
-                            return "ON";
-                        } else if (code == 503) {
-                            return "DEGRADED";
-                        } else {
-                            return "OFFLINE";
-                        }
-                    } catch (Exception e) {
-                        return "OFFLINE";
-                    }
-                })
+        return firstProbe
                 .thenAccept(liveStatus -> itemMap.put("liveStatus", liveStatus))
                 .exceptionally(ex -> {
                     itemMap.put("liveStatus", "OFFLINE");
                     return null;
                 });
+    }
+
+    /**
+     * Execute a single HTTP GET probe and return the status string
+     * ("ON", "DEGRADED", "OFFLINE", or "UNKNOWN" for malformed URLs).
+     */
+    private CompletableFuture<String> doProbe(String url) {
+        HttpRequest request;
+        try {
+            request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(PROBE_TIMEOUT)
+                    .GET()
+                    .build();
+        } catch (Exception e) {
+            return CompletableFuture.completedFuture("UNKNOWN");
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                HttpResponse<Void> response = httpClient.send(
+                        request, HttpResponse.BodyHandlers.discarding());
+                int code = response.statusCode();
+                if (code >= 200 && code < 400) {
+                    return "ON";
+                } else if (code == 503) {
+                    return "DEGRADED";
+                } else {
+                    return "OFFLINE";
+                }
+            } catch (Exception e) {
+                return "OFFLINE";
+            }
+        });
     }
 }

@@ -5,7 +5,7 @@
 
 Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge graph, and cross-references.
 
-**215 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**216 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -72,8 +72,8 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | GET | `/api/execution/requests/:id` | GET /api/execution/requests/:id — get a single request |
 | PATCH | `/api/execution/requests/:id/transition` | PATCH /api/execution/requests/:id/transition — transition WorkRequest status |
 | GET | `/api/execution/state` | GET /api/execution/state — summary of execution domain state |
-| GET | `/api/external-ids` | GET /api/external-ids — reverse lookup: find which nebula system owns a given external ID |
-| PATCH | `/api/external-ids/:id` | PATCH /api/external-ids/:id — update confidence, method, notes, or role_in_system |
+| GET | `/api/external-ids` | GET /api/external-ids — reverse lookup via asset_relation |
+| PATCH | `/api/external-ids/:id` | PATCH /api/external-ids/:id — deprecated |
 | POST | `/api/features` | FEATURES POST /api/features |
 | DELETE | `/api/features/:id` | DELETE /api/features/:id — cascade deletes requirements with feature_id |
 | GET | `/api/features/:id` | GET /api/features/:id — single feature |
@@ -110,6 +110,7 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | GET | `/api/intent-records/:id` | GET /api/intent-records/:id — full intent record with candidate info |
 | GET | `/api/intents` | INTENT RECORDS GET /api/intents — list with pagination |
 | GET | `/api/intents/:id` | GET /api/intents/:id — single intent record |
+| GET | `/api/inventory` | GET /api/inventory — rollup counts for the full hierarchy tree Returns per-node counts (systems/subsystems/features) for tree badges plus global totals. Single query, no per-node N+1. |
 | GET | `/api/knowledge/cross-references` | GET /api/knowledge/cross-references — list cross-references for graph overlay with pagination. Also includes harvest_candidate spawn-plan cross-references from nebula.cross_references. |
 | GET | `/api/knowledge/edges` | GET /api/knowledge/edges — list graph edges with optional filters and pagination |
 | GET | `/api/knowledge/entities` | KNOWLEDGE GRAPH — read-only queries for graph visualization GET /api/knowledge/entities — list knowledge graph entities with optional filters and pagination |
@@ -203,9 +204,9 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | PATCH | `/api/systems/:id` | PATCH /api/systems/:id — name, description, readme, architecture |
 | GET | `/api/systems/:id/agendas` | GET /api/systems/:id/agendas — list agendas scoped to a system, with nested items |
 | GET | `/api/systems/:id/docs` | GET /api/systems/:id/docs — read docs from all workspaces for a system |
-| GET | `/api/systems/:id/external-ids` | SYSTEM EXTERNAL IDS (cross-schema junction) GET /api/systems/:id/external-ids — list all external mappings for a system |
-| POST | `/api/systems/:id/external-ids` | POST /api/systems/:id/external-ids — create a new external ID mapping |
-| DELETE | `/api/systems/:id/external-ids/:eid` | DELETE /api/systems/:id/external-ids/:eid — soft-expire a mapping |
+| GET | `/api/systems/:id/external-ids` | The system_external_ids junction has been replaced by asset_relation (system-asset OWNS service-asset). These endpoints now query asset_relation instead. Full history remains in system_external_ids_history (append-only). GET /api/systems/:id/external-ids — list owned services via asset_relation |
+| POST | `/api/systems/:id/external-ids` | POST /api/systems/:id/external-ids — create asset_relation edge (deprecated junction) |
+| DELETE | `/api/systems/:id/external-ids/:eid` | DELETE /api/systems/:id/external-ids/:eid — deprecated |
 | POST | `/api/systems/:id/folders` | POST /api/systems/:id/folders |
 | GET | `/api/systems/:id/harvest-candidates` | GET /api/systems/:id/harvest-candidates — list all harvest candidates linked to a specific system (direct filter by system_id). |
 | GET | `/api/systems/:id/implementation-plans` | GET /api/systems/:id/implementation-plans — plans linked to a system via cross-refs |
@@ -213,7 +214,7 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | DELETE | `/api/systems/:id/info/:tabId` | DELETE /api/systems/:id/info/:tabId — delete an info tab When tabId='harvest_context', also unlinks all candidates from this system. |
 | PUT | `/api/systems/:id/info/:tabId` | PUT /api/systems/:id/info/:tabId — save an info tab |
 | GET | `/api/systems/:id/intent-records` | GET /api/systems/:id/intent-records — list intent records scoped to a system |
-| GET | `/api/systems/:id/inventory` | SYSTEM INVENTORY (unified cross-schema view) GET /api/systems/:id/inventory — unified inventory joining nebula.systems → system_external_ids → terrain / registry / semantics. Returns all external ID links for a system, each resolved with its source-layer details (terrain service, registry peer, sema |
+| GET | `/api/systems/:id/inventory` | SYSTEM INVENTORY (unified cross-schema view) GET /api/systems/:id/inventory — unified inventory via asset_relation V076 migration: joins through asset_relation (system OWNS service) instead of the deprecated system_external_ids junction. |
 | GET | `/api/systems/:id/specifications` | GET /api/systems/:id/specifications — list specification revisions scoped to a system |
 | GET | `/api/systems/:id/work-requests` | GET /api/systems/:id/work-requests — list work requests scoped to a system |
 | DELETE | `/api/systems/:systemId/folders/:folderId` | DELETE /api/systems/:systemId/folders/:folderId |

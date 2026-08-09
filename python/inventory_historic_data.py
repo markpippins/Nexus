@@ -96,9 +96,28 @@ def count_files(directory: str) -> dict:
 
 
 def plan_number_from_filename(fn: str) -> str | None:
+    """Extract plan number from a doc filename.
+
+    Handles: 0082-nebula..., 013-formal-agenda..., v0112-... (v-numbered),
+    0074-response-indicators-on-rows (leading number), e2e-test-v2-v0112.
+    """
     m = re.match(r"(\d{3,4})(?:[-_.])", fn)
-    if not m:
-        m = re.match(r"v(\d{3,4})", fn, re.IGNORECASE)
+    if m:
+        return norm_pn(m.group(1))
+    m = re.search(r"v(\d{3,4})\b", fn)
+    if m:
+        return norm_pn(m.group(1))
+    return None
+
+
+def embedded_plan_number(path: str) -> str | None:
+    """Extract 'Plan Number: NNNN' from a doc's frontmatter/header (first 25 lines)."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            head = f.read(6000)
+    except Exception:
+        return None
+    m = re.search(r"Plan\s+Number:\s*(\d{3,4})", head)
     return norm_pn(m.group(1)) if m else None
 
 
@@ -177,6 +196,7 @@ def main():
         (f"{AUDIT}/PLANS", "audit/PLANS"),
         (f"{AUDIT}/IMPLEMENTATION_PLANS", "audit/IMPLEMENTATION_PLANS"),
     ]
+    doc_unmatched = []
     for base, label in plan_doc_dirs:
         if not os.path.isdir(base):
             continue
@@ -185,20 +205,47 @@ def main():
                 if not fn.endswith(".md"):
                     continue
                 pn = plan_number_from_filename(fn)
+                if not pn:
+                    pn = embedded_plan_number(os.path.join(root, fn))
                 rel = os.path.relpath(root, base)
                 doc_mapping[pn].append((os.path.join(root, fn), label, rel if rel != "." else ""))
+                if pn and pn not in kg_plans:
+                    doc_unmatched.append(pn)
 
-    unnumbered_docs = [v[0][0] for k, v in doc_mapping.items() if k is None]
     numbered = {k: v for k, v in doc_mapping.items() if k}
-    out(f"  Plan-numbered docs: {len(numbered)} | unnumbered docs: {len(unnumbered_docs)}")
+    unnumbered_docs = [v[0][0] for k, v in doc_mapping.items() if k is None]
     in_kg = [k for k in numbered if k in kg_plans]
     not_in_kg = [k for k in numbered if k not in kg_plans]
+    out(f"  Plan-numbered docs (incl. v-numbers + embedded): {len(numbered)} | unnumbered docs: {len(unnumbered_docs)}")
     out(f"  Numbered docs already in KG: {len(in_kg)}")
     out(f"  Numbered docs NOT in KG ({len(not_in_kg)}):")
     for k in sorted(not_in_kg):
         src = numbered[k][0][1]
         out(f"    {k}  <- {os.path.basename(numbered[k][0][0])} ({src})")
+    out(f"  Unnumbered plan docs NOT in KG ({len(unnumbered_docs)}):")
+    for p in unnumbered_docs:
+        out(f"    {os.path.relpath(p, AUDIT)}")
     out()
+
+    # audit/CHANGES/committed — builder change reports (completion evidence)
+    changes_dir = f"{AUDIT}/CHANGES/committed"
+    changes_refs = []
+    if os.path.isdir(changes_dir):
+        for fn in sorted(os.listdir(changes_dir)):
+            if not fn.endswith(".md"):
+                continue
+            m = re.match(r"builder-(\d{8})-(\d{3,4})-?(.*)\.md", fn)
+            if not m:
+                continue
+            date, seq, slug = m.groups()
+            pn = norm_pn(seq)
+            changes_refs.append((fn, pn, slug))
+        out("\n### audit/CHANGES/committed — builder change reports (completion evidence)")
+        out(f"  {len(changes_refs)} reports; {len([1 for _, pn, _ in changes_refs if pn in kg_plans])} reference plans in KG")
+        for fn, pn, slug in changes_refs:
+            status = "KG" if pn in kg_plans else "---"
+            out(f"    {status} {fn}")
+        out()
 
     # ── 3. bak/nexus RECORD dirs ──────────────────────────────────────
     out("## 3. ./bak/nexus RECORD dirs (eza listing)")
@@ -264,13 +311,15 @@ def main():
     out("=" * 78)
     out("GAPS FOUND")
     out("=" * 78)
-    out(f"  A. Plan-numbered docs in audit not in KG: {len(not_in_kg)}")
+    out(f"  A. Plan-numbered docs in audit not in KG: {len(not_in_kg)} (incl. v-numbers/embedded)")
     for k in sorted(not_in_kg)[:20]:
         out(f"      {k}")
+    out(f"  A2. Unnumbered plan docs not in KG: {len(unnumbered_docs)}")
     out(f"  B. WORK_REQUESTS files missing from KG: {len(folder_wr_ids - kg_wr_ids)}")
     out(f"  C. Reviewer-evidenced plans: {len(reviewer_plans)}")
     out(f"  D. Resolved-file completion evidence: {sum(resolved_counts.values())} files across {len(resolved_counts)} sets")
-    out(f"  E. losm RECORD plans: 4 (all in DB/KG)" )
+    out(f"  E. losm RECORD plans: 4 (all in DB/KG)")
+    out(f"  F. CHANGES/committed builder reports: {len(changes_refs)} ({len([1 for _, pn, _ in changes_refs if pn in kg_plans])} plan refs in KG)")
 
     report_path = f"{AUDIT}/maintenance/kg-reconciliation.md"
     if args.write:

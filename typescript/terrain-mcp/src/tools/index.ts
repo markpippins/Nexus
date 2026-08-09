@@ -76,9 +76,18 @@ export function registerTools(server: McpServer) {
       health: z.string().optional(),
     },
     async (args) => {
-      const data = await callTerrainJson(`/mcp-servers`, {
-        method: "POST",
-        body: JSON.stringify(args),
+      // Upsert: find by name → PUT if exists, POST if new
+      const mcpData = await callTerrainJson<any>(`/mcp-servers`);
+      const mcpList = mcpData.data ?? mcpData.mcpServers ?? mcpData;
+      const mcpServers = Array.isArray(mcpList) ? mcpList : [];
+      const existing = mcpServers.find((s: any) => s.name === args.name);
+
+      const method = existing ? "PUT" : "POST";
+      const path = existing ? `/mcp-servers/${existing.id}` : `/mcp-servers`;
+
+      const data = await callTerrainJson(path, {
+        method,
+        body: JSON.stringify(existing ? { ...existing, ...args } : args),
       });
       return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
     }
@@ -112,9 +121,18 @@ export function registerTools(server: McpServer) {
       service_type_id: z.number().optional().describe("Service type ID: 2=Microservice, 3=Express, 12=Python Service (default 3)"),
     },
     async (args) => {
-      const data = await callTerrainJson(`/runnable-services`, {
-        method: "POST",
-        body: JSON.stringify(args),
+      // Upsert: find by name → PUT if exists, POST if new
+      const svcData = await callTerrainJson<any>(`/runnable-services`);
+      const svcList = svcData.data ?? svcData.services ?? svcData;
+      const svcServices = Array.isArray(svcList) ? svcList : [];
+      const existing = svcServices.find((s: any) => s.name === args.name);
+
+      const method = existing ? "PUT" : "POST";
+      const path = existing ? `/runnable-services/${existing.id}` : `/runnable-services`;
+
+      const data = await callTerrainJson(path, {
+        method,
+        body: JSON.stringify(existing ? { ...existing, ...args } : args),
       });
       return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
     }

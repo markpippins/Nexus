@@ -257,16 +257,32 @@ export function createRoutes(pool: Pool): Router {
             features: feats.map((f: any) => ({ ...camelCaseRow(f), subsystemId: f.subsystem_id })),
           });
         }
-        // External IDs (cross-schema junction)
-        const { rows: externalIds } = await pool.query(
-          'SELECT * FROM system_external_ids WHERE system_id = $1 ORDER BY source_schema, source_table',
-          [sys.id]
-        );
+        // Asset relations — system→service edges (V075 migration)
+        // Replaces the deprecated system_external_ids junction.
+        let assetRelations: any[] = [];
+        try {
+          const { rows } = await pool.query(
+            `SELECT ar.id, ar.relation_type AS "relationType",
+                    ar.effective_at AS "effectiveAt",
+                    json_build_object(
+                      'id', ca.id, 'canonicalAssetId', ca.canonical_asset_id,
+                      'assetKind', ca.asset_kind, 'canonicalKey', ca.canonical_key
+                    ) AS "relatedAsset"
+             FROM semantics.asset_relation ar
+             JOIN semantics.canonical_asset ca ON ca.id = ar.to_asset_id AND ca.expired_at IS NULL
+             WHERE ar.from_asset_id = $1 AND ar.expired_at IS NULL
+             ORDER BY ar.relation_type, ar.effective_at DESC`,
+            [sys.asset_id]
+          );
+          assetRelations = rows;
+        } catch {
+          // semantics schema may not be accessible in all environments
+        }
         result.push({
           ...camelCaseRow(sys),
           folders: folders.map((f: any) => ({ ...f, id: f.id, name: f.name, category: f.category, note: f.note })),
           subsystems,
-          externalIds: externalIds.map((eid: any) => camelCaseRow(eid)),
+          externalIds: assetRelations,
         });
       }
       res.json({
@@ -364,16 +380,31 @@ export function createRoutes(pool: Pool): Router {
           features: feats.map((f: any) => ({ ...toEpochMs(f, 'created_at'), subsystemId: f.subsystem_id })),
         });
       }
-      // External IDs (cross-schema junction)
-      const { rows: externalIds } = await pool.query(
-        'SELECT * FROM system_external_ids WHERE system_id = $1 ORDER BY source_schema, source_table',
-        [sys.id]
-      );
+      // Asset relations — system→service edges (V075 migration)
+      let assetRelations: any[] = [];
+      try {
+        const { rows } = await pool.query(
+          `SELECT ar.id, ar.relation_type AS "relationType",
+                  ar.effective_at AS "effectiveAt",
+                  json_build_object(
+                    'id', ca.id, 'canonicalAssetId', ca.canonical_asset_id,
+                    'assetKind', ca.asset_kind, 'canonicalKey', ca.canonical_key
+                  ) AS "relatedAsset"
+           FROM semantics.asset_relation ar
+           JOIN semantics.canonical_asset ca ON ca.id = ar.to_asset_id AND ca.expired_at IS NULL
+           WHERE ar.from_asset_id = $1 AND ar.expired_at IS NULL
+           ORDER BY ar.relation_type, ar.effective_at DESC`,
+          [sys.asset_id]
+        );
+        assetRelations = rows;
+      } catch {
+        // semantics schema may not be accessible in all environments
+      }
       res.json({
         ...toEpochMs(sys, 'created_at'),
         folders: folders.map((f: any) => ({ ...f, id: f.id, name: f.name, category: f.category, note: f.note })),
         subsystems,
-        externalIds: externalIds.map((eid: any) => camelCaseRow(eid)),
+        externalIds: assetRelations,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -3122,7 +3153,7 @@ export function createRoutes(pool: Pool): Router {
           `SELECT ir.*, hc.system_id, hc.subsystem_id, hc.feature_id,
                   h.source_filename AS harvest_source
            FROM nebula.intent_records ir
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
            ORDER BY ir.created_at DESC
            LIMIT $1 OFFSET $2`,
@@ -3144,11 +3175,11 @@ export function createRoutes(pool: Pool): Router {
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
-          `SELECT ir.id, ir.candidate_id, ir.parent_id, ir.title, ir.description,
+          `SELECT ir.id, hc.id AS candidate_id, ir.parent_id, ir.title, ir.description,
                   ir.source_type, ir.source_ref, ir.tags, ir.status, ir.metadata,
                   ir.created_at, ir.updated_at
            FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE hc.system_id = $1
            ORDER BY ir.created_at DESC
            LIMIT $2 OFFSET $3`,
@@ -3157,7 +3188,7 @@ export function createRoutes(pool: Pool): Router {
         pool.query(
           `SELECT COUNT(*)::int AS total
            FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE hc.system_id = $1`,
           [id]
         ),
@@ -3177,11 +3208,11 @@ export function createRoutes(pool: Pool): Router {
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
-          `SELECT ir.id, ir.candidate_id, ir.parent_id, ir.title, ir.description,
+          `SELECT ir.id, hc.id AS candidate_id, ir.parent_id, ir.title, ir.description,
                   ir.source_type, ir.source_ref, ir.tags, ir.status, ir.metadata,
                   ir.created_at, ir.updated_at
            FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE hc.subsystem_id = $1
            ORDER BY ir.created_at DESC
            LIMIT $2 OFFSET $3`,
@@ -3190,7 +3221,7 @@ export function createRoutes(pool: Pool): Router {
         pool.query(
           `SELECT COUNT(*)::int AS total
            FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE hc.subsystem_id = $1`,
           [id]
         ),
@@ -3210,11 +3241,11 @@ export function createRoutes(pool: Pool): Router {
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
-          `SELECT ir.id, ir.candidate_id, ir.parent_id, ir.title, ir.description,
+          `SELECT ir.id, hc.id AS candidate_id, ir.parent_id, ir.title, ir.description,
                   ir.source_type, ir.source_ref, ir.tags, ir.status, ir.metadata,
                   ir.created_at, ir.updated_at
            FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE hc.feature_id = $1
            ORDER BY ir.created_at DESC
            LIMIT $2 OFFSET $3`,
@@ -3223,7 +3254,7 @@ export function createRoutes(pool: Pool): Router {
         pool.query(
           `SELECT COUNT(*)::int AS total
            FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE hc.feature_id = $1`,
           [id]
         ),
@@ -3242,7 +3273,7 @@ export function createRoutes(pool: Pool): Router {
     try {
       const { id } = req.params;
       const { rows: [row] } = await pool.query(
-        `SELECT ir.*, hc.system_id, hc.subsystem_id, hc.feature_id, h.source_filename AS harvest_source\n         FROM nebula.intent_records ir\n         LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id\n         LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id\n         WHERE ir.id = $1`,
+        `SELECT ir.*, hc.system_id, hc.subsystem_id, hc.feature_id, h.source_filename AS harvest_source\n         FROM nebula.intent_records ir\n         LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id\n         LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id\n         WHERE ir.id = $1`,
         [id]
       );
       if (!row) return res.status(404).json({ error: 'Intent record not found' });
@@ -3326,7 +3357,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
            WHERE hc.system_id = $1 OR req.system_id = $1
            ORDER BY a.created_at DESC
@@ -3338,7 +3369,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
            WHERE hc.system_id = $1 OR req.system_id = $1`,
           [id]
@@ -3382,7 +3413,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
            WHERE hc.subsystem_id = $1 OR req.subsystem_id = $1
            ORDER BY a.created_at DESC
@@ -3394,7 +3425,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
            WHERE hc.subsystem_id = $1 OR req.subsystem_id = $1`,
           [id]
@@ -3437,7 +3468,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
            WHERE hc.feature_id = $1 OR req.feature_id = $1
            ORDER BY a.created_at DESC
@@ -3449,7 +3480,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
            WHERE hc.feature_id = $1 OR req.feature_id = $1`,
           [id]
@@ -3487,7 +3518,7 @@ export function createRoutes(pool: Pool): Router {
       const sourceId = req.query.sourceId as string;
       if (!sourceId) return res.status(400).json({ error: 'sourceId query parameter is required' });
       const { rowCount } = await pool.query(
-        `UPDATE nebula.agenda_items SET valid_until = now() WHERE agenda_id = $1 AND (source_id = $2 OR source_id IN (SELECT id FROM nebula.intent_records WHERE candidate_id = $2)) AND valid_until > now()`,
+        `UPDATE nebula.agenda_items SET valid_until = now() WHERE agenda_id = $1 AND (source_id = $2 OR source_id IN (SELECT ir.id FROM nebula.intent_records ir JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id WHERE hc.id = $2)) AND valid_until > now()`,
         [id, sourceId]
       );
       if (rowCount === 0) return res.status(404).json({ error: 'Agenda item not found' });
@@ -3622,7 +3653,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.active_specifications s
            LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
            WHERE hc.system_id = $1 OR req.system_id = $1
@@ -3635,7 +3666,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.active_specifications s
            LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
            WHERE hc.system_id = $1 OR req.system_id = $1`,
@@ -3673,7 +3704,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.active_specifications s
            LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
            WHERE hc.subsystem_id = $1 OR req.subsystem_id = $1
@@ -3686,7 +3717,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.active_specifications s
            LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
            WHERE hc.subsystem_id = $1 OR req.subsystem_id = $1`,
@@ -3724,7 +3755,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.active_specifications s
            LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
            WHERE hc.feature_id = $1 OR req.feature_id = $1
@@ -3737,7 +3768,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.active_specifications s
            LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
            WHERE hc.feature_id = $1 OR req.feature_id = $1`,
@@ -3809,7 +3840,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE req.system_id = $1 OR hc.system_id = $1
            ORDER BY wr.id, wr.created_at DESC
            LIMIT $2 OFFSET $3`,
@@ -3822,7 +3853,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE req.system_id = $1 OR hc.system_id = $1`,
           [id]
         ),
@@ -3848,7 +3879,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE req.subsystem_id = $1 OR hc.subsystem_id = $1
            ORDER BY wr.id, wr.created_at DESC
            LIMIT $2 OFFSET $3`,
@@ -3861,7 +3892,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE req.subsystem_id = $1 OR hc.subsystem_id = $1`,
           [id]
         ),
@@ -3887,7 +3918,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE req.feature_id = $1 OR hc.feature_id = $1
            ORDER BY wr.id, wr.created_at DESC
            LIMIT $2 OFFSET $3`,
@@ -3900,7 +3931,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE req.feature_id = $1 OR hc.feature_id = $1`,
           [id]
         ),
@@ -8245,10 +8276,9 @@ export function createRoutes(pool: Pool): Router {
   //  SYSTEM INVENTORY (unified cross-schema view)
   // ════════════════════════════════════════════════════════════════
 
-  // GET /api/systems/:id/inventory — unified inventory joining
-  // nebula.systems → system_external_ids → terrain / registry / semantics.
-  // Returns all external ID links for a system, each resolved with its
-  // source-layer details (terrain service, registry peer, semantics asset).
+  // GET /api/systems/:id/inventory — unified inventory via asset_relation
+  // V076 migration: joins through asset_relation (system OWNS service)
+  // instead of the deprecated system_external_ids junction.
   router.get('/systems/:id/inventory', async (req: Request, res: Response) => {
     try {
       const { id } = req.params as { id: string };
@@ -8259,115 +8289,80 @@ export function createRoutes(pool: Pool): Router {
         return res.status(400).json({ error: 'invalid_id', message: `'${id}' is not a valid UUID` });
       }
 
-      // 1. Fetch the system
+      // 1. Fetch the system (need asset_id for the join)
       const { rows: [sys] } = await pool.query(
-        'SELECT id, name, description, path FROM systems WHERE id = $1',
+        'SELECT id, name, description, path, asset_id FROM systems WHERE id = $1',
         [id],
       );
       if (!sys) return res.status(404).json({ error: 'System not found' });
 
-      // 2. Fetch all external IDs with resolved source-layer data.
-      //    LEFT JOIN terrain + registry (via service_identity_map) and
-      //    semantics in a single query so each row carries its relevant
-      //    resolved details. Rows where the source_schema doesn't match
-      //    get NULLs for that layer's columns.
-      const { rows } = await pool.query(
-        `SELECT
-           sei.id,
-           sei.source_schema AS "sourceSchema",
-           sei.source_table AS "sourceTable",
-           sei.source_id AS "sourceId",
-           sei.match_confidence AS "matchConfidence",
-           sei.match_method AS "matchMethod",
-           sei.role_in_system AS "roleInSystem",
-           sei.notes,
-           -- terrain layer
-           trs.id AS "terrainId",
-           trs.name AS "terrainName",
-           trs.port AS "terrainPort",
-           trs.status AS "terrainStatus",
-           trs.health_check_url AS "terrainHealthCheckUrl",
-           trs.workspace_path AS "terrainWorkspacePath",
-           trs.is_internal AS "terrainIsInternal",
-           -- registry layer (via service_identity_map from terrain)
-           rs.id AS "registryId",
-           rs.name AS "registryName",
-           rs.default_port AS "registryPort",
-           rs.status AS "registryStatus",
-           rs.description AS "registryDescription",
-           rs.version AS "registryVersion",
-           rs.repository_url AS "registryRepositoryUrl",
-           -- semantics layer
-           ca.id AS "assetId",
-           ca.canonical_asset_id AS "canonicalAssetId",
-           ca.asset_kind AS "assetKind",
-           ca.validity_start AS "assetValidityStart",
-           ca.validity_end AS "assetValidityEnd"
-         FROM nebula.system_external_ids sei
-         LEFT JOIN terrain.runnable_services trs
-           ON sei.source_schema = 'terrain'
-          AND sei.source_table = 'runnable_services'
-          AND trs.id::text = sei.source_id
-         LEFT JOIN registry.service_identity_map sim
-           ON sim.terrain_service_id = trs.id
-          AND sim.valid_until = '9999-12-31 00:00:00+00'
-         LEFT JOIN registry.services rs
-           ON rs.id = sim.registry_service_id
-         LEFT JOIN semantics.canonical_asset ca
-           ON sei.source_schema = 'semantics'
-          AND sei.source_table = 'canonical_asset'
-          AND ca.id::text = sei.source_id
-          AND ca.expired_at IS NULL
-         WHERE sei.system_id = $1
-           AND sei.recorded_until_dt = '9999-12-31 23:59:59+00'
-         ORDER BY sei.source_schema, sei.source_table, trs.name NULLS LAST`,
-        [id],
-      );
+      // 2. Fetch service assets owned by this system via asset_relation.
+      //    Resolve terrain and registry details from the service asset.
+      //    V078: registry.services joined via shared asset_id (identity_map
+      //    safe pairs now share the same canonical_asset).
+      let services: any[] = [];
+      try {
+        const { rows } = await pool.query(
+          `SELECT ar.id AS "relationId", ar.relation_type AS "relationType",
+                  ar.effective_at AS "effectiveAt",
+                  ca.id AS "assetId", ca.canonical_asset_id AS "canonicalAssetId",
+                  ca.asset_kind AS "assetKind",
+                  -- terrain layer (matched via asset_id)
+                  trs.id AS "terrainId", trs.name AS "terrainName",
+                  trs.port AS "terrainPort", trs.status AS "terrainStatus",
+                  trs.health_check_url AS "terrainHealthCheckUrl",
+                  trs.workspace_path AS "terrainWorkspacePath",
+                  trs.is_internal AS "terrainIsInternal",
+                  -- registry layer (joined via shared asset_id)
+                  rs.id AS "registryId", rs.name AS "registryName",
+                  rs.default_port AS "registryPort", rs.status AS "registryStatus",
+                  rs.description AS "registryDescription",
+                  rs.version AS "registryVersion",
+                  rs.repository_url AS "registryRepositoryUrl"
+           FROM semantics.asset_relation ar
+           JOIN semantics.canonical_asset ca
+             ON ca.id = ar.to_asset_id AND ca.expired_at IS NULL
+           LEFT JOIN terrain.runnable_services trs
+             ON trs.asset_id = ca.id
+           LEFT JOIN registry.services rs
+             ON rs.asset_id = trs.asset_id AND rs.asset_id IS NOT NULL
+           WHERE ar.from_asset_id = $1
+             AND ar.expired_at IS NULL
+             AND ar.relation_type = 'owns'
+           ORDER BY trs.name NULLS LAST`,
+          [sys.asset_id]
+        );
+        services = rows;
+      } catch {
+        // semantics schema may not be accessible — graceful degrade
+      }
 
-      // 3. Assemble: each row gets its resolved source-layer object
-      const externalIds = rows.map((r: any) => {
+      // 3. Assemble: each service gets its resolved layers
+      const externalIds = services.map((r: any) => {
         const entry: any = {
-          id: r.id,
-          sourceSchema: r.sourceSchema,
-          sourceTable: r.sourceTable,
-          sourceId: r.sourceId,
-          matchConfidence: r.matchConfidence,
-          matchMethod: r.matchMethod,
-          roleInSystem: r.roleInSystem,
-          notes: r.notes,
+          id: r.relationId,
+          relationType: r.relationType,
+          effectiveAt: r.effectiveAt,
+          asset: {
+            id: r.assetId,
+            canonicalAssetId: r.canonicalAssetId,
+            assetKind: r.assetKind,
+          },
         };
 
         if (r.terrainId !== null) {
           entry.terrain = {
-            id: r.terrainId,
-            name: r.terrainName,
-            port: r.terrainPort,
-            status: r.terrainStatus,
-            healthCheckUrl: r.terrainHealthCheckUrl,
-            workspacePath: r.terrainWorkspacePath,
-            isInternal: r.terrainIsInternal,
+            id: r.terrainId, name: r.terrainName, port: r.terrainPort,
+            status: r.terrainStatus, healthCheckUrl: r.terrainHealthCheckUrl,
+            workspacePath: r.terrainWorkspacePath, isInternal: r.terrainIsInternal,
           };
         }
 
         if (r.registryId !== null) {
           entry.registry = {
-            id: r.registryId,
-            name: r.registryName,
-            port: r.registryPort,
-            status: r.registryStatus,
-            description: r.registryDescription,
-            version: r.registryVersion,
-            repositoryUrl: r.registryRepositoryUrl,
-          };
-        }
-
-        if (r.assetId !== null) {
-          entry.semantics = {
-            id: r.assetId,
-            canonicalAssetId: r.canonicalAssetId,
-            assetKind: r.assetKind,
-            validityStart: r.assetValidityStart,
-            validityEnd: r.assetValidityEnd,
+            id: r.registryId, name: r.registryName, port: r.registryPort,
+            status: r.registryStatus, description: r.registryDescription,
+            version: r.registryVersion, repositoryUrl: r.registryRepositoryUrl,
           };
         }
 
@@ -8376,11 +8371,9 @@ export function createRoutes(pool: Pool): Router {
 
       // 4. Aggregate counts
       const counts = {
-        totalExternalIds: externalIds.length,
+        totalServices: externalIds.length,
         terrainServices: externalIds.filter((e: any) => e.terrain).length,
         registryServices: externalIds.filter((e: any) => e.registry).length,
-        semanticsAssets: externalIds.filter((e: any) => e.semantics).length,
-        roles: [...new Set(externalIds.map((e: any) => e.roleInSystem).filter(Boolean))] as string[],
       };
 
       res.json({
@@ -8393,139 +8386,185 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // GET /api/inventory — rollup counts for the full hierarchy tree
+  // Returns per-node counts (systems/subsystems/features) for tree badges
+  // plus global totals. Single query, no per-node N+1.
+  router.get('/inventory', async (_req: Request, res: Response) => {
+    try {
+      // Systems: count subsystems, features, requirements, plans, candidates, ext links
+      const { rows: sysRows } = await pool.query(
+        `SELECT s.id AS "systemId", s.name AS "systemName",
+                COUNT(DISTINCT sub.id)::int AS "subsystemCount",
+                COUNT(DISTINCT feat.id)::int AS "featureCount",
+                COUNT(DISTINCT f.id)::int AS "folderCount",
+                COUNT(DISTINCT req.id)::int AS "reqCount",
+                COUNT(DISTINCT ip.id)::int AS "planCount",
+                COUNT(DISTINCT hc.id)::int AS "candidateCount",
+                COUNT(DISTINCT ar.id)::int AS "extLinkCount"
+         FROM systems s
+         LEFT JOIN subsystems sub ON sub.system_id = s.id
+         LEFT JOIN features feat ON feat.subsystem_id = sub.id
+         LEFT JOIN system_folders f ON f.system_id = s.id
+         LEFT JOIN requirements req ON req.system_id = s.id
+         LEFT JOIN nebula.implementation_plans ip ON ip.requirement_id = req.id
+         LEFT JOIN nebula.harvest_candidates hc ON hc.system_id = s.id
+         LEFT JOIN semantics.asset_relation ar ON ar.from_asset_id = s.asset_id AND ar.expired_at IS NULL
+         GROUP BY s.id, s.name
+         ORDER BY s.name`
+      );
+
+      // Subsystems: count features, requirements, plans, candidates
+      const { rows: subRows } = await pool.query(
+        `SELECT sub.id AS "subsystemId", sub.name AS "subsystemName",
+                sub.system_id AS "systemId",
+                COUNT(DISTINCT feat.id)::int AS "featureCount",
+                COUNT(DISTINCT req.id)::int AS "reqCount",
+                COUNT(DISTINCT ip.id)::int AS "planCount",
+                COUNT(DISTINCT hc.id)::int AS "candidateCount"
+         FROM subsystems sub
+         LEFT JOIN features feat ON feat.subsystem_id = sub.id
+         LEFT JOIN requirements req ON req.subsystem_id = sub.id
+         LEFT JOIN nebula.implementation_plans ip ON ip.requirement_id = req.id
+         LEFT JOIN nebula.harvest_candidates hc ON hc.subsystem_id = sub.id
+         GROUP BY sub.id, sub.name, sub.system_id
+         ORDER BY sub.name`
+      );
+
+      // Features: count requirements, plans, candidates
+      const { rows: featRows } = await pool.query(
+        `SELECT feat.id AS "featureId", feat.name AS "featureName",
+                feat.subsystem_id AS "subsystemId",
+                COUNT(DISTINCT req.id)::int AS "reqCount",
+                COUNT(DISTINCT ip.id)::int AS "planCount",
+                COUNT(DISTINCT hc.id)::int AS "candidateCount"
+         FROM features feat
+         LEFT JOIN requirements req ON req.feature_id = feat.id
+         LEFT JOIN nebula.implementation_plans ip ON ip.requirement_id = req.id
+         LEFT JOIN nebula.harvest_candidates hc ON hc.feature_id = feat.id
+         GROUP BY feat.id, feat.name, feat.subsystem_id
+         ORDER BY feat.name`
+      );
+
+      // Totals
+      const totals = {
+        systems: sysRows.length,
+        subsystems: subRows.length,
+        features: featRows.length,
+        requirements: sysRows.reduce((sum, r) => sum + (r.reqCount || 0), 0),
+        plans: sysRows.reduce((sum, r) => sum + (r.planCount || 0), 0),
+        candidates: sysRows.reduce((sum, r) => sum + (r.candidateCount || 0), 0),
+      };
+
+      res.json({ systems: sysRows, subsystems: subRows, features: featRows, totals });
+    } catch (err: any) {
+      res.status(500).json({ error: 'inventory_failed', message: err.message });
+    }
+  });
+
   // ════════════════════════════════════════════════════════════════
-  //  SYSTEM EXTERNAL IDS (cross-schema junction)
+  //  SYSTEM EXTERNAL IDS — DEPRECATED (V077 migration)
+  //
+  //  The system_external_ids junction has been replaced by
+  //  asset_relation (system-asset OWNS service-asset).
+  //  These endpoints now query asset_relation instead.
+  //  Full history remains in system_external_ids_history (append-only).
   // ════════════════════════════════════════════════════════════════
 
-  // GET /api/systems/:id/external-ids — list all external mappings for a system
+  // GET /api/systems/:id/external-ids — list owned services via asset_relation
   router.get('/systems/:id/external-ids', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const { offset, limit, page, pageSize } = parsePagination(req.query);
 
-      const [dataResult, countResult] = await Promise.all([
-        pool.query(
-          'SELECT * FROM system_external_ids WHERE system_id = $1 ORDER BY source_schema, source_table LIMIT $2 OFFSET $3',
-          [id, pageSize, offset]
-        ),
-        pool.query('SELECT COUNT(*)::int AS total FROM system_external_ids WHERE system_id = $1', [id]),
-      ]);
-
-      res.json({
-        items: dataResult.rows.map((r: any) => camelCaseRow(r)),
-        total: parseInt(countResult.rows[0].total, 10),
-        page,
-        pageSize,
-      });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // POST /api/systems/:id/external-ids — create a new external ID mapping
-  router.post('/systems/:id/external-ids', async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      const { sourceSchema, sourceTable, sourceId, matchConfidence = 1.0, matchMethod = 'manual', notes = null, roleInSystem = null } = req.body;
-      if (!sourceSchema || !sourceTable || !sourceId) {
-        return res.status(400).json({ error: 'sourceSchema, sourceTable, and sourceId are required' });
-      }
-      // Verify system exists
-      const { rows: [sys] } = await pool.query('SELECT id FROM systems WHERE id = $1', [id]);
+      // Get system's asset_id first
+      const { rows: [sys] } = await pool.query(
+        'SELECT asset_id FROM systems WHERE id = $1', [id]
+      );
       if (!sys) return res.status(404).json({ error: 'System not found' });
 
-      const { rows: [eid] } = await pool.query(
-        `INSERT INTO system_external_ids_history (system_id, source_schema, source_table, source_id, match_confidence, match_method, role_in_system, notes, recorded_on_dt, recorded_until_dt)
-         SELECT $1, $2, $3, $4, $5, $6, $7, $8, NOW(), '9999-12-31 23:59:59+00'
-         WHERE NOT EXISTS (
-           SELECT 1 FROM system_external_ids_history
-           WHERE system_id = $1 AND source_schema = $2 AND source_table = $3
-             AND source_id = $4 AND role_in_system IS NOT DISTINCT FROM $7
-             AND recorded_until_dt = '9999-12-31 23:59:59+00'
-         )
-         RETURNING *`,
-        [id, sourceSchema, sourceTable, sourceId, matchConfidence, matchMethod, roleInSystem, notes]
-      );
-
-      if (!eid) {
-        return res.status(409).json({ error: `Mapping already exists for system ${id} → (${sourceSchema}, ${sourceTable}, ${sourceId}) with role ${roleInSystem || '(none)'}` });
+      let items: any[] = [];
+      let total = 0;
+      try {
+        const [dataResult, countResult] = await Promise.all([
+          pool.query(
+            `SELECT ar.id, ar.relation_type AS "relationType",
+                    ar.effective_at AS "effectiveAt",
+                    json_build_object('id', ca.id, 'canonicalAssetId', ca.canonical_asset_id,
+                      'assetKind', ca.asset_kind) AS "relatedAsset"
+             FROM semantics.asset_relation ar
+             JOIN semantics.canonical_asset ca ON ca.id = ar.to_asset_id AND ca.expired_at IS NULL
+             WHERE ar.from_asset_id = $1 AND ar.expired_at IS NULL
+             ORDER BY ar.relation_type, ar.effective_at DESC
+             LIMIT $2 OFFSET $3`,
+            [sys.asset_id, pageSize, offset]
+          ),
+          pool.query(
+            'SELECT COUNT(*)::int AS total FROM semantics.asset_relation WHERE from_asset_id = $1 AND expired_at IS NULL',
+            [sys.asset_id]
+          ),
+        ]);
+        items = dataResult.rows;
+        total = parseInt(countResult.rows[0].total, 10);
+      } catch {
+        // semantics not available — return empty
       }
 
-      res.status(201).json(camelCaseRow(eid));
+      res.json({ items, total, page, pageSize });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  // DELETE /api/systems/:id/external-ids/:eid — soft-expire a mapping
+  // POST /api/systems/:id/external-ids — create asset_relation edge (deprecated junction)
+  router.post('/systems/:id/external-ids', async (req: Request, res: Response) => {
+    return res.status(410).json({
+      error: 'deprecated',
+      message: 'system_external_ids has been replaced by asset_relation. Use POST /api/canonical_asset/:id/external-ids on semantics-srv (port 3160) instead.',
+    });
+  });
+
+  // DELETE /api/systems/:id/external-ids/:eid — deprecated
   router.delete('/systems/:id/external-ids/:eid', async (req: Request, res: Response) => {
-    try {
-      const { id, eid } = req.params;
-      const { rowCount } = await pool.query(
-        `UPDATE system_external_ids_history
-         SET recorded_until_dt = NOW()
-         WHERE id = $1::uuid AND system_id = $2::uuid
-           AND recorded_until_dt = '9999-12-31 23:59:59+00'`,
-        [eid, id]
-      );
-      if (rowCount === 0) return res.status(404).json({ error: 'External ID mapping not found' });
-      res.json({ expired: true });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
+    return res.status(410).json({
+      error: 'deprecated',
+      message: 'system_external_ids has been replaced by asset_relation. Use DELETE /api/canonical_asset/:id/external-ids/:eid on semantics-srv (port 3160) instead.',
+    });
   });
 
-  // GET /api/external-ids — reverse lookup: find which nebula system owns a given external ID
+  // GET /api/external-ids — reverse lookup via asset_relation
   router.get('/external-ids', async (req: Request, res: Response) => {
     try {
-      const { sourceSchema, sourceTable, sourceId } = req.query;
-      if (!sourceSchema || !sourceTable || !sourceId) {
-        return res.status(400).json({ error: 'sourceSchema, sourceTable, and sourceId query params are required' });
+      const { assetId } = req.query;
+      if (!assetId) {
+        return res.status(400).json({ error: 'assetId query param is required (migration from sourceSchema/sourceTable/sourceId)' });
       }
-      const { rows } = await pool.query(
-        `SELECT eid.*, sys.name AS system_name, sys.description AS system_description
-         FROM system_external_ids eid
-         JOIN systems sys ON sys.id = eid.system_id
-         WHERE eid.source_schema = $1 AND eid.source_table = $2 AND eid.source_id = $3`,
-        [sourceSchema, sourceTable, sourceId]
-      );
-      if (rows.length === 0) {
-        return res.status(404).json({ error: `No system found for ${sourceSchema}.${sourceTable} id=${sourceId}` });
+      let items: any[] = [];
+      try {
+        const { rows } = await pool.query(
+          `SELECT ar.id, ar.relation_type AS "relationType",
+                  ar.effective_at AS "effectiveAt",
+                  json_build_object('id', ns.id, 'name', ns.name) AS "system"
+           FROM semantics.asset_relation ar
+           JOIN nebula.systems ns ON ns.asset_id = ar.from_asset_id
+           WHERE ar.to_asset_id = $1 AND ar.expired_at IS NULL`,
+          [assetId]
+        );
+        items = rows;
+      } catch {
+        // semantics not available
       }
-      // Return all matches (multi-role is allowed now)
-      res.json({ items: rows.map((r: any) => camelCaseRow(r)), total: rows.length });
+      res.json({ items, total: items.length });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  // PATCH /api/external-ids/:id — update confidence, method, notes, or role_in_system
+  // PATCH /api/external-ids/:id — deprecated
   router.patch('/external-ids/:id', async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      const { matchConfidence, matchMethod, notes, roleInSystem, systemId } = req.body;
-      const sets: string[] = [];
-      const vals: any[] = [];
-      let i = 1;
-      if (matchConfidence !== undefined) { sets.push(`match_confidence = $${i++}`); vals.push(matchConfidence); }
-      if (matchMethod !== undefined) { sets.push(`match_method = $${i++}`); vals.push(matchMethod); }
-      if (notes !== undefined) { sets.push(`notes = $${i++}`); vals.push(notes); }
-      if (roleInSystem !== undefined) { sets.push(`role_in_system = $${i++}`); vals.push(roleInSystem); }
-      if (systemId !== undefined) { sets.push(`system_id = $${i++}`); vals.push(systemId); }
-      if (sets.length === 0) return res.json({ ok: true });
-      vals.push(id);
-      const { rows: [eid] } = await pool.query(
-        `UPDATE system_external_ids_history
-         SET ${sets.join(', ')}
-         WHERE id = $${i}::uuid AND recorded_until_dt = '9999-12-31 23:59:59+00'
-         RETURNING *`,
-        vals
-      );
-      if (!eid) return res.status(404).json({ error: 'External ID mapping not found' });
-      res.json(camelCaseRow(eid));
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
+    return res.status(410).json({
+      error: 'deprecated',
+      message: 'system_external_ids has been replaced by asset_relation. Use PATCH on semantics-srv (port 3160) for asset_relation updates.',
+    });
   });
 
   return router;

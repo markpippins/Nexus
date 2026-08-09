@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, input, signal, effect, computed, output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, input, signal, effect, computed, output, OnInit, OnDestroy, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PlatformManagementService, Server, SystemItem, getCategoryEndpointType } from '../../services/platform-management.service.js';
 import { UpsertServerDialogComponent } from './upsert-server-dialog/upsert-server-dialog.component.js';
@@ -13,6 +13,7 @@ import { UpsertLookupDialogComponent } from './upsert-lookup-dialog/upsert-looku
 import { UpsertLibraryDialogComponent } from './upsert-library-dialog/upsert-library-dialog.component.js';
 import { UpsertSystemDialogComponent } from './upsert-system-dialog/upsert-system-dialog.component.js';
 import { CategoriesViewComponent } from './categories-view/categories-view.component.js';
+import { ServiceTreeComponent } from '../service-tree/service-tree.component.js';
 import { LookupItem } from '../../services/platform-management.service.js';
 
 @Component({
@@ -27,7 +28,8 @@ import { LookupItem } from '../../services/platform-management.service.js';
         UpsertLookupDialogComponent,
         UpsertLibraryDialogComponent,
         UpsertSystemDialogComponent,
-        CategoriesViewComponent
+        CategoriesViewComponent,
+        ServiceTreeComponent
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -435,7 +437,19 @@ import { LookupItem } from '../../services/platform-management.service.js';
                         </div>
                     }
                     @case ('deployments') {
-                        <div class="flex flex-col h-full">
+                        <div class="flex flex-row h-full">
+                            <!-- Full-height mesh tree nav — the exact nesting widget from the Services Mesh view's left sidebar -->
+                            <!-- .service-tree draws its own right border — no border-r here (avoid 2px seam) -->
+                            <div class="shrink-0 h-full" style="width: clamp(240px, 30vw, 360px)">
+                                <app-service-tree
+                                    [services]="meshServices()"
+                                    [dependencies]="meshDependencies()"
+                                    [deployments]="meshDeployments()"
+                                    [selectedService]="meshSelectedService()"
+                                    (serviceSelected)="onMeshServiceSelected($event)"
+                                ></app-service-tree>
+                            </div>
+                            <div class="flex flex-col flex-1 min-w-0">
                             <div class="overflow-x-auto flex-1">
                                 <table class="w-full text-left border-collapse">
                                     <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
@@ -574,6 +588,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                     </div>
                                 </div>
                             }
+                            </div>
                         </div>
                     }
                     @case ('servers') {
@@ -915,7 +930,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
     </div>
   `
 })
-export class PlatformManagementComponent {
+export class PlatformManagementComponent implements OnInit, OnDestroy {
     managementType = input.required<string>();
     baseUrl = input.required<string>();
     toolbarAction = input<{ name: string; payload?: any; id: number } | null>(null);
@@ -928,6 +943,25 @@ export class PlatformManagementComponent {
     platformService = inject(PlatformManagementService);
     private serviceMeshService = inject(ServiceMeshService);
     private componentRegistry = inject(ComponentRegistryService);
+
+    // ── Mesh tree widget (the exact Service Mesh sidebar widget, embedded in the Deployments pane) ──
+
+    /** Live mesh services — same live source as the Service Mesh sidebar tree. */
+    meshServices = computed(() => this.serviceMeshService.services());
+    /** Live mesh dependencies (kept for parity with the sidebar bindings). */
+    meshDependencies = computed(() => this.serviceMeshService.dependencies());
+    /** Live mesh deployments — registry deployments merged with /api/v1/status health, polled every 30s. */
+    meshDeployments = computed(() => this.serviceMeshService.deployments());
+    /** Currently selected service — shared selection state with the Service Mesh view. */
+    meshSelectedService = computed(() => this.serviceMeshService.selectedService());
+
+    /**
+     * Number of mounted Deployments panes showing the mesh tree. Polling is shared
+     * (ServiceMeshService is a root singleton), so polling stops only when the LAST
+     * instance unmounts — closing one pane in split view must not freeze the other.
+     */
+    private static deploymentsPaneCount = 0;
+    private isDeploymentsPane = false;
 
     // Data Signals
     // Data Signals (Raw)
@@ -1220,6 +1254,43 @@ export class PlatformManagementComponent {
                 this.statusInfo.emit({ type: displayType, count });
             }
         });
+    }
+
+    ngOnInit(): void {
+        this.syncMeshPolling(this.displayType() === 'deployments');
+    }
+
+    ngOnChanges(changes: SimpleChanges): void {
+        if (changes['managementType']) {
+            this.syncMeshPolling(this.displayType() === 'deployments');
+        }
+    }
+
+    ngOnDestroy(): void {
+        this.syncMeshPolling(false);
+    }
+
+    /**
+     * Owns the ServiceMeshService polling lifecycle while the Deployments pane is
+     * visible. startPolling() is idempotent (root-singleton service); polling is
+     * only stopped when the last deployments pane unmounts.
+     */
+    private syncMeshPolling(active: boolean): void {
+        if (active === this.isDeploymentsPane) return;
+        this.isDeploymentsPane = active;
+        if (active) {
+            PlatformManagementComponent.deploymentsPaneCount++;
+            this.serviceMeshService.startPolling();
+        } else {
+            PlatformManagementComponent.deploymentsPaneCount = Math.max(0, PlatformManagementComponent.deploymentsPaneCount - 1);
+            if (PlatformManagementComponent.deploymentsPaneCount === 0) {
+                this.serviceMeshService.stopPolling();
+            }
+        }
+    }
+
+    onMeshServiceSelected(service: ServiceInstance): void {
+        this.serviceMeshService.selectService(service);
     }
 
     private sortData<T>(data: T[], sort: { column: string; direction: 'asc' | 'desc' }, getValue: (item: T, col: string) => any): T[] {

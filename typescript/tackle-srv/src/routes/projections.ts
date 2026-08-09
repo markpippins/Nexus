@@ -104,7 +104,18 @@ function writeFileWithDrift(
       return { written: true, sha: newSha, backedUp: true };
     }
 
-    // No drift (sha matches or no lastSha256) — overwrite
+    // Untracked target: we have no stored sha, so we cannot prove the
+    // existing file is ours. Never silently overwrite hand-authored
+    // content — back it up first, then adopt.
+    if (!lastSha256) {
+      const ts = new Date().toISOString().replace(/[:.]/g, "-");
+      const bakPath = `${targetPath}.bak-${ts}`;
+      renameSync(targetPath, bakPath);
+      writeFileSync(targetPath, content, "utf8");
+      return { written: true, sha: newSha, backedUp: true };
+    }
+
+    // No drift (sha matches) — overwrite
     writeFileSync(targetPath, content, "utf8");
     return { written: true, sha: newSha, backedUp: false };
   }
@@ -151,7 +162,11 @@ projectionsRouter.get("/drift", async (_req, res) => {
           const diskSha = sha256(content);
           entry.disk_sha256 = diskSha;
           entry.stored_sha256 = p.last_sha256;
-          entry.drift = diskSha !== (p.last_sha256 || diskSha);
+          // Untracked (never rendered) files with differing content are
+          // drifted by definition — the old `diskSha !== (lastSha || diskSha)`
+          // masked them as clean, hiding the first-render clobber hazard.
+          entry.drift = p.last_sha256 ? diskSha !== p.last_sha256 : true;
+          entry.untracked = !p.last_sha256;
         } else {
           entry.missing = true;
           entry.drift = true;
@@ -372,6 +387,32 @@ async function renderProjection(projection: any): Promise<any[]> {
     const renderedBody = renderTemplate(projection.template, ctx);
     const content = GENERATED_HEADER(projection.name) + renderedBody;
     const targetPath = resolveTargetPath(projection, row);
+
+    // ── First-render clobber guard ────────────────────────────────────
+    // If this projection has NEVER rendered (no stored sha) and the target
+    // file already exists with different content, the file is almost
+    // certainly hand-authored. Do not replace it — skip and report, so the
+    // operator can reconcile the template with the real content first.
+    // Without this, a freshly-registered stub template silently destroys
+    // the live governance files on the next render-all (see the ACP
+    // projection incident: 6 registered projections, zero renders,
+    // startup-hook render-all would have replaced AGENTS.md/CLAUDE.md/etc
+    // with ~300-char stubs, irreversibly).
+    if (!projection.last_sha256 && existsSync(targetPath)) {
+      const existing = readFileSync(targetPath, "utf8");
+      if (sha256(existing) !== sha256(content)) {
+        results.push({
+          projection_id: projection.id,
+          name: projection.name,
+          target_path: targetPath,
+          written: false,
+          skipped: true,
+          reason: "first-render clobber guard: existing file differs from template (hand-authored?)",
+          role: row.role || row.name || null,
+        });
+        continue;
+      }
+    }
 
     const result = writeFileWithDrift(targetPath, content, projection.last_sha256);
 

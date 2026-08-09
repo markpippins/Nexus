@@ -159,13 +159,8 @@ interface CachedPromptCard {
 }
 
 async function readPromptCard(role: string, slug: string): Promise<CachedPromptCard | null> {
-  try {
-    const raw = await redis.get(`${PROMPT_PROC_PREFIX}${role}::${slug}`);
-    return raw ? (JSON.parse(raw) as CachedPromptCard) : null;
-  } catch (err: any) {
-    console.error(`[prompts/get] redis read failed for ${role}::${slug}: ${err.message}`);
-    return null;
-  }
+  const raw = await redis.get(`${PROMPT_PROC_PREFIX}${role}::${slug}`);
+  return raw ? (JSON.parse(raw) as CachedPromptCard) : null;
 }
 
 function renderPromptResponse(card: CachedPromptCard, args: Record<string, any>) {
@@ -210,7 +205,16 @@ app.get("/prompts/get", async (req, res) => {
   const slashIdx = name.indexOf("/");
   const role = name.substring(0, slashIdx);
   const slug = name.substring(slashIdx + 1);
-  const card = await readPromptCard(role, slug);
+  let card: CachedPromptCard | null = null;
+  try {
+    card = await readPromptCard(role, slug);
+  } catch (err: any) {
+    console.error(`[prompts/get] redis read failed for ${role}::${slug}: ${err.message}`);
+    res.status(503).json({
+      error: `Redis unavailable (status: ${redis.status}). The prompt cache is unreachable. Verify Redis is running and try again.`,
+    });
+    return;
+  }
   if (!card) {
     res.status(404).json({
       error: `Prompt "${name}" not cached. Run tackle-prompt-sync-srv (port 3501, /refresh) to populate Redis.`,
@@ -232,7 +236,16 @@ app.post("/prompts/get", async (req, res) => {
   const slashIdx = name.indexOf("/");
   const role = name.substring(0, slashIdx);
   const slug = name.substring(slashIdx + 1);
-  const card = await readPromptCard(role, slug);
+  let card: CachedPromptCard | null = null;
+  try {
+    card = await readPromptCard(role, slug);
+  } catch (err: any) {
+    console.error(`[prompts/get] redis read failed for ${role}::${slug}: ${err.message}`);
+    res.status(503).json({
+      error: `Redis unavailable (status: ${redis.status}). The prompt cache is unreachable. Verify Redis is running and try again.`,
+    });
+    return;
+  }
   if (!card) {
     res.status(404).json({
       error: `Prompt "${name}" not cached. Run tackle-prompt-sync-srv (port 3501, /refresh) to populate Redis.`,

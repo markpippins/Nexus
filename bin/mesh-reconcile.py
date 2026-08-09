@@ -128,7 +128,33 @@ def load_registry() -> dict[str, dict]:
 
 
 def load_identity_map() -> dict[int, dict]:
-    """Current-valid registry↔terrain identity mappings by registry id."""
+    """Current-valid registry↔terrain identity mappings by registry id.
+
+    V076 migration: derives identity from asset_relation (equivalent edges)
+    instead of the deprecated registry.service_identity_map.
+    Falls back to service_identity_map if asset_relation is unavailable.
+    """
+    # Primary: derive from asset_relation equivalent edges
+    try:
+        rows = _run_sql(
+            "SELECT rs.id, trs.id, 'asset-equivalent', 1.0 "
+            "FROM semantics.asset_relation ar "
+            "JOIN registry.services rs ON rs.asset_id = ar.from_asset_id "
+            "JOIN terrain.runnable_services trs ON trs.asset_id = ar.to_asset_id "
+            "WHERE ar.relation_type = 'equivalent' AND ar.expired_at IS NULL "
+            "UNION "
+            "SELECT rs2.id, trs2.id, 'asset-shared', 1.0 "
+            "FROM semantics.canonical_asset ca "
+            "JOIN registry.services rs2 ON rs2.asset_id = ca.id "
+            "JOIN terrain.runnable_services trs2 ON trs2.asset_id = ca.id "
+            "WHERE ca.expired_at IS NULL"
+        )
+        if rows:
+            return {int(r[0]): {"terrain_id": int(r[1]), "method": r[2],
+                                "confidence": float(r[3] or 0)} for r in rows}
+    except Exception:
+        pass
+    # Fallback: legacy service_identity_map (deprecated, removed in V078)
     rows = _run_sql(
         "SELECT registry_service_id, terrain_service_id, match_method, "
         "COALESCE(match_confidence, 0) "
