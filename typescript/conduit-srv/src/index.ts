@@ -25,6 +25,8 @@
  *   GET    /vision/work-requests
  *   GET    /vision/work-requests/:id
  *   GET    /vision/receipts
+ *   GET    /wr/:id/projection-drift
+ *   GET    /wr/drift-scan
  *   GET    /health
  */
 
@@ -40,6 +42,7 @@ import configRouter from "./routes/config.js";
 import governanceRouter from "./routes/governance.js";
 import visionRouter from "./routes/vision.js";
 import sessionLogRouter from "./routes/session-log.js";
+import wrRouter from "./routes/wr.js";
 
 const PORT = parseInt(process.env.CONDUIT_SRV_PORT || "3104", 10);
 
@@ -73,6 +76,7 @@ app.use("/config", configRouter);
 app.use("/governance", governanceRouter);
 app.use("/vision", visionRouter);
 app.use("/log", sessionLogRouter);
+app.use("/wr", wrRouter);
 
 // ── Root health check ───────────────────────────────────────────────
 
