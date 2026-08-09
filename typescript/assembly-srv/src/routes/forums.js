@@ -236,8 +236,10 @@ forumsRouter.post('/threads/:threadId/comments', async (req, res, next) => {
 
     res.status(201).json({ id: result.rows[0].id, role: result.rows[0].role, model: result.rows[0].model });
   } catch (err) {
-    if (err.code === 'P0002') throw new NotFoundError('Thread not found');
-    if (err.code === 'P0001') throw new BadRequestError('Parent comment not found or does not belong to this thread');
+    // NOTE: must call next(), not throw — throw inside an async handler rejects the
+    // promise unhandled, Express never responds, and the client hangs.
+    if (err.code === 'P0002') return next(new NotFoundError('Thread not found'));
+    if (err.code === 'P0001') return next(new BadRequestError('Parent comment not found or does not belong to this thread'));
     next(err);
   }
 });
@@ -344,7 +346,7 @@ forumsRouter.post('/move-thread', async (req, res, next) => {
     if (result.rows.length === 0) throw new NotFoundError('Post not found');
     res.json(result.rows[0]);
   } catch (err) {
-    if (err.code === 'P0002') throw new NotFoundError('Destination forum not found or post not found');
+    if (err.code === 'P0002') return next(new NotFoundError('Destination forum not found or post not found'));
     next(err);
   }
 });forumsRouter.delete('/threads/:threadId', async (req, res, next) => {
@@ -356,7 +358,7 @@ forumsRouter.post('/move-thread', async (req, res, next) => {
     if (result.rowCount === 0) throw new NotFoundError('Thread not found');
     res.json({ deleted: true, expired: true, thread_id: req.params.threadId });
   } catch (err) {
-    if (err.code === 'P0002') throw new NotFoundError('Thread not found');
+    if (err.code === 'P0002') return next(new NotFoundError('Thread not found'));
     next(err);
   }
 });
@@ -407,7 +409,7 @@ forumsRouter.get('/comments/:id', async (req, res, next) => {
     if (result.rowCount === 0) throw new NotFoundError('Comment not found');
     res.json({ deleted: true, expired: true, comment_id: req.params.id });
   } catch (err) {
-    if (err.code === 'P0002') throw new NotFoundError('Comment not found');
+    if (err.code === 'P0002') return next(new NotFoundError('Comment not found'));
     next(err);
   }
 });

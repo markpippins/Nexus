@@ -1,5 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════════════
---  V086 — T01 Phase C follow-up: asset_id on vision.work_requests
+--  V089 — T01 Phase C follow-up: asset_id on vision.work_requests
+--  (renumbered from V086 on 2026-08-09 — V086 was already taken by
+--   V086__tackle_roles_updated_at_trigger.sql, commit 7f3b2ed)
 --
 --  Decision ref: 898a203b (architect, 2026-08-09)
 --  Finding:      dccc6478-0a71-4ac4-93db-9698cb335071 (architect analysis)
@@ -62,10 +64,10 @@ BEGIN
         INTO v_total, v_null FROM vision.work_requests;
 
     IF v_null > 0 THEN
-        RAISE EXCEPTION 'V086 verify: % of % vision.work_requests rows still NULL', v_null, v_total;
+        RAISE EXCEPTION 'V089 verify: % of % vision.work_requests rows still NULL', v_null, v_total;
     END IF;
 
-    RAISE NOTICE '✅ V086 applied — asset_id on % vision.work_requests (0 NULL).', v_total;
+    RAISE NOTICE '✅ V089 applied — asset_id on % vision.work_requests (0 NULL).', v_total;
 END $$;
 
 COMMIT;
