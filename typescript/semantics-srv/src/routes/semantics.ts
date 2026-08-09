@@ -315,6 +315,126 @@ semanticsRouter.get("/asset_revision/:id", async (req, res) => {
   }
 });
 
+// ── Evidence filter routes (before for-loop to override auto-gen) ──
+
+// GET /api/evidence_item?evidenceType=agent_record&origin=harvested
+semanticsRouter.get("/evidence_item", async (req, res) => {
+  try {
+    const db = getDb();
+    const includeExpired = req.query.includeExpired === "true" || req.query.includeExpired === "1";
+    const limit = Math.min(parseInt(String(req.query.limit || "100"), 10) || 100, 500);
+    const offset = Math.max(parseInt(String(req.query.offset || "0"), 10) || 0, 0);
+
+    const clauses: string[] = includeExpired ? [] : ["ei.expired_at IS NULL"];
+    const values: any[] = [];
+    let i = 1;
+
+    if (req.query.evidenceType) {
+      clauses.push(`et.name = $${i++}`);
+      values.push(req.query.evidenceType);
+    }
+    if (req.query.origin) {
+      clauses.push(`ei.origin = $${i++}`);
+      values.push(req.query.origin);
+    }
+    if (req.query.uri) {
+      clauses.push(`ei.uri LIKE $${i++}`);
+      values.push(`${req.query.uri}%`);
+    }
+    if (req.query.sourceHash) {
+      clauses.push(`ei.source_hash = $${i++}`);
+      values.push(req.query.sourceHash);
+    }
+
+    const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+
+    const [dataResult, countResult] = await Promise.all([
+      db.query(
+        `SELECT ei.*, et.name AS "evidenceType"
+         FROM semantics.evidence_item ei
+         JOIN semantics.evidence_type et ON et.id = ei.evidence_type_id
+         ${where}
+         ORDER BY ei.captured_at DESC NULLS LAST
+         LIMIT $${i} OFFSET $${i + 1}`,
+        [...values, limit, offset],
+      ),
+      db.query(
+        `SELECT count(*)::int AS total
+         FROM semantics.evidence_item ei
+         JOIN semantics.evidence_type et ON et.id = ei.evidence_type_id
+         ${where}`,
+        values,
+      ),
+    ]);
+
+    res.json({
+      items: dataResult.rows,
+      total: countResult.rows[0]?.total ?? 0,
+      page: Math.floor(offset / limit) + 1,
+      pageSize: limit,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "list_failed", message: err.message });
+  }
+});
+
+// GET /api/statement_evidence?statementType=concept_relationship&statementId=<uuid>
+semanticsRouter.get("/statement_evidence", async (req, res) => {
+  try {
+    const db = getDb();
+    const includeExpired = req.query.includeExpired === "true" || req.query.includeExpired === "1";
+    const limit = Math.min(parseInt(String(req.query.limit || "100"), 10) || 100, 500);
+    const offset = Math.max(parseInt(String(req.query.offset || "0"), 10) || 0, 0);
+
+    const clauses: string[] = includeExpired ? [] : ["se.expired_at IS NULL"];
+    const values: any[] = [];
+    let i = 1;
+
+    if (req.query.statementType) {
+      clauses.push(`se.statement_type = $${i++}`);
+      values.push(req.query.statementType);
+    }
+    if (req.query.statementId) {
+      clauses.push(`se.statement_id = $${i++}`);
+      values.push(req.query.statementId);
+    }
+    if (req.query.role) {
+      clauses.push(`se.role = $${i++}`);
+      values.push(req.query.role);
+    }
+
+    const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+
+    const [dataResult, countResult] = await Promise.all([
+      db.query(
+        `SELECT se.*, et.name AS "evidenceType", ei.uri, ei.excerpt
+         FROM semantics.statement_evidence se
+         JOIN semantics.evidence_item ei ON ei.id = se.evidence_item_id
+         JOIN semantics.evidence_type et ON et.id = ei.evidence_type_id
+         ${where}
+         ORDER BY se.effective_at DESC
+         LIMIT $${i} OFFSET $${i + 1}`,
+        [...values, limit, offset],
+      ),
+      db.query(
+        `SELECT count(*)::int AS total
+         FROM semantics.statement_evidence se
+         ${where}`,
+        values,
+      ),
+    ]);
+
+    res.json({
+      items: dataResult.rows,
+      total: countResult.rows[0]?.total ?? 0,
+      page: Math.floor(offset / limit) + 1,
+      pageSize: limit,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "list_failed", message: err.message });
+  }
+});
+
 // ── Generated per-table CRUD ─────────────────────────────────────────
 
 for (const t of TABLES) {
