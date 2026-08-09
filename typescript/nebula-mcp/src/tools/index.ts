@@ -1008,6 +1008,43 @@ export function registerTools(server: McpServer) {
   );
 
   server.tool(
+    "nebula_get_inbox",
+    "Get a role's inbox in one call: the stored pointer plus agent records addressed to that role (tags ['to:<role>']) created at or after the pointer. Replaces the manual pointer + list + filter dance (R17) with a single MCP call.",
+    {
+      role: z.string().describe("Role name (e.g., architect, engineer, planner)"),
+      limit: z.number().optional().describe("Max records to return (default 20, max 100)"),
+    },
+    async (args) => {
+      const role = args.role;
+      const limit = Math.min(args.limit ?? 20, 100);
+      // REST returns { role, pointer } — extract the ISO timestamp string.
+      const pointerResult = (await NebulaClient.getInboxPointer(role)) as
+        | { role?: string; pointer?: string | null }
+        | string
+        | null;
+      const pointer =
+        typeof pointerResult === "object" && pointerResult !== null
+          ? pointerResult.pointer ?? null
+          : pointerResult;
+      const items = await NebulaClient.listAgentRecords({
+        tag: [`to:${role}`],
+        createdAfter: typeof pointer === "string" ? pointer : undefined,
+        limit,
+      });
+      // REST list responses are wrapped as { items, total, page, pageSize }.
+      const records = Array.isArray(items)
+        ? items
+        : ((items as { items?: unknown[] })?.items ?? []);
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ role, pointer, items: records, count: records.length }, null, 2),
+        }],
+      };
+    }
+  );
+
+  server.tool(
     "nebula_create_agent_record",
     "Create a new agent record in the database (canonical write path for all agent audit artifacts). Use this instead of writing to the filesystem.",
     {
