@@ -24,6 +24,21 @@ _DSN = os.environ.get(
     os.environ.get("CONDUIT_PG_DSN", "postgresql://pguser:pgpass@localhost:5432/nexus"),
 )
 
+# ── Root for resolving relative raw_location paths ──────────────────
+# source_observation.raw_location stores paths relative to the dev
+# checkout (e.g. "nexus/audit/CONDUIT_DATA/session_logs/foo.log" or
+# "file:///nexus/plans/0136.md"). This file lives at
+# <nexus>/python/epistemologist/db.py, so:
+#   dirname x1 = python/epistemologist
+#   dirname x2 = python
+#   dirname x3 = nexus  (NEXUS_ROOT)
+#   dirname x4 = dev    (DEV_ROOT)
+_NEXUS_ROOT = os.environ.get(
+    "NEXUS_ROOT",
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+)
+_DEV_ROOT = os.environ.get("DEV_ROOT", os.path.dirname(_NEXUS_ROOT))
+
 
 def _connect():
     return psycopg2.connect(_DSN)
@@ -96,6 +111,20 @@ def read_observation_text(observation: dict, max_chars: int = 8000) -> str:
 
     # Try reading the file if raw_location looks like a real path
     if location and not location.startswith("nebula."):
+        # Strip file:// scheme if present
+        if location.startswith("file://"):
+            location = location[len("file://"):]
+        # Resolve relative paths against DEV_ROOT (e.g. "nexus/audit/...")
+        # — raw_location is relative to the dev checkout root, not CWD.
+        if not os.path.isabs(location):
+            candidate = os.path.join(_DEV_ROOT, location)
+            if os.path.exists(candidate):
+                location = candidate
+            else:
+                # Fallback: maybe it's relative to the nexus checkout itself
+                candidate2 = os.path.join(_NEXUS_ROOT, location)
+                if os.path.exists(candidate2):
+                    location = candidate2
         try:
             with open(location, "r", encoding="utf-8", errors="replace") as f:
                 text = f.read()
