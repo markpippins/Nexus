@@ -21,3 +21,14 @@
 [submodule "python/vision/losm-kernel"]
 	path = python/vision/losm-kernel
 	url = https://github.com/markpippins/nexus-losm-kernel-python.git
+[submodule "angular/assembly-ui"]
+	path = angular/assembly-ui
+	url = https://github.com/markpippins/assembly-ui.git
+
+[submodule "angular/semantics-ui"]
+	path = angular/semantics-ui
+	url = https://github.com/markpippins/semantics-ui
+
+[submodule "angular/shrapnel-ui"]
+	path = angular/shrapnel-ui
+	url = https://github.com/markpippins/shrapnel-console-king.git
