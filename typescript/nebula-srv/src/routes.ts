@@ -8386,6 +8386,81 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // GET /api/inventory — rollup counts for the full hierarchy tree
+  // Returns per-node counts (systems/subsystems/features) for tree badges
+  // plus global totals. Single query, no per-node N+1.
+  router.get('/inventory', async (_req: Request, res: Response) => {
+    try {
+      // Systems: count subsystems, features, requirements, plans, candidates, ext links
+      const { rows: sysRows } = await pool.query(
+        `SELECT s.id AS "systemId", s.name AS "systemName",
+                COUNT(DISTINCT sub.id)::int AS "subsystemCount",
+                COUNT(DISTINCT feat.id)::int AS "featureCount",
+                COUNT(DISTINCT f.id)::int AS "folderCount",
+                COUNT(DISTINCT req.id)::int AS "reqCount",
+                COUNT(DISTINCT ip.id)::int AS "planCount",
+                COUNT(DISTINCT hc.id)::int AS "candidateCount",
+                COUNT(DISTINCT ar.id)::int AS "extLinkCount"
+         FROM systems s
+         LEFT JOIN subsystems sub ON sub.system_id = s.id
+         LEFT JOIN features feat ON feat.subsystem_id = sub.id
+         LEFT JOIN system_folders f ON f.system_id = s.id
+         LEFT JOIN requirements req ON req.system_id = s.id
+         LEFT JOIN nebula.implementation_plans ip ON ip.requirement_id = req.id
+         LEFT JOIN nebula.harvest_candidates hc ON hc.system_id = s.id
+         LEFT JOIN semantics.asset_relation ar ON ar.from_asset_id = s.asset_id AND ar.expired_at IS NULL
+         GROUP BY s.id, s.name
+         ORDER BY s.name`
+      );
+
+      // Subsystems: count features, requirements, plans, candidates
+      const { rows: subRows } = await pool.query(
+        `SELECT sub.id AS "subsystemId", sub.name AS "subsystemName",
+                sub.system_id AS "systemId",
+                COUNT(DISTINCT feat.id)::int AS "featureCount",
+                COUNT(DISTINCT req.id)::int AS "reqCount",
+                COUNT(DISTINCT ip.id)::int AS "planCount",
+                COUNT(DISTINCT hc.id)::int AS "candidateCount"
+         FROM subsystems sub
+         LEFT JOIN features feat ON feat.subsystem_id = sub.id
+         LEFT JOIN requirements req ON req.subsystem_id = sub.id
+         LEFT JOIN nebula.implementation_plans ip ON ip.requirement_id = req.id
+         LEFT JOIN nebula.harvest_candidates hc ON hc.subsystem_id = sub.id
+         GROUP BY sub.id, sub.name, sub.system_id
+         ORDER BY sub.name`
+      );
+
+      // Features: count requirements, plans, candidates
+      const { rows: featRows } = await pool.query(
+        `SELECT feat.id AS "featureId", feat.name AS "featureName",
+                feat.subsystem_id AS "subsystemId",
+                COUNT(DISTINCT req.id)::int AS "reqCount",
+                COUNT(DISTINCT ip.id)::int AS "planCount",
+                COUNT(DISTINCT hc.id)::int AS "candidateCount"
+         FROM features feat
+         LEFT JOIN requirements req ON req.feature_id = feat.id
+         LEFT JOIN nebula.implementation_plans ip ON ip.requirement_id = req.id
+         LEFT JOIN nebula.harvest_candidates hc ON hc.feature_id = feat.id
+         GROUP BY feat.id, feat.name, feat.subsystem_id
+         ORDER BY feat.name`
+      );
+
+      // Totals
+      const totals = {
+        systems: sysRows.length,
+        subsystems: subRows.length,
+        features: featRows.length,
+        requirements: sysRows.reduce((sum, r) => sum + (r.reqCount || 0), 0),
+        plans: sysRows.reduce((sum, r) => sum + (r.planCount || 0), 0),
+        candidates: sysRows.reduce((sum, r) => sum + (r.candidateCount || 0), 0),
+      };
+
+      res.json({ systems: sysRows, subsystems: subRows, features: featRows, totals });
+    } catch (err: any) {
+      res.status(500).json({ error: 'inventory_failed', message: err.message });
+    }
+  });
+
   // ════════════════════════════════════════════════════════════════
   //  SYSTEM EXTERNAL IDS — DEPRECATED (V077 migration)
   //
