@@ -23,8 +23,26 @@ from work_request_factory import WorkRequestFactory
 # ── Structured logging ────────────────────────────────────────────
 
 _log: logging.Logger | None = None
+
+
+def _default_conduit_data_dir() -> str:
+    """Default conduit runtime data dir.
+
+    ``.conduit-data/`` was removed 2026-08-09 and mirrored to
+    ``nexus/audit/CONDUIT_DATA`` for posterity; the emitter must not
+    recreate the deleted directory. ``CONDUIT_DATA_DIR`` overrides.
+    """
+    env = os.environ.get("CONDUIT_DATA_DIR")
+    if env:
+        return env
+    return os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "audit", "CONDUIT_DATA",
+    )
+
+
 _LOG_PATH = os.environ.get("CONDUIT_LOG_PATH", os.path.join(
-    os.environ.get("CONDUIT_DATA_DIR", "/home/codex/dev/nexus/.conduit-data"),
+    _default_conduit_data_dir(),
     "conduit.log"
 ))
 
@@ -58,10 +76,33 @@ def _get_log() -> logging.Logger:
 
 # ── Path constants ──────────────────────────────────────────────────
 
-DEFAULT_DB_PATH = os.environ.get("CONDUIT_DATA_DIR", "/home/codex/dev/nexus/.conduit-data")
+DEFAULT_DB_PATH = _default_conduit_data_dir()
 LOCK_PATH = os.environ.get("PIPELINE_LOCK_PATH", "/tmp/pipeline-manager.lock")
-DCO_DIR = os.environ.get("PIPELINE_DCO_DIR", "/home/codex/dev/nexus/.conduit-data/WORK_REQUESTS")
+DCO_DIR = os.environ.get("PIPELINE_DCO_DIR", os.path.join(_default_conduit_data_dir(), "WORK_REQUESTS"))
 PROJECT_ROOT = os.environ.get("PIPELINE_ROOT", "/home/codex/dev")
+
+# ── WR emission mode (legacy emitter gate) ──────────────────────────
+# Architect finding 89d7fbe3 (2026-08-09): the legacy DCO-file emission
+# + file-based executor dispatch (``executor_cloud.py <dco_path>``) is
+# gated behind an explicit opt-in. Default is "runtime" — WRs are
+# recorded in the runtime store (vision.work_requests / execution.requests
+# + cascade admission) and NO DCO file is written and NO executor is
+# launched from main.py. Set CONDUIT_WR_EMIT_MODE=file (or pass
+# ``--emit-mode file``) to restore the legacy behavior; PIPELINE_DCO_DIR
+# then controls the target dir and must point somewhere writable (NOT a
+# removed / read-only directory).
+_DEFAULT_WR_EMIT_MODE = "runtime"
+WR_EMIT_MODES = ("file", "runtime")
+
+
+def _resolve_default_emit_mode() -> str:
+    mode = os.environ.get("CONDUIT_WR_EMIT_MODE", _DEFAULT_WR_EMIT_MODE).strip().lower()
+    if mode not in WR_EMIT_MODES:
+        raise ValueError(f"Invalid CONDUIT_WR_EMIT_MODE {mode!r}; expected one of {WR_EMIT_MODES}")
+    return mode
+
+
+WR_EMIT_MODE = _resolve_default_emit_mode()
 
 EXECUTOR_TIMEOUT_SECONDS = int(os.environ.get("PIPELINE_EXECUTOR_TIMEOUT", "1800"))
 WATCHDOG_STALE_SECONDS = int(os.environ.get("PIPELINE_WATCHDOG_STALE", "1500"))
@@ -583,6 +624,21 @@ def _dispatch_one(
     cursor_before = db.get_cursor(role)
     print(f"Processing plan: {plan_id} - {plan.get('title', '')} for role {role}")
     print(f"  cursor before: {cursor_before or '(none)'}")
+
+    # ── Legacy emitter gate (architect finding 89d7fbe3, 2026-08-09) ──
+    # DCO-file emission + executor dispatch is opt-in only ("file"). In
+    # the default "runtime" mode main.py performs NO emission and NO
+    # dispatch: the plan is left eligible for the runtime store
+    # (execution.requests + cascade admission) and completion receipts
+    # come from the harness. No ticket claimed, no session opened, no
+    # cursor moved — a clean no-op.
+    if WR_EMIT_MODE != "file":
+        print(f"  [gated] Legacy WR file-emission disabled (CONDUIT_WR_EMIT_MODE={WR_EMIT_MODE!r}). "
+              f"Plan {plan_id} role={role} left for runtime dispatch — "
+              f"no DCO file written, no executor launched.")
+        log.warning("wr-emission gated: plan=%s role=%s mode=%s (runtime dispatch)",
+                    plan_id, role, WR_EMIT_MODE)
+        return
 
     session_id = f"{role}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{os.urandom(4).hex()}"
     db.create_session(session_id, role, [plan_id])
@@ -1146,6 +1202,10 @@ if __name__ == "__main__":
     parser.add_argument("--run", choices=["builder", "reviewer", "planner", "critic"], help="Run the conduit for a specific role")
     parser.add_argument("--plan", help="Dispatch a builder for a single plan ID (bypasses cursor/pause)")
     parser.add_argument("--force", action="store_true", help="Override circuit breaker block when using --plan")
+    parser.add_argument("--emit-mode", choices=list(WR_EMIT_MODES), default=None,
+                        help="WR emission mode: 'file' (legacy DCO-file dispatch, opt-in) or "
+                             "'runtime' (default — no file emission; the runtime store is the "
+                             "dispatch authority). Overrides CONDUIT_WR_EMIT_MODE.")
     parser.add_argument("--all", action="store_true", help="Run for all roles sequentially")
     parser.add_argument("--supersede", help="Supersede a ticket by ID (mark terminal, optionally create replacement)")
     parser.add_argument("--supersede-reason", default="", help="Reason for superseding (used with --supersede)")
@@ -1158,6 +1218,8 @@ if __name__ == "__main__":
                         help="Run kernel sync in continuous poll loop")
 
     args = parser.parse_args()
+    if args.emit_mode is not None:
+        WR_EMIT_MODE = args.emit_mode  # module-level; overrides env default
     registry = load_registry(args.registry)
 
     # ── Kernel bridge flags (no lock needed) ─────────────────────

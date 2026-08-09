@@ -296,4 +296,25 @@ def run():
     except FileNotFoundError:
         check("G-12 lease_id guard", False, "main.py not found")
 
+    print("\n--- E-13: Legacy WR file-emission gate (architect finding 89d7fbe3) ---")
+    try:
+        src = read_file("python/conduit/main.py")
+        has_gate = 'WR_EMIT_MODE != "file"' in src and "[gated]" in src
+        check("main.py gates legacy WR file-emission (default runtime)",
+              has_gate,
+              "gate marker '[gated]' / 'WR_EMIT_MODE != \"file\"' missing from _dispatch_one")
+        check("main.py no longer hardcodes the deleted .conduit-data path",
+              "/home/codex/dev/nexus/.conduit-data" not in src,
+              "remove remaining '/home/codex/dev/nexus/.conduit-data' default paths (dir deleted 2026-08-09)")
+    except FileNotFoundError:
+        check("E-13 gate file", False, "python/conduit/main.py not found")
+
+    try:
+        exe = read_file("python/conduit/executor_cloud.py")
+        check("executor_cloud.py no longer hardcodes .conduit-data",
+              ".conduit-data" not in exe,
+              "session_logs path default still points at deleted .conduit-data")
+    except FileNotFoundError:
+        check("E-13 executor file", False, "python/conduit/executor_cloud.py not found")
+
     return passed, failed, skipped

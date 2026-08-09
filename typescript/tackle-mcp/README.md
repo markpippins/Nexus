@@ -112,7 +112,7 @@ interface ProcedureIndexEntry {
 
 ```json
 [
-  { "slug": "pipeline-health-check", "summary": "Scan for blocked plans...", "tags": ["turn-protocol", "pipeline"] },
+  { "slug": "pipeline-health-check", "summary": "DB-first pipeline health check: blocked plans, plan-status drift (stuck pending + expired tickets + external evidence), flagged changes...", "tags": ["turn-protocol", "pipeline", "health-check", "drift"] },
   { "slug": "handle-review-rejection", "summary": "When a change report...", "tags": ["review", "rejection"] }
 ]
 ```
@@ -141,7 +141,7 @@ Reads `mem:idx:{role}` from Redis and returns the procedure index.
   "role": "engineer",
   "count": 7,
   "procedures": [
-    { "slug": "pipeline-health-check", "summary": "...", "tags": [...] },
+    { "slug": "pipeline-health-check", "summary": "DB-first pipeline health check: blocked plans, plan-status drift, flagged changes...", "tags": ["turn-protocol", "pipeline", "health-check", "drift"] },
     ...
   ]
 }

@@ -753,7 +753,9 @@ def _run_from_path(dco_path: str) -> int:
     session_log_path = None
     if session_id:
         session_log_path = os.path.join(
-            os.environ.get("CONDUIT_DATA_DIR", "/home/codex/dev/nexus/.conduit-data"),
+            os.environ.get("CONDUIT_DATA_DIR", os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                "audit", "CONDUIT_DATA")),
             "session_logs",
             f"{session_id}.log",
         )
