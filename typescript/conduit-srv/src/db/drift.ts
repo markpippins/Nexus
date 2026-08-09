@@ -56,10 +56,12 @@ export interface DriftScanRow {
 }
 
 // Sweep active work requests and report projection-vs-replay drift.
-// Defaults to non-terminal statuses (everything except completed /
-// cancelled / failed / settled); a single `statusFilter` overrides the
-// default for targeted checks. Per-WR try/catch keeps one bad row from
-// killing the scan. Limit is bounded 1..500.
+// Defaults to non-terminal statuses — terminal set aligned with
+// runtime-kernel.ts (SETTLED/REJECTED/FAILED/NOOP/DEFERRED) plus the
+// ledger names COMPLETED/CANCELLED, i.e. everything except
+// completed/cancelled/failed/settled/rejected/noop/deferred. A single
+// `statusFilter` overrides the default for targeted checks. Per-WR
+// try/catch keeps one bad row from killing the scan. Limit is bounded 1..500.
 export async function scanProjectionDrift(opts: {
   limit?: number;
   statusFilter?: string[];
@@ -79,7 +81,8 @@ export async function scanProjectionDrift(opts: {
          LIMIT $2`
       : `SELECT work_request_uuid, wr_id, status
          FROM ${VISION_SCHEMA}.work_requests
-         WHERE status NOT IN ('completed', 'cancelled', 'failed', 'settled')
+         WHERE status NOT IN ('completed', 'cancelled', 'failed', 'settled',
+                              'rejected', 'noop', 'deferred')
          ORDER BY recorded_on_dt DESC
          LIMIT $1`,
     opts.statusFilter?.length
