@@ -39,6 +39,7 @@ import java.util.concurrent.Executors;
 public class PlatformHealthController {
 
     private static final HttpClient httpClient = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(2))
             .executor(Executors.newVirtualThreadPerTaskExecutor())
             .build();
