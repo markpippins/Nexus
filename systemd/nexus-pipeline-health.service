@@ -1,0 +1,17 @@
+[Unit]
+Description=Pipeline Health Sweep — runs pipeline health checks (blocked plans, plan-status drift, flagged changes, projection drift via conduit-srv /wr/drift-scan) and posts findings to the Assembly drift-reports forum
+Documentation=https://github.com/codex/nexus/wiki/pipeline-health-sweep
+After=network.target postgresql.service conduit-srv.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /home/codex/dev/nexus/bin/pipeline-health-sweep.py --quiet
+User=codex
+Group=codex
+
+# Hardening (state file written to ~/.cache/nexus-pipeline-health-state.json)
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target
