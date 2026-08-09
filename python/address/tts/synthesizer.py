@@ -16,6 +16,7 @@ import hashlib
 import os
 import subprocess
 import sys
+import threading
 import wave
 import time
 from dataclasses import dataclass
@@ -34,8 +35,17 @@ DEFAULT_MODEL_DIR = Path.home() / ".local" / "share" / "piper-tts"
 # Relative to the project root (nexus/)
 AUDIO_CACHE_DIR = Path(__file__).resolve().parents[3] / ".tts-audio"
 
-# Sampling rate for Piper output
+# Sampling rate for Piper output (informational; actual rate comes
+# from the loaded voice config)
 SAMPLE_RATE = 22050
+
+# ── In-process voice cache ─────────────────────────────────────────
+# PiperVoice is expensive to load (~20-30s cold). Cache one instance per
+# voice name so repeated synthesis is fast. Each entry is (voice, lock);
+# the lock serializes synthesis because espeak-ng phonemization inside
+# PiperVoice.synthesize() is not thread-safe.
+_VOICE_CACHE: dict[str, tuple[Any, threading.Lock]] = {}
+_VOICE_CACHE_GUARD = threading.Lock()
 
 
 @dataclass
@@ -101,9 +111,8 @@ def _log(msg: str, *args: Any) -> None:
 def synthesize(text: str, *, voice: str = DEFAULT_VOICE) -> SynthesisResult:
     """Synthesize text to speech and return the audio file path.
 
-    Uses the piper CLI subprocess (primary — proven reliable; the Python
-    API has been observed writing header-only 44-byte wavs, so it is only
-    a last-resort fallback).
+    Uses Piper's in-process Python API (primary — fast, voice cached in
+    memory) with the piper CLI subprocess as a fallback.
 
     Args:
         text: The text to synthesize.
@@ -136,12 +145,12 @@ def synthesize(text: str, *, voice: str = DEFAULT_VOICE) -> SynthesisResult:
 
     start_time = time.time()
 
-    # ── Use Piper subprocess (primary — proven reliable) ──
+    # ── Use Piper Python API (primary — in-process, cached voice) ──
     try:
-        _synthesize_subprocess(text, str(output_path), voice)
-    except Exception as e:
-        _log(f"Subprocess failed ({e}), trying Python API...")
         _synthesize_python(text, str(output_path), voice)
+    except Exception as e:
+        _log(f"Python API failed ({e}), trying piper CLI subprocess...")
+        _synthesize_subprocess(text, str(output_path), voice)
 
     # ── Validation guard ──
     # Never return (or later play) silent/empty audio. The Python API
@@ -166,31 +175,56 @@ def synthesize(text: str, *, voice: str = DEFAULT_VOICE) -> SynthesisResult:
     )
 
 
+def _get_voice(voice: str) -> tuple[Any, threading.Lock]:
+    """Return a cached (PiperVoice, lock) for the given voice name.
+
+    Loads the model once per voice and reuses it across calls. The lock
+    serializes synthesis on the shared instance (espeak-ng phonemization
+    is not thread-safe).
+    """
+    with _VOICE_CACHE_GUARD:
+        entry = _VOICE_CACHE.get(voice)
+        if entry is None:
+            from piper import PiperVoice
+
+            model_path, config_path = _ensure_voice_model(voice)
+            entry = (
+                PiperVoice.load(model_path, config_path=config_path),
+                threading.Lock(),
+            )
+            _VOICE_CACHE[voice] = entry
+        return entry
+
+
 def _synthesize_python(text: str, output_path: str, voice: str) -> None:
     """Use Piper's Python API for synthesis.
 
-    PiperVoice.synthesize() expects a wave.Wave_write object, not a raw
-    file handle. We must set up the WAV header (mono, 16-bit PCM,
-    correct sample rate) before passing it to Piper.
-
-    NOTE (2026-08-09): On this install the Python API writes header-only
-    (44-byte) wavs — synthesis produces no samples. Kept as a last-resort
-    fallback only; the CLI subprocess is the working path. The caller's
-    validation guard catches the empty output.
+    piper >= 1.3 changed PiperVoice.synthesize() to return an
+    Iterable[AudioChunk] — it no longer accepts a wave file object.
+    (Passing one silently discards the audio, producing header-only
+    44-byte wavs.) We consume the chunk iterable and write each chunk's
+    int16 bytes, mirroring piper's own CLI. The voice is cached in
+    process so repeated calls skip the ~20-30s model load.
     """
-    model_path, config_path = _ensure_voice_model(voice)
-
-    from piper import PiperVoice
-
-    voice_obj = PiperVoice.load(model_path, config_path=config_path)
+    voice_obj, voice_lock = _get_voice(voice)
     sample_rate = voice_obj.config.sample_rate
     _log(f"Voice loaded: {voice} @ {sample_rate}Hz")
 
-    with wave.open(output_path, "wb") as wav_file:
-        wav_file.setnchannels(1)          # mono
-        wav_file.setsampwidth(2)          # 16-bit PCM
-        wav_file.setframerate(sample_rate)
-        voice_obj.synthesize(text, wav_file)
+    # 200ms of silence between sentences (matches piper CLI default)
+    silence_int16_bytes = bytes(int(sample_rate * 0.2 * 2))
+
+    with voice_lock:
+        with wave.open(output_path, "wb") as wav_file:
+            wav_params_set = False
+            for i, chunk in enumerate(voice_obj.synthesize(text)):
+                if not wav_params_set:
+                    wav_file.setframerate(chunk.sample_rate)
+                    wav_file.setsampwidth(chunk.sample_width)
+                    wav_file.setnchannels(chunk.sample_channels)
+                    wav_params_set = True
+                if i > 0:
+                    wav_file.writeframes(silence_int16_bytes)
+                wav_file.writeframes(chunk.audio_int16_bytes)
 
     _log(f"Synthesized {len(text)} chars → {output_path}")
 
