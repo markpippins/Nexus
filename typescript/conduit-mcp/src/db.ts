@@ -1888,10 +1888,11 @@ const migrations: Migration[] = [
     version: 24,
     description: "Expose status column in nebula.plans view (Architect gap #1) — add implementation_plan status (draft/pending/approved/work_requested/completed/archived) so consumers can query plan lifecycle stage without joining to nebula.implementation_plans",
     up: async (exec) => {
-      // Add status column to nebula.plans view
-      // IMPORTANT: Must append at END because CREATE OR REPLACE VIEW cannot
-      // change existing column names — inserting 'status' mid-list would
-      // be interpreted as renaming 'deleted' to 'status'.
+      // Add status column to nebula.plans view.
+      // IMPORTANT: Must match existing column order exactly (created_at,
+      // updated_at, deleted) and append status at the END. CREATE OR REPLACE
+      // VIEW cannot change column names — any reordering is interpreted as a
+      // rename and rejected.
       await exec(`
         CREATE OR REPLACE VIEW nebula.plans AS
         SELECT
@@ -1907,12 +1908,12 @@ const migrations: Migration[] = [
           ''::text AS prompt_ref,
           ''::text AS notes,
           0 AS priority,
+          created_at::text AS created_at,
+          updated_at::text AS updated_at,
           CASE
             WHEN status = 'archived' THEN 1
             ELSE 0
           END AS deleted,
-          created_at::text AS created_at,
-          updated_at::text AS updated_at,
           status
         FROM nebula.implementation_plans
       `);
@@ -1946,9 +1947,9 @@ const migrations: Migration[] = [
               ps.prompt_ref,
               ps.notes,
               ps.priority,
-              ps.deleted,
               ps.created_at,
               ps.updated_at,
+              ps.deleted,
               ps.derived_status AS status
             FROM conduit.plan_status ps;
           END IF;
