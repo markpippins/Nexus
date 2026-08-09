@@ -77,15 +77,6 @@ app-nav-toolbar {
   opacity: 0.35;
 }
 
-.nav-toolbar-spacer {
-  flex: 1;
-  min-height: 0;
-}
-
-.nav-toolbar-theme-btn {
-  flex-shrink: 0;
-}
-
 /* Collapse / Expand button — pinned to the bottom of the toolbar */
 .nav-toolbar-collapse-btn {
   flex-shrink: 0;
@@ -102,7 +93,6 @@ app-nav-toolbar {
 /* Fade out hidden elements using opacity + visibility (animatable, unlike display) */
 .nav-toolbar.is-collapsed .orb-wrapper,
 .nav-toolbar.is-collapsed .nav-toolbar-divider,
-.nav-toolbar.is-collapsed .nav-toolbar-spacer,
 .nav-toolbar.is-collapsed .nav-toolbar-btn:not(.nav-toolbar-collapse-btn) {
   opacity: 0;
   visibility: hidden;

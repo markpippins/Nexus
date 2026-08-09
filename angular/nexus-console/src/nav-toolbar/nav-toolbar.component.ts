@@ -2,7 +2,6 @@ import { Component, ChangeDetectionStrategy, input, output, ViewEncapsulation } 
 import { CommonModule } from '@angular/common';
 import { ViewMode } from '../bottom-bar/bottom-bar.component.js';
 import { OrbComponent } from '../orb/orb.component.js';
-import { Theme } from '../services/ui-preferences.service.js';
 
 export interface NavItem {
   key: ViewMode;
@@ -194,12 +193,8 @@ export const NAV_ITEMS: NavItemOrSeparator[] = [
 export class NavToolbarComponent {
   /** Current view mode to highlight the active button */
   viewMode = input<ViewMode>('file-explorer');
-  /** Current theme for the toggle button icon */
-  theme = input<Theme>('theme-steel');
   /** Emitted when the user clicks a navigation button */
   viewModeChange = output<ViewMode>();
-  /** Emitted when the user clicks the theme toggle */
-  themeChange = output<Theme>();
 
   /** Whether the nav toolbar is collapsed */
   collapsed = input(false);
@@ -207,14 +202,6 @@ export class NavToolbarComponent {
   collapseToggled = output<void>();
 
   readonly navItems = NAV_ITEMS;
-  readonly THEME_CYCLE: Theme[] = ['theme-steel', 'theme-light', 'theme-dark'];
-
-  toggleTheme(): void {
-    const current = this.theme();
-    const idx = this.THEME_CYCLE.indexOf(current);
-    const next = this.THEME_CYCLE[(idx + 1) % this.THEME_CYCLE.length];
-    this.themeChange.emit(next);
-  }
 
   onCollapseToggle(): void {
     this.collapseToggled.emit();
