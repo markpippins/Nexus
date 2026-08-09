@@ -103,6 +103,20 @@ def fetch_knowledge_entities():
                         if val and isinstance(val, str) and len(val) > 10:
                             embed_text = val
                             break
+                # Pared KG (plans / work_requests): goal / problem_statement /
+                # desired_outcome — combine with the title for richer text.
+                if not embed_text or len(embed_text) < 30:
+                    raw_title = props.get("title")
+                    title = raw_title.strip() if isinstance(raw_title, str) else ""
+                    bits = []
+                    if title:
+                        bits.append(f"Title: {title}")
+                    for key in ("goal", "problem_statement", "desired_outcome"):
+                        val = props.get(key)
+                        if isinstance(val, str) and len(val.strip()) > 5:
+                            bits.append(val.strip())
+                    if bits:
+                        embed_text = " ".join(bits)
             except (_json.JSONDecodeError, TypeError):
                 pass
 
