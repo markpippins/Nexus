@@ -2934,6 +2934,8 @@ export interface AgentSchedulerRow {
   agent_config: string;
   schedule_type: string;
   schedule_value: number;
+  cron_expr: string | null;
+  event_criteria: string | null;
   project_dir: string;
   task_slug: string | null;
   enabled: number;
@@ -2989,13 +2991,14 @@ function toScheduleSeconds(v: unknown, dflt: number): number {
 export async function createSchedulerEntry(data: {
   role: string; model_id?: string; harness?: string;
   agent_config?: string; schedule_type?: string; schedule_value?: number | string;
+  cron_expr?: string; event_criteria?: string | object | null;
   project_dir?: string; task_slug?: string | null;
   enabled?: number | boolean | string;
 }): Promise<AgentSchedulerRow> {
   const now = new Date().toISOString();
   const row = await qOne(`
-    INSERT INTO agent_scheduler (role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, task_slug, enabled, metadata, created_at, updated_at)
-    VALUES (@role, @model_id, @harness, @agent_config, @schedule_type, @schedule_value, @project_dir, @task_slug, @enabled, '{}', @now, @now)
+    INSERT INTO agent_scheduler (role, model_id, harness, agent_config, schedule_type, schedule_value, cron_expr, event_criteria, project_dir, task_slug, enabled, metadata, created_at, updated_at)
+    VALUES (@role, @model_id, @harness, @agent_config, @schedule_type, @schedule_value, @cron_expr, @event_criteria, @project_dir, @task_slug, @enabled, '{}', @now, @now)
     RETURNING *
   `, {
     role: data.role,
@@ -3004,6 +3007,10 @@ export async function createSchedulerEntry(data: {
     agent_config: data.agent_config ?? "{}",
     schedule_type: data.schedule_type ?? "interval",
     schedule_value: toScheduleSeconds(data.schedule_value, 3600),
+    cron_expr: data.cron_expr ?? null,
+    event_criteria: data.event_criteria == null ? null
+      : typeof data.event_criteria === "string" ? data.event_criteria
+      : JSON.stringify(data.event_criteria),
     project_dir: data.project_dir ?? "/home/codex/dev",
     task_slug: data.task_slug ?? null,
     enabled: toEnabledInt(data.enabled, 1),
@@ -3015,6 +3022,7 @@ export async function createSchedulerEntry(data: {
 export async function updateSchedulerEntry(id: number, data: Partial<{
   role: string; model_id: string | null; harness: string;
   agent_config: string; schedule_type: string; schedule_value: number | string;
+  cron_expr: string | null; event_criteria: string | object | null;
   project_dir: string; enabled: number | boolean | string; last_run_at: string;
   last_run_status: string; metadata: string;
 }>): Promise<AgentSchedulerRow | undefined> {
@@ -3022,7 +3030,7 @@ export async function updateSchedulerEntry(id: number, data: Partial<{
   const sets: string[] = ["updated_at = @now"];
   const params: Record<string, any> = { id, now };
   const fields = ["role", "model_id", "harness", "agent_config", "schedule_type",
-    "schedule_value", "project_dir", "task_slug", "enabled", "last_run_at", "last_run_status", "metadata"];
+    "schedule_value", "cron_expr", "event_criteria", "project_dir", "task_slug", "enabled", "last_run_at", "last_run_status", "metadata"];
   for (const f of fields) {
     if ((data as any)[f] !== undefined) {
       sets.push(`${f} = @${f}`);
@@ -3030,6 +3038,10 @@ export async function updateSchedulerEntry(id: number, data: Partial<{
         ? toEnabledInt((data as any)[f], 1)
         : f === "schedule_value"
         ? toScheduleSeconds((data as any)[f], 3600)
+        : f === "event_criteria" && (data as any)[f] != null
+        ? typeof (data as any)[f] === "string"
+          ? (data as any)[f]
+          : JSON.stringify((data as any)[f])
         : (data as any)[f];
     }
   }
@@ -3088,6 +3100,10 @@ async function resolveSchedulerPrompt(
 }
 
 export async function getDueSchedulerEntries(): Promise<DueSchedulerEntry[]> {
+  // NOTE: the canonical evaluator is the Python runner
+  // (python/tackle/agent_scheduler_runner.py evaluate_tick — T15). This
+  // endpoint is a UI convenience mirror for the interval-based legacy
+  // evaluation; cron/event entries are matched + stamped by the runner only.
   const rows = await qAll(`
     SELECT * FROM agent_scheduler
     WHERE enabled = 1
