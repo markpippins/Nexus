@@ -426,7 +426,8 @@ def _detect_crash_type(stderr_lines: list[str]) -> str:
 
 
 def _ensure_dirs() -> None:
-    d = os.path.join(PROJECT_ROOT, "nexus", ".conduit-data", "sessions")
+    # .conduit-data was deleted 2026-08-09 and mirrored to audit/CONDUIT_DATA
+    d = os.path.join(PROJECT_ROOT, "nexus", "audit", "CONDUIT_DATA", "sessions")
     os.makedirs(d, exist_ok=True)
 
 

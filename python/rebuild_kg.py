@@ -31,9 +31,10 @@ from collections import defaultdict
 
 KG_PATH = "/home/codex/dev/nexus/graph/nexus-knowledge-graph.json"
 BACKUP_PATH = "/home/codex/dev/nexus/graph/nexus-knowledge-graph.json.bak"
-WR_FOLDER = "/home/codex/dev/nexus/.conduit-data/WORK_REQUESTS"
-SESSIONS = "/home/codex/dev/nexus/.conduit-data/sessions"
-SESSION_LOGS = "/home/codex/dev/nexus/.conduit-data/session_logs"
+# .conduit-data deleted 2026-08-09; mirror is the posterity home
+WR_FOLDER = "/home/codex/dev/nexus/audit/CONDUIT_DATA/WORK_REQUESTS"
+SESSIONS = "/home/codex/dev/nexus/audit/CONDUIT_DATA/sessions"
+SESSION_LOGS = "/home/codex/dev/nexus/audit/CONDUIT_DATA/session_logs"
 HISTORY = "/home/codex/dev/nexus/audit/HISTORY"
 
 PG = {"host": "localhost", "port": "5432", "user": "pguser", "db": "nexus"}

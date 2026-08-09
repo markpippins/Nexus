@@ -13,7 +13,7 @@ def generate_work_to_date(root_path, output_file):
     wr_files = []
     # Search common locations
     search_paths = [
-        os.path.join(root_path, "nexus/.conduit-data", "WORK_REQUESTS", "**", "*.json")
+        os.path.join(root_path, "nexus/audit/CONDUIT_DATA", "WORK_REQUESTS", "**", "*.json")
     ]
     
     for path in search_paths:

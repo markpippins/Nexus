@@ -41,10 +41,12 @@ import { validateReceipt } from "./receipts";
 const PORT = parseInt(process.env.PORT || "3100", 10);
 const PIPELINE_DIR =
   process.env.PIPELINE_DIR ||
-  path.resolve(__dirname, "../../../../nexus/.conduit-data");
+  // .conduit-data deleted 2026-08-09; mirror is the posterity home
+  path.resolve(__dirname, "../../../../nexus/audit/CONDUIT_DATA");
 const GRAPH_DIR =
   process.env.GRAPH_DIR ||
-  path.resolve(PIPELINE_DIR, "../graph");
+  // graph lives at nexus/graph, independent of PIPELINE_DIR
+  path.resolve(__dirname, "../../../../nexus/graph");
 
 const app = express();
 app.use(cors());

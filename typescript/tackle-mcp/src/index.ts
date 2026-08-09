@@ -406,7 +406,8 @@ app.post("/config/ai/test", async (req, res) => {
 
     // Direct subprocess spawn — pipe output to session log file
     const projectRoot = process.env.PIPELINE_ROOT || "/home/codex/dev";
-    const sessionsDir = path.join(projectRoot, "nexus", ".conduit-data", "sessions");
+    // .conduit-data was deleted 2026-08-09 and mirrored to audit/CONDUIT_DATA
+    const sessionsDir = path.join(projectRoot, "nexus", "audit", "CONDUIT_DATA", "sessions");
     fs.mkdirSync(sessionsDir, { recursive: true });
     const sessionLogPath = path.join(sessionsDir, `${sessionId}.log`);
     const logStream = fs.createWriteStream(sessionLogPath, { flags: "a" });
@@ -889,7 +890,8 @@ app.get("/log/:sessionId", async (req, res) => {
   }
 
   const projectRoot = process.env.PIPELINE_ROOT || "/home/codex/dev";
-  const logPath = path.join(projectRoot, "nexus", ".conduit-data", "sessions", `${sessionId}.log`);
+  // .conduit-data was deleted 2026-08-09 and mirrored to audit/CONDUIT_DATA
+  const logPath = path.join(projectRoot, "nexus", "audit", "CONDUIT_DATA", "sessions", `${sessionId}.log`);
 
   res.writeHead(200, {
     "Content-Type": "text/event-stream",

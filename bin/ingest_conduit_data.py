@@ -25,7 +25,8 @@ DB_CONFIG = {
     "password": "pgpass",
 }
 
-WR_DIR = os.path.join(os.path.dirname(__file__), "..", "..", ".conduit-data", "WORK_REQUESTS")
+# .conduit-data deleted 2026-08-09; mirror is the posterity home
+WR_DIR = os.path.join(os.path.dirname(__file__), "..", "audit", "CONDUIT_DATA", "WORK_REQUESTS")
 
 
 def load_work_requests(wr_dir: str) -> list[dict]:

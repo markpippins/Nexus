@@ -1,7 +1,7 @@
 {
   "name": "conduit-mcp",
   "version": "1.0.0",
-  "description": "MCP server that watches nexus/.conduit-data/ filesystem and exposes SSE + MCP tools",
+  "description": "MCP server that watches the conduit data directory (audit/CONDUIT_DATA mirror) and exposes SSE + MCP tools",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
