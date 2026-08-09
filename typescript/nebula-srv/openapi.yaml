@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: nebula-srv — Nebula Knowledge-Graph API
-  version: 1.0.e5a309f2
+  version: 1.0.06860af5
   description: 'Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge
     graph, and cross-references.
 
@@ -37,6 +37,7 @@ tags:
 - name: inbox-pointers
 - name: intent-records
 - name: intents
+- name: inventory
 - name: knowledge
 - name: observations
 - name: op-registry
@@ -2211,7 +2212,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: 'GET /api/external-ids — reverse lookup: find which nebula system owns a given external ID'
+      summary: GET /api/external-ids — reverse lookup via asset_relation
   /api/external-ids/{id}:
     patch:
       tags:
@@ -2242,7 +2243,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: PATCH /api/external-ids/:id — update confidence, method, notes, or role_in_system
+      summary: PATCH /api/external-ids/:id — deprecated
       parameters:
       - name: id
         in: path
@@ -3493,6 +3494,38 @@ paths:
         required: true
         schema:
           type: string
+  /api/inventory:
+    get:
+      tags:
+      - inventory
+      operationId: get_inventory
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: GET /api/inventory — rollup counts for the full hierarchy tree Returns per-node counts (systems/subsystems/features)
+        for tree badges plus gl
   /api/knowledge/cross-references:
     get:
       tags:
@@ -6766,8 +6799,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: SYSTEM EXTERNAL IDS (cross-schema junction) GET /api/systems/:id/external-ids — list all external mappings
-        for a system
+      summary: The system_external_ids junction has been replaced by asset_relation (system-asset OWNS service-asset). These
+        endpoints now query asset_rela
       parameters:
       - name: id
         in: path
@@ -6803,7 +6836,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: POST /api/systems/:id/external-ids — create a new external ID mapping
+      summary: POST /api/systems/:id/external-ids — create asset_relation edge (deprecated junction)
       parameters:
       - name: id
         in: path
@@ -6840,7 +6873,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: DELETE /api/systems/:id/external-ids/:eid — soft-expire a mapping
+      summary: DELETE /api/systems/:id/external-ids/:eid — deprecated
       parameters:
       - name: id
         in: path
@@ -7152,8 +7185,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: SYSTEM INVENTORY (unified cross-schema view) GET /api/systems/:id/inventory — unified inventory joining nebula.systems
-        → system_external_ids
+      summary: 'SYSTEM INVENTORY (unified cross-schema view) GET /api/systems/:id/inventory — unified inventory via asset_relation
+        V076 migration: joins thr'
       parameters:
       - name: id
         in: path
