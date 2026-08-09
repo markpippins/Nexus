@@ -101,8 +101,9 @@ def _log(msg: str, *args: Any) -> None:
 def synthesize(text: str, *, voice: str = DEFAULT_VOICE) -> SynthesisResult:
     """Synthesize text to speech and return the audio file path.
 
-    Uses Piper's Python API (piper.PiperVoice) for synthesis.
-    Falls back to the piper CLI if the Python API is unavailable.
+    Uses the piper CLI subprocess (primary — proven reliable; the Python
+    API has been observed writing header-only 44-byte wavs, so it is only
+    a last-resort fallback).
 
     Args:
         text: The text to synthesize.
@@ -142,6 +143,17 @@ def synthesize(text: str, *, voice: str = DEFAULT_VOICE) -> SynthesisResult:
         _log(f"Subprocess failed ({e}), trying Python API...")
         _synthesize_python(text, str(output_path), voice)
 
+    # ── Validation guard ──
+    # Never return (or later play) silent/empty audio. The Python API
+    # fallback has been observed writing header-only 44-byte wavs
+    # (2026-08-09), so a real-audio check is mandatory before returning.
+    if not output_path.exists() or output_path.stat().st_size < 1000:
+        size = output_path.stat().st_size if output_path.exists() else 0
+        raise RuntimeError(
+            f"Synthesis produced no audio ({size} bytes) — both piper "
+            f"paths failed. Check the piper install/voice model."
+        )
+
     duration_ms = int((time.time() - start_time) * 1000)
 
     return SynthesisResult(
@@ -160,6 +172,11 @@ def _synthesize_python(text: str, output_path: str, voice: str) -> None:
     PiperVoice.synthesize() expects a wave.Wave_write object, not a raw
     file handle. We must set up the WAV header (mono, 16-bit PCM,
     correct sample rate) before passing it to Piper.
+
+    NOTE (2026-08-09): On this install the Python API writes header-only
+    (44-byte) wavs — synthesis produces no samples. Kept as a last-resort
+    fallback only; the CLI subprocess is the working path. The caller's
+    validation guard catches the empty output.
     """
     model_path, config_path = _ensure_voice_model(voice)
 
@@ -199,7 +216,11 @@ def _synthesize_subprocess(text: str, output_path: str, voice: str) -> None:
         input=text,
         capture_output=True,
         text=True,
-        timeout=30,
+        # 30s was too tight: cold model load (~25s) + long-text synthesis
+        # exceeded it, causing a false timeout and a ~30s stall before the
+        # fallback. 120s gives the CLI ample headroom (observed: ~27s cold
+        # short, ~13s warm long).
+        timeout=120,
     )
 
     if result.returncode != 0:
