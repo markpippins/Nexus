@@ -1,0 +1,20 @@
+[Unit]
+# Agent scheduler evaluator — single DB-driven evaluation loop (T13-T16).
+# Runs the canonical tackle runner (NOT the old conduit shim).
+# Per architect decision 13600407 (2026-08-09): systemd user timers are the
+# single OS-level substrate; this 1-minute tick replaces the retired cron line.
+# Per T16 gate: runs in --shadow mode (evaluate only, no launches/consumption)
+# until acceptance is passed — then drop "--shadow" from ExecStart.
+# Ref: tackle.agent_scheduler v14 contract (85ae61af), V091 migration.
+Description=Nexus Agent Scheduler Evaluator (tackle, shadow per T16)
+After=network.target postgresql.service
+Wants=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/codex/dev/nexus/python
+Environment=PYTHONPATH=/home/codex/dev/nexus/python
+Environment=CONDUIT_PG_DSN=postgresql://pguser:pgpass@localhost:5432/nexus
+ExecStart=/home/codex/opt/anaconda3/bin/python3 -m tackle.agent_scheduler_runner --shadow
+StandardOutput=append:/tmp/agent-scheduler-evaluator.log
+StandardError=append:/tmp/agent-scheduler-evaluator.log

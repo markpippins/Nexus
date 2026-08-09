@@ -1,0 +1,19 @@
+[Unit]
+# Agent scheduler evaluator tick — 1-minute cadence driving the single
+# DB evaluation loop (architect decision 13600407; T13-T16).
+# Replaces the retired cron line:
+#   * * * * * cd .../python && PYTHONPATH=... python3 -m conduit.agent_scheduler_runner
+# (conduit.agent_scheduler_runner is now a deprecated shim — the canonical
+# module is tackle.agent_scheduler_runner, used here.)
+Description=Agent scheduler evaluator tick (every 1 min)
+RefuseManualStart=no
+
+[Timer]
+OnCalendar=*:0/1
+OnBootSec=30s
+OnUnitActiveSec=1min
+Persistent=true
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target
