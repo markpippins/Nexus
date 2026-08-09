@@ -3153,7 +3153,7 @@ export function createRoutes(pool: Pool): Router {
           `SELECT ir.*, hc.system_id, hc.subsystem_id, hc.feature_id,
                   h.source_filename AS harvest_source
            FROM nebula.intent_records ir
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
            ORDER BY ir.created_at DESC
            LIMIT $1 OFFSET $2`,
@@ -3175,11 +3175,11 @@ export function createRoutes(pool: Pool): Router {
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
-          `SELECT ir.id, ir.candidate_id, ir.parent_id, ir.title, ir.description,
+          `SELECT ir.id, hc.id AS candidate_id, ir.parent_id, ir.title, ir.description,
                   ir.source_type, ir.source_ref, ir.tags, ir.status, ir.metadata,
                   ir.created_at, ir.updated_at
            FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE hc.system_id = $1
            ORDER BY ir.created_at DESC
            LIMIT $2 OFFSET $3`,
@@ -3188,7 +3188,7 @@ export function createRoutes(pool: Pool): Router {
         pool.query(
           `SELECT COUNT(*)::int AS total
            FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE hc.system_id = $1`,
           [id]
         ),
@@ -3208,11 +3208,11 @@ export function createRoutes(pool: Pool): Router {
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
-          `SELECT ir.id, ir.candidate_id, ir.parent_id, ir.title, ir.description,
+          `SELECT ir.id, hc.id AS candidate_id, ir.parent_id, ir.title, ir.description,
                   ir.source_type, ir.source_ref, ir.tags, ir.status, ir.metadata,
                   ir.created_at, ir.updated_at
            FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE hc.subsystem_id = $1
            ORDER BY ir.created_at DESC
            LIMIT $2 OFFSET $3`,
@@ -3221,7 +3221,7 @@ export function createRoutes(pool: Pool): Router {
         pool.query(
           `SELECT COUNT(*)::int AS total
            FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE hc.subsystem_id = $1`,
           [id]
         ),
@@ -3241,11 +3241,11 @@ export function createRoutes(pool: Pool): Router {
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
-          `SELECT ir.id, ir.candidate_id, ir.parent_id, ir.title, ir.description,
+          `SELECT ir.id, hc.id AS candidate_id, ir.parent_id, ir.title, ir.description,
                   ir.source_type, ir.source_ref, ir.tags, ir.status, ir.metadata,
                   ir.created_at, ir.updated_at
            FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE hc.feature_id = $1
            ORDER BY ir.created_at DESC
            LIMIT $2 OFFSET $3`,
@@ -3254,7 +3254,7 @@ export function createRoutes(pool: Pool): Router {
         pool.query(
           `SELECT COUNT(*)::int AS total
            FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE hc.feature_id = $1`,
           [id]
         ),
@@ -3273,7 +3273,7 @@ export function createRoutes(pool: Pool): Router {
     try {
       const { id } = req.params;
       const { rows: [row] } = await pool.query(
-        `SELECT ir.*, hc.system_id, hc.subsystem_id, hc.feature_id, h.source_filename AS harvest_source\n         FROM nebula.intent_records ir\n         LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id\n         LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id\n         WHERE ir.id = $1`,
+        `SELECT ir.*, hc.system_id, hc.subsystem_id, hc.feature_id, h.source_filename AS harvest_source\n         FROM nebula.intent_records ir\n         LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id\n         LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id\n         WHERE ir.id = $1`,
         [id]
       );
       if (!row) return res.status(404).json({ error: 'Intent record not found' });
@@ -3357,7 +3357,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
            WHERE hc.system_id = $1 OR req.system_id = $1
            ORDER BY a.created_at DESC
@@ -3369,7 +3369,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
            WHERE hc.system_id = $1 OR req.system_id = $1`,
           [id]
@@ -3413,7 +3413,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
            WHERE hc.subsystem_id = $1 OR req.subsystem_id = $1
            ORDER BY a.created_at DESC
@@ -3425,7 +3425,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
            WHERE hc.subsystem_id = $1 OR req.subsystem_id = $1`,
           [id]
@@ -3468,7 +3468,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
            WHERE hc.feature_id = $1 OR req.feature_id = $1
            ORDER BY a.created_at DESC
@@ -3480,7 +3480,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
            WHERE hc.feature_id = $1 OR req.feature_id = $1`,
           [id]
@@ -3518,7 +3518,7 @@ export function createRoutes(pool: Pool): Router {
       const sourceId = req.query.sourceId as string;
       if (!sourceId) return res.status(400).json({ error: 'sourceId query parameter is required' });
       const { rowCount } = await pool.query(
-        `UPDATE nebula.agenda_items SET valid_until = now() WHERE agenda_id = $1 AND (source_id = $2 OR source_id IN (SELECT id FROM nebula.intent_records WHERE candidate_id = $2)) AND valid_until > now()`,
+        `UPDATE nebula.agenda_items SET valid_until = now() WHERE agenda_id = $1 AND (source_id = $2 OR source_id IN (SELECT ir.id FROM nebula.intent_records ir JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id WHERE hc.id = $2)) AND valid_until > now()`,
         [id, sourceId]
       );
       if (rowCount === 0) return res.status(404).json({ error: 'Agenda item not found' });
@@ -3653,7 +3653,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.active_specifications s
            LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
            WHERE hc.system_id = $1 OR req.system_id = $1
@@ -3666,7 +3666,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.active_specifications s
            LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
            WHERE hc.system_id = $1 OR req.system_id = $1`,
@@ -3704,7 +3704,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.active_specifications s
            LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
            WHERE hc.subsystem_id = $1 OR req.subsystem_id = $1
@@ -3717,7 +3717,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.active_specifications s
            LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
            WHERE hc.subsystem_id = $1 OR req.subsystem_id = $1`,
@@ -3755,7 +3755,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.active_specifications s
            LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
            WHERE hc.feature_id = $1 OR req.feature_id = $1
@@ -3768,7 +3768,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.active_specifications s
            LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
            WHERE hc.feature_id = $1 OR req.feature_id = $1`,
@@ -3840,7 +3840,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE req.system_id = $1 OR hc.system_id = $1
            ORDER BY wr.id, wr.created_at DESC
            LIMIT $2 OFFSET $3`,
@@ -3853,7 +3853,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE req.system_id = $1 OR hc.system_id = $1`,
           [id]
         ),
@@ -3879,7 +3879,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE req.subsystem_id = $1 OR hc.subsystem_id = $1
            ORDER BY wr.id, wr.created_at DESC
            LIMIT $2 OFFSET $3`,
@@ -3892,7 +3892,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE req.subsystem_id = $1 OR hc.subsystem_id = $1`,
           [id]
         ),
@@ -3918,7 +3918,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE req.feature_id = $1 OR hc.feature_id = $1
            ORDER BY wr.id, wr.created_at DESC
            LIMIT $2 OFFSET $3`,
@@ -3931,7 +3931,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
            LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            WHERE req.feature_id = $1 OR hc.feature_id = $1`,
           [id]
         ),
