@@ -110,11 +110,25 @@ const DEFAULT_SERVICES: MCPServiceConfig[] = [
     required: false,
     protocol: "jsonrpc",
   },
+  {
+    // Phase-2 DSL MCP (command_lookup / command_execute / command_completions
+    // over mcp.command_registry, executes via this aggregator). Plain
+    // JSON-RPC — pin `jsonrpc` (no REST /tools route; POST / is canonical).
+    name: "slash-command-mcp",
+    baseUrl: process.env.SLASH_COMMAND_MCP_URL || "http://localhost:3220",
+    required: false,
+    protocol: "jsonrpc",
+  },
   // Not in DEFAULT_SERVICES:
   //   role-memory-srv — not an MCP; it's the PG→Redis sync engine. The
   //                     `memory_*` tools are already exposed by tackle-mcp.
   //   tackle-prompt-bridge — not a tool server (prompts, not tools); the
   //                     `prompts/*` surface is exposed via tackle-mcp.
+  //   voyager-adapter — not an MCP at all (NATS subscriber: fs observations
+  //                     → semantics.source_observation; no tools/list). It is
+  //                     registered in service-registry + heartbeat only, not
+  //                     tool discovery (to-do 1bc328eb, deviation from the
+  //                     proposed order).
 ];
 
 // Per-service lock counter so concurrent discoveries don't collide on JSON-RPC ids.
