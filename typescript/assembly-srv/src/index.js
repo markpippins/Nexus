@@ -4,13 +4,34 @@ import dotenv from 'dotenv';
 import { routes } from './routes/index.js';
 import { errorHandler } from './error-handler.js';
 import { startHeartbeat } from 'heartbeat-client';
-import { runMigration } from './db.js';
+import { runMigration, pool } from './db.js';
 
 dotenv.config({ path: '../../.env' });
 dotenv.config({ path: '.env' });
 
 const app = express();
 const PORT = process.env.ASSEMBLY_SRV_PORT || 3107;
+let server;
+
+// ── Graceful shutdown ────────────────────────────────────────────
+// Without this, node never exits on SIGTERM (open server + pg pool keep
+// the event loop alive) and systemd waits ~90s for TimeoutStopSec before
+// SIGKILL — every restart/deploy appears to hang.
+function shutdown(sig) {
+  console.log(`assembly-srv: ${sig} received, shutting down gracefully`);
+  const force = setTimeout(() => {
+    console.error('assembly-srv: graceful shutdown timed out, forcing exit');
+    process.exit(0);
+  }, 8000);
+  force.unref();
+  const finish = () => {
+    pool.end().then(() => process.exit(0)).catch(() => process.exit(0));
+  };
+  if (server) server.close(finish);
+  else finish();
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 // ── Process-level safety net ─────────────────────────────────────
 process.on('uncaughtException', (err) => {
@@ -36,7 +57,7 @@ app.use(errorHandler);
 
 async function main() {
   await runMigration();
-  const server = app.listen(PORT, () => {
+  server = app.listen(PORT, () => {
     console.log(`assembly-srv listening on http://localhost:${PORT}`);
 
     startHeartbeat({
