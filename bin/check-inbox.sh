@@ -13,18 +13,23 @@
 # pointer/createdAfter expect ISO strings (only ISO was verified to parse).
 #
 # Usage:
-#   check-inbox.sh [--role <role>] [--pointer <ISO>|--all] [--limit N]
-#                  [--update-pointer] [--raw]
+#   check-inbox.sh [--role <role>] [--pointer <ISO>|--since <SPEC>|--all]
+#                  [--limit N] [--update-pointer] [--raw]
 #
 # Options:
 #   --role <role>       role whose inbox to query (default: engineer)
 #   --pointer <ISO>     explicit createdAfter timestamp (overrides stored ptr)
+#   --since <SPEC>      relative lookback, e.g. 7d / 12h / 30m / 45s — convenience
+#                       sugar for --pointer "$(date ...)" (non-destructive)
 #   --all               ignore the stored pointer; list most recent records
 #   --limit N           max records to return (default: 10)
 #   --update-pointer    after listing, PUT the pointer to the newest record's
 #                       createdAt (converted to ISO) so the next check is clean
 #   --raw               print the raw MCP result JSON instead of summaries
 #   -h, --help          show this help
+#
+# Env: NEBULA_MCP_BASE overrides the MCP endpoint (default
+# http://localhost:3102) — used by tests/bin/checks.py to point at a mock.
 #
 # Exit: 0 = ok (even with zero new records), 1 = transport/tool error,
 # 2 = usage error.
@@ -40,18 +45,19 @@ if [ ! -d "$LIB_DIR" ]; then
 fi
 
 PYTHONPATH="$LIB_DIR${PYTHONPATH:+:$PYTHONPATH}" exec python3 - "$@" <<'PY'
-import json, sys
-from datetime import datetime, timezone
+import json, os, re, sys
+from datetime import datetime, timedelta, timezone
 
 from nebula_mcp_client import McpClient
 
-BASE = "http://localhost:3102"
+BASE = os.environ.get("NEBULA_MCP_BASE", "http://localhost:3102")
 
-USAGE = """Usage: check-inbox.sh [--role <role>] [--pointer <ISO>|--all] [--limit N]
-                  [--update-pointer] [--raw]
+USAGE = """Usage: check-inbox.sh [--role <role>] [--pointer <ISO>|--since <SPEC>|--all]
+                  [--limit N] [--update-pointer] [--raw]
 Options:
   --role <role>       role whose inbox to query (default: engineer)
   --pointer <ISO>     explicit createdAfter timestamp (overrides stored ptr)
+  --since <SPEC>      relative lookback: 7d / 12h / 30m / 45s (non-destructive)
   --all               ignore the stored pointer; list most recent records
   --limit N           max records to return (default: 10)
   --update-pointer    after listing, PUT the pointer to the newest record's
@@ -62,6 +68,7 @@ Options:
 # --- arg parsing -----------------------------------------------------------
 role = "engineer"
 pointer = None
+since = None
 all_records = False
 limit = 10
 update_pointer = False
@@ -83,6 +90,11 @@ while i < len(args):
         if i >= len(args):
             print("ERROR: --pointer requires a value", file=sys.stderr); sys.exit(2)
         pointer = args[i]
+    elif a == "--since":
+        i += 1
+        if i >= len(args):
+            print("ERROR: --since requires a value (e.g. 7d, 12h, 30m, 45s)", file=sys.stderr); sys.exit(2)
+        since = args[i]
     elif a == "--all":
         all_records = True
     elif a == "--limit":
@@ -104,6 +116,25 @@ while i < len(args):
         print(USAGE, file=sys.stderr)
         sys.exit(2)
     i += 1
+
+# --- resolve --since into an explicit pointer (non-destructive) ------------
+if since is not None:
+    if pointer is not None or all_records:
+        print("ERROR: --since cannot be combined with --pointer or --all", file=sys.stderr)
+        sys.exit(2)
+    m = re.fullmatch(r"(\d+)([dhms])", since.strip().lower())
+    if not m:
+        print("ERROR: --since expects <N>d|h|m|s (e.g. 7d, 12h, 30m, 45s); got %r" % since, file=sys.stderr)
+        sys.exit(2)
+    n = int(m.group(1))
+    unit = m.group(2)
+    delta = {
+        "d": timedelta(days=n),
+        "h": timedelta(hours=n),
+        "m": timedelta(minutes=n),
+        "s": timedelta(seconds=n),
+    }[unit]
+    pointer = (datetime.now(timezone.utc) - delta).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 # --- MCP call --------------------------------------------------------------
 try:

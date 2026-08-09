@@ -13,7 +13,7 @@ import os
 NEXUS_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(NEXUS_ROOT)
 
-SUITES = ["db", "vocabulary", "guards", "pipeline", "scheduled"]
+SUITES = ["db", "vocabulary", "guards", "pipeline", "scheduled", "bin"]
 
 def run_suite(name):
     mod_path = os.path.join(NEXUS_ROOT, "tests", name, "checks.py")
