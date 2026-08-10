@@ -99,8 +99,11 @@ FROM stuck s ORDER BY s.created_at
 QUERY_FLAGGED = """
 SELECT record_type, role, left(title,70) AS title, to_char(created_at,'YYYY-MM-DD HH24:MI') AS created
 FROM nebula.agent_records
-WHERE (tags && ARRAY['type:rejection','type:violation','type:incident'])
-   OR record_type = 'inspection'
+WHERE ((tags && ARRAY['type:rejection','type:violation','type:incident'])
+    OR record_type = 'inspection')
+  AND NOT (tags && ARRAY['status:resolved','status:done','status:closed','resolved','done','closed'])
+  AND NOT (tags && ARRAY['cycle:hourly-maintenance','hourly-maintenance'])
+  AND NOT (record_type = 'inspection' AND (title IN ('.gitkeep','REGISTRY') OR tags = '{}'))
 ORDER BY created_at DESC LIMIT 20
 """
 
