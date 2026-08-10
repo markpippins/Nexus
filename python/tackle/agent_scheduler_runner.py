@@ -434,6 +434,16 @@ class Runner:
             if events:
                 item["event_ids"] = [str(e["id"]) for e in events]
 
+            # ── Emptiness check (1285 remediation slice 1) ──────────
+            # Before launching, verify the role has eligible work.
+            # This prevents the runaway-reviewer incident: reviewer
+            # launched with 0 plans and burned CPU generating nothing.
+            # Runs before both shadow and real paths so it's visible in shadow mode.
+            if not self._has_eligible_work(role):
+                _log.info("skip (role=%s, eligible=0) — no work to do", role)
+                summary["skipped_empty"] = summary.get("skipped_empty", 0) + 1
+                continue
+
             if shadow:
                 _log.info("[shadow] would launch entry %d (%s, %s), events=%d",
                           entry_id, role, stype, len(events))
@@ -445,15 +455,6 @@ class Runner:
             if events:
                 self._stamp_consumed([str(e["id"]) for e in events])
                 summary["events_consumed"] += len(events)
-
-            # ── Emptiness check (1285 remediation slice 1) ──────────
-            # Before launching, verify the role has eligible work.
-            # This prevents the runaway-reviewer incident: reviewer
-            # launched with 0 plans and burned CPU generating nothing.
-            if not self._has_eligible_work(role):
-                _log.info("skip (role=%s, eligible=0) — no work to do", role)
-                summary["skipped_empty"] = summary.get("skipped_empty", 0) + 1
-                continue
 
             result = self.launch_agent(entry)
             self.record_run(entry_id, result)
