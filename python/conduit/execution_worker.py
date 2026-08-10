@@ -206,7 +206,19 @@ def _complete_conduit_lifecycle(
     success: bool,
 ) -> None:
     """Replicate _dispatch_one's success/failure tail: receipt, close ticket,
-    advance cursor, create next tickets (Invariant 5)."""
+    advance cursor, create next tickets (Invariant 5).
+
+    GOVERNANCE COVERAGE (do NOT add vision_bridge.issue_receipt here):
+    db.insert_receipt below writes to vision.receipts, whose
+    trg_receipt_governance trigger creates a peb.governance_events row for
+    every receipt — this channel ALREADY leaves a governance event (verified
+    live 2026-08-10: receipt:IMPLEMENTATION rows for plans 1284/1286).
+    Adding issue_receipt() on top would double-write vision.receipts AND map
+    SUCCESS -> REVIEW_PASS, which create_next_tickets' terminal-state guard
+    (treats REVIEW_PASS/BLOCK/PLAN_BLOCK as plan-terminal) would suppress
+    spawning the reviewer ticket and break the pipeline. Keep the
+    IMPLEMENTATION/BLOCK lifecycle receipt here; the trigger covers governance.
+    """
     if success:
         db.insert_receipt(
             plan_id=plan_id,
