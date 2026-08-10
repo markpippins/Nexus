@@ -27,6 +27,10 @@ on:
   pull_request:
     branches: [main, master, feature/*]
   workflow_dispatch:
+  schedule:
+    # Daily 6 AM UTC — catches drift even without code pushes (e.g. a
+    # manual DB edit that wasn't regenerated into the seed + manifest).
+    - cron: '0 6 * * *'
 
 permissions:
   contents: read
