@@ -39,6 +39,7 @@ interface TrackedSession {
   model: string | undefined;
   startedAt: number;
   promptFile: string;
+  pid?: number; // child process PID (set by executeOpencode for direct SIGTERM)
 }
 
 const activeSessions = new Map<string, TrackedSession>();
@@ -70,11 +71,14 @@ function startWatchdog(): void {
       // ── Runaway detected — kill + unload ──────────────────────
       await log("warn", `runaway detected: job=${jobId} role=${session.role} elapsed=${Math.round(elapsed/1000)}s — killing`);
 
-      // Kill opencode processes tied to this prompt file
-      try {
-        await execFileAsync("pkill", ["-f", `opencode.*${session.promptFile.split("/").pop()}`]);
-      } catch {
-        // pkill returns non-zero when no match — that's fine
+      // Kill the child process directly by PID (set by executeOpencode spawn)
+      if (session.pid) {
+        try {
+          process.kill(session.pid, 'SIGTERM');
+          await log("info", `runaway kill: SIGTERM sent to pid=${session.pid} job=${jobId.slice(0, 8)}`);
+        } catch {
+          // Process already dead — that's fine
+        }
       }
 
       // Unload Ollama model if one was in use
@@ -529,10 +533,15 @@ async function executeOllama(
  * Execute via opencode CLI (full tool access, requires GPU for reasonable speed).
  * When a model was resolved from tackle config_bundle it is passed via --model,
  * so external-provider changes made in tackle-ui take effect on harness runs.
+ *
+ * Uses child_process.spawn (not execFile) so the T16 runaway watchdog can
+ * directly SIGTERM the child process by PID instead of pattern-matching pkill.
  */
 async function executeOpencode(params: HarnessExecParams): Promise<HarnessExecResult> {
   const { prompt_file, work_dir, agent, role, model, timeout_ms } = params;
   const opencodeBin = process.env.OPENCODE_BIN || "opencode";
+  // Extract jobId from prompt filename (${jobId}.md) for watchdog PID tracking
+  const jobId = prompt_file.split("/").pop()?.replace(".md", "") || "";
 
   const cmdArgs = [
     "run",
@@ -547,32 +556,53 @@ async function executeOpencode(params: HarnessExecParams): Promise<HarnessExecRe
 
   await log("info", `opencode exec agent=${agent} model=${model ?? "(unset)"} file=${prompt_file} dir=${work_dir} bin=${opencodeBin}`);
 
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      opencodeBin,
-      cmdArgs,
-      {
-        cwd: work_dir,
-        timeout: timeout_ms,
-        maxBuffer: 10 * 1024 * 1024,
-        env: {
-          ...process.env,
-          HARNESS_ROLE: role,
-          HARNESS_JOB_ID: prompt_file.split("/").pop()?.replace(".md", "") || "",
-        },
-      }
-    );
+  return new Promise((resolve) => {
+    const child = spawn(opencodeBin, cmdArgs, {
+      cwd: work_dir,
+      env: {
+        ...process.env,
+        HARNESS_ROLE: role,
+        HARNESS_JOB_ID: prompt_file.split("/").pop()?.replace(".md", "") || "",
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
 
-    // ── consumed_units tracking (RoleLeases plan 1286) ──────────
-    incrementConsumedUnits(role).catch(() => {});
-    return { exitCode: 0, stdout, stderr };
-  } catch (error: any) {
-    return {
-      exitCode: error.code || 1,
-      stdout: error.stdout || "",
-      stderr: error.stderr || error.message,
-    };
-  }
+    // Register PID for runaway watchdog (direct SIGTERM instead of pkill -f)
+    if (jobId) {
+      const session = activeSessions.get(jobId);
+      if (session) {
+        session.pid = child.pid;
+        log("info", `opencode pid=${child.pid} registered for watchdog (job=${jobId.slice(0, 8)})`);
+      }
+    }
+
+    let stdout = '';
+    let stderr = '';
+    child.stdout?.on('data', (data: Buffer) => { stdout += data.toString(); });
+    child.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
+
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM');
+      // Give it 5s to exit gracefully, then force-kill
+      setTimeout(() => {
+        try { child.kill('SIGKILL'); } catch { /* already dead */ }
+      }, 5000);
+    }, timeout_ms);
+
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      const exitCode = code ?? 1;
+      if (exitCode === 0) {
+        incrementConsumedUnits(role).catch(() => {});
+      }
+      resolve({ exitCode, stdout, stderr });
+    });
+
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      resolve({ exitCode: 1, stdout, stderr: err.message });
+    });
+  });
 }
 
 // ── Outcome helpers ─────────────────────────────────────────────────
