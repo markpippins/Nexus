@@ -525,9 +525,12 @@ def main():
         summary = runner.evaluate_tick(shadow=args.shadow)
     finally:
         runner.close()
-    _log.info("Tick complete — evaluated=%d launched=%d events_consumed=%d errors=%d due=%s",
+    _log.info("Tick complete — evaluated=%d launched=%d events_consumed=%d "
+              "skipped_empty=%d skipped_interactive=%d errors=%d due=%s",
               summary["evaluated"], summary["launched"],
-              summary["events_consumed"], summary["errors"],
+              summary["events_consumed"],
+              summary.get("skipped_empty", 0), summary.get("skipped_interactive", 0),
+              summary["errors"],
               [d["entry_id"] for d in summary["due"]])
 
 
