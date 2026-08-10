@@ -298,6 +298,41 @@ async function createSchema(
       ON ${TACKLE_SCHEMA}.role_memory (role, expiration_dt DESC NULLS FIRST)
   `);
 
+  // role_leases — session-level role leases (RoleLeases / plan 1286):
+  // a bounded window + budget under which a role on a given channel may
+  // consume work. Mirrors execution.leases (per-request) but scoped to a
+  // role/session. One ACTIVE lease per role at a time.
+  await exec(`
+    CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.role_leases (
+      id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      role            TEXT NOT NULL,
+      channel         TEXT NOT NULL DEFAULT 'interactive'
+                      CHECK (channel IN ('interactive','opencode','ollama','unknown')),
+      model           TEXT,
+      window_start    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      window_end      TIMESTAMPTZ NOT NULL,
+      budget_units    INTEGER,
+      consumed_units  INTEGER NOT NULL DEFAULT 0,
+      status          TEXT NOT NULL DEFAULT 'ACTIVE'
+                      CHECK (status IN ('ACTIVE','EXPIRED','RELEASED')),
+      acquired_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at      TIMESTAMPTZ NOT NULL,
+      released_at     TIMESTAMPTZ,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_role_leases_active_per_role
+      ON ${TACKLE_SCHEMA}.role_leases (role)
+      WHERE status = 'ACTIVE'
+  `);
+  await exec(`
+    CREATE INDEX IF NOT EXISTS idx_role_leases_status
+      ON ${TACKLE_SCHEMA}.role_leases (status, expires_at)
+  `);
+
   // ── Add FK constraints to roles(name) (idempotent for existing tables) ──
   await exec(`
     DO $$
@@ -937,6 +972,7 @@ const DEFAULT_ROLES: { name: string; description: string }[] = [
   { name: "analyst", description: "Gap and triage analyst — identifies missing coverage, classifies incidents" },
   { name: "inspector", description: "Compliance auditor — verifies invariants, issues violation reports" },
   { name: "test", description: "Internal test harness role — used for test invoke sessions and ad-hoc agent runs" },
+  { name: "leased-builder", description: "Interactive-channel implementation executor — bounded role lease (RoleLeases, plan 1286): consumes from the READY pool under a window+budget lease, mirroring builder with a mandatory time limit" },
 ];
 
 async function seedDefaultRoles(

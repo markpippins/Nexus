@@ -1717,6 +1717,64 @@ export function registerTools(server: McpServer) {
   );
 
   server.tool(
+    "role_lease_issue",
+    "Issue an ACTIVE role lease (RoleLeases, plan 1286): a bounded window + budget under which a role on a channel may consume work. Mandatory time limit. One ACTIVE lease per role at a time.",
+    {
+      role: z.string().describe("Role name (e.g. 'leased-builder', 'engineer')"),
+      channel: z.enum(["interactive","opencode","ollama","unknown"]).optional()
+        .describe("Harness channel (default: interactive)"),
+      model: z.string().optional().describe("Model identifier (e.g. 'freebuff/glm-5.2')"),
+      ttlSeconds: z.number().optional().describe("Window/lease length in seconds (default: 3600 — one hour)"),
+      budgetUnits: z.number().optional().describe("Max work units the role may consume under this lease"),
+      windowEnd: z.string().optional().describe("Explicit window end ISO timestamp (overrides ttlSeconds)"),
+    },
+    async (args) => {
+      const result = await NebulaClient.issueRoleLease(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "role_lease_renew",
+    "Renew an ACTIVE role lease (extend window/budget). Fails if expired or released. Renewal is an explicit decision, not automatic.",
+    {
+      id: z.string().describe("Role lease UUID"),
+      ttlSeconds: z.number().optional().describe("Extension in seconds (default: 3600)"),
+      budgetUnits: z.number().optional().describe("New budget ceiling"),
+    },
+    async (args) => {
+      const result = await NebulaClient.renewRoleLease(args.id, { ttlSeconds: args.ttlSeconds, budgetUnits: args.budgetUnits });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "role_lease_revoke",
+    "Revoke an ACTIVE role lease (voluntary release, e.g. dispenser empty or session ending). Unclaimed work returns to the pool.",
+    {
+      id: z.string().describe("Role lease UUID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.revokeRoleLease(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "role_lease_status",
+    "List role leases (optionally filtered by role/status) — for orientation: does my role have an active lease right now?",
+    {
+      role: z.string().optional().describe("Filter by role"),
+      status: z.string().optional().describe("Filter by status (ACTIVE/RELEASED/EXPIRED)"),
+      limit: z.number().optional().describe("Max rows (default: 50)"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listRoleLeases(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
     "execution_submit_attempt",
     "Submit an execution attempt result. Creates an attempt record linked to the lease.",
     {

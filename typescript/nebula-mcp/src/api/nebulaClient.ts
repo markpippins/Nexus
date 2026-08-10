@@ -597,6 +597,26 @@ export const NebulaClient = {
     error?: string; exitCode?: number;
   }) => httpRequest("POST", "/api/execution/attempts", body),
 
+  /** POST /api/role-leases/issue (RoleLeases, plan 1286) */
+  issueRoleLease: (body: {
+    role: string; channel?: string; model?: string;
+    ttlSeconds?: number; budgetUnits?: number; windowEnd?: string;
+  }) => httpRequest("POST", "/api/role-leases/issue", body),
+
+  /** POST /api/role-leases/:id/renew */
+  renewRoleLease: (id: string, body: { ttlSeconds?: number; budgetUnits?: number }) =>
+    httpRequest("POST", `/api/role-leases/${encodeURIComponent(id)}/renew`, body),
+
+  /** POST /api/role-leases/:id/revoke */
+  revokeRoleLease: (id: string) =>
+    httpRequest("POST", `/api/role-leases/${encodeURIComponent(id)}/revoke`),
+
+  /** GET /api/role-leases?role=&status=&limit= */
+  listRoleLeases: (params?: { role?: string; status?: string; limit?: number }) =>
+    httpRequest("GET", `/api/role-leases?${new URLSearchParams(
+      Object.entries(params || {}).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])
+    )}`),
+
   /** POST /api/execution/receipts */
   issueReceipt: (body: {
     attemptId: string; type?: string; agentRole?: string;

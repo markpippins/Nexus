@@ -6807,6 +6807,171 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // ─────────────────────────────────────────────────────────────────────
+  //  ROLE LEASES (RoleLeases / plan 1286) — session-level leases in tackle
+  //  schema: a bounded window + budget under which a role on a channel may
+  //  consume work. Mirrors execution.leases (per-request) at role scope.
+  // ─────────────────────────────────────────────────────────────────────
+
+  // POST /api/role-leases/issue — issue an ACTIVE role lease
+  router.post('/role-leases/issue', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { role, channel, model, ttlSeconds, budgetUnits, windowEnd } = req.body;
+
+      if (!role) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: 'role is required' });
+        return;
+      }
+
+      // One ACTIVE lease per role at a time (mirrors execution lease rule)
+      const { rows: existing } = await client.query(
+        "SELECT id FROM tackle.role_leases WHERE role = $1 AND status = 'ACTIVE'",
+        [role]
+      );
+      if (existing.length > 0) {
+        await client.query('ROLLBACK');
+        res.status(409).json({ error: 'Active role lease already exists', existingLeaseId: existing[0].id });
+        return;
+      }
+
+      // window_end explicit OR ttl from now (mandatory time limit per design)
+      const ttl = ttlSeconds ?? 3600;
+      const windowEndTs = windowEnd
+        ? new Date(windowEnd)
+        : new Date(Date.now() + ttl * 1000);
+      if (windowEndTs.getTime() <= Date.now()) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: 'windowEnd/ttlSeconds must be in the future' });
+        return;
+      }
+
+      const { rows: [lease] } = await client.query(
+        `INSERT INTO tackle.role_leases
+           (role, channel, model, window_end, budget_units, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $4) RETURNING *`,
+        [role, channel || 'interactive', model || null, windowEndTs, budgetUnits ?? null]
+      );
+      await client.query('COMMIT');
+      res.status(201).json(lease);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/role-leases/:id/renew — renew an ACTIVE lease (window + budget)
+  router.post('/role-leases/:id/renew', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { id } = req.params;
+      const { ttlSeconds, budgetUnits } = req.body;
+
+      const { rows: [lease] } = await client.query(
+        'SELECT * FROM tackle.role_leases WHERE id = $1', [id]
+      );
+      if (!lease) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Role lease not found' }); return; }
+      if (lease.status !== 'ACTIVE') {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: `Cannot renew role lease in status '${lease.status}' (must be ACTIVE)` });
+        return;
+      }
+      if (new Date(lease.expires_at) < new Date()) {
+        await client.query("UPDATE tackle.role_leases SET status = 'EXPIRED' WHERE id = $1", [id]);
+        await client.query('COMMIT');
+        res.status(400).json({ error: 'Role lease has already expired' });
+        return;
+      }
+
+      const ttl = ttlSeconds ?? 3600;
+      const { rows: [updated] } = await client.query(
+        `UPDATE tackle.role_leases
+         SET window_end = GREATEST(window_end, NOW() + ($1 || ' seconds')::interval),
+             expires_at = NOW() + ($1 || ' seconds')::interval,
+             budget_units = COALESCE($2, budget_units),
+             updated_at = NOW()
+         WHERE id = $3 AND status = 'ACTIVE' RETURNING *`,
+        [ttl, budgetUnits ?? null, id]
+      );
+      await client.query('COMMIT');
+      res.json(updated);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/role-leases/:id/revoke — release an ACTIVE role lease
+  router.post('/role-leases/:id/revoke', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { id } = req.params;
+      const { rows: [lease] } = await client.query(
+        'SELECT * FROM tackle.role_leases WHERE id = $1', [id]
+      );
+      if (!lease) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Role lease not found' }); return; }
+      if (lease.status !== 'ACTIVE') {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: `Cannot revoke role lease in status '${lease.status}' (must be ACTIVE)` });
+        return;
+      }
+      const { rows: [updated] } = await client.query(
+        "UPDATE tackle.role_leases SET status = 'RELEASED', released_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *",
+        [id]
+      );
+      await client.query('COMMIT');
+      res.json(updated);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // GET /api/role-leases — list role leases (filters: role, status)
+  router.get('/role-leases', async (req: Request, res: Response) => {
+    try {
+      const { role, status, limit } = req.query as Record<string, string | undefined>;
+      const conds: string[] = [];
+      const vals: any[] = [];
+      if (role) { vals.push(role); conds.push(`role = $${vals.length}`); }
+      if (status) { vals.push(status); conds.push(`status = $${vals.length}`); }
+      const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+      const { rows } = await pool.query(
+        `SELECT * FROM tackle.role_leases ${where} ORDER BY created_at DESC LIMIT $${vals.length + 1}`,
+        [...vals, Number(limit) || 50]
+      );
+      res.json({ items: rows });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/role-leases/stale — ACTIVE leases past window/budget (for sweep)
+  router.get('/role-leases/stale', async (_req: Request, res: Response) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT * FROM tackle.role_leases
+         WHERE status = 'ACTIVE'
+           AND (expires_at < NOW()
+             OR (budget_units IS NOT NULL AND consumed_units >= budget_units))
+         ORDER BY expires_at ASC`
+      );
+      res.json({ items: rows });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // POST /api/execution/attempts — submit an attempt (create + set outcome)
   router.post('/execution/attempts', async (req: Request, res: Response) => {
     const client = await pool.connect();
