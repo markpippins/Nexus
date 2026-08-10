@@ -41,6 +41,7 @@ import os
 import sys
 import threading
 import time
+import urllib.request
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -340,14 +341,17 @@ def _process_one(db: DBAdapter, row: dict, executor_id: str, dry_run: bool, mode
                 req.get("metadata", {}).get("model", ""), success=True,
             )
             # ── consumed_units tracking (RoleLeases plan 1286) ──────
+            # Unified accounting: POST /api/role-leases/consume (canonical endpoint)
             try:
-                with db._get_connection() as conn:
-                    conn.execute(
-                        "UPDATE tackle.role_leases SET consumed_units = consumed_units + 1, "
-                        "updated_at = NOW() WHERE role = %s AND status = 'ACTIVE'",
-                        (ROLE,)
-                    )
-                    conn.commit()
+                _body = json.dumps({"role": ROLE}).encode()
+                _req = urllib.request.Request(
+                    "http://localhost:3101/api/role-leases/consume",
+                    data=_body,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(_req, timeout=5):
+                    pass
             except Exception as e:  # noqa: BLE001
                 _log.warning("consumed_units update failed: %s", e)
         renewer_stop.set()

@@ -6972,6 +6972,28 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // POST /api/role-leases/consume — increment consumed_units (interactive channel)
+  router.post('/role-leases/consume', async (req: Request, res: Response) => {
+    try {
+      const { role } = req.body;
+      if (!role) return res.status(400).json({ error: 'role is required' });
+      const { rows } = await pool.query(
+        `UPDATE tackle.role_leases
+         SET consumed_units = consumed_units + 1, updated_at = NOW()
+         WHERE role = $1 AND status = 'ACTIVE'
+         RETURNING id, consumed_units, budget_units`,
+        [role]
+      );
+      if (rows.length === 0) {
+        return res.status(404).json({ error: `No ACTIVE lease for role '${role}'` });
+      }
+      const lease = rows[0];
+      res.json({ ok: true, consumed: lease.consumed_units, budget: lease.budget_units });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // POST /api/execution/attempts — submit an attempt (create + set outcome)
   router.post('/execution/attempts', async (req: Request, res: Response) => {
     const client = await pool.connect();

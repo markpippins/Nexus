@@ -492,14 +492,27 @@ export async function checkRoleLease(role: string): Promise<RoleLeaseStatus | nu
 }
 
 /**
- * Increment consumed_units on the active role lease (idempotent —
- * no-op when no ACTIVE lease exists for the role).
+ * Increment consumed_units on the active role lease via the canonical
+ * POST /api/role-leases/consume endpoint (nebula-srv).
+ *
+ * Unified accounting: all three execution channels (execution_worker,
+ * harness-srv, interactive) hit the same endpoint, so lease accounting
+ * is a single canonical event rather than three copies of the same SQL.
+ *
+ * Idempotent — no-op when no ACTIVE lease exists for the role.
  */
 export async function incrementConsumedUnits(role: string): Promise<void> {
-  await pool.query(
-    `UPDATE tackle.role_leases
-     SET consumed_units = consumed_units + 1, updated_at = NOW()
-     WHERE role = $1 AND status = 'ACTIVE'`,
-    [role]
-  );
+  const nebulaUrl = process.env.NEBULA_URL || "http://localhost:3101";
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5_000);
+  try {
+    await fetch(`${nebulaUrl}/api/role-leases/consume`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 }
