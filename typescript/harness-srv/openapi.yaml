@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: harness-srv — Generic Execution Harness
-  version: 1.0.9ed6984c
+  version: 1.0.f6e112c4
   description: 'Merges Tackle role context (prompt + tool ACL + procedure cards) with Wind task context (inputs + acceptance
     criteria) and invokes an agent via the configured harness.
 
@@ -14,6 +14,7 @@ tags:
 - name: health
 - name: resolve-context
 - name: run
+- name: sessions
 paths:
   /health:
     get:
@@ -105,6 +106,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /sessions:
+    get:
+      tags:
+      - sessions
+      operationId: get_sessions
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: GET /sessions — active session list (runaway watchdog visibility)
 components:
   schemas:
     JsonBody:
