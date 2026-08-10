@@ -14,7 +14,7 @@
  */
 
 import express from "express";
-import { resolveContext, emitEvent, pool, redis, checkRoleLease, incrementConsumedUnits } from "./db";
+import { resolveContext, emitEvent, pool, redis, checkRoleLease, incrementConsumedUnits, emitGovernanceReceipt } from "./db";
 import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import { writeFile, readFile, unlink, mkdir, appendFile } from "fs/promises";
@@ -39,6 +39,7 @@ interface TrackedSession {
   model: string | undefined;
   startedAt: number;
   promptFile: string;
+  wind_task_id?: string; // for governance BLOCK receipt on watchdog kill
   pid?: number; // child process PID (set by executeOpencode for direct SIGTERM)
 }
 
@@ -122,6 +123,26 @@ No agent records were produced since launch. The process was killed and the mode
         // best-effort record
       }
 
+      // Governance BLOCK receipt — the killed run is an abnormal
+      // completion; BLOCK is the always-valid override receipt type
+      // (watchdog is whitelisted as a receipt-issuing executor in
+      // tackle.vision_bridge._PASS_THROUGH_EXECUTORS).
+      if (session.wind_task_id) {
+        emitGovernanceReceipt({
+          planId: session.wind_task_id,
+          type: "BLOCK",
+          agentRole: "watchdog",
+          sessionId: jobId,
+          summary: `runaway watchdog kill: ${session.role} (job ${jobId.slice(0, 8)})`,
+          metadata: {
+            stage: "watchdog_kill",
+            role: session.role,
+            model: session.model || "unknown",
+            elapsed_ms: elapsed,
+          },
+        });
+      }
+
       activeSessions.delete(jobId);
     }
   }, WATCHDOG_INTERVAL_MS);
@@ -185,6 +206,7 @@ app.post("/run", async (req, res) => {
       agent,
       timeout_ms = 300_000,
     } = req.body;
+    const resolveOnly = req.body.resolve_only === true;
 
     if (!wind_task_id) {
       return res.status(400).json({ error: "wind_task_id is required" });
@@ -253,6 +275,25 @@ app.post("/run", async (req, res) => {
       actor_type: "system",
     });
 
+    // Governance PLAN_CREATE — bootstrap the receipt lifecycle for the
+    // wind_task_id (fresh plan id → PLAN_CREATE is the only valid first
+    // receipt). Skipped for resolve_only dry-runs: no work unit runs.
+    if (!resolveOnly) {
+      await emitGovernanceReceipt({
+        planId: wind_task_id,
+        type: "PLAN_CREATE",
+        agentRole: resolved.role,
+        sessionId: jobId,
+        summary: `harness-srv ${jobId.slice(0, 8)}: run started (${resolved.task.task_slug})`,
+        metadata: {
+          stage: "run_start",
+          wind_task_id,
+          task_slug: resolved.task.task_slug,
+          harness_id: effectiveHarnessId,
+        },
+      });
+    }
+
     // 4. Append outcome instruction to prompt and write to temp file
     const outcomeInstruction = buildOutcomeInstruction(resolved.outcomes || []);
     const fullPrompt = resolved.prompt + "\n\n" + outcomeInstruction;
@@ -264,8 +305,6 @@ app.post("/run", async (req, res) => {
     let exitCode = 0;
     let stdout = "";
     let stderr = "";
-
-    const resolveOnly = req.body.resolve_only === true;
 
     if (resolveOnly) {
       // Skip execution — return resolved context only
@@ -283,6 +322,7 @@ app.post("/run", async (req, res) => {
         model: effectiveModel,
         startedAt: startTime,
         promptFile,
+        wind_task_id,
       });
 
       try {
@@ -334,6 +374,40 @@ app.post("/run", async (req, res) => {
       exitCode === 0 ? "info" : "warn",
       `run job=${jobId} role=${resolved.role} exit=${exitCode} duration_ms=${Date.now() - startTime} model=${effectiveModel ?? "(harness default)"}`
     );
+
+    // 6b. Governance completion receipts — IMPLEMENTATION then
+    // REVIEW_PASS (exit 0) / REVIEW_REJECT (exit != 0), walked in the
+    // order validateReceipt requires. Best-effort + sequential so the
+    // chain lands in peb.governance_events like every other channel.
+    if (!resolveOnly) {
+      const durationMs = Date.now() - startTime;
+      const completedMetadata = {
+        stage: "run_complete",
+        wind_task_id,
+        task_slug: resolved.task.task_slug,
+        harness_id: effectiveHarnessId,
+        exit_code: exitCode,
+        duration_ms: durationMs,
+        stdout_preview: stdout.slice(0, 300),
+        stderr_preview: stderr.slice(0, 300),
+      };
+      await emitGovernanceReceipt({
+        planId: wind_task_id,
+        type: "IMPLEMENTATION",
+        agentRole: resolved.role,
+        sessionId: jobId,
+        summary: `harness-srv ${jobId.slice(0, 8)}: implementation ${exitCode === 0 ? "ok" : "failed"} (${resolved.task.task_slug})`,
+        metadata: completedMetadata,
+      });
+      await emitGovernanceReceipt({
+        planId: wind_task_id,
+        type: exitCode === 0 ? "REVIEW_PASS" : "REVIEW_REJECT",
+        agentRole: resolved.role,
+        sessionId: jobId,
+        summary: `harness-srv ${jobId.slice(0, 8)}: ${exitCode === 0 ? "completed" : "failed"} exit=${exitCode} (${resolved.task.task_slug})`,
+        metadata: completedMetadata,
+      });
+    }
 
     // 7. Parse outcome from agent output
     const parsedOutcome = parseOutcome(stdout, resolved.outcomes || []);

@@ -519,3 +519,13 @@ export async function incrementConsumedUnits(role: string): Promise<void> {
     clearTimeout(timer);
   }
 }
+
+// ── Governance receipts (vision.receipts → peb.governance_events) ──
+// The harness/Wind channel was the last unverified execution channel for
+// governance events (it only wrote cascade.events). The receipt payload
+// builder + best-effort emitter live in the side-effect-free
+// ./governance module so unit tests can load them without constructing
+// db/redis clients; index.ts imports emitGovernanceReceipt via this
+// re-export.
+export { buildGovernanceReceiptPayload, emitGovernanceReceipt } from "./governance";
+export type { GovernanceReceiptParams } from "./governance";
