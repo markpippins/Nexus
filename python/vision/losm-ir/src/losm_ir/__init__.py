@@ -19,7 +19,12 @@ from losm_ir.work_request import (
     WorkRequestArtifacts, WorkRequestMetadata,
 )
 from losm_ir.execution_receipt import ExecutionReceipt, MutationRecord
-from losm_ir.executor_registry import ExecutorRegistry, ExecutorRegistration, InvocationContract
+from losm_ir.executor_registry import (
+    DEFAULT_KNOWN_EXECUTORS,
+    ExecutorRegistry,
+    ExecutorRegistration,
+    InvocationContract,
+)
 from losm_ir.plan import PlanIR, ExecutionStep as PlanExecutionStep
 from losm_ir.spec import SpecIR, SpecStep
 from losm_ir.execution import ExecutionIR, ExecutionStatus, StepResult
@@ -65,6 +70,7 @@ __all__ = [
     "WorkRequestLineage", "ProducedFile", "IntermediateOutput",
     "WorkRequestArtifacts", "WorkRequestMetadata",
     "ExecutionReceipt", "MutationRecord",
+    "DEFAULT_KNOWN_EXECUTORS",
     "ExecutorRegistry", "ExecutorRegistration", "InvocationContract",
     "PlanIR", "PlanExecutionStep",
     "SpecIR", "SpecStep",

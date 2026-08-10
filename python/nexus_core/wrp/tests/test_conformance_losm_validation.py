@@ -26,6 +26,13 @@ Tested invariants:
         or written; validation stays advisory and WRP stays the business
         authority.
 
+NOTE on executors: the node stream uses the `meep-construction` executor
+(candidate compiler boundary). Under DEFAULT_KNOWN_EXECUTORS it is an
+UNKNOWN executor, so the compile emits a WARN — which is intentional and
+part of the advisory boundary evidence (wr-conf-009 AC2 asserts the WARN
+contract explicitly). Do not "fix" it to a known executor; that would
+silently delete this WARN-path coverage.
+
 Deterministic and LLM-free. Pure library test — no live services required.
 
 Usage:

@@ -36,6 +36,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from losm_ir.execution_receipt import ExecutionReceipt
+from losm_ir.executor_registry import DEFAULT_KNOWN_EXECUTORS
 from losm_ir.work_request import WorkRequestDCO
 
 _log = logging.getLogger("tackle.vision_bridge")
@@ -224,11 +225,13 @@ def issue_receipt(
     conduit_type = _RESULT_TO_RECEIPT_TYPE.get(receipt.result, "CRITIQUE")
     wr_id = plan_id or receipt.work_request_id
 
-    # Map LOSM executor_id to conduit agent_role
-    agent_role = receipt.executor_id if receipt.executor_id in (
-        "planner", "builder", "reviewer", "critic", "analyst",
-        "architect", "inspector", "engineer", "watchdog",
-    ) else "builder"
+    # Map LOSM executor_id to conduit agent_role. Base set is the canonical
+    # DEFAULT_KNOWN_EXECUTORS (losm_ir.executor_registry) so the pass-through
+    # whitelist can never drift from the compile/governance sets; watchdog is
+    # added explicitly as a harness-internal executor (T16) that does not own
+    # DAG nodes but does issue receipts.
+    _PASS_THROUGH_EXECUTORS = DEFAULT_KNOWN_EXECUTORS | {"watchdog"}
+    agent_role = receipt.executor_id if receipt.executor_id in _PASS_THROUGH_EXECUTORS else "builder"
 
     now = receipt.timestamp or _now_iso()
 
