@@ -1,6 +1,6 @@
 """
 wr-conf-011: CAL addressing conformance — the cherry-picked nbk P5 port,
-guarded against source drift.
+guarded against drift.
 
 Dependency-map thread (1a07a098) open question Q2 asked whether nbk's CAL
 addressing + lease scheduling should be folded into nexus_core. The lease
@@ -9,18 +9,18 @@ half was already superseded by the canonical role-lease dispenser
 primitive, so it was cherry-picked into `nexus_core/wrp/addressing.py` as a
 zero-dep module — same port pattern as `identity.py`.
 
-Tested invariants:
-  AC1 — Byte parity with the nbk source: make_address()/parse_address()/
-        content_hash() agree exactly with nbk.core on multiple vectors
-        (different realms/graphs/trajectories/nodes, unicode, version
-        overrides). Guards the port against silent source drift.
+Q2 RESOLVED (2026-08-10): nbk is archived. Per the original Q2-expiry note,
+AC1 parity against the live nbk source has been RE-ANCHORED to committed
+golden vectors (values captured from the port before the archive), and the
+`test_nbk_guard_is_armed` assertion removed — the format-contract tests are
+kept as-is. The golden vectors below are the frozen reference; the archived
+nbk source (`python/_archived/nbk`) is no longer required for this suite.
 
-  NOTE (Q2 expiry): the AC1 parity guard deliberately couples wr-conf-011
-  to nbk's continued existence — `nbk_core._content_hash` is private-name
-  access, and `test_nbk_guard_is_armed` hard-fails if nbk becomes
-  unimportable. This is intentional: when Q2 resolves (nbk archived/folded),
-  re-anchor AC1 parity to committed golden vectors and remove the
-  `test_nbk_guard_is_armed` assertion — keep the format-contract tests.
+Tested invariants:
+  AC1 — Golden vectors: make_address()/parse_address()/content_hash() agree
+        exactly with the committed golden values captured from nbk.core
+        before the archive (unicode + explicit-version vectors included).
+        Guards the port against silent drift without any nbk dependency.
   AC2 — Format contract: cal:// prefix, 5 components, default version is a
         12-hex content hash of the location path.
   AC3 — Round-trip: parse(make_address(...)) recovers all components;
@@ -46,15 +46,6 @@ from nexus_core.wrp.addressing import (                             # noqa: E402
     parse_address,
 )
 
-# The port source — nbk.core must be importable for the parity guard. It is
-# pure stdlib, so this is safe everywhere.
-try:
-    import nbk.core as nbk_core                              # noqa: E402
-    NBK_AVAILABLE = True
-except ImportError:
-    nbk_core = None
-    NBK_AVAILABLE = False
-
 LOCATION_VECTORS = [
     ("dev", "my-pipeline", "t0", "transform"),
     ("dev", "my-pipeline", "t0", "extract"),
@@ -63,57 +54,38 @@ LOCATION_VECTORS = [
     ("dev", "unicode-graph", "t2", "éà"),
 ]
 
+# Golden values captured from the port (== nbk.core parity) at archive time
+# (2026-08-10). These are the frozen reference now that nbk is archived.
+GOLDEN_ADDRESSES = [
+    "cal://dev/my-pipeline/t0/transform/6400f9c2c7c8",
+    "cal://dev/my-pipeline/t0/extract/ea4933c7ac85",
+    "cal://prod/wrp-kernel/t1/execute/f3fbdcf3ced3",
+    "cal://stage/vision-stack/t0/validate/07e7e78f9479",
+    "cal://dev/unicode-graph/t2/éà/662d5fd8e332",
+]
 
-class TestAc1ParityWithNbkSource(unittest.TestCase):
-    """AC1 — the port must agree byte-for-byte with the nbk source."""
+GOLDEN_CONTENT_HASHES = {
+    ("a", "b", "c"): "a52dd81bfd5e",
+    ("dev/my-pipeline/t0/transform",): "6400f9c2c7c8",
+    ("", "", "", ""): "be5be69f55e9",
+}
 
-    @unittest.skipUnless(NBK_AVAILABLE, "nbk.core not importable — parity guard skipped")
-    def test_make_address_matches_nbk(self):
+
+class TestAc1GoldenVectors(unittest.TestCase):
+    """AC1 — golden vector parity (frozen at archive; no nbk dependency)."""
+
+    def test_make_address_golden(self):
         for i, (realm, graph, traj, node) in enumerate(LOCATION_VECTORS):
             with self.subTest(vector=i):
                 self.assertEqual(
                     make_address(realm, graph, traj, node),
-                    nbk_core.make_address(realm, graph, traj, node),
+                    GOLDEN_ADDRESSES[i],
                 )
 
-    @unittest.skipUnless(NBK_AVAILABLE, "nbk.core not importable — parity guard skipped")
-    def test_make_address_explicit_version_matches_nbk(self):
-        # Exercise the `version or content_hash(...)` fallback branch against
-        # the source — the default-version vectors above do not cover it.
-        for i, (realm, graph, traj, node) in enumerate(LOCATION_VECTORS):
-            with self.subTest(vector=i):
-                self.assertEqual(
-                    make_address(realm, graph, traj, node, version="fixed-v1"),
-                    nbk_core.make_address(realm, graph, traj, node, version="fixed-v1"),
-                )
-
-    @unittest.skipUnless(NBK_AVAILABLE, "nbk.core not importable — parity guard skipped")
-    def test_parse_address_matches_nbk(self):
-        for i, (realm, graph, traj, node) in enumerate(LOCATION_VECTORS):
-            addr = make_address(realm, graph, traj, node)
-            with self.subTest(vector=i):
-                self.assertEqual(
-                    parse_address(addr),
-                    nbk_core.parse_address(addr),
-                )
-
-    @unittest.skipUnless(NBK_AVAILABLE, "nbk.core not importable — parity guard skipped")
-    def test_content_hash_matches_nbk(self):
-        cases = [
-            ("a", "b", "c"),
-            ("dev/my-pipeline/t0/transform",),
-            ("", "", "", ""),
-        ]
-        for i, parts in enumerate(cases):
-            with self.subTest(case=i):
-                self.assertEqual(content_hash(*parts),
-                                 nbk_core._content_hash(*parts))
-
-    def test_nbk_guard_is_armed(self):
-        # The whole point of AC1 is drift protection — if nbk.core ever stops
-        # being importable this must be visible, not silently skipped forever.
-        self.assertTrue(NBK_AVAILABLE,
-                        "nbk.core must remain importable for the parity guard")
+    def test_content_hash_golden(self):
+        for parts, expected in GOLDEN_CONTENT_HASHES.items():
+            with self.subTest(parts=parts):
+                self.assertEqual(content_hash(*parts), expected)
 
 
 class TestAc2FormatContract(unittest.TestCase):
