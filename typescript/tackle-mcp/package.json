@@ -12,7 +12,8 @@
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "ioredis": "^5.11.1",
-    "pg": "^8.21.0"
+    "pg": "^8.21.0",
+    "tackle-seeds": "file:../tackle-seeds"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

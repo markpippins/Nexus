@@ -8,10 +8,12 @@ committed SQL had drifted from the live cards (the seed was non-executable for
 months and cards were iteratively updated by scripts since). This script
 re-renders every card — slug, title, summary, body_md, tags, triggers,
 mcp_tools — plus its live role_memory associations, into the
-seedMemoryProcedures() template literal of:
+seedMemoryProcedures() template literal of the shared seed package:
 
-    typescript/tackle-srv/src/db.ts
-    typescript/tackle-mcp/src/db.ts   (identical mirror seed)
+    typescript/tackle-seeds/index.ts
+
+consumed by both tackle-srv and tackle-mcp (single source of truth, so seed
+edits never need to be applied twice by hand).
 
 Escaping conventions (established by commit 4ba52cc; see agent record
 93785aab — these are proven by the shadow-seed byte-compare):
@@ -51,9 +53,9 @@ import tempfile
 DSN = os.environ.get("CONDUIT_PG_DSN", "postgresql://pguser:pgpass@localhost:5432/nexus")
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # nexus/
+SEED_PACKAGE_DIR = os.path.join(REPO, "typescript", "tackle-seeds")
 SEED_FILES = [
-    os.path.join(REPO, "typescript", "tackle-srv", "src", "db.ts"),
-    os.path.join(REPO, "typescript", "tackle-mcp", "src", "db.ts"),
+    os.path.join(SEED_PACKAGE_DIR, "index.ts"),
 ]
 
 HEADER = """DO $$
@@ -344,6 +346,29 @@ ROLLBACK;
               % (tag, int(counts.get("SEEDED", 0)), int(counts.get("ROLES_SEEDED", 0))))
 
 
+def build_tackle_seeds():
+    """Rebuild tackle-seeds/dist after writing the seed.
+
+    Runtime (tsx dev, node prod) resolves `tackle-seeds` to the built
+    dist/index.js, so the seed is only actually served after this rebuild.
+    Uses the package's own tsc if installed, else a sibling project's.
+    """
+    candidates = [
+        os.path.join(SEED_PACKAGE_DIR, "node_modules", ".bin", "tsc"),
+        os.path.join(REPO, "typescript", "tackle-srv", "node_modules", ".bin", "tsc"),
+        os.path.join(REPO, "typescript", "tackle-mcp", "node_modules", ".bin", "tsc"),
+    ]
+    tsc = next((c for c in candidates if os.path.exists(c)), None)
+    if tsc is None:
+        print("  WARNING: tsc not found — tackle-seeds dist NOT rebuilt;"
+              " rebuild it before starting tackle-srv/tackle-mcp")
+        return
+    r = subprocess.run([tsc, "-p", SEED_PACKAGE_DIR], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise SystemExit(f"tackle-seeds build failed:\n{r.stderr}")
+    print("  [build] tackle-seeds dist rebuilt (runtime now serves the fresh seed)")
+
+
 # ── main ────────────────────────────────────────────────────────────────────
 
 
@@ -384,13 +409,20 @@ def main() -> int:
             open(path, "w", encoding="utf-8").write(splice_seed(src, new_body))
             print(f"    wrote")
 
+    if not args.dry_run:
+        build_tackle_seeds()
+
     if args.verify:
         if args.dry_run:
             print("--verify is ignored with --dry-run")
         else:
             for path in SEED_FILES:
-                tag = path.split(os.sep)[-3]
+                tag = path.split(os.sep)[-2]  # e.g. "tackle-seeds"
                 verify_file(path, tag)
+            # Also verify the built artifact that services actually execute.
+            dist_path = os.path.join(SEED_PACKAGE_DIR, "dist", "index.js")
+            if os.path.exists(dist_path):
+                verify_file(dist_path, tag + "-dist")
     return 0
 
 
