@@ -71,6 +71,10 @@ SELECT plan_id, type, to_char(created_at, 'YYYY-MM-DD') AS since
 FROM latest WHERE type IN ('BLOCK','HOLD') ORDER BY created_at
 """
 
+# Drift v3 (to-do 299fce45): adds the explicit report-only FLAG — a plan is
+# flagged when ALL THREE hold: latest receipt PLAN_CREATE >24h AND a builder
+# ticket unclaimed >24h AND external completion evidence exists
+# (IMPLEMENTATION/REVIEW_PASS receipts OR inspection/record evidence).
 QUERY_DRIFT = """
 WITH latest AS (
   SELECT DISTINCT ON (plan_id) plan_id, type, created_at
@@ -78,24 +82,46 @@ WITH latest AS (
   ORDER BY plan_id, created_at DESC),
 stuck AS (
   SELECT plan_id, created_at FROM latest
-  WHERE type = 'PLAN_CREATE' AND created_at < NOW() - INTERVAL '24 hours')
+  WHERE type = 'PLAN_CREATE' AND created_at < NOW() - INTERVAL '24 hours'),
+ticks AS (
+  SELECT plan_id,
+    count(*) FILTER (WHERE role = 'builder' AND status = 'open'
+                     AND claimed_at IS NULL
+                     AND created_at < NOW() - INTERVAL '24 hours') AS unclaimed_24h,
+    count(*) FILTER (WHERE status = 'expired'
+      OR (status IN ('open','claimed','stale')
+          AND expires_at IS NOT NULL AND expires_at < NOW())) AS expired,
+    count(*) FILTER (WHERE status = 'cancelled') AS cancelled
+  FROM vision.tickets GROUP BY plan_id),
+receipt_ev AS (
+  SELECT plan_id, count(*) AS n
+  FROM vision.receipts
+  WHERE type IN ('IMPLEMENTATION','REVIEW_PASS') AND plan_id ~ '^[0-9]+$'
+  GROUP BY plan_id),
+rec_ev AS (
+  SELECT s.plan_id,
+    (SELECT count(*) FROM nebula.agent_records ar
+      WHERE (ar.plan_ref = s.plan_id
+         OR ar.content ~* ('(^|[^0-9])' || s.plan_id || '([^0-9]|$)'))
+        AND ar.record_type IN ('report','inspection','engineering_log','assessment','analysis','decision')
+        AND COALESCE(ar.title,'') NOT ILIKE '%pre-fk-snapshot%'
+        AND COALESCE(ar.title,'') NOT ILIKE '%drift%'
+        AND COALESCE(ar.title,'') NOT ILIKE '%ghost%'
+        AND COALESCE(ar.title,'') NOT ILIKE '%cross-reference%'
+        AND COALESCE(ar.title,'') NOT ILIKE 'CROSS REFERENCES%') AS n
+  FROM stuck s)
 SELECT s.plan_id, to_char(s.created_at,'YYYY-MM-DD') AS last_plan_create,
-  (SELECT count(*) FROM vision.tickets t
-    WHERE t.plan_id = s.plan_id AND (t.status = 'expired'
-      OR (t.status IN ('open','claimed','stale')
-          AND t.expires_at IS NOT NULL AND t.expires_at < NOW()))) AS expired_tickets,
-  (SELECT count(*) FROM vision.tickets t
-    WHERE t.plan_id = s.plan_id AND t.status = 'cancelled') AS cancelled_tickets,
-  (SELECT count(*) FROM nebula.agent_records ar
-    WHERE (ar.plan_ref = s.plan_id
-       OR ar.content ~* ('(^|[^0-9])' || s.plan_id || '([^0-9]|$)'))
-      AND ar.record_type IN ('report','inspection','engineering_log','assessment','analysis','decision')
-      AND COALESCE(ar.title,'') NOT ILIKE '%pre-fk-snapshot%'
-      AND COALESCE(ar.title,'') NOT ILIKE '%drift%'
-      AND COALESCE(ar.title,'') NOT ILIKE '%ghost%'
-      AND COALESCE(ar.title,'') NOT ILIKE '%cross-reference%'
-      AND COALESCE(ar.title,'') NOT ILIKE 'CROSS REFERENCES%') AS evidence_rows
-FROM stuck s ORDER BY s.created_at
+  COALESCE(t.expired,0) AS expired_tickets,
+  COALESCE(t.cancelled,0) AS cancelled_tickets,
+  COALESCE(ev.n,0) + COALESCE(re.n,0) AS evidence_rows,
+  COALESCE(t.unclaimed_24h,0) AS unclaimed_24h,
+  ((COALESCE(t.unclaimed_24h,0) > 0 OR COALESCE(t.expired,0) > 0)
+   AND (COALESCE(ev.n,0) + COALESCE(re.n,0)) > 0) AS drift_flag
+FROM stuck s
+LEFT JOIN ticks t ON t.plan_id = s.plan_id
+LEFT JOIN receipt_ev ev ON ev.plan_id = s.plan_id
+LEFT JOIN rec_ev re ON re.plan_id = s.plan_id
+ORDER BY s.created_at
 """
 
 QUERY_FLAGGED = """
@@ -120,6 +146,78 @@ def run_checks(cur):
     cur.execute(QUERY_FLAGGED)
     flagged = cur.fetchall()
     return {"blocked": blocked, "drift": drift, "flagged": flagged}
+
+
+def emit_drift_findings(conn, drift_rows, nebula_url, role, model, dry_run=False):
+    """Emit `type:finding` agent records (to:architect + to:watchdog) for
+    flagged drift plans — the report-only routing layer of the to-do 299fce45
+    flag. Dedup: an existing open finding for the same plan_id suppresses a
+    re-emit, so the 30-min timer cannot spam the inbox.
+
+    Returns (emitted, skipped) counts.
+    """
+    import urllib.request
+
+    emitted, skipped = 0, 0
+    # Commit any prior work and take a FRESH snapshot of plan_ids that already
+    # have an OPEN type:finding record — a stale transaction snapshot would
+    # miss records committed by earlier runs and cause duplicate emits.
+    conn.commit()
+    cur = conn.cursor()
+    cur.execute(
+        """SELECT DISTINCT plan_ref FROM nebula.agent_records
+           WHERE plan_ref IS NOT NULL
+             AND tags && ARRAY['type:finding']
+             AND NOT (tags && ARRAY['status:closed','status:resolved','status:done'])"""
+    )
+    already_open = {r[0] for r in cur.fetchall()}
+    cur.close()
+
+    for row in drift_rows:
+        pid = row[0]
+        if not row[6]:  # drift_flag
+            continue
+        if pid in already_open:
+            skipped += 1
+            continue
+        already_open.add(pid)  # same run may flag multiple, keep set local
+        title = f"Drift finding: plan {pid} stuck-pending with external completion evidence"
+        content = (
+            f"**Report-only flag (never auto-closed).** Plan `{pid}` is stuck-pending "
+            f"(latest receipt PLAN_CREATE >24h, last {row[1]}) with a builder ticket "
+            f"expired ({row[2]}) / unclaimed >24h ({row[5]}) and external completion "
+            f"evidence ({row[4]} IMPLEMENTATION/REVIEW_PASS receipt or agent-record rows).\n\n"
+            f"Suggested close: IMPLEMENTATION + REVIEW_PASS receipts, or CANCELLED receipt "
+            f"if abandoned — confirm manually before acting. Source: `pipeline-health-sweep.py` "
+            f"drift check v3 (to-do 299fce45)."
+        )
+        payload = {
+            "recordType": "analysis",
+            "role": role,
+            "title": title,
+            "content": content,
+            "tags": ["to:architect", "to:watchdog", "type:finding", "status:open"],
+            "planRef": pid,
+            "level": 3,
+            "visibilityScope": "all",
+        }
+        if dry_run:
+            print(f"[dry-run] would emit finding record for plan {pid} (planRef={pid})")
+            emitted += 1
+            continue
+        try:
+            req = urllib.request.Request(
+                f"{nebula_url}/api/agent-records",
+                data=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                json.loads(resp.read())
+            emitted += 1
+        except Exception as e:  # noqa: BLE001
+            print(f"WARN: finding record emit for plan {pid} failed: {e}", file=sys.stderr)
+    return emitted, skipped
 
 
 def fetch_projection_drift(conduit_url):
@@ -176,7 +274,7 @@ def signature(findings):
         items.append(f"blocked|{row[0]}")
     # include the signal columns so evidence/ticket-state changes re-post
     for row in findings["drift"]:
-        items.append(f"drift|{row[0]}|{row[2]}|{row[3]}|{row[4]}")
+        items.append(f"drift|{row[0]}|{row[2]}|{row[3]}|{row[4]}|{row[5]}|{row[6]}")
     for row in findings["flagged"]:
         items.append(f"flagged|{row[2]}|{row[3]}")  # title|created
     # projection drift (work_request_uuid + state signals so fixes re-post)
@@ -225,17 +323,25 @@ def build_report(findings, role, model):
         lines.append("\nNone.")
     lines.append("")
 
-    lines.append("## 2. Plan-status drift (stuck pending + expired/cancelled ticket + evidence)")
+    lines.append("## 2. Plan-status drift (stuck pending + expired/unclaimed ticket + external evidence)")
     if drift:
         lines += [
             "",
-            "| plan_id | last_plan_create | expired | cancelled | evidence |",
-            "|---|---|---|---|---|",
+            "| plan_id | last_plan_create | expired | unclaimed>24h | cancelled | evidence | FLAG |",
+            "|---|---|---|---|---|---|---|",
         ]
-        for pid, since, exp, canc, ev in drift:
-            lines.append(f"| {pid} | {since} | {exp} | {canc} | {ev} |")
+        flagged = []
+        for pid, since, exp, canc, ev, unclaimed, flag in drift:
+            mark = "🚩" if flag else ""
+            lines.append(f"| {pid} | {since} | {exp} | {unclaimed} | {canc} | {ev} | {mark} |")
+            if flag:
+                flagged.append((pid, since, exp, unclaimed, ev))
         lines.append("")
-        lines.append("**Remediation:** evidence>0 → implemented-but-pending: close via IMPLEMENTATION + REVIEW_PASS. cancelled>0/expired>0 with no evidence → abandoned: close via CANCELLED receipt (`POST /api/receipts/`), or re-arm ticket if genuinely wanted. Heuristic — confirm each manually.")
+        lines.append(
+            f"**{len(flagged)} flagged** (🚩 = stuck PLAN_CREATE >24h AND expired/unclaimed builder ticket AND external completion evidence — implemented-but-pending, report-only, never auto-closed; finding records tagged `to:architect`+`to:watchdog` are emitted for these)."
+        )
+        lines.append("")
+        lines.append("**Remediation:** evidence>0 → implemented-but-pending: close via IMPLEMENTATION + REVIEW_PASS. expired/unclaimed>0 with no evidence → abandoned: close via CANCELLED receipt (`POST /api/receipts/`), or re-arm ticket if genuinely wanted. Heuristic — confirm each manually.")
     else:
         lines.append("\nNone — no plan has been stuck-pending (PLAN_CREATE) >24h.")
     lines.append("")
@@ -385,6 +491,15 @@ def main():
     # 5th check: stale role leases via nebula-srv HTTP (plan 1286).
     findings["role_leases"] = fetch_role_lease_stale(args.nebula_url)
 
+    # finding-record routing (to-do 299fce45): flagged drift plans get
+    # type:finding records to:architect + to:watchdog. Dry-run only reports;
+    # live runs emit after the forum post so a failed post still emits.
+    flagged_rows = [r for r in findings["drift"] if r[6]]
+    if args.dry_run:
+        conn2 = psycopg2.connect(**DB)
+        emit_drift_findings(conn2, flagged_rows, args.nebula_url, args.role, args.model, dry_run=True)
+        conn2.close()
+
     sig = signature(findings)
     total = sum(len(v) for v in findings.values() if v is not None)
 
@@ -459,6 +574,20 @@ def main():
     save_state(args.state, {"signature": sig, "threadId": thread.get("id"), "postedAt": now})
     if not args.quiet:
         print(f"posted findings thread {thread.get('id')} ({total} findings)")
+
+    # emit tag-routed finding records for flagged drift plans (deduped)
+    if flagged_rows:
+        try:
+            conn3 = psycopg2.connect(**DB)
+            emitted, skipped = emit_drift_findings(
+                conn3, flagged_rows, args.nebula_url, args.role, args.model
+            )
+            conn3.close()
+        except Exception as e:  # noqa: BLE001
+            print(f"WARN: finding-record emission failed: {e}", file=sys.stderr)
+            emitted = skipped = 0
+        if not args.quiet:
+            print(f"finding records: emitted {emitted}, skipped (already open) {skipped}")
     return 0
 
 
