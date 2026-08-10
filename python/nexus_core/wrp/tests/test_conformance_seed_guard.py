@@ -28,6 +28,15 @@ Tested invariants:
   AC4 — Escape conventions: only `${SQL}` interpolation is allowed, no
         backslash-quote that would render to a bare SQL quote, no raw
         backticks inside the template, and escaping is actually in use.
+  AC5 — Manifest guard (CI): the committed typescript/tackle-seeds/
+        seed-manifest.json (emitted by bin/regenerate_memory_seed.py from the
+        live DB — card count, role count, per-card sha256 + role sets) is the
+        no-live-DB reference. The rendered seed is executed against a scratch
+        schema created entirely by this test (no live tackle.memory needed —
+        only any Postgres + node), and the seeded state is byte-compared
+        against the manifest. This is what CI runs (see
+        .github/workflows/seed-guard.yml) so seed drift is caught
+        automatically without a live DB.
 
 Usage:
     cd /home/codex/dev/nexus
@@ -47,6 +56,13 @@ _SELF_DIR = os.path.dirname(os.path.abspath(__file__))
 _NEXUS_PYTHON = os.path.abspath(os.path.join(_SELF_DIR, "..", "..", ".."))
 if _NEXUS_PYTHON not in sys.path:
     sys.path.insert(0, _NEXUS_PYTHON)
+
+from nexus_core.wrp.seed_manifest import (  # noqa: E402
+    MANIFEST_PATH,
+    card_sha256,
+    manifest_matches_live,
+    read_manifest,
+)
 
 DSN = os.environ.get("CONDUIT_PG_DSN", "postgresql://pguser:pgpass@localhost:5432/nexus")
 
@@ -232,6 +248,84 @@ def _shadow_seed(rendered_sql: str) -> dict:
             cur.execute(q)
             result[label] = cur.fetchone()[0]
         return result
+    finally:
+        conn.close()
+
+
+def _scratch_seed(rendered_sql: str) -> dict:
+    """Execute the rendered seed against a scratch schema with NO live tables.
+
+    Creates tackle.memory + tackle.role_memory from scratch (DDL embedded
+    below, mirroring tackle-srv/src/db.ts), runs the DO block, and returns
+    the seeded state keyed for manifest comparison: {"seeded_cards",
+    "seeded_roles", "by_slug": {slug: {"sha256", "roles"}}}.
+
+    This is the CI path — it needs only ANY reachable Postgres (a scratch
+    schema in a throwaway DB), not the live tackle schema.
+    """
+    conn = _db()
+    try:
+        cur = conn.cursor()
+        schema = _schema_name()
+        shadow_sql = (
+            rendered_sql
+            .replace(f"{schema}.memory", "pg_temp.memory")
+            .replace(f"{schema}.role_memory", "pg_temp.role_memory")
+        )
+        # Minimal faithful mirror of the live DDL (tackle-srv/src/db.ts):
+        # memory + role_memory with the FK, PK, UNIQUE and the btree_gist
+        # EXCLUDE constraint so role-assignment semantics match live.
+        cur.execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
+        cur.execute(
+            "CREATE TEMP TABLE memory ("
+            "  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),"
+            "  slug TEXT NOT NULL UNIQUE,"
+            "  title TEXT NOT NULL,"
+            "  summary TEXT NOT NULL DEFAULT '',"
+            "  body_md TEXT NOT NULL DEFAULT '',"
+            "  tags TEXT[] NOT NULL DEFAULT '{}',"
+            "  triggers TEXT[] NOT NULL DEFAULT '{}',"
+            "  mcp_tools TEXT[] NOT NULL DEFAULT '{}'"
+            ")"
+        )
+        cur.execute(
+            "CREATE TEMP TABLE role_memory ("
+            "  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),"
+            "  memory_id UUID NOT NULL REFERENCES pg_temp.memory(id) ON DELETE CASCADE,"
+            "  role TEXT NOT NULL,"
+            "  as_of_dt TIMESTAMPTZ NOT NULL DEFAULT NOW(),"
+            "  expiration_dt TIMESTAMPTZ,"
+            "  CONSTRAINT uq_role_memory_active EXCLUDE USING gist ("
+            "    memory_id WITH =, role WITH =,"
+            "    tstzrange(as_of_dt, expiration_dt) WITH &&"
+            "  )"
+            ")"
+        )
+        cur.execute(shadow_sql)  # DO block — no params → simple query protocol
+        conn.commit()
+
+        cur.execute(
+            "SELECT slug, title, summary, body_md, tags, triggers, mcp_tools "
+            "FROM pg_temp.memory ORDER BY slug"
+        )
+        by_slug = {}
+        for slug, title, summary, body_md, tags, triggers, mcp_tools in cur.fetchall():
+            cur.execute(
+                "SELECT role FROM pg_temp.role_memory rm "
+                "JOIN pg_temp.memory m ON rm.memory_id = m.id "
+                "WHERE m.slug = %s ORDER BY role",
+                (slug,),
+            )
+            roles = [r[0] for r in cur.fetchall()]
+            by_slug[slug] = {
+                "sha256": card_sha256(slug, title, summary, body_md, tags, triggers, mcp_tools),
+                "roles": roles,
+            }
+        cur.execute("SELECT count(*) FROM pg_temp.memory")
+        seeded_cards = cur.fetchone()[0]
+        cur.execute("SELECT count(*) FROM pg_temp.role_memory")
+        seeded_roles = cur.fetchone()[0]
+        return {"seeded_cards": seeded_cards, "seeded_roles": seeded_roles, "by_slug": by_slug}
     finally:
         conn.close()
 
@@ -434,6 +528,101 @@ class TestAc4EscapeConventions(unittest.TestCase):
         body = _template_body()
         self.assertGreaterEqual(body.count("\\`"), 1, "no escaped backticks found")
         self.assertGreaterEqual(body.count("''"), 1, "no doubled apostrophes found")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  AC5 — Manifest guard (CI): scratch-schema seed vs committed manifest
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestAc5ManifestGuard(unittest.TestCase):
+    """The rendered seed executed against a scratch schema must byte-match the
+    committed seed-manifest.json (the no-live-DB reference). This is the CI
+    path — CI has no live tackle.memory, only the manifest."""
+
+    def test_manifest_committed_and_parseable(self):
+        """The manifest exists, parses, and is internally consistent."""
+        self.assertTrue(os.path.exists(MANIFEST_PATH), f"missing: {MANIFEST_PATH}")
+        manifest = read_manifest()
+        self.assertIsInstance(manifest.get("card_count"), int)
+        self.assertIsInstance(manifest.get("role_count"), int)
+        self.assertEqual(manifest["card_count"], len(manifest.get("cards", [])))
+        by_slug = {c["slug"] for c in manifest["cards"]}
+        self.assertEqual(len(by_slug), manifest["card_count"], "duplicate slugs in manifest")
+        for c in manifest["cards"]:
+            self.assertRegex(c["slug"], r"^[a-z0-9-]+$")
+            self.assertRegex(c["sha256"], r"^[0-9a-f]{64}$")
+            self.assertIsInstance(c.get("roles"), list)
+
+    def test_scratch_seed_card_count_matches_manifest(self):
+        """Scratch execution seeds exactly the manifest's card count."""
+        result = _scratch_seed(_render_seed())
+        manifest = read_manifest()
+        self.assertEqual(
+            result["seeded_cards"], manifest["card_count"],
+            "seeded card count must match the committed manifest "
+            "(a hand-edit to the seed that added/removed a card breaks this)",
+        )
+
+    def test_scratch_seed_role_count_matches_manifest(self):
+        """Scratch execution seeds exactly the manifest's role-row count."""
+        result = _scratch_seed(_render_seed())
+        manifest = read_manifest()
+        self.assertEqual(
+            result["seeded_roles"], manifest["role_count"],
+            "seeded role rows must match the committed manifest",
+        )
+
+    def test_scratch_seed_card_hashes_match_manifest(self):
+        """Every seeded card's content sha256 matches the manifest — byte
+        identity of slug/title/summary/body_md/tags/triggers/mcp_tools."""
+        result = _scratch_seed(_render_seed())
+        manifest = read_manifest()
+        manifest_by_slug = {c["slug"]: c for c in manifest["cards"]}
+        mismatched = []
+        for slug, state in result["by_slug"].items():
+            expected = manifest_by_slug.get(slug)
+            if expected is None:
+                mismatched.append(f"{slug}: in seed, not in manifest")
+            elif expected["sha256"] != state["sha256"]:
+                mismatched.append(f"{slug}: content hash differs from manifest")
+        for slug in manifest_by_slug:
+            if slug not in result["by_slug"]:
+                mismatched.append(f"{slug}: in manifest, missing from seed")
+        self.assertEqual(mismatched, [], "seed content drifted from the committed manifest")
+
+    def test_scratch_seed_role_sets_match_manifest(self):
+        """Per-card role sets match the manifest exactly."""
+        result = _scratch_seed(_render_seed())
+        manifest = read_manifest()
+        manifest_by_slug = {c["slug"]: c for c in manifest["cards"]}
+        mismatched = []
+        for slug, state in result["by_slug"].items():
+            expected = manifest_by_slug.get(slug)
+            if expected is None:
+                continue  # covered by the hash test
+            if expected["roles"] != state["roles"]:
+                mismatched.append(f"{slug}: roles {state['roles']} != manifest {expected['roles']}")
+        self.assertEqual(mismatched, [], "role sets drifted from the committed manifest")
+
+    def test_manifest_matches_live_when_reachable(self):
+        """Locally (live DB reachable) the committed manifest must equal live.
+
+        This is the double-check that the CI reference wasn't regenerated stale:
+        the manifest is the projection CI trusts, so it must match the canonical
+        DB exactly. Skips when the live tackle schema is absent (CI)."""
+        conn = _db()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = 'tackle' AND table_name = 'memory'"
+            )
+            if cur.fetchone() is None:
+                self.skipTest("live tackle.memory not present (CI) — manifest-vs-live check skipped")
+            ok, problems = manifest_matches_live(conn)
+            self.assertTrue(ok, "committed manifest differs from live:\n  " + "\n  ".join(problems))
+        finally:
+            conn.close()
 
 
 if __name__ == "__main__":

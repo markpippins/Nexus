@@ -58,6 +58,17 @@ SEED_FILES = [
     os.path.join(SEED_PACKAGE_DIR, "index.ts"),
 ]
 
+# Shared manifest helpers (hashing convention must match wr-conf-006 exactly).
+sys.path.insert(0, os.path.join(REPO, "python"))
+from nexus_core.wrp.seed_manifest import (  # noqa: E402
+    MANIFEST_PATH,
+    build_manifest,
+    manifest_matches_live,
+    write_manifest,
+)
+
+MANIFEST_FILES = [MANIFEST_PATH]
+
 HEADER = """DO $$
 DECLARE
     v_memory_id UUID;
@@ -409,6 +420,20 @@ def main() -> int:
             open(path, "w", encoding="utf-8").write(splice_seed(src, new_body))
             print(f"    wrote")
 
+    # The manifest is the second canonical projection: card count, role count,
+    # per-card sha256 + role sets — consumed by wr-conf-006's CI guard as the
+    # no-live-DB reference (see nexus_core/wrp/seed_manifest.py).
+    if not args.dry_run:
+        conn2 = psycopg2.connect(DSN)
+        try:
+            manifest = build_manifest(conn2)
+        finally:
+            conn2.close()
+        write_manifest(manifest)
+        rel = os.path.relpath(MANIFEST_PATH, REPO)
+        print(f"  {rel}: wrote ({manifest['card_count']} cards, "
+              f"{manifest['role_count']} roles, {os.path.getsize(MANIFEST_PATH)} bytes)")
+
     if not args.dry_run:
         build_tackle_seeds()
 
@@ -423,6 +448,20 @@ def main() -> int:
             dist_path = os.path.join(SEED_PACKAGE_DIR, "dist", "index.js")
             if os.path.exists(dist_path):
                 verify_file(dist_path, tag + "-dist")
+            # Manifest must be current against live too (CI guard reference).
+            conn3 = psycopg2.connect(DSN)
+            try:
+                ok, problems = manifest_matches_live(conn3)
+            finally:
+                conn3.close()
+            if ok:
+                print("  [manifest] committed seed-manifest.json matches live")
+            else:
+                print("  [manifest] COMMITTED MANIFEST IS STALE:")
+                for p in problems:
+                    print(f"    - {p}")
+                print("  (re-run without --verify to rewrite it, then re-verify)")
+                return 1
     return 0
 
 

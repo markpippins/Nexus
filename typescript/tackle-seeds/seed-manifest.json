@@ -1,0 +1,444 @@
+{
+  "card_count": 38,
+  "cards": [
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "builder",
+        "critic",
+        "engineer",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "c8ee53af63a26ab4b810700caa8f8cb323062c0c9f70d92cd48ef11c47a5dc6d",
+      "slug": "agent-config-template"
+    },
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "builder",
+        "critic",
+        "engineer",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "af0c875e302196137b3405ca770b12a1358d6db8ac3116ab4ba4df46dfb2720d",
+      "slug": "bootstrap-self-update"
+    },
+    {
+      "roles": [
+        "builder",
+        "engineer"
+      ],
+      "sha256": "69d21ce769629edd510e335e55046800f8cb96916ab69fbc03dfb83119cef819",
+      "slug": "builder-workflow"
+    },
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "auditor",
+        "builder",
+        "critic",
+        "DBA",
+        "engineer",
+        "epistemologist",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "362605eacbf94c686442feee321b2ae14cc26c5ead0293735e39cf0e70512963",
+      "slug": "conduit-mcp-tools"
+    },
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "auditor",
+        "builder",
+        "critic",
+        "DBA",
+        "engineer",
+        "epistemologist",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "55a87f408dd0c685263dd9b401518f8b479301878b061e745121079575170887",
+      "slug": "day-night-boundary"
+    },
+    {
+      "roles": [
+        "engineer"
+      ],
+      "sha256": "2bfc96bb6050d16be898033f511d4c4381853a98d48937534816dfbdfbd69fd9",
+      "slug": "engineer-backlog-check"
+    },
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "auditor",
+        "builder",
+        "critic",
+        "DBA",
+        "engineer",
+        "epistemologist",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "aaf19bac0def929f44ac6b3f94813eafeba8e4131e9feaea1e9e6ec6e42a6c85",
+      "slug": "inbox-query-procedure"
+    },
+    {
+      "roles": [
+        "analyst",
+        "engineer"
+      ],
+      "sha256": "054debbbdc10f1fad0ae596d6134aecabf408d33abcd7b6893c7b45645da7365",
+      "slug": "investigation-resources"
+    },
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "inspector",
+        "operator"
+      ],
+      "sha256": "3ab8358ff342cb210cd124967ff45819066e5f9a8e1392dbb0d65ce8c93813c0",
+      "slug": "knowledge-graph-pipeline"
+    },
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "auditor",
+        "builder",
+        "critic",
+        "DBA",
+        "engineer",
+        "epistemologist",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "5b19814bbea213c687a1787c1a220cc1bc7e25e172aefb175a8aff6c7fb64c8d",
+      "slug": "knowledge-stratification"
+    },
+    {
+      "roles": [
+        "architect",
+        "builder",
+        "engineer",
+        "planner"
+      ],
+      "sha256": "e89b1c0d883553921da533d08c0d3ab32b8ae550f9a79174b1b8f1a124fb8cde",
+      "slug": "mcp-server-config"
+    },
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "auditor",
+        "builder",
+        "critic",
+        "DBA",
+        "engineer",
+        "epistemologist",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "81d16958f5c8bf456d1313cc3d3c8f6db1a7943e1cca389db146a004ee23aff4",
+      "slug": "nebula-mcp-tools"
+    },
+    {
+      "roles": [
+        "architect",
+        "auditor",
+        "builder",
+        "DBA",
+        "engineer",
+        "epistemologist",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "6b66a16af3b9b62e6569f9e1a5a55ca97c79b49e7029bdf65f7102817fbeb89b",
+      "slug": "nexus-boot-procedure"
+    },
+    {
+      "roles": [
+        "operator"
+      ],
+      "sha256": "832312a085a44831c90695261f4db7025f89a62c3442a322744a7e0963ab4595",
+      "slug": "operator-audit-search"
+    },
+    {
+      "roles": [
+        "operator"
+      ],
+      "sha256": "3081d0a75c09f4ee5237389c796b664c16c49e99d68f51f0e124811331ced21d",
+      "slug": "operator-no-hallucination-rule"
+    },
+    {
+      "roles": [
+        "operator"
+      ],
+      "sha256": "0cd379150e58afa62665c8a0e2a2ffeec1da41f8db938a3e36e2138884712384",
+      "slug": "operator-pipeline-query"
+    },
+    {
+      "roles": [
+        "operator"
+      ],
+      "sha256": "675b4684b89935662c971114b4cafd3013c1d72be7d9cbf12aa71664104d4663",
+      "slug": "operator-requirement-lookup"
+    },
+    {
+      "roles": [
+        "operator"
+      ],
+      "sha256": "b39709ad483753af97088ed34ddf764eb15eeb64c833177ebe4c905eb0e306a2",
+      "slug": "operator-workrequest-lifecycle"
+    },
+    {
+      "roles": [
+        "engineer",
+        "inspector",
+        "reviewer"
+      ],
+      "sha256": "39a91babefdba93622be4d96f6076fe4554326093d71fc789b81663df9b2393e",
+      "slug": "orphan-detection"
+    },
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "auditor",
+        "builder",
+        "critic",
+        "DBA",
+        "engineer",
+        "epistemologist",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "70407efe82c1ed21deedf6fb0f2e05e6f19b62b68f7c62b2377fefb28aab89cd",
+      "slug": "per-role-outbox-table"
+    },
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "builder",
+        "critic",
+        "engineer",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "1ffb2d1f09b684fb80ab4f87a4c9dbdd42681612c649fc863d0d49ac2f2a718c",
+      "slug": "pipeline-health-check"
+    },
+    {
+      "roles": [
+        "builder",
+        "engineer"
+      ],
+      "sha256": "5fdb48bba237129e0cf4dc1246c008f94d72e811d1316f907c03b8573aaa137a",
+      "slug": "plan-deletion-cleanup"
+    },
+    {
+      "roles": [
+        "engineer",
+        "planner"
+      ],
+      "sha256": "1afb347189b8030cb301987dba650221f35a746dbce5ccb51ba3b16a01ba7359",
+      "slug": "planner-create-plan"
+    },
+    {
+      "roles": [
+        "planner"
+      ],
+      "sha256": "06fc0be8a46a8c82105f664fd28851ddbe41f98e9927f24a6d31a7598589aa15",
+      "slug": "planning-elucidation"
+    },
+    {
+      "roles": [
+        "builder",
+        "engineer",
+        "planner"
+      ],
+      "sha256": "2c0f380d1d29597deeff3e414ec297046f20630620834311b3504cf7b3475572",
+      "slug": "plan-template-format"
+    },
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "builder",
+        "critic",
+        "engineer",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "0d2e7b80c3cadec9495f390942aca333ef32b5d39e6369eb2e72429c5b0cfe69",
+      "slug": "post-turn-self-update"
+    },
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "builder",
+        "critic",
+        "engineer",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "98b18816aea847683b1b0a9a30f13b7e3256c62e6099da448bbb6a3d67659b0e",
+      "slug": "prompt-capture"
+    },
+    {
+      "roles": [
+        "architect",
+        "engineer",
+        "planner"
+      ],
+      "sha256": "bf2b613fffa3e8784135cdcc0e3f778d8542d59a9d48a42bb7fa37c24afa38b9",
+      "slug": "proposal-capture"
+    },
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "auditor",
+        "builder",
+        "critic",
+        "DBA",
+        "engineer",
+        "epistemologist",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "806b7bf1cd14500ee0b1714cba9154e67ad9fb9232bc464670faea75c198e486",
+      "slug": "role-governance"
+    },
+    {
+      "roles": [
+        "builder",
+        "engineer"
+      ],
+      "sha256": "acf9a5e781bc90cdf29b7a0ab1ea31399b544beefa49e8b313ba950227544566",
+      "slug": "role-lease-orientation"
+    },
+    {
+      "roles": [
+        "engineer"
+      ],
+      "sha256": "83fbfcfff2ca604246dfbb0567202ea6665dd2edd0f65b60f4784d9ab35b685b",
+      "slug": "rover-harvest-notification"
+    },
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "auditor",
+        "builder",
+        "critic",
+        "DBA",
+        "engineer",
+        "epistemologist",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "fa89f80946beb39192f43e005743e76852f42809caf25fb117246969d4284a5d",
+      "slug": "tackle-mcp-tools"
+    },
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "auditor",
+        "builder",
+        "critic",
+        "DBA",
+        "engineer",
+        "epistemologist",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "83d7ac6d0b3d5c444447fdd755b5b936dd91a3ef7a6aeaa2717fa229d54d5302",
+      "slug": "tag-routing-reference"
+    },
+    {
+      "roles": [
+        "engineer"
+      ],
+      "sha256": "b064c658a02543d2cd36b279d25d3c8c29e7d261ce25c87bee2b2977dd5730af",
+      "slug": "terrain-registration"
+    },
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "auditor",
+        "builder",
+        "critic",
+        "DBA",
+        "engineer",
+        "epistemologist",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "20a67b199b3fd6cc919dbe6faf011055362f05be880dc79575b6eb45c2775b56",
+      "slug": "thread-tracking"
+    },
+    {
+      "roles": [
+        "architect",
+        "builder",
+        "engineer",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "9c54413efe5087564504cb46d5c478aafb241296b96b3af591e3b1e2c61d235b",
+      "slug": "turn-based-planning-check"
+    },
+    {
+      "roles": [
+        "builder",
+        "engineer"
+      ],
+      "sha256": "5b231e5c928551faf77b714693254f2936eaac29ad0b4f1dbba37366e9571ec0",
+      "slug": "verification-commands"
+    },
+    {
+      "roles": [
+        "analyst",
+        "architect",
+        "builder",
+        "critic",
+        "engineer",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "fc4ec999702a31373f195990af0eefb317c98f2424eb990fdc31a834db8365d8",
+      "slug": "work-request-participation"
+    }
+  ],
+  "role_count": 209,
+  "schema": "tackle"
+}

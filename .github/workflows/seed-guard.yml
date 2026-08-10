@@ -1,0 +1,58 @@
+name: Seed Drift Guard
+
+# Runs the wr-conf-006 AC5 manifest guard: renders seedMemoryProcedures()
+# from typescript/tackle-seeds/index.ts with real JS semantics (node),
+# executes the DO block against a SCRATCH schema in a throwaway Postgres
+# (no live tackle schema needed), and asserts the seeded card count + role
+# count + per-card sha256 + role sets match the committed
+# typescript/tackle-seeds/seed-manifest.json.
+#
+# This is the no-live-DB reference: bin/regenerate_memory_seed.py emits the
+# manifest from the canonical DB alongside the seed, so a hand-edit or stale
+# regeneration of the seed that drifts from the DB also breaks the manifest
+# compare here — seed drift is caught automatically on every push/PR, with no
+# production database required.
+
+on:
+  push:
+    branches: [main, master, feature/*, dev]
+  pull_request:
+    branches: [main, master, feature/*]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  seed-manifest-guard:
+    name: "wr-conf-006 AC5: seed vs committed manifest (scratch DB)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: nexus
+          POSTGRES_USER: pguser
+          POSTGRES_PASSWORD: pgpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pguser -d nexus"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install test deps
+        run: python3 -m pip install --quiet pytest psycopg2-binary
+      - name: Seed manifest guard (scratch schema)
+        run: make seed-guard-test
+        shell: bash

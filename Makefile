@@ -3,7 +3,7 @@
         cir5-lint cir5-validate \
         cir-arl cir-verify install-hooks \
         test-db-setup test-db-reset test \
-        mesh-test \
+        mesh-test seed-guard-test \
         apidocs-extract apidocs-gen apidocs-validate apidocs-regen \
         mcp-start mcp-stop mcp-restart mcp-status mcp-watch
 
@@ -166,6 +166,18 @@ mcp-watch:
 mesh-test:
 	@echo "[mesh-test] running mesh-register probe tests..."
 	@python3 -m pytest bin/tests/test_mesh_register_probe.py -v
+
+# ─── Seed drift guard (wr-conf-006 AC5, manifest mode) ───────────────────────
+# Backed by nexus/.github/workflows/seed-guard.yml — same command locally and
+# in CI. Runs the rendered seed against a scratch schema and asserts the card
+# count + per-card sha256 + role sets match the committed
+# typescript/tackle-seeds/seed-manifest.json (the no-live-DB reference emitted
+# by bin/regenerate_memory_seed.py from the canonical DB). Needs `node` and
+# ANY reachable Postgres (the live tackle schema is not required).
+
+seed-guard-test:
+	@echo "[seed-guard] running wr-conf-006 manifest guard (scratch DB)..."
+	@python3 -m pytest python/nexus_core/wrp/tests/test_conformance_seed_guard.py -k 'Ac5' -v
 
 # ─── API docs (tools/api-docs) ───────────────────────────────────────────────
 # Backed by nexus/.github/workflows/apidocs.yml — same commands locally and
