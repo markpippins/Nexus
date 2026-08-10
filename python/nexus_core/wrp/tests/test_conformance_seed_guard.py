@@ -16,6 +16,20 @@ persists), and asserts every seeded card byte-matches the live tackle.memory
 table — plus the role_memory associations. It also asserts the escape
 conventions hold structurally in the source.
 
+CARD-BODY AUTHORING CAUTION (read before writing any card): the shadow
+substitution in _shadow_seed() re-points the seed's INSERT targets by
+string-replacing the two exact qualified table names (the schema constant
+from `const SQL = ...`, currently `tackle`, plus `.memory` /
+`.role_memory`) across the ENTIRE rendered SQL. A card body that spells
+either qualified name as one unbroken token — in prose, a code fence, or
+backticks — gets that text corrupted inside its VALUES clause and
+false-fails every byte-compare as though the seed had drifted. This really
+happened: the seed-integrity card's body named the canonical tables in
+qualified form and had to be reworded (commit 7253675). Refer to the
+canonical tables descriptively in card prose (e.g. "the canonical
+procedure-card table"), never with the schema-qualified name as a single
+token.
+
 Tested invariants:
   AC1 — Render integrity: the source is locatable, renders through node to
         executable SQL, and the DO block executes cleanly against shadow
@@ -193,10 +207,17 @@ def _shadow_seed(rendered_sql: str) -> dict:
     """Execute the rendered seed into pg_temp shadow tables, compare vs live.
 
     Temp tables die with the connection, so nothing persists. Only the two
-    exact qualified table names are re-pointed at pg_temp; prose mentions of
-    'tackle.' inside card bodies are untouched (if a future card body ever
-    contains the literal 'tackle.memory', this would false-fail loudly rather
-    than silently pass — acceptable for a guard).
+    exact qualified table names (the `const SQL = ...` schema, currently
+    `tackle`, plus `.memory` / `.role_memory`) are re-pointed at pg_temp
+    via plain string replacement over the WHOLE rendered SQL.
+
+    CARD-BODY CONSTRAINT: because the replacement is textual, a card body
+    that contains either qualified table name as one unbroken token (prose,
+    code fence, or backticks) gets that text corrupted inside its VALUES
+    clause and false-fails every byte-compare. The seed-integrity card hit
+    this and required a reword (commit 7253675) — card bodies must refer to
+    the canonical tables descriptively, never with the schema-qualified
+    name spelled out.
     """
     conn = _db()
     try:
