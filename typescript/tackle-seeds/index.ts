@@ -2186,6 +2186,110 @@ BEGIN
             VALUES (v_memory_id, v_role, NOW(), NULL);
         END LOOP;
     END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 39. Seed Integrity — Three-Layer Guard
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'seed-integrity',
+        'Seed Integrity — Three-Layer Guard',
+        'The procedure-card seed (typescript/tackle-seeds/index.ts) is the single source of truth for all tackle procedure cards, regenerated from the live DB by bin/regenerate_memory_seed.py. Three independent layers keep it honest: the generator --verify + pre-commit hook (commit-time, live DB), the wr-conf-006 conformance suite (local, 21 tests), and the GitHub Actions manifest guard (daily + push/PR, no live DB needed).',
+        '## Procedure\n'
+        '\n'
+        'The \`seedMemoryProcedures()\` template literal in \`typescript/tackle-seeds/index.ts\` is the single source of truth for all tackle procedure cards. It is regenerated FROM the live canonical DB (the \`tackle\` schema''s procedure-card table) by \`bin/regenerate_memory_seed.py\` — the DB is canonical; the seed is a derived projection. The committed \`typescript/tackle-seeds/seed-manifest.json\` is a matching full-content snapshot (card count, per-card sha256, role sets) that CI uses as its no-live-DB reference.\n'
+        '\n'
+        'Three layers independently guard against seed drift (hand-edits, stale regenerations, backtick/apostrophe/ARRAY corruption invisible to tsc):\n'
+        '\n'
+        '### Layer 1 — Generator \`--verify\` + Pre-Commit Hook (commit-time)\n'
+        '\n'
+        'When seed-relevant files are staged (\`typescript/tackle-seeds/\`, \`bin/regenerate_memory_seed.py\`, \`tackle-srv\`/\`tackle-mcp\` \`db.ts\`, \`.githooks/pre-commit\`), the pre-commit hook runs \`python3 bin/regenerate_memory_seed.py --verify\`:\n'
+        '\n'
+        '1. Renders the seed from source with real JS semantics (node subprocess).\n'
+        '2. Executes the DO block against \`pg_temp\` shadow tables (\`LIKE the canonical memory/role-memory tables INCLUDING ALL\`).\n'
+        '3. Byte-compares every seeded card (title/summary/body/tags/triggers/mcp_tools) and role set against the live canonical table.\n'
+        '4. Also verifies the committed \`seed-manifest.json\` matches live (recomputes expected manifest, byte-compares).\n'
+        '5. If the seed had drifted, the generator rewrites the worktree copy — the hook BLOCKS the commit with a re-stage message.\n'
+        '\n'
+        'If \`node\` or the live DB is unreachable, the hook skips with a warning (safety net, not a hard environment requirement).\n'
+        '\n'
+        '\`\`\`\n'
+        '# Manual verify (same command the hook runs):\n'
+        'python3 bin/regenerate_memory_seed.py --verify\n'
+        '\n'
+        '# Regenerate seed + manifest from live DB:\n'
+        'python3 bin/regenerate_memory_seed.py\n'
+        '\`\`\`\n'
+        '\n'
+        '### Layer 2 — Conformance Suite (local, 21 tests, wr-conf-006)\n'
+        '\n'
+        '\`python/nexus_core/wrp/tests/test_conformance_seed_guard.py\` (wr-conf-006) runs 21 tests across five assertion classes:\n'
+        '\n'
+        '- **AC1** (4): Render integrity — source locatable, no stale copies in \`tackle-srv\`/\`tackle-mcp\` \`db.ts\`, node render produces executable DO block with one INSERT per live card, shadow execution clean with matching counts, built dist artifact also verified.\n'
+        '- **AC2** (3): Card byte-identity — every seeded card row byte-matches the live table; none missing/extra; the 7 historically-missing operator/investigation cards present.\n'
+        '- **AC3** (2): Role byte-identity — per-card role sets match the live role-memory table; no orphaned cards.\n'
+        '- **AC4** (4): Escape conventions — static probes on the template body: only the SQL schema interpolation marker is allowed (the one interpolation the seed intentionally uses); no backslash-quote rendering bare quotes; no raw backticks; escaping is in use.\n'
+        '- **AC5** (8): Manifest guard — committed manifest is parseable/consistent; scratch-schema execution of the rendered seed vs manifest (counts, per-card sha256, role sets); content self-consistency (stored sha256 equals sha256 of embedded content); bootstrap round-trip (apply_manifest to build_manifest equals committed manifest); manifest-vs-live (skips when no live tables).\n'
+        '\n'
+        '\`\`\`\n'
+        '# Run the full suite (needs node + Postgres with a tackle schema):\n'
+        'python3 -m pytest python/nexus_core/wrp/tests/test_conformance_seed_guard.py -v\n'
+        '\n'
+        '# Run only the manifest guard (works with any Postgres, no live tackle):\n'
+        'python3 -m pytest python/nexus_core/wrp/tests/test_conformance_seed_guard.py -k "Ac5" -v\n'
+        '\`\`\`\n'
+        '\n'
+        '### Layer 3 — CI Manifest Guard (automatic, daily + push/PR)\n'
+        '\n'
+        '\`.github/workflows/seed-guard.yml\` runs on every push/PR to \`dev\`/main/feature branches AND daily at 6 AM UTC:\n'
+        '\n'
+        '1. **Bootstrap**: \`bin/bootstrap_seed_manifest.py\` reads the committed \`seed-manifest.json\` and reconstructs the canonical procedure-card tables in a throwaway Postgres service container (DDL mirrors \`db.ts\` incl. btree_gist EXCLUDE constraint, all 39 cards + 212 role rows). Refuses if the target schema contains any table beyond \`memory\`/\`role_memory\` (the live-DB guard).\n'
+        '2. **Guard**: \`make seed-guard-test\` runs the full 21-test suite against the bootstrapped schema — rendering the seed from source (node) and comparing it against the manifest-derived tables byte-for-byte.\n'
+        '\n'
+        'The CI workflow independently verifies: bootstrap + rendering + SQL execution + byte-compare — all with NO production database. The pre-commit hook + local tests cover the live-DB path.\n'
+        '\n'
+        '### When the Guard Blocks a Commit\n'
+        '\n'
+        'The pre-commit hook blocks with \`[seed-guard] COMMIT BLOCKED\` when the seed was regenerated from the live DB (it had drifted). The fresh copy is in the worktree but NOT staged:\n'
+        '\n'
+        '\`\`\`\n'
+        '# Stage the fresh seed and manifest, then commit again:\n'
+        'git add typescript/tackle-seeds/\n'
+        'git commit\n'
+        '\`\`\`\n'
+        '\n'
+        'If the block is spurious (e.g., \`node\` or the DB was down), the hook skips with a warning — the CI guard will catch any actual drift on the next push.\n'
+        '\n'
+        '### When to Regenerate\n'
+        '\n'
+        'Run \`python3 bin/regenerate_memory_seed.py\` whenever:\n'
+        '\n'
+        '1. A procedure card is added, removed, or edited in the live procedure-card table.\n'
+        '2. A role assignment changes in the role-memory table.\n'
+        '3. After a data migration that modifies card content.\n'
+        '\n'
+        'The command regenerates both the seed (\`index.ts\`) and the manifest (\`seed-manifest.json\`). The pre-commit hook will then auto-detect them as drifted (if staging was done before regenerating) and require a re-stage.\n'
+        '\n'
+        '\`\`\`\n'
+        '# Regenerate everything from live DB:\n'
+        'python3 bin/regenerate_memory_seed.py\n'
+        '\n'
+        '# Regenerate + verify:\n'
+        'python3 bin/regenerate_memory_seed.py --verify\n'
+        '\`\`\`',
+        ARRAY['seed-integrity', 'procedure-card', 'conformance', 'guard', 'drift'],
+        ARRAY['seed integrity', 'seed drift', 'regenerate seed', 'seed guard', 'wr-conf-006', 'seed-manifest'],
+        '{}'
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY['architect', 'builder', 'engineer'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
     RAISE NOTICE 'Memory procedures seeded.';
 END $$;`;
 }
