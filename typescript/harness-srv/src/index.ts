@@ -14,7 +14,7 @@
  */
 
 import express from "express";
-import { resolveContext, emitEvent, pool, redis } from "./db";
+import { resolveContext, emitEvent, pool, redis, checkRoleLease, incrementConsumedUnits } from "./db";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { writeFile, readFile, unlink, mkdir, appendFile } from "fs/promises";
@@ -93,6 +93,25 @@ app.post("/run", async (req, res) => {
 
     // 1. Resolve context
     const resolved = await resolveContext(wind_task_id, contextOverrides);
+
+    // ── Role-lease guard (RoleLeases plan 1286, slice 3) ─────────────
+    const lease = await checkRoleLease(resolved.role);
+    if (!lease) {
+      await log(
+        "warn",
+        `run job=${jobId} role=${resolved.role} — no active role lease (proceeding anyway; lease-less runs will be gated in a follow-up)`
+      );
+    } else if (lease.expired || lease.exhausted) {
+      await log(
+        "warn",
+        `run job=${jobId} role=${resolved.role} — role lease ${lease.expired ? "EXPIRED" : "EXHAUSTED"} (window_end=${lease.window_end}, consumed=${lease.consumed_units}/${lease.budget_units ?? "unlimited"}) — proceeding but lease should be renewed`
+      );
+    } else {
+      await log(
+        "info",
+        `run job=${jobId} role=${resolved.role} — active lease ok (consumed=${lease.consumed_units}/${lease.budget_units ?? "unlimited"}, window_end=${lease.window_end})`
+      );
+    }
 
     // 2. Merge overrides
     const effectiveHarnessId = harness_id || resolved.harness_id;
@@ -373,6 +392,8 @@ async function executeOllama(
     }
 
     const data = await resp.json() as any;
+    // ── consumed_units tracking (RoleLeases plan 1286) ──────────
+    incrementConsumedUnits(role).catch(() => {});
     return {
       exitCode: 0,
       stdout: data.response || "",
@@ -424,6 +445,8 @@ async function executeOpencode(params: HarnessExecParams): Promise<HarnessExecRe
       }
     );
 
+    // ── consumed_units tracking (RoleLeases plan 1286) ──────────
+    incrementConsumedUnits(role).catch(() => {});
     return { exitCode: 0, stdout, stderr };
   } catch (error: any) {
     return {

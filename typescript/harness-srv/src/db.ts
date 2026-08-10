@@ -453,3 +453,53 @@ export async function emitEvent(params: {
 }
 
 export { pool, redis };
+
+// ── Role-lease guard (RoleLeases plan 1286, slice 3) ─────────────────
+
+export interface RoleLeaseStatus {
+  id: string;
+  role: string;
+  channel: string;
+  status: string;
+  window_end: string;
+  budget_units: number | null;
+  consumed_units: number;
+  expired: boolean;
+  exhausted: boolean;
+}
+
+/**
+ * Check whether a role has an active lease in tackle.role_leases.
+ *
+ * Returns null when no ACTIVE lease exists (role has not been leased).
+ * Returns the lease with computed `expired` (past window_end) and
+ * `exhausted` (budget consumed) flags so callers can decide whether
+ * to proceed, warn, or reject.
+ */
+export async function checkRoleLease(role: string): Promise<RoleLeaseStatus | null> {
+  const result = await pool.query(
+    `SELECT id, role, channel, status,
+            window_end, budget_units, consumed_units,
+            NOW() > window_end AS expired,
+            (budget_units IS NOT NULL AND consumed_units >= budget_units) AS exhausted
+     FROM tackle.role_leases
+     WHERE role = $1 AND status = 'ACTIVE'
+     LIMIT 1`,
+    [role]
+  );
+  if (result.rows.length === 0) return null;
+  return result.rows[0] as RoleLeaseStatus;
+}
+
+/**
+ * Increment consumed_units on the active role lease (idempotent —
+ * no-op when no ACTIVE lease exists for the role).
+ */
+export async function incrementConsumedUnits(role: string): Promise<void> {
+  await pool.query(
+    `UPDATE tackle.role_leases
+     SET consumed_units = consumed_units + 1, updated_at = NOW()
+     WHERE role = $1 AND status = 'ACTIVE'`,
+    [role]
+  );
+}
