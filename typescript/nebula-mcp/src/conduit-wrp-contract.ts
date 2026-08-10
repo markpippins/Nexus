@@ -693,3 +693,137 @@ function buildCrossReferences(
  * Enforcement: reduceToProjection() processes any prefix of the full
  * receipt stream and produces a valid substate projection.
  */
+
+/* ===================================================================
+ * 9. CONFORMANCE EXPERIMENT — internal WR trace (MEEP vs IR/kernel)
+ * =================================================================== */
+
+/**
+ * Internal intent types supported by the conformance experiment.
+ *
+ * A conformance intent traces a single internal WorkRequest through both
+ * deterministic candidate paths (MEEP and IR/kernel) and verifies
+ * opcode-level equivalence between the two. The intents are synthetic —
+ * they exist to exercise the pipeline, not to do user-visible work.
+ *
+ * Registration is gated: new conformance intents may only be registered
+ * when an existing intent's opcode vocabulary is shown to be
+ * insufficient AND an architect approves the addition.
+ */
+export type ConformanceIntentType =
+  | "TEST_SCAFFOLD_SERVICE"; // CONSTRUCTION archetype scaffold path
+
+/**
+ * A conformance intent registration record. Describes the synthetic
+ * intent, its canonical prompt, and the conditions under which it is
+ * permitted.
+ */
+export interface ConformanceIntentRegistration {
+  /** The intent type identifier. */
+  intentType: ConformanceIntentType;
+  /** Deterministic canonical prompt fed to the MEEP pipeline. */
+  canonicalPrompt: string;
+  /** Whether the intent is LLM-free in its capture path. */
+  llmFree: boolean;
+  /** Whether this registration required architect approval. */
+  architectApproved: boolean;
+  /** Condition that must hold for the intent to be registered. */
+  registrationCondition: string;
+}
+
+/** The canonical registration for TEST_SCAFFOLD_SERVICE. */
+export const TEST_SCAFFOLD_SERVICE_REGISTRATION: ConformanceIntentRegistration = {
+  intentType: "TEST_SCAFFOLD_SERVICE",
+  canonicalPrompt: "scaffold a deterministic test service builder",
+  llmFree: true,
+  architectApproved: false, // initial intent — no approval required
+  registrationCondition:
+    "registered by default as the initial conformance intent",
+};
+
+/**
+ * One opcode observation from a candidate path.
+ *
+ * The MEEP path emits one opcode per CER event:
+ *   { node: <node_id>, op: <event_type> }
+ * The IR/kernel path emits one opcode per applied state transition:
+ *   { receipt: <receipt_type>, state: <to_state> }
+ *
+ * The two shapes are compared structurally by the conformance oracle.
+ * Both are emitted as the same discriminated union via pathTag.
+ */
+export interface MeepPathOpcode {
+  pathTag: "meep";
+  node: string;
+  op: string;
+}
+
+export interface IrPathOpcode {
+  pathTag: "ir";
+  receipt: string;
+  state: string;
+}
+
+export type ConformanceOpcode = MeepPathOpcode | IrPathOpcode;
+
+/**
+ * Equivalence evidence comparing the two path outputs for a single
+ * internal WorkRequest.
+ */
+export interface ConformanceEquivalenceEvidence {
+  /** The internal WorkRequest id (e.g. "wr-conf-001"). */
+  workRequestId: string;
+  /** Intent type under test. */
+  intentType: ConformanceIntentType;
+  /** Whether the two paths produced byte-identical opcode sequences. */
+  opcodesByteIdentical: boolean;
+  /** Whether the two paths produced identical schema shapes. */
+  schemaShapeIdentical: boolean;
+  /** Whether two observations of each path are byte-identical
+   *  (idempotent capture). */
+  observationIdempotent: boolean;
+  /** Whether replay is idempotent (byte-identical replay state). */
+  replayIdempotent: boolean;
+  /** Length of the MEEP-path opcode sequence. */
+  meepOpcodeCount: number;
+  /** Length of the IR/kernel-path opcode sequence. */
+  irOpcodeCount: number;
+  /** SHA-256 fingerprint of the MEEP-path output. */
+  meepFingerprint: string;
+  /** SHA-256 fingerprint of the IR/kernel-path output. */
+  irFingerprint: string;
+  /** SHA-256 fingerprint of the first delta-store replay state. */
+  replayFingerprint1: string;
+  /** SHA-256 fingerprint of the second delta-store replay state. */
+  replayFingerprint2: string;
+}
+
+/**
+ * Architect verdict on which path is canonical.
+ *
+ * The conformance experiment produces evidence; an architect role
+ * records the verdict (retire or promote) to the database addressed
+ * to:architect.
+ */
+export type ConformanceVerdictKind =
+  | "promote"   // promote one path to canonical
+  | "retire";   // retire one path as redundant
+
+export interface ConformanceVerdict {
+  /** Which verdict was reached. */
+  kind: ConformanceVerdictKind;
+  /** The path that was promoted to canonical or retired. */
+  path: "meep" | "ir";
+  /** The internal WorkRequest id this verdict covers. */
+  workRequestId: string;
+  /** Evidence supporting the verdict. */
+  evidence: ConformanceEquivalenceEvidence;
+  /** Free-text rationale recorded by the architect role. */
+  rationale: string;
+  /** Whether registration of a second conformance intent is blocked.
+   *
+   * If true, the second intent may NOT be registered: TEST_SCAFFOLD_SERVICE
+   * opcodes were sufficient. If false, a second intent may be registered
+   * conditional on architect approval. */
+  secondIntentBlocked: boolean;
+}

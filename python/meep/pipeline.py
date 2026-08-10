@@ -75,3 +75,72 @@ def run_and_replay(prompt: str, use_ast: bool = True) -> tuple[CERLog, Execution
     log = run_pipeline(prompt, use_ast=use_ast)
     state = replay(log)
     return log, state
+
+
+# ── Conformance: MEEP-path opcode extraction ─────────────────────────
+
+
+# Internal intent type used by the conformance experiment to trace a single
+# WorkRequest through the MEEP candidate path. Deterministic and LLM-free:
+# the prompt is mapped through the fixed heuristic IRL classifier → IR
+# resolver → spec compiler → lowering pass → scheduler, never invoking an
+# LLM. The resulting CERLog is the MEEP-path output record.
+CONF_TEST_INTENT_TYPE = "TEST_SCAFFOLD_SERVICE"
+
+# Deterministic conformance prompt for TEST_SCAFFOLD_SERVICE. It maps to the
+# CONSTRUCTION archetype ("scaffold" keyword) whose template is
+# specify → build → verify — the opcode sequence this experiment compares
+# against the IR/kernel-path projection.
+CONF_TEST_PROMPT = "scaffold a deterministic test service builder"
+
+
+def run_conformance_pipeline(intent_type: str = CONF_TEST_INTENT_TYPE) -> CERLog:
+    """Execute the MEEP pipeline for the conformance intent.
+
+    Pure-function, deterministic, LLM-free capture path. The prompt is
+    fixed per intent type so the same ``intent_type`` always yields the
+    same CERLog (byte-identical event payload, modulo timestamps which are
+    deterministic when using a fixed clock).
+
+    Args:
+        intent_type: The conformance intent type. Only
+            ``TEST_SCAFFOLD_SERVICE`` is supported in v1.
+
+    Returns:
+        An append-only CER event log produced by executing the fixed
+        conformance prompt through the MEEP pipeline.
+
+    Raises:
+        ValueError: If *intent_type* is not a registered conformance
+            intent.
+    """
+    if intent_type != CONF_TEST_INTENT_TYPE:
+        raise ValueError(
+            f"Unknown conformance intent type: {intent_type!r}. "
+            f"Only {CONF_TEST_INTENT_TYPE!r} is registered."
+        )
+    return run_pipeline(CONF_TEST_PROMPT, use_ast=False)
+
+
+def extract_meep_opcodes(log: CERLog) -> list[dict]:
+    """Extract a deterministic opcode sequence from a MEEP CERLog.
+
+    The MEEP path encodes opcodes as CER events: each event's node_id and
+    event_type form one (node, op) pair. The opcode sequence is the
+    ordered list of these pairs — it is the MEEP-path output record that
+    the conformance oracle compares against the IR/kernel path.
+
+    Determinism invariant: for the same CERLog, this function always
+    returns the same list (structural equality, no timestamps).
+
+    Args:
+        log: The CERLog from the MEEP pipeline.
+
+    Returns:
+        Ordered list of ``{"node": str, "op": str}`` dicts — one per
+        CER event.
+    """
+    return [
+        {"node": event.node_id, "op": event.event_type}
+        for event in log.events
+    ]

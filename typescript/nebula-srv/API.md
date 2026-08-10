@@ -5,7 +5,7 @@
 
 Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge graph, and cross-references.
 
-**216 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**221 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -164,6 +164,11 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | DELETE | `/api/requirements/:id/dependencies/:depId` | DELETE /api/requirements/:id/dependencies/:depId — remove a dependency link |
 | POST | `/api/requirements/:id/move` | SYSTEM FOLDERS POST /api/requirements/:id/move — kanban-friendly single-id status move (Plan 0131) |
 | PATCH | `/api/requirements/batch` | PATCH /api/requirements/batch — batch status update (BEFORE /:id!) |
+| GET | `/api/role-leases` | GET /api/role-leases — list role leases (filters: role, status) |
+| POST | `/api/role-leases/:id/renew` | POST /api/role-leases/:id/renew — renew an ACTIVE lease (window + budget) |
+| POST | `/api/role-leases/:id/revoke` | POST /api/role-leases/:id/revoke — release an ACTIVE role lease |
+| POST | `/api/role-leases/issue` | ROLE LEASES (RoleLeases / plan 1286) — session-level leases in tackle schema: a bounded window + budget under which a role on a channel may consume work. Mirrors execution.leases (per-request) at role scope. POST /api/role-leases/issue — issue an ACTIVE role lease |
+| GET | `/api/role-leases/stale` | GET /api/role-leases/stale — ACTIVE leases past window/budget (for sweep) |
 | GET | `/api/roles` | ROLES GET /api/roles — list all roles (governance roles with capabilities) |
 | GET | `/api/roles/:id` | GET /api/roles/:id — single role |
 | GET | `/api/search` | SEARCH (cross-entity full-text) GET /api/search?q=... |

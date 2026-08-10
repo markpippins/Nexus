@@ -417,3 +417,183 @@ def reconstruct_kernel_state(
             )
 
     return engine.kernel_state
+
+
+# ── Append-only delta store (conformance replay) ─────────────────────
+#
+# DeltaStore is an in-memory append-only log of KernelDeltas with
+# byte-identical replay semantics. It is the conformance-experiment
+# artifact used to verify that the same committed delta sequence always
+# reconstructs the same KernelState, regardless of how many times it is
+# replayed.
+#
+# Design invariants:
+# - Append-only: once committed, a delta cannot be modified or removed.
+# - Monotonic versions: each committed delta version > all prior versions.
+# - Byte-identical replay: replay() of the same committed sequence
+#   always produces structurally-equal KernelState (I3).
+# - Idempotent: replay() may be called any number of times without
+#   changing the committed log or producing different state.
+#
+# This is NOT the source of truth — the canonical KernelState lives in
+# the runtime store (PostgreSQL). DeltaStore is an observation artifact
+# used by the conformance experiment to verify replay determinism.
+
+
+class DeltaStore:
+    """In-memory append-only store of KernelDeltas.
+
+    Supports the conformance replay contract:
+      1. commit(delta) — append a delta with a monotonic version.
+      2. replay() — reconstruct KernelState from the full committed log.
+
+    All operations are deterministic and side-effect-free aside from
+    the internal log mutation (which is append-only by construction).
+    """
+
+    def __init__(self) -> None:
+        self._deltas: List[KernelDelta] = []
+
+    def commit(self, delta: KernelDelta) -> int:
+        """Append a delta to the log.
+
+        Args:
+            delta: The KernelDelta to commit. Its version MUST be greater
+                than the last committed delta's version (or 0 if empty).
+
+        Returns:
+            The new length of the committed log.
+
+        Raises:
+            ValueError: If the delta's version is not monotonically
+                greater than the last committed version.
+        """
+        if self._deltas:
+            last_version = self._deltas[-1].version
+            if delta.version <= last_version:
+                raise ValueError(
+                    f"Delta version {delta.version} must be greater "
+                    f"than last committed version {last_version}"
+                )
+        self._deltas.append(delta)
+        return len(self._deltas)
+
+    def replay(self) -> KernelState:
+        """Reconstruct KernelState from the full committed delta log.
+
+        Replays every committed delta in order through a fresh
+        KernelEngine, starting from genesis (empty state).
+
+        Determinism invariant (I3): the same committed log always
+        produces the same KernelState on every call.
+
+        Returns:
+            The reconstructed KernelState.
+        """
+        engine = KernelEngine()
+        for delta in self._deltas:
+            result = engine.reduce(delta)
+            if result.is_error:
+                # Conformance: log and continue so partial replay state
+                # is still byte-identical across replays.
+                engine.kernel_state.lineage.record_from_delta(
+                    version=engine.kernel_state.version,
+                    delta_id=delta.delta_id,
+                    step="delta_replay",
+                    event_type="error",
+                    detail=f"Replay error: {result.error.message}",
+                )
+        return engine.kernel_state
+
+    def replay_to_state(
+        self, starting_state: KernelState
+    ) -> KernelState:
+        """Replay the committed log starting from a given KernelState.
+
+        Used to verify byte-identical replay after a snapshot: the
+        reconstruct path is the same as replay() but seeded with a
+        pre-existing state.
+
+        Args:
+            starting_state: The KernelState to seed the engine with.
+
+        Returns:
+            The reconstructed KernelState after all deltas are applied.
+        """
+        engine = KernelEngine(starting_state)
+        for delta in self._deltas:
+            if delta.version <= starting_state.version:
+                continue
+            result = engine.reduce(delta)
+            if result.is_error:
+                engine.kernel_state.lineage.record_from_delta(
+                    version=engine.kernel_state.version,
+                    delta_id=delta.delta_id,
+                    step="delta_replay",
+                    event_type="error",
+                    detail=f"Replay error: {result.error.message}",
+                )
+        return engine.kernel_state
+
+    @property
+    def deltas(self) -> tuple:
+        """Immutable view of the committed delta log."""
+        return tuple(self._deltas)
+
+    def __len__(self) -> int:
+        return len(self._deltas)
+
+    def reset(self) -> None:
+        """Clear the store. For test isolation only."""
+        self._deltas.clear()
+
+
+def kernel_state_fingerprint(state: KernelState) -> str:
+    """Compute a stable SHA-256 fingerprint of a KernelState.
+
+    The fingerprint is the byte-identical replay evidence used by the
+    conformance experiment: two KernelStates with the same fingerprint
+    are structurally equal (same version, receipts, plans, transitions,
+    graph, identity, and lineage).
+
+    Determinism invariant (I3): same state → same fingerprint every call.
+    """
+    import hashlib
+    import json
+
+    payload = json.dumps(state.to_dict(), sort_keys=True, default=str)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def byte_identical_replay(store: DeltaStore) -> dict:
+    """Verify byte-identical replay of a DeltaStore.
+
+    Replays the committed log twice and compares the resulting
+    KernelState fingerprints. Returns a structured evidence record.
+
+    Determinism invariant (I3): two replays of the same log must
+    produce fingerprints that are byte-identical.
+
+    Args:
+        store: The DeltaStore to verify.
+
+    Returns:
+        A dict with:
+          - ``deltas``: number of committed deltas.
+          - ``fingerprint_1``: SHA-256 of the first replay.
+          - ``fingerprint_2``: SHA-256 of the second replay.
+          - ``byte_identical``: True iff the two fingerprints match.
+          - ``idempotent``: True iff replay is byte-identical (same as
+            ``byte_identical``).
+    """
+    s1 = store.replay()
+    fp1 = kernel_state_fingerprint(s1)
+    s2 = store.replay()
+    fp2 = kernel_state_fingerprint(s2)
+    return {
+        "deltas": len(store),
+        "fingerprint_1": fp1,
+        "fingerprint_2": fp2,
+        "byte_identical": fp1 == fp2,
+        "idempotent": fp1 == fp2,
+    }

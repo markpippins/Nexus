@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: conduit-srv — WorkRequest Pipeline Orchestrator (REST surface)
-  version: 1.0.37fad09e
+  version: 1.0.9456b346
   description: 'REST surface of the conduit pipeline orchestrator: workflows, tickets, tokens, config (cron, failure-recovery),
     governance (replay, events), vision, and session log. The MCP tool surface is served separately (Streamable HTTP JSON-RPC
     on the same port).
@@ -21,6 +21,7 @@ tags:
 - name: tokens
 - name: vision
 - name: workflows
+- name: wr
 paths:
   /:
     get:
@@ -585,6 +586,72 @@ paths:
       tags:
       - workflows
       operationId: get_workflows
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /wr/{id}/projection-drift:
+    get:
+      tags:
+      - wr
+      operationId: get_wr_id_projection_drift
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /wr/drift-scan:
+    get:
+      tags:
+      - wr
+      operationId: get_wr_drift_scan
       responses:
         '200':
           description: Success
