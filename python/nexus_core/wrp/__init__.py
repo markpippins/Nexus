@@ -1,4 +1,9 @@
-"""WRP state machine primitives, kernel data types, and projection reducer."""
+"""WRP state machine primitives, kernel data types, addressing, and projection reducer."""
+
+from .addressing import (
+    make_address,
+    parse_address,
+)
 
 from .states import (
     WRP_ADJACENCY_MATRIX,
@@ -29,4 +34,8 @@ __all__ = [
     "KernelError",
     "KernelResult",
     "KernelSnapshot",
+    # addressing.py (content_hash deliberately NOT exported at package level
+    # — it is the low-level helper, kept module-importable for tests only)
+    "make_address",
+    "parse_address",
 ]
