@@ -88,6 +88,8 @@ export interface ResolvedModelConfig {
   harness_id: string;
   harness_name: string;
   invocation_semantics: Record<string, any>;
+  /** config_bundle invocation_mode: CLI | HTTP | SDK | MCP | INTERACTIVE */
+  invocation_mode: string;
   fallback_models: ResolvedFallbackModel[];
   /** opencode --model value computed from model_identifier */
   opencode_model_id: string;
@@ -315,6 +317,7 @@ export async function resolveRoleModel(role: string): Promise<ResolvedModelConfi
     harness_id: primary.harness_id ?? "",
     harness_name: primary.harness_name ?? "",
     invocation_semantics: parseJson(primary.invocation_semantics),
+    invocation_mode: primary.invocation_mode ?? "",
     fallback_models: fallbacks,
     opencode_model_id: opencodeModelId(primary.provider_id ?? "", primary.model_identifier),
   };

@@ -193,6 +193,21 @@ app.post("/run", async (req, res) => {
     // 1. Resolve context
     const resolved = await resolveContext(wind_task_id, contextOverrides);
 
+    // ── Interactive-hosted guard (Freebuff roles, plan 1286 follow-up) ─
+    // Roles whose config_bundle resolves to invocation_mode=INTERACTIVE
+    // (harness harn-freebuff) run INSIDE Freebuff — they are never
+    // launched by harness-srv. Refuse before any spawn happens.
+    if (resolved.model?.invocation_mode === "INTERACTIVE") {
+      await log(
+        "warn",
+        `run job=${jobId} role=${resolved.role} — INTERACTIVE-hosted role (Freebuff); refusing harness launch`
+      );
+      return res.status(400).json({
+        job_id: jobId,
+        error: `role ${resolved.role} is INTERACTIVE-hosted (Freebuff) — cannot be launched via harness-srv; run it in the Freebuff interactive session instead`,
+      });
+    }
+
     // ── Role-lease guard (RoleLeases plan 1286, slice 3) ─────────────
     const lease = await checkRoleLease(resolved.role);
     if (!lease) {

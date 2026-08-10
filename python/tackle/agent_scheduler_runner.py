@@ -369,6 +369,35 @@ class Runner:
         )
         cur.close()
 
+    def _is_interactive_hosted(self, role: str) -> bool:
+        """Check whether a role is INTERACTIVE-hosted (runs inside Freebuff).
+
+        Roles whose active config_bundle resolves to invocation_mode=
+        'INTERACTIVE' (harness harn-freebuff) are executed by the Freebuff
+        interactive session — the scheduler must NEVER launch them via
+        opencode/ollama. This mirrors the harness-srv /run guard.
+        """
+        try:
+            cur = self._conn.cursor()
+            cur.execute(
+                """SELECT invocation_mode FROM tackle.config_bundle
+                   WHERE role = %s AND is_active = 1
+                   ORDER BY priority ASC LIMIT 1""",
+                (role,),
+            )
+            row = cur.fetchone()
+            cur.close()
+            return bool(row and row[0] == "INTERACTIVE")
+        except Exception as e:
+            # Fail CLOSED: if we can't confirm the role is launchable, we
+            # must not launch it. A skipped tick is benign; wrongly spawning
+            # a Freebuff-resident role defeats the entire guard.
+            _log.warning(
+                "interactive-hosted check failed for role=%s: %s — assuming interactive-hosted (refusing launch)",
+                role, e,
+            )
+            return True
+
     def _has_eligible_work(self, role: str) -> bool:
         """Check whether a role has any eligible work before launching.
 
@@ -408,7 +437,7 @@ class Runner:
         now = datetime.now(timezone.utc)
         summary: dict[str, Any] = {
             "evaluated": 0, "due": [], "events_consumed": 0, "launched": 0,
-            "errors": 0, "skipped_empty": 0,
+            "errors": 0, "skipped_empty": 0, "skipped_interactive": 0,
         }
         for entry in self.get_enabled_entries():
             summary["evaluated"] += 1
@@ -433,6 +462,15 @@ class Runner:
             item = {"entry_id": entry_id, "role": role, "schedule_type": stype}
             if events:
                 item["event_ids"] = [str(e["id"]) for e in events]
+
+            # ── Interactive-hosted guard (Freebuff roles) ────────────
+            # Roles running inside Freebuff (config_bundle invocation_mode
+            # = INTERACTIVE, harn-freebuff) are never launched by the
+            # scheduler — the interactive session IS their executor.
+            if self._is_interactive_hosted(role):
+                _log.info("skip (role=%s, interactive-hosted) — runs inside Freebuff, not launchable", role)
+                summary["skipped_interactive"] = summary.get("skipped_interactive", 0) + 1
+                continue
 
             # ── Emptiness check (1285 remediation slice 1) ──────────
             # Before launching, verify the role has eligible work.

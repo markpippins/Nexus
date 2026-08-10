@@ -175,7 +175,7 @@ async function createSchema(
       harness_id      TEXT REFERENCES ${TACKLE_SCHEMA}.harnesses(id),
       priority        INTEGER NOT NULL DEFAULT 0,
       invocation_mode TEXT NOT NULL DEFAULT 'CLI'
-                        CHECK(invocation_mode IN ('CLI', 'HTTP', 'SDK', 'MCP')),
+                        CHECK(invocation_mode IN ('CLI', 'HTTP', 'SDK', 'MCP', 'INTERACTIVE')),
       command         TEXT,
       endpoint_url    TEXT,
       timeout_ms      INTEGER,
@@ -1878,7 +1878,7 @@ export interface ConfigBundleRow {
   provider_id: string | null;
   harness_id: string | null;
   priority: number;
-  invocation_mode: "CLI" | "HTTP" | "SDK" | "MCP";
+  invocation_mode: "CLI" | "HTTP" | "SDK" | "MCP" | "INTERACTIVE";
   command: string | null;
   endpoint_url: string | null;
   timeout_ms: number | null;
@@ -2114,7 +2114,7 @@ export async function upsertConfigBundles(
   role: string, bundles: {
     model_id: string; priority: number;
     provider_id?: string | null; harness_id?: string | null;
-    name?: string; invocation_mode?: "CLI" | "HTTP" | "SDK" | "MCP";
+    name?: string; invocation_mode?: "CLI" | "HTTP" | "SDK" | "MCP" | "INTERACTIVE";
     command?: string | null; endpoint_url?: string | null; timeout_ms?: number | null;
   }[],
 ): Promise<void> {

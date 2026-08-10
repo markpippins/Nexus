@@ -697,7 +697,7 @@ async function createSchema(
       harness_id      TEXT REFERENCES ${TACKLE_SCHEMA}.harnesses(id),
       priority        INTEGER NOT NULL DEFAULT 0,
       invocation_mode TEXT NOT NULL DEFAULT 'CLI'
-                        CHECK(invocation_mode IN ('CLI', 'HTTP', 'SDK', 'MCP')),
+                        CHECK(invocation_mode IN ('CLI', 'HTTP', 'SDK', 'MCP', 'INTERACTIVE')),
       command         TEXT,
       endpoint_url    TEXT,
       timeout_ms      INTEGER,
@@ -2875,6 +2875,62 @@ const migrations: Migration[] = [
       console.log('[migrations] v35: PRIMARY KEY added to vision.tickets');
     },
   },
+  {
+    version: 36,
+    description: "config_bundle: add INTERACTIVE invocation mode for Freebuff-hosted roles (leased-builder) + harn-freebuff harness",
+    up: async (exec) => {
+      // 1. Extend the invocation_mode CHECK to allow INTERACTIVE.
+      //    Freebuff-hosted roles (interactive channel) are never launched —
+      //    Freebuff itself is the execution host. INTERACTIVE marks them
+      //    so launch paths (harness-srv /run, agent_scheduler) refuse to spawn.
+      await exec(`
+        ALTER TABLE tackle.config_bundle
+          DROP CONSTRAINT IF EXISTS config_bundle_invocation_mode_check
+      `);
+      await exec(`
+        ALTER TABLE tackle.config_bundle
+          ADD CONSTRAINT config_bundle_invocation_mode_check
+          CHECK (invocation_mode IN ('CLI', 'HTTP', 'SDK', 'MCP', 'INTERACTIVE'))
+      `);
+
+      // 2. Seed the Freebuff-hosted harness — semantics declare NO binary:
+      //    execution.mode = hosted, host = freebuff. Anything that reads
+      //    invocation_semantics can see this is not launchable.
+      await exec(`
+        INSERT INTO tackle.harnesses (id, name, invocation_semantics, created_at, updated_at)
+        VALUES (
+          'harn-freebuff',
+          'Freebuff (interactive host)',
+          '{"binary":null,"capabilities":{"agent":true,"model":true,"working_directory":false,"system_prompt":true},"execution":{"mode":"hosted","host":"freebuff"},"semantics":{},"role_mapping":{"strategy":"none"}}',
+          NOW(), NOW()
+        )
+        ON CONFLICT (id) DO NOTHING
+      `);
+
+      // 3. Seed leased-builder's interactive config bundle.
+      //    invocation_mode=INTERACTIVE + harness_id=harn-freebuff means:
+      //    model resolution still works (role_lease accounting), but no
+      //    launch path may spawn this role.
+      await exec(`
+        INSERT INTO tackle.config_bundle
+          (id, name, role, model_id, provider_id, harness_id, priority, invocation_mode, is_active, metadata, created_at, updated_at)
+        VALUES (
+          'cb-leased-builder-interactive',
+          'Leased-Builder (Freebuff interactive)',
+          'leased-builder',
+          'mod-glm-5-2',
+          NULL,
+          'harn-freebuff',
+          0,
+          'INTERACTIVE',
+          1,
+          '{"channel":"interactive","host":"freebuff"}',
+          NOW(), NOW()
+        )
+        ON CONFLICT (role, model_id) DO NOTHING
+      `);
+    },
+  },
 ];
 
 /**
@@ -4660,7 +4716,7 @@ export interface ConfigBundleRow {
   provider_id: string | null;
   harness_id: string | null;
   priority: number;
-  invocation_mode: "CLI" | "HTTP" | "SDK" | "MCP";
+  invocation_mode: "CLI" | "HTTP" | "SDK" | "MCP" | "INTERACTIVE";
   command: string | null;
   endpoint_url: string | null;
   timeout_ms: number | null;
