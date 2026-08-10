@@ -10,7 +10,7 @@ const router = Router();
 // POST /vision/work-requests — create or upsert a work request
 router.post("/work-requests", async (req, res) => {
   try {
-    const { id, work_request_uuid, dco_json, context, status, title } = req.body;
+    const { id, work_request_uuid, dco_json, context, status, title, entity_key } = req.body;
     if (!id) {
       res.status(400).json({ ok: false, error: "Missing required field: id" });
       return;
@@ -18,16 +18,17 @@ router.post("/work-requests", async (req, res) => {
     // Atomic upsert by wr_id (ON CONFLICT avoids race condition)
     const uuid = work_request_uuid || crypto.randomUUID();
     const rows = await query<any>(
-      `INSERT INTO ${VISION_SCHEMA}.work_requests (wr_id, work_request_uuid, dco_json, context, status, title)
-       VALUES ($1, $2, $3, $4::jsonb, $5, $6)
+      `INSERT INTO ${VISION_SCHEMA}.work_requests (wr_id, work_request_uuid, dco_json, context, status, title, entity_key)
+       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)
        ON CONFLICT (wr_id) DO UPDATE SET
          dco_json = EXCLUDED.dco_json,
          context = EXCLUDED.context,
          status = EXCLUDED.status,
          title = EXCLUDED.title,
+         entity_key = COALESCE(EXCLUDED.entity_key, ${VISION_SCHEMA}.work_requests.entity_key),
          updated_at = NOW()
        RETURNING work_request_uuid, (xmax = 0) AS inserted`,
-      [id, uuid, dco_json || "{}", JSON.stringify(context || {}), status || "pending", title || ""]
+      [id, uuid, dco_json || "{}", JSON.stringify(context || {}), status || "pending", title || "", entity_key || null]
     );
     const inserted = rows[0]?.inserted === true;
     res.json({ ok: true, id, work_request_uuid: rows[0]?.work_request_uuid || uuid, action: inserted ? "created" : "updated" });

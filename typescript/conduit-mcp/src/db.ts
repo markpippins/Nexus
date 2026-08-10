@@ -2931,6 +2931,26 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 37,
+    description: "Add entity_key (CCNF content identity) to work_requests (vision + conduit) — roadmap Q4: every WR gets content identity at creation",
+    up: async (exec) => {
+      // entity_key = SHA256 over sorted {domain, intent, actor, scope} per
+      // go/wrp/ccnf-ref (DeriveIdentity). Pure-Python mirror lives in
+      // nexus_core/wrp/identity.py; cross-language parity guarded by wr-conf-010.
+      // Column is nullable: legacy rows predate compile-time emission; new WRs
+      // get it from birth via vision_bridge.create_work_request.
+      await exec(`
+        ALTER TABLE ${VISION_SCHEMA}.work_requests
+          ADD COLUMN IF NOT EXISTS entity_key TEXT
+      `);
+      await exec(`
+        ALTER TABLE ${PG_SCHEMA}.work_requests
+          ADD COLUMN IF NOT EXISTS entity_key TEXT
+      `);
+      console.log("[migrations] v37: added entity_key to work_requests (vision + conduit)");
+    },
+  },
 ];
 
 /**
@@ -4103,6 +4123,7 @@ export async function createWorkRequest(wr: {
   context?: any;
   status?: string;
   title?: string;
+  entity_key?: string | null;
 }): Promise<{ ok: boolean; id: string; work_request_uuid: string }> {
   const now = new Date().toISOString();
   const ctx = wr.context ?? {};
@@ -4111,13 +4132,14 @@ export async function createWorkRequest(wr: {
   const uuid = wr.work_request_uuid || crypto.randomUUID();
   if (!ctx.work_request_uuid) ctx.work_request_uuid = uuid;
   await qRun(
-    `INSERT INTO ${VISION_SCHEMA}.work_requests (wr_id, work_request_uuid, dco_json, context, status, title, recorded_on_dt)
-     VALUES (@wr_id, @work_request_uuid, @dco_json, @context::jsonb, @status, @title, @now)
+    `INSERT INTO ${VISION_SCHEMA}.work_requests (wr_id, work_request_uuid, dco_json, context, status, title, recorded_on_dt, entity_key)
+     VALUES (@wr_id, @work_request_uuid, @dco_json, @context::jsonb, @status, @title, @now, @entity_key)
      ON CONFLICT (wr_id) DO UPDATE SET
        dco_json = EXCLUDED.dco_json,
        context = EXCLUDED.context,
        status = EXCLUDED.status,
-       title = COALESCE(EXCLUDED.title, ${VISION_SCHEMA}.work_requests.title)`,
+       title = COALESCE(EXCLUDED.title, ${VISION_SCHEMA}.work_requests.title),
+       entity_key = COALESCE(EXCLUDED.entity_key, ${VISION_SCHEMA}.work_requests.entity_key)`,
     {
       wr_id: wr.id,
       work_request_uuid: uuid,
@@ -4125,6 +4147,7 @@ export async function createWorkRequest(wr: {
       context: JSON.stringify(ctx),
       status: wr.status ?? "pending",
       title: wr.title ?? "",
+      entity_key: wr.entity_key ?? null,
       now,
     }
   );

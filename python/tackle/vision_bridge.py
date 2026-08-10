@@ -39,6 +39,8 @@ from losm_ir.execution_receipt import ExecutionReceipt
 from losm_ir.executor_registry import DEFAULT_KNOWN_EXECUTORS
 from losm_ir.work_request import WorkRequestDCO
 
+from nexus_core.wrp.identity import emit_identity
+
 _log = logging.getLogger("tackle.vision_bridge")
 
 # ── Conduit server URLs ───────────────────────────────────────────────
@@ -134,6 +136,28 @@ _RECEIPT_TYPE_TO_RESULT = {v: k for k, v in _RESULT_TO_RECEIPT_TYPE.items()}
 # ── Work Request CRUD ─────────────────────────────────────────────────
 
 
+def _dco_ccnf_input(dco: WorkRequestDCO) -> Dict[str, Any]:
+    """Build the CCNF input document for a WorkRequestDCO (mirrors
+    ``ccnf_bridge.CCNFAdapter.from_work_request`` shape) so the pure-Python
+    emitter can derive the entity_key without the Go binary.
+    """
+    meta = getattr(dco, "metadata", None) or {}
+    agent_id = meta.get("agent_id") or "conduit"
+    from datetime import datetime, timezone
+    ts = int(datetime.now(timezone.utc).timestamp())
+    return {
+        "event_id": dco.id,
+        "actor": {"type": "system", "id": agent_id},
+        "intent": {
+            "action": "execute",
+            "target_type": "workrequest",
+            "target_id": f"workrequest:{dco.id}",
+        },
+        "domain": "execution",
+        "timestamp": ts,
+    }
+
+
 def create_work_request(
     dco: WorkRequestDCO,
     plan_id: Optional[str] = None,
@@ -151,11 +175,23 @@ def create_work_request(
     wr_id = plan_id or dco.id
     wr_uuid = generate_work_request_uuid()
 
+    # entity_key derived at creation (birth), via the pure-Python CCNF mirror —
+    # roadmap Q4: every WR gets content identity from birth, not at execution.
+    # Only ValueError (documented emit failure: e.g. missing intent.action) is
+    # tolerated as a null key; anything else is a real bug in the mirror and
+    # must surface rather than be silently swallowed.
+    try:
+        entity_key, _, _ = emit_identity(_dco_ccnf_input(dco))
+    except ValueError:
+        _log.warning("create_work_request: no entity_key for wr=%s (intent not emittable)", wr_id)
+        entity_key = None
+
     payload = {
         "id": wr_id,
         "work_request_uuid": wr_uuid,
         "dco_json": dco.model_dump_json(),
         "status": dco.execution_state.status if dco.execution_state else "pending",
+        "entity_key": entity_key,
         "context": {
             "plan_id": wr_id,
             "work_request_uuid": wr_uuid,
