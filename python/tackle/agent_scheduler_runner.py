@@ -369,6 +369,36 @@ class Runner:
         )
         cur.close()
 
+    def _has_eligible_work(self, role: str) -> bool:
+        """Check whether a role has any eligible work before launching.
+
+        This is the 1285 remediation: the runaway-reviewer incident
+        (e6d854da) happened because the scheduler launched reviewer with
+        0 eligible plans — the agent burned CPU generating nothing.
+
+        Checks (per role):
+          - builder  → READY execution.requests count > 0
+          - reviewer → open reviewer tickets in vision.tickets > 0
+          - critic / other → assume eligible (conservative fallback)
+        """
+        try:
+            cur = self._conn.cursor()
+            if role == "builder":
+                cur.execute(
+                    "SELECT COUNT(*) AS n FROM execution.requests WHERE status = 'READY'"
+                )
+                return cur.fetchone()[0] > 0
+            if role == "reviewer":
+                cur.execute(
+                    "SELECT COUNT(*) AS n FROM vision.tickets WHERE role = 'reviewer' AND status = 'open'"
+                )
+                return cur.fetchone()[0] > 0
+            # Conservative: roles without a specific check are assumed to have work
+            return True
+        except Exception as e:
+            _log.warning("eligibility check failed for role=%s: %s — assuming eligible", role, e)
+            return True  # fail open — don't block the scheduler on a query error
+
     def evaluate_tick(self, *, shadow: bool = False) -> dict:
         """The single evaluation tick. Returns a summary dict.
 
@@ -377,7 +407,8 @@ class Runner:
         """
         now = datetime.now(timezone.utc)
         summary: dict[str, Any] = {
-            "evaluated": 0, "due": [], "events_consumed": 0, "launched": 0, "errors": 0,
+            "evaluated": 0, "due": [], "events_consumed": 0, "launched": 0,
+            "errors": 0, "skipped_empty": 0,
         }
         for entry in self.get_enabled_entries():
             summary["evaluated"] += 1
@@ -414,6 +445,15 @@ class Runner:
             if events:
                 self._stamp_consumed([str(e["id"]) for e in events])
                 summary["events_consumed"] += len(events)
+
+            # ── Emptiness check (1285 remediation slice 1) ──────────
+            # Before launching, verify the role has eligible work.
+            # This prevents the runaway-reviewer incident: reviewer
+            # launched with 0 plans and burned CPU generating nothing.
+            if not self._has_eligible_work(role):
+                _log.info("skip (role=%s, eligible=0) — no work to do", role)
+                summary["skipped_empty"] = summary.get("skipped_empty", 0) + 1
+                continue
 
             result = self.launch_agent(entry)
             self.record_run(entry_id, result)

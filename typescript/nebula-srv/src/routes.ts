@@ -6972,7 +6972,12 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
-  // POST /api/role-leases/consume — increment consumed_units (interactive channel)
+  // POST /api/role-leases/consume — increment consumed_units (all channels)
+  //
+  // Unified accounting: execution_worker, harness-srv, and interactive
+  // Freebuff all hit this one endpoint for lease consumption. When the
+  // budget is exhausted, the endpoint auto-revokes the lease and emits
+  // a type:lease-exhausted agent record so the operator is notified.
   router.post('/role-leases/consume', async (req: Request, res: Response) => {
     try {
       const { role } = req.body;
@@ -6981,14 +6986,53 @@ export function createRoutes(pool: Pool): Router {
         `UPDATE tackle.role_leases
          SET consumed_units = consumed_units + 1, updated_at = NOW()
          WHERE role = $1 AND status = 'ACTIVE'
-         RETURNING id, consumed_units, budget_units`,
+         RETURNING id, consumed_units, budget_units, window_end, channel, model`,
         [role]
       );
       if (rows.length === 0) {
         return res.status(404).json({ error: `No ACTIVE lease for role '${role}'` });
       }
       const lease = rows[0];
-      res.json({ ok: true, consumed: lease.consumed_units, budget: lease.budget_units });
+      const exhausted = lease.budget_units !== null && lease.consumed_units >= lease.budget_units;
+
+      if (exhausted) {
+        // Auto-revoke — budget consumed, no more work under this lease
+        await pool.query(
+          `UPDATE tackle.role_leases SET status = 'RELEASED', updated_at = NOW() WHERE id = $1`,
+          [lease.id]
+        );
+        // Emit exhaustion record (fire-and-forget — don't block the response)
+        const exhaustId = randomUUID();
+        const now = new Date().toISOString();
+        pool.query(
+          `INSERT INTO nebula.agent_records_history (id, record_type, role, title, content, tags, created_at, recorded_on_dt)
+           VALUES ($1::uuid, 'report', $2, $3, $4, $5, $6, $6)`,
+          [
+            exhaustId,
+            'architect',
+            `Role-lease exhausted: ${role} (${lease.consumed_units}/${lease.budget_units})`,
+            `## Role lease exhausted
+
+- **Role:** ${role}
+- **Channel:** ${lease.channel || 'unknown'}
+- **Model:** ${lease.model || 'unknown'}
+- **Consumed:** ${lease.consumed_units}/${lease.budget_units}
+- **Window end:** ${lease.window_end}
+- **Lease ID:** ${lease.id}
+
+The lease has been auto-revoked. Issue a new lease to resume work.`,
+            ['type:lease-exhausted', 'to:architect', 'to:engineer', `role:${role}`],
+            now
+          ]
+        ).catch(() => { /* best-effort — don't fail the response */ });
+      }
+
+      res.json({
+        ok: true,
+        consumed: lease.consumed_units,
+        budget: lease.budget_units,
+        exhausted,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

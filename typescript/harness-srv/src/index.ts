@@ -15,7 +15,7 @@
 
 import express from "express";
 import { resolveContext, emitEvent, pool, redis, checkRoleLease, incrementConsumedUnits } from "./db";
-import { execFile } from "child_process";
+import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import { writeFile, readFile, unlink, mkdir, appendFile } from "fs/promises";
 import { join } from "path";
@@ -28,6 +28,101 @@ app.use(express.json());
 const PORT = parseInt(process.env.HARNESS_PORT || "3420");
 const WORK_DIR = process.env.HARNESS_WORK_DIR || "/home/codex/dev";
 const PROMPT_DIR = join(WORK_DIR, ".harness", "prompts");
+
+// ── Runaway watchdog (T16 guardrail, 1285 remediation slice 2) ───
+const RUNAWAY_THRESHOLD_MS = 15 * 60 * 1000; // 15 min
+const WATCHDOG_INTERVAL_MS = 60_000; // check every 60s
+
+interface TrackedSession {
+  jobId: string;
+  role: string;
+  model: string | undefined;
+  startedAt: number;
+  promptFile: string;
+}
+
+const activeSessions = new Map<string, TrackedSession>();
+
+function startWatchdog(): void {
+  setInterval(async () => {
+    const now = Date.now();
+    for (const [jobId, session] of activeSessions) {
+      const elapsed = now - session.startedAt;
+      if (elapsed < RUNAWAY_THRESHOLD_MS) continue;
+
+      // Check for durable output since launch
+      let hasOutput = false;
+      try {
+        const nebulaUrl = process.env.NEBULA_URL || "http://localhost:3101";
+        const since = new Date(session.startedAt).toISOString();
+        const resp = await fetch(
+          `${nebulaUrl}/api/agent-records?role=${encodeURIComponent(session.role)}&createdAfter=${since}&limit=1`
+        );
+        const data = await resp.json() as any;
+        hasOutput = (data?.items?.length || 0) > 0;
+      } catch {
+        // Can't reach nebula — assume worst case, don't kill
+        continue;
+      }
+
+      if (hasOutput) continue; // agent is producing output, not runaway
+
+      // ── Runaway detected — kill + unload ──────────────────────
+      await log("warn", `runaway detected: job=${jobId} role=${session.role} elapsed=${Math.round(elapsed/1000)}s — killing`);
+
+      // Kill opencode processes tied to this prompt file
+      try {
+        await execFileAsync("pkill", ["-f", `opencode.*${session.promptFile.split("/").pop()}`]);
+      } catch {
+        // pkill returns non-zero when no match — that's fine
+      }
+
+      // Unload Ollama model if one was in use
+      if (session.model) {
+        try {
+          const ollamaUrl = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
+          await fetch(`${ollamaUrl}/api/generate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model: session.model, keep_alive: 0 }),
+          });
+        } catch {
+          // best-effort unload
+        }
+      }
+
+      // Emit runaway detection record
+      const exhaustId = uuidv4();
+      const isoNow = new Date().toISOString();
+      try {
+        await pool.query(
+          `INSERT INTO nebula.agent_records_history (id, record_type, role, title, content, tags, created_at, recorded_on_dt)
+           VALUES ($1::uuid, 'report', 'architect', $2, $3, $4, $5, $5)`,
+          [
+            exhaustId,
+            `Runaway agent killed: ${session.role} (job ${jobId.slice(0, 8)})`,
+            `## Runaway agent detected + killed
+
+- **Job:** ${jobId}
+- **Role:** ${session.role}
+- **Model:** ${session.model || 'unknown'}
+- **Elapsed:** ${Math.round(elapsed / 1000)}s
+- **Threshold:** ${RUNAWAY_THRESHOLD_MS / 1000}s
+
+No agent records were produced since launch. The process was killed and the model unloaded.`,
+            ['type:runaway-detected', 'to:architect', 'to:engineer', `role:${session.role}`],
+            isoNow
+          ]
+        );
+      } catch {
+        // best-effort record
+      }
+
+      activeSessions.delete(jobId);
+    }
+  }, WATCHDOG_INTERVAL_MS);
+  log("info", `watchdog started (threshold=${RUNAWAY_THRESHOLD_MS}ms, interval=${WATCHDOG_INTERVAL_MS}ms)`);
+}
 
 // ── File logging (nexus/logs/harness-srv.log) ─────────────────────
 const LOG_DIR = process.env.NEXUS_LOG_DIR || "/home/codex/dev/nexus/logs";
@@ -162,6 +257,15 @@ app.post("/run", async (req, res) => {
         procedure_cards: resolved.prompt.match(/^- \*\*/gm)?.length || 0,
       });
     } else {
+      // ── Register session for runaway watchdog ──────────────────
+      activeSessions.set(jobId, {
+        jobId,
+        role: resolved.role,
+        model: effectiveModel,
+        startedAt: startTime,
+        promptFile,
+      });
+
       try {
         const result = await executeHarness({
           harness_id: effectiveHarnessId,
@@ -179,6 +283,8 @@ app.post("/run", async (req, res) => {
         exitCode = execError.exitCode || 1;
         stdout = execError.stdout || "";
         stderr = execError.stderr || execError.message;
+      } finally {
+        activeSessions.delete(jobId);
       }
     }
 
@@ -295,6 +401,18 @@ app.get("/health", async (_req, res) => {
   } catch (error: any) {
     res.status(503).json({ status: "error", error: error.message });
   }
+});
+
+// ── GET /sessions — active session list (runaway watchdog visibility)
+app.get("/sessions", (_req, res) => {
+  const sessions = Array.from(activeSessions.values()).map((s) => ({
+    jobId: s.jobId,
+    role: s.role,
+    model: s.model || null,
+    startedAt: new Date(s.startedAt).toISOString(),
+    elapsedSeconds: Math.round((Date.now() - s.startedAt) / 1000),
+  }));
+  res.json({ sessions, count: sessions.length });
 });
 
 // ── Harness execution ───────────────────────────────────────────────
@@ -533,6 +651,7 @@ const server = app.listen(PORT, () => {
   console.log(`[harness-srv] work dir: ${WORK_DIR}`);
   console.log(`[harness-srv] prompt dir: ${PROMPT_DIR}`);
   log("info", `listening on port ${PORT} (work dir: ${WORK_DIR}, log: ${LOG_FILE})`);
+  startWatchdog();
 });
 
 server.on('error', (err: NodeJS.ErrnoException) => {
