@@ -2,6 +2,8 @@
   "card_count": 38,
   "cards": [
     {
+      "body_md": "## Agent Config Role Definition\n\nEach agent role .md file (in .opencode/agents/) MUST include a message block in its frontmatter:\n\n```yaml\n---\nassumes_role: <role>\nmessage:\n  inbox_query:\n    - tags contain \"to:<role>\"\n    - tags contain \"status:open\"\n  record_types: [list of valid record types for this role]\n  auto_present: true\n  enrich_context: true\n---\n```\n\n### Fields\n- assumes_role: The role this agent config activates (engineer, architect, planner, etc.)\n- inbox_query: Tag filters for inbox querying\n- record_types: Valid agent record types this role may write\n- auto_present: Whether to surface inbox items on every turn start\n- enrich_context: Whether to load linked system/subsystem/plan data on boot\n\n### Valid record_type values\nreport, analysis, assessment, inspection, prompt, response, engineering_log, architecture_note, decision",
+      "mcp_tools": [],
       "roles": [
         "analyst",
         "architect",
@@ -13,9 +15,28 @@
         "reviewer"
       ],
       "sha256": "c8ee53af63a26ab4b810700caa8f8cb323062c0c9f70d92cd48ef11c47a5dc6d",
-      "slug": "agent-config-template"
+      "slug": "agent-config-template",
+      "summary": "Frontmatter template for .opencode/agents/ role definition files.",
+      "tags": [
+        "reference",
+        "config",
+        "frontmatter",
+        "agent-definition"
+      ],
+      "title": "Agent Config Frontmatter Template",
+      "triggers": [
+        "agent config",
+        "frontmatter",
+        "role definition",
+        ".opencode/agents"
+      ]
     },
     {
+      "body_md": "## Procedure\n\nOn role activation (every session start):\n\n1. **Ensure projection target directories exist:**\n   ```\n   mkdir -p nexus/audit/{PROMPTS,RESPONSES,PLANS/pending,IMPLEMENTATION_PLANS/active,CHANGES/committed,ENGINEERING/reports,...}\n   find nexus/audit -type d -empty -not -path '*/.git/*' -exec touch {}/.gitkeep \\;\n   ```\n   These are on-demand projection targets, not the canonical store.\n\n2. **Query your inbox:**\n   - Use `nebula_list_agent_records` and filter for tags containing `\"to:<your_role>\"` and `\"status:open\"`\n   - If nebula-mcp is unreachable, surface this as a blocking infrastructure issue \u2014 do not silently proceed without checking the inbox\n   - Present any open items to the user before proceeding\n\n3. **Query nebula projection config** to verify current role\u2192folder assignments. Read `nexus/audit/AGENT_FOLDER_MAP.md` as a static reference copy.\n\n4. **Present any new items** to the user before proceeding with their request.",
+      "mcp_tools": [
+        "nebula_list_agent_records",
+        "nebula_create_agent_record"
+      ],
       "roles": [
         "analyst",
         "architect",
@@ -27,17 +48,55 @@
         "reviewer"
       ],
       "sha256": "af0c875e302196137b3405ca770b12a1358d6db8ac3116ab4ba4df46dfb2720d",
-      "slug": "bootstrap-self-update"
+      "slug": "bootstrap-self-update",
+      "summary": "On activation: ensure audit directories, query inbox, present open items.",
+      "tags": [
+        "turn-protocol",
+        "activation",
+        "bootstrap",
+        "inbox"
+      ],
+      "title": "Bootstrap Self-Update (Activation)",
+      "triggers": [
+        "activate",
+        "session start",
+        "boot",
+        "turn start"
+      ]
     },
     {
+      "body_md": "## Builder Workflow\n\n### 1. Query Pipeline State\nUse `conduit-mcp_query_conduit_state` to find pending plans. Check for blocked plans first \u2014 if any exist, stop and alert.\n\n### 2. Read Plan Details\nUse `conduit-mcp_get_plan_receipts` to review plan receipts and confirm its lifecycle state. Read the .md file from filesystem for the implementation spec (goal, files, AC, deps).\n\n### 3. Implement\nModify code according to the plan goal, files affected, and acceptance criteria. Use `conduit-mcp_agent_heartbeat` to report liveness.\n\n### 4. Handle Blockers\nIf implementation cannot proceed: `conduit-mcp_issue_receipt` with type BLOCK. Report the issue to the user.\n\n### 5. Report Completion\nUse `conduit-mcp_agent_finished` when the plan is implemented. The pipeline manager handles receipt advancement automatically.\n\n### Continuous Execution Rule\nThe Builder works through all available plans without pausing. Only stops on: true blocker, logical impossibility, or user interrupt. Does NOT ask for approval between plans.",
+      "mcp_tools": [
+        "conduit-mcp_query_conduit_state",
+        "conduit-mcp_get_plan_receipts",
+        "conduit-mcp_agent_heartbeat",
+        "conduit-mcp_issue_receipt",
+        "conduit-mcp_agent_finished"
+      ],
       "roles": [
         "builder",
         "engineer"
       ],
       "sha256": "69d21ce769629edd510e335e55046800f8cb96916ab69fbc03dfb83119cef819",
-      "slug": "builder-workflow"
+      "slug": "builder-workflow",
+      "summary": "How the Builder picks up pending plans, implements them, and handles blockers.",
+      "tags": [
+        "builder",
+        "workflow",
+        "implementation",
+        "plans"
+      ],
+      "title": "Builder: Implementation Workflow",
+      "triggers": [
+        "builder workflow",
+        "implement plan",
+        "pending plans",
+        "blocker"
+      ]
     },
     {
+      "body_md": "## Conduit-MCP Tool Reference\n\nConduit-mcp (port 3100) manages the plan lifecycle, issues receipts, and serves pipeline state.\n\n### Plan Lifecycle\n| Tool | Purpose |\n|------|---------|\n| query_conduit_state | Return full pipeline state |\n| create_plan | Create a pending implementation plan |\n| create_proposed_plan | Create a lightweight proposed plan |\n| update_plan | Update plan metadata |\n| delete_plan | Soft-delete a plan |\n| hard_delete_plan | Permanently delete a stuck plan |\n| promote_plan | Promote proposed \\u2192 planning |\n| revise_plan | Create a revision copy in planning |\n| unblock_plan | Move blocked \\u2192 pending |\n| report_plan_metadata | Update plan title/description |\n| get_plan_receipts | Get receipt chain for a plan |\n\n### Receipts & Agent Status\n| Tool | Purpose |\n|------|---------|\n| issue_receipt | Record a conduit event receipt |\n| report_builder_status | Report builder process status |\n| agent_heartbeat | Report agent liveness and state |\n| agent_finished | Report agent completed its task |\n\n### Queries\n| Tool | Purpose |\n|------|---------|\n| query_analytics | Query conduit analytics metrics |\n| query_prompts | Search captured prompts with lineage |\n| query_nebula_backlog | Query Nebula RMS backlog |\n| query_nebula_systems | Query Nebula RMS hierarchy |",
+      "mcp_tools": [],
       "roles": [
         "analyst",
         "architect",
@@ -52,9 +111,25 @@
         "reviewer"
       ],
       "sha256": "362605eacbf94c686442feee321b2ae14cc26c5ead0293735e39cf0e70512963",
-      "slug": "conduit-mcp-tools"
+      "slug": "conduit-mcp-tools",
+      "summary": "Complete catalog of conduit-mcp tools for plan lifecycle and pipeline management.",
+      "tags": [
+        "reference",
+        "conduit-mcp",
+        "tools",
+        "appendix"
+      ],
+      "title": "Conduit-MCP Tool Reference",
+      "triggers": [
+        "list tools",
+        "what tools",
+        "conduit-mcp",
+        "MCP reference"
+      ]
     },
     {
+      "body_md": "## Day/Night Turn Boundary\n\nSessions follow a perceptual cycle:\n\n### Day (within a turn)\n- Evidence accumulation\n- Messages arrive, inbox is queried, work is done, records are written\n- No full perceptual recalculation\n- Each turn appends to the timeline without reconciling the entire belief state\n\n### Night (between sessions / on explicit reflection)\n- Accumulated records are reconciled\n- Stale threads are resolved or archived\n- Divergences that accumulated during the day are evaluated\n- Projections are regenerated\n- The belief state is recomputed\n\n### Triggers for Night mode\n- Session end (user disconnects)\n- Explicit type:reconciliation request\n- Scheduler-driven reflection cycle (future)\n\n### Constraint\nDuring Day, agents MUST NOT require full perceptual recalculation to respond. The inbox query is the attention filter \\u2014 it answers \"what needs my attention right now?\" without resolving the entire epistemic state.",
+      "mcp_tools": [],
       "roles": [
         "analyst",
         "architect",
@@ -69,16 +144,56 @@
         "reviewer"
       ],
       "sha256": "55a87f408dd0c685263dd9b401518f8b479301878b061e745121079575170887",
-      "slug": "day-night-boundary"
+      "slug": "day-night-boundary",
+      "summary": "Perceptual cycle: Day (evidence accumulation within a turn) vs Night (reconciliation between sessions).",
+      "tags": [
+        "operational-model",
+        "day-night",
+        "perceptual-cycle",
+        "reconciliation"
+      ],
+      "title": "Day/Night Turn Boundary",
+      "triggers": [
+        "day night",
+        "turn boundary",
+        "perceptual cycle",
+        "reconciliation"
+      ]
     },
     {
+      "body_md": "## Procedure\n\nEngineers must run this check at session start AND at the start of every subsequent turn **before** processing the user's request.\n\n1. **Call `nebula_list_requirements`** with no filter to retrieve the entire current requirement set; filter client-side by status.\n\n2. **Filter to backlog-relevant items**: keep requirements whose `status` is one of `Backlog`, `ToDo`, `InProgress`, `Active`, or `Blocked`. Exclude `Done`, `Accepted`, `Cancelled`.\n\n3. **Present the backlog before acting:**\n   > \"Backlog context \u2014 [N] open requirement(s) in Nebula RMS:\n   > - **[id]** `[title]` \u2014 [status] \u00b7 [priority] \u00b7 parent: [parent]\n   > Your current request may overlap with one of these. Want to claim an existing item, record new work, or proceed outside the backlog?\"\n\n4. **Propose, do not auto-claim** \u2014 if the request matches a backlog item, surface the candidate and ask before flipping status. Never unilaterally transition a requirement's status.\n\n5. **Record genuinely new work** \u2014 if the request is new, create a requirement via `nebula_create_requirement`.\n\n6. **Re-check before every turn** \u2014 backlog state can shift between turns.",
+      "mcp_tools": [
+        "nebula_list_requirements",
+        "nebula_create_requirement",
+        "nebula_update_requirement"
+      ],
       "roles": [
         "engineer"
       ],
       "sha256": "2bfc96bb6050d16be898033f511d4c4381853a98d48937534816dfbdfbd69fd9",
-      "slug": "engineer-backlog-check"
+      "slug": "engineer-backlog-check",
+      "summary": "Query nebula RMS backlog before starting work. Surface pending requirements.",
+      "tags": [
+        "engineer",
+        "backlog",
+        "requirements",
+        "nebula-rms"
+      ],
+      "title": "Engineer Backlog Check (Nebula RMS)",
+      "triggers": [
+        "start of turn",
+        "before working",
+        "backlog",
+        "requirement"
+      ]
     },
     {
+      "body_md": "\n## Procedure\n\nBefore processing any request, query your role's inbox for messages from other agents.\n\n1. **Query your inbox (R17, verified)** \u2014 the nebula REST API is the simple path:\n\n   ```bash\n   curl -s \"http://localhost:3101/api/agent-records?role=<your_role>&createdAfter=<pointer_iso>\" \\\n     | python3 -c 'import sys,json; d=json.load(sys.stdin); [print(i[\"createdAt\"], i[\"title\"][:60]) for i in d.get(\"items\",[])]'\n   ```\n\n   - Store the last-seen pointer at `http://localhost:3101/api/inbox-pointer/<role>` (GET / PUT, ISO timestamps).\n   - **Caveat (verified):** this endpoint applies `role` + `createdAfter` but silently IGNORES `tags` and `limit` (returns up to 100, newest first).\n   - Records return `createdAt` as epoch ms \u2014 convert to ISO before using it in `createdAfter`/the pointer.\n\n2. **Ready-made helper** \u2014 `nexus/bin/check-inbox.sh --role <your_role>` wraps the exact tag-faithful query:\n   - `--all` ignores the pointer, `--pointer <ISO>` overrides it, `--update-pointer` advances it, `--limit N`, `--raw`, `-h`.\n   - Default path: single `nebula_get_inbox` MCP call on nebula-mcp 3102 (Streamable HTTP) via the canonical client lib `nexus/python/nebula-mcp-client/` \u2014 resolves the stored pointer and applies `tags:[\"to:<role>\"]` server-side in one round-trip. `--pointer <ISO>` / `--all` fall back to `nebula_list_agent_records` with an explicit `createdAfter`.\n\n3. **Weekly review (once per week, non-destructive)** \u2014 look back 7 days for anything that slipped through. `--since 7d` (shorthand for `--pointer \"<7 days ago ISO>\"`) overrides the `createdAfter` filter for this call only and leaves the stored pointer untouched, so the next normal check never re-delivers already-seen records:\n\n   ```bash\n   nexus/bin/check-inbox.sh --role <your_role> --since 7d --limit 100\n   ```\n\n   - Assess what was missed and surface any items that slipped through.\n   - If the review covered everything, optionally mark it all as seen by adding `--update-pointer` (advances to the newest record in the window).\n   - The raw-REST equivalent \u2014 a *permanent* rewind that re-delivers the week on the next check \u2014 is `PUT /api/inbox-pointer/<role>` with a 7-day-old ISO timestamp; rarely wanted.\n\n4. **Present findings** \u2014 Surface any open messages to the user before acting. Do NOT silently process inbox items.\n\n5. **Tag routing conventions:**\n   - `to:{role}` \u2014 intended recipient (engineer, architect, planner, etc.)\n   - `from:{role}` \u2014 sender\n   - `status:{state}` \u2014 open, claimed, in_progress, resolved, archived\n   - `type:{kind}` \u2014 incident, task, question, decision, finding, proposal, etc.\n   - `thread:{id}` \u2014 thread membership (short form UUID)\n\n6. **Thread tracking** \u2014 Conversations between roles use `threadRef` (shared UUID across messages):\n   - First message: new UUID threadRef\n   - Response: same threadRef, updated status\n   - Query: `nebula_list_agent_records` with `threadRef = \"<uuid>\"`\n\n7. **Infrastructure failure** \u2014 If nebula-mcp / nebula REST is unreachable, surface as a blocking issue. Do not silently proceed.\n\n",
+      "mcp_tools": [
+        "nebula_list_agent_records",
+        "nebula_create_agent_record",
+        "nebula_update_agent_record"
+      ],
       "roles": [
         "analyst",
         "architect",
@@ -93,17 +208,67 @@
         "reviewer"
       ],
       "sha256": "aaf19bac0def929f44ac6b3f94813eafeba8e4131e9feaea1e9e6ec6e42a6c85",
-      "slug": "inbox-query-procedure"
+      "slug": "inbox-query-procedure",
+      "summary": "Query your role inbox for open messages before proceeding each turn.",
+      "tags": [
+        "messaging",
+        "inbox",
+        "routing",
+        "communication"
+      ],
+      "title": "Inbox Query (Role-Driven Messaging)",
+      "triggers": [
+        "start of turn",
+        "inbox",
+        "messages",
+        "agent communication"
+      ]
     },
     {
+      "body_md": "# Investigation resources: knowledge graph, audit DB, cross-refs\n\n## When to use this card\n\nYou are investigating an inventory / baseline question (e.g. T01): what\nentities exist, what audit trail exists, or how is X linked to Y. Answer\nfrom the database-first resources below \u2014 not by scanning filesystem\ndirectories.\n\n## 1. Knowledge graph (knowledge-srv, port 3109)\n\nServes the `knowledge` schema (knowledge.postgres: graph_entities,\ngraph_edges, graph_cross_references, graph_migrations).\n\nREST endpoints (all GET):\n\n- `/knowledge/summary` \u2014 entity/edge/cross-ref counts by section and\n  relation type. Live state: 2539 entities, 31 edges, 13 cross-refs,\n  15 migrations. Sections include work_requests (1897), plans (419),\n  types (41), gaps_and_blockers (41), actors (39), rules (32),\n  architectural_observations (26), decisions (16), topology (13),\n  epistemic_types (8), state_machines (4), boundaries (3).\n- `/knowledge/entities` \u2014 all graph entities\n- `/knowledge/entities/:section/:entity_id` \u2014 single entity\n- `/knowledge/entities/:section/:entity_id/relations` \u2014 outgoing edges\n- `/knowledge/edges` \u2014 all edges\n- `/knowledge/cross-references` \u2014 graph-level cross-references\n- `/knowledge/migrations` \u2014 migration history\n\n## 2. Canonical audit database (nebula agent records)\n\nThe database is the ONLY canonical audit trail (filesystem audit dirs are\nderived projections). Query via nebula-mcp tools:\n\n- `nebula_list_agent_records` \u2014 filters: role, type, tag(s) (AND\n  conjunction), search, createdAfter/createdBefore (ISO 8601), level,\n  visibilityScope, planRef, limit/offset.\n- `nebula_get_agent_record` \u2014 full content of one record.\n- `nebula_create_agent_record` / `nebula_update_agent_record` \u2014 write path.\n\nRecord types: report, analysis, assessment, inspection, prompt, response,\nengineering_log, architecture_note, decision.\nLevels: 1 (raw/operational), 2 (structured), 3 (planning/architectural),\n4 (meta/system reasoning).\nVisibility: builder, architect, planner, reviewer, all.\nTag routing convention: to:, from:, status:, type:, threadRef (lower-kebab).\n\n## 3. Cross-references table (nebula.cross_references)\n\nThe join between plans, agent records, and knowledge entities. History\nlives in nebula.cross_references_history.\n\n- `nebula_list_cross_references` \u2014 filter by sourceType/sourceId,\n  targetType/targetId, relType.\n- `nebula_create_cross_reference` / `nebula_get_cross_reference` /\n  `nebula_delete_cross_reference`.\n\nrel_type taxonomy (valid values):\n\n- wrp:depends_on, wrp:implements, wrp:tracked_by, wrp:impacts_system,\n  wrp:supersedes\n- ag:references_plan, ag:same_thread_as, ag:prompted_by, ag:spawns_plan\n- kv:sourced_from, kv:informs, kv:cross_schema, kv:name_overlap,\n  kv:description_overlap\n\nThe knowledge graph also exposes its own cross-refs via\nknowledge-srv `GET /knowledge/cross-references`\n(graph_cross_references \u2014 currently 13 links).\n\n## Anti-patterns\n\n- Do not read audit/ or IMPLEMENTATION_PLANS/ markdown as operational\n  state; query the DB via nebula-mcp.\n- Do not guess rel_type strings; use the taxonomy above.\n- When a question says \"who/what references X\", start from\n  nebula.cross_references and expand via relations.\n",
+      "mcp_tools": [
+        "nebula_list_agent_records",
+        "nebula_get_agent_record",
+        "nebula_list_cross_references",
+        "nebula_create_cross_reference",
+        "nebula_get_cross_reference",
+        "nebula_delete_cross_reference"
+      ],
       "roles": [
         "analyst",
         "engineer"
       ],
       "sha256": "054debbbdc10f1fad0ae596d6134aecabf408d33abcd7b6893c7b45645da7365",
-      "slug": "investigation-resources"
+      "slug": "investigation-resources",
+      "summary": "Where to look when investigating \"what exists / what changed / how is X linked to Y\": the knowledge graph (knowledge-srv 3109), the canonical audit database (nebula agent records, 3101), and the cross-references table (nebula.cross_references).",
+      "tags": [
+        "investigation",
+        "knowledge-graph",
+        "audit",
+        "cross-references",
+        "database-first",
+        "t01"
+      ],
+      "title": "Investigation resources: knowledge graph, audit DB, cross-refs",
+      "triggers": [
+        "investigation",
+        "knowledge graph",
+        "audit database",
+        "cross-refs",
+        "what entities exist",
+        "what changed",
+        "linked to",
+        "baseline",
+        "inventory",
+        "t01"
+      ]
     },
     {
+      "body_md": "## When to use this card\n\n- You edited graph/nexus-knowledge-graph.json and need the changes in PostgreSQL\n- Entity counts, embeddings, or knowledge_entity assets look stale/duplicated\n- Any task touching knowledge.graph_entities, graph_entity_embeddings, or the Knowledge Steward role\n\n## Canonical pipeline (4 steps)\n\n```\ngraph/nexus-knowledge-graph.json   (edit this \u2014 the disk source of truth)\n   \u2502\n   \u25bc\nbin/import-knowledge-graph.sh     (ONE command: import + cleanup + backfill + embed)\n   \u2502\n   \u25bc\nknowledge.graph_entities          \u2190 migrate_graph.py (python/steward/)\nknowledge.graph_entity_embeddings \u2190 embed-knowledge-graph.sh (bin/)\nsemantics.canonical_asset         \u2190 asset_id backfill via sql/V083__graph_entities_asset_id_backfill.sql\n```\n\n## Usage\n\n```bash\n# Full cycle (import + asset backfill + embed):\nnexus/bin/import-knowledge-graph.sh\n\n# Import + backfill only (embed later):\nnexus/bin/import-knowledge-graph.sh --skip-embed\n\n# Inspect only, no writes:\nnexus/bin/import-knowledge-graph.sh --dry-run\n\n# Show migration history:\npython3 python/steward/migrate_graph.py --list   # requires NEXUS_DB_DSN env\n```\n\n## CRITICAL \u2014 do not run migrate_graph.py bare\n\n- migrate_graph.py defaults to the WRONG DSN (`postgresql://nexus:nexus@localhost:5432/graph`).\n  The wrapper always exports `NEXUS_DB_DSN=postgresql://pguser:pgpass@localhost:5432/nexus`.\n- migrate_graph.py DELETEs all graph_entities/graph_edges/graph_cross_references then re-INSERTs\n  with fresh gen_random_uuid() ids. Because nothing FKs to graph_entities, a bare re-import\n  silently: (1) leaves old `knowledge_entity` canonical_asset rows unreferenced (asset count\n  inflates), and (2) leaves graph_entity_embeddings rows pointing at deleted entity uuids\n  (orphans accumulate).\n\n## Invariant (must hold after every run)\n\n```\ncount(graph_entities) == count(graph_entity_embeddings)\n                       == count(canonical_asset WHERE asset_kind='knowledge_entity' AND expired_at IS NULL)\nAND 0 graph_entities with NULL asset_id\nAND 0 orphan embeddings\n```\n\n## Steward ownership\n\nThe Knowledge Steward role has exclusive write access to knowledge.graph_* tables.\nAll other agents are read-only. The import wrapper is the sanctioned write path.",
+      "mcp_tools": [
+        "bash",
+        "nebula_list_agent_records"
+      ],
       "roles": [
         "analyst",
         "architect",
@@ -111,9 +276,35 @@
         "operator"
       ],
       "sha256": "3ab8358ff342cb210cd124967ff45819066e5f9a8e1392dbb0d65ce8c93813c0",
-      "slug": "knowledge-graph-pipeline"
+      "slug": "knowledge-graph-pipeline",
+      "summary": "How to import the disk KG (graph/nexus-knowledge-graph.json) into knowledge.graph_entities, backfill asset_id, and re-embed. Use bin/import-knowledge-graph.sh \u2014 never run migrate_graph.py bare.",
+      "tags": [
+        "kg",
+        "knowledge-graph",
+        "embed",
+        "steward",
+        "graph_entities",
+        "embeddings",
+        "canonical_asset",
+        "import-knowledge-graph",
+        "migrate_graph"
+      ],
+      "title": "Knowledge Graph import + embed pipeline (disk JSON \u2192 PostgreSQL)",
+      "triggers": [
+        "knowledge graph",
+        "knowledge-graph",
+        "import kg",
+        "re-embed",
+        "graph_entities",
+        "embed-knowledge-graph",
+        "migrate_graph",
+        "KG import",
+        "steward"
+      ]
     },
     {
+      "body_md": "## Knowledge Stratification\n\nEvery document and chunk has two independent attributes: Abstraction Level and Visibility Scope.\n\n### Axis 1: Abstraction Level (L1-L4)\n\n| Level | Name | Description | Primary Consumers |\n|-------|------|-------------|-------------------|\n| L1 | Raw / operational | APIs, schemas, contracts, error codes, configs | Builder |\n| L2 | Structured / intermediate | Subsystem design, DAG semantics, data models | Builder, Architect |\n| L3 | Planning / architectural | Rationale, trade-offs, migration philosophy | Architect, Inspector |\n| L4 | Meta / system reasoning | Cross-system doctrine, ontology, governance | Architect (opt-in) |\n\n### Axis 2: Visibility Scope\n\n| Scope | Effect |\n|-------|--------|\n| builder | Visible to builder role only |\n| architect | Visible to architect role only |\n| planner | Visible to planner role only |\n| reviewer | Visible to reviewer role only |\n| all | Visible to all roles |\n\n### Per-Role Query Filters\n\n| Role | Level Filter | Visibility Filter |\n|------|-------------|-------------------|\n| Builder | level \\u2264 1 primary, \\u2264 2 secondary | scope IN (builder, all) |\n| Architect | level \\u2264 3 primary, L4 allowed | scope IN (architect, all) |\n| Planner | level \\u2264 2 primary, \\u2264 3 allowed | scope IN (planner, all) |\n| Reviewer | level \\u2264 2 | scope IN (reviewer, builder, all) |\n| Inspector | level \\u2264 3 | scope IN (all) |\n| Analyst | level \\u2264 3 | scope IN (analyst, all) |\n\n### Cross-Reference Semantics\nCross-references are a conditional expansion operator, not a default join. Builders start narrow and expand when blocked; Architects start broader for design context; Inspectors expand aggressively for compliance.",
+      "mcp_tools": [],
       "roles": [
         "analyst",
         "architect",
@@ -128,9 +319,25 @@
         "reviewer"
       ],
       "sha256": "5b19814bbea213c687a1787c1a220cc1bc7e25e172aefb175a8aff6c7fb64c8d",
-      "slug": "knowledge-stratification"
+      "slug": "knowledge-stratification",
+      "summary": "Two-axis knowledge model: abstraction levels L1-L4 combined with visibility scopes.",
+      "tags": [
+        "reference",
+        "knowledge",
+        "stratification",
+        "levels"
+      ],
+      "title": "Knowledge Stratification (L1-L4)",
+      "triggers": [
+        "knowledge levels",
+        "L1 L2 L3 L4",
+        "stratification",
+        "visibility"
+      ]
     },
     {
+      "body_md": "## MCP Server Configuration\n\n### Conduit-mcp (port 3100)\n- Pipeline orchestration: state machine, receipts, tickets\n- All plan creation/promotion/state queries go through MCP tools\n- Never write .md files directly to nexus/graph/IMPLEMENTATION_PLANS/\n\n### Chat Server (port 3101)\n- Python: nexus/python/conduit/agent_chat.py\n- MCP server proxies /chat routes:\n  - GET /chat/config \u2014 available agent roles\n  - POST /chat/send \u2014 send message to an agent\n  - GET /chat/sessions \u2014 active sessions\n- Supports @planner, @builder, @reviewer, @critic notation\n- Spawns opencode run --agent <role> as background process\n- Streams output via SSE: /chat/stream/<id>\n\n### Health Check\n- GET /health returns server status, PID, pipeline state\n- OrphanScan section: detects soft-deleted plans with stale .md files, and filesystem artifacts with no DB row",
+      "mcp_tools": [],
       "roles": [
         "architect",
         "builder",
@@ -138,9 +345,27 @@
         "planner"
       ],
       "sha256": "e89b1c0d883553921da533d08c0d3ab32b8ae550f9a79174b1b8f1a124fb8cde",
-      "slug": "mcp-server-config"
+      "slug": "mcp-server-config",
+      "summary": "Conduit-mcp server, chat server, health check, and orphan scan details.",
+      "tags": [
+        "reference",
+        "config",
+        "server",
+        "mcp",
+        "chat"
+      ],
+      "title": "MCP Server & Chat Configuration",
+      "triggers": [
+        "mcp server",
+        "chat server",
+        "health check",
+        "port 3100",
+        "port 3101"
+      ]
     },
     {
+      "body_md": "## Nebula-MCP Tool Reference\n\nFull catalog of nebula-mcp tools, organized by domain. Available over MCP transport (Stdio or SSE on port 3102).\n\n### Hierarchy: Systems / Subsystems / Features\n| Tool | Purpose |\n|------|---------|\n| nebula_list_systems | List all systems with full nested hierarchy |\n| nebula_create_system | Create a new system |\n| nebula_update_system | Update system metadata |\n| nebula_delete_system | Delete a system and cascade |\n| nebula_create_subsystem | Create a subsystem |\n| nebula_update_subsystem | Update subsystem metadata |\n| nebula_delete_subsystem | Delete a subsystem and cascade |\n| nebula_move_subsystem | Move a subsystem to a different parent |\n| nebula_create_feature | Create a feature under a subsystem |\n| nebula_update_feature | Update feature metadata |\n| nebula_delete_feature | Delete a feature and cascade |\n| nebula_move_feature | Move a feature to a different subsystem |\n\n### Requirements (Backlog / Kanban)\n| Tool | Purpose |\n|------|---------|\n| nebula_list_requirements | List requirements, filterable |\n| nebula_create_requirement | Create a new requirement |\n| nebula_update_requirement | Update requirement fields |\n| nebula_move_requirement | Move requirement to a new status |\n| nebula_delete_requirement | Delete a requirement |\n| nebula_batch_update_requirements | Batch-update status |\n\n### Agent Records (Bitemporal Audit)\n| Tool | Purpose |\n|------|---------|\n| nebula_list_agent_records | List audit records, filterable |\n| nebula_get_agent_record | Get a single record with full content |\n| nebula_create_agent_record | Create a new record (canonical write path) |\n| nebula_update_agent_record | Update an existing record |\n| nebula_delete_agent_record | Delete a record |\n\n### Harvest Pipeline\n| Tool | Purpose |\n|------|---------|\n| nebula_list_harvests | List harvest outputs |\n| nebula_get_harvest | Get a single harvest |\n| nebula_create_harvest | Record a new harvest |\n| nebula_delete_harvest | Delete a harvest |\n\n### Projections (Markdown Generation)\n| Tool | Purpose |\n|------|---------|\n| nebula_list_projections | List projection configs |\n| nebula_create_projection | Create a projection config |\n| nebula_render_projection | Execute projection, write output |\n| nebula_delete_projection | Delete a projection |\n\n### Cross-References\n| Tool | Purpose |\n|------|---------|\n| nebula_list_cross_references | List cross-references, filterable |\n| nebula_get_cross_reference | Get a single cross-reference |\n| nebula_create_cross_reference | Create a cross-reference link |\n| nebula_delete_cross_reference | Delete a cross-reference |\n\n### Other Domains\n| Tool | Purpose |\n|------|---------|\n| nebula_create_folder | Create a system folder |\n| nebula_delete_folder | Delete a system folder |\n| nebula_list_sessions | List work sessions |\n| nebula_create_session | Record a work session |\n| nebula_update_session | Update session outcome |\n| nebula_delete_session | Delete a session |\n| nebula_list_workspaces | List workspace mappings |\n| nebula_create_workspace | Map system to filesystem path |\n| nebula_delete_workspace | Remove workspace mapping |\n| nebula_read_docs | Read README/ARCHITECTURE from disk |\n| nebula_read_system_docs | Read docs from all system workspaces |\n| nebula_read_subsystem_docs | Read docs from subsystem workspaces |\n| nebula_list_plans | List implementation plans |\n| nebula_get_plan | Fetch a single plan |\n| nebula_get_preferences | Get all user preferences |\n| nebula_set_preference | Set a preference value |\n| nebula_delete_preference | Delete a preference |\n| nebula_get_system_info | Get info tab content |\n| nebula_set_system_info | Save info tab content |\n| nebula_demote_system | Demote system into subsystem |\n| nebula_import | Bulk-import data |\n| nebula_seed | Idempotently seed example data |\n| nebula_query_conduit_plans | List conduit plans (bitemporal) |\n| nebula_query_conduit_plan_history | Full lifecycle of one plan |\n| nebula_query_conduit_plan_receipts | Receipts for a plan |\n| nebula_query_conduit_as_of | Point-in-time snapshot |\n| nebula_list_deleted_conduit_plans | Find soft-deleted plans |\n| nebula_health | Check server and DB health",
+      "mcp_tools": [],
       "roles": [
         "analyst",
         "architect",
@@ -155,9 +380,25 @@
         "reviewer"
       ],
       "sha256": "81d16958f5c8bf456d1313cc3d3c8f6db1a7943e1cca389db146a004ee23aff4",
-      "slug": "nebula-mcp-tools"
+      "slug": "nebula-mcp-tools",
+      "summary": "Complete catalog of nebula-mcp tools organized by domain.",
+      "tags": [
+        "reference",
+        "nebula-mcp",
+        "tools",
+        "appendix"
+      ],
+      "title": "Nebula-MCP Tool Reference",
+      "triggers": [
+        "list tools",
+        "what tools",
+        "nebula-mcp",
+        "MCP reference"
+      ]
     },
     {
+      "body_md": "## Procedure\n\nLoad at minimum:\n1. `nexus/CLAUDE.md`\n2. `nexus/.agents/pipeline-mode.json`\n3. `nexus/.agents/OPERATING_MODEL.md`\n4. `nexus/.agents/skills/mode-router/SKILL.md`\n5. Current conduit-mcp pipeline state (query via GET /state)\n\nAdditional .agents/ documents as needed, not indiscriminately.",
+      "mcp_tools": [],
       "roles": [
         "architect",
         "auditor",
@@ -169,53 +410,189 @@
         "reviewer"
       ],
       "sha256": "6b66a16af3b9b62e6569f9e1a5a55ca97c79b49e7029bdf65f7102817fbeb89b",
-      "slug": "nexus-boot-procedure"
+      "slug": "nexus-boot-procedure",
+      "summary": "Minimum startup read set before making changes in nexus/.",
+      "tags": [
+        "bootstrap",
+        "startup",
+        "initialization"
+      ],
+      "title": "Nexus Boot Procedure",
+      "triggers": [
+        "start session",
+        "activate",
+        "boot",
+        "nexus"
+      ]
     },
     {
+      "body_md": "# Search audit archives\n\n## When to use this card\n\nThe user asks about historical artifacts \u2014 \"previous work\", \"completed\nplans\", \"audit log\", \"change reports\", \"prompt history\",\n\"inspections\", \"what did we ship last week\".\n\n## Procedure\n\n1. **Choose category by question shape:**\n   - Completed plans / build logs \u2192 `query_archive` with\n     `{ category: \"completed-plans\" | \"build-logs\" }`\n   - Prompts (captured prompts with lineage) \u2192 `query_prompts` with\n     `{ search: \"<term>\", project: \"<name>\" }` (both optional)\n   - Inspections (reports, errors, warnings, blockers, todos) \u2192\n     `query_inspections` with `{ status: \"resolved\" | \"unresolved\" |\n     \"pending\", category: \"report\" | \"error\" | \"warning\" | ... }`\n   - Change reports \u2192 `query_changes` with\n     `{ category: \"committed\" | \"flagged\" | \"reviewed\" }`\n2. **Pagination:** all four tools accept `{ page, pageSize }`.\n   Default page size is 50; increase or decrease as the user requests.\n3. **Always include the file path.** Every returned entry has a\n   `file_path` or `path` field \u2014 name it in your reply so the user\n   can cross-check on disk.\n\n## Reporting shape\n\n- For a list query: report `total results, page X/Y`, then list\n  `[date | title | path]` rows from the actual payload.\n- For a single-result query: quote the entry verbatim.\n\n## Anti-patterns\n\n- Do not paraphrase an audit entry's summary; quote it.\n- Do not omit the file path \u2014 that's the cross-check lever.\n- Do not invent dates or titles.\n\n## MCP tools used\n\n- `query_archive` \u2014 search archived pipeline artifacts (category filter)\n- `query_prompts` \u2014 captured prompts with lineage (search, project)\n- `query_inspections` \u2014 inspection records (category, status, plan ref)\n- `query_changes` \u2014 change reports (category filter)\n",
+      "mcp_tools": [
+        "query_archive",
+        "query_prompts",
+        "query_inspections",
+        "query_changes"
+      ],
       "roles": [
         "operator"
       ],
       "sha256": "832312a085a44831c90695261f4db7025f89a62c3442a322744a7e0963ab4595",
-      "slug": "operator-audit-search"
+      "slug": "operator-audit-search",
+      "summary": "When the user asks about past completed work, change reports, prompts, or inspections, use query_archive (filters by category: completed-plans, build-logs, prompts, changes), query_prompts (search + project filter), query_inspections (status filters), or query_changes (committed, flagged, reviewed). Return pagination-aware responses and always name the original file path so the user can cross-check.",
+      "tags": [
+        "audit",
+        "archive",
+        "prompts",
+        "inspections",
+        "changes",
+        "operator"
+      ],
+      "title": "Search audit archives",
+      "triggers": [
+        "previous work",
+        "completed plan",
+        "audit log",
+        "change report",
+        "prompt history",
+        "inspections"
+      ]
     },
     {
+      "body_md": "# No-hallucination rule for tool data\n\n## When to use this card\n\nAlways. This is the operator's most important procedure card. Every\nreply that includes data must be grounded in tool output.\n\n## Rule\n\nReport exactly what the tool returned, in this order:\n\n1. **Report the structure first.** \"The tool returned\n   `{ count: 12, records: [...] }`.\" Name the keys, count, and the\n   top-level shape. The user can ask follow-up questions about\n   specific fields once they trust the surface shape.\n2. **Quote the specific fields the user asked about**, verbatim from\n   the payload. Do not paraphrase values that are short enough to\n   quote (`< 200` chars). For longer values, summarize then offer to\n   quote in full.\n3. **Errors are facts, not failures to hide.** If the tool returned\n   `{ error: \"...\" }` or threw an exception, report the error\n   verbatim. Do not say \"couldn't find it\" or \"no data available\" \u2014\n   quote the error string.\n4. **Never invent data.** No plan IDs (`#0123`), requirement IDs\n   (`req-456`), WR IDs (`wr-789`), statuses, counts, or timestamps\n   that did not appear in the tool response. If you don't have a\n   tool result for a field the user asked about, say so and dispatch\n   the appropriate tool.\n\n## Why this exists as a card\n\nThe other roles (engineer, architect, planner, etc.) get this rule\ninlined in their system prompt. The operator was previously getting\nit from an in-prompt `CRITICAL: You MUST use the actual data`\ndirective. Loading this card lets the operator consult the same rule\nvia the procedure-card pathway at request time, consistent with how\nthe other roles load cards at turn start (see AGENTS.md Role Memory\nProcedure Registry).\n\n## Anti-patterns\n\n- \"I see 5 pending plans\" when the tool returned 3 \u2014 never.\n- \"The plan title is X\" when the tool returned title Y \u2014 quote, don't\n  paraphrase a Y into an X.\n- Omitting an error block from the response because it \"looked\n  unimportant\".\n- Producing a quoted plan ID that the user mentioned in an earlier\n  exchange but that did NOT appear in this turn's tool response.\n\n## MCP tools used\n\n(none \u2014 this card governs reporting behavior, not tool selection)\n",
+      "mcp_tools": [],
       "roles": [
         "operator"
       ],
       "sha256": "3081d0a75c09f4ee5237389c796b664c16c49e99d68f51f0e124811331ced21d",
-      "slug": "operator-no-hallucination-rule"
+      "slug": "operator-no-hallucination-rule",
+      "summary": "Always report exactly what the tool returned. If the tool returned an error, report the error verbatim. If it returned JSON, summarize the payload structure (keys, counts) and then quote specific fields the user asked about. Never produce plan IDs, requirement IDs, statuses, or any data that did not come back in the tool response.",
+      "tags": [
+        "hallucination",
+        "grounding",
+        "tool-data",
+        "operator",
+        "critical"
+      ],
+      "title": "No-hallucination rule for tool data",
+      "triggers": []
     },
     {
+      "body_md": "# Query and report pipeline state\n\n## When to use this card\n\nThe user asks about pipeline status \u2014 \"how are plans doing\", \"is the\npipeline jammed\", \"what is the pipeline working on right now\", \"circuit\nbreaker\", \"builder activity\", \"any blocked plans\", recent receipts.\n\n## Procedure\n\n1. **Default:** call `query_conduit_state` (no args). It returns the\n   full pipeline JSON. Treat this as the single source of truth for\n   pipeline state \u2014 never reconstruct plan counts from memory or\n   earlier exchanges.\n2. **Read buckets in this order and report each non-empty one:**\n   - `plans.blocked` \u2014 if non-empty, this is the most important finding.\n     List plan number + title for each.\n   - `plans.active` \u2014 in-progress work; report builder ticket status.\n   - `plans.pending` \u2014 queued; report count.\n   - `plans.hold` \u2014 parked architectural work; report count.\n   - `plans.completed` \u2014 usually omit unless user asks; report count only.\n   - `plans.archived` \u2014 omit unless user asks explicitly.\n3. **Always report** `builder.status` (running/idle/stale/killed) and\n   `circuitBreaker.tripped` (true/false). These are the two health\n   signals.\n4. **Specific field request** \u2014 if the user asked for one field (\"just\n   the blocked plans\", \"circuit breaker status\"), report *only* that\n   field. Do not dump the full state.\n5. **For a specific plan's history:** call `get_plan_receipts` with\n   `{ plan_id: \"<number>\" }` and report the receipt chain.\n6. **For a list of work requests:** call `runtime_list_work_requests`,\n   optionally with `{ status: \"QUEUED\" | \"CLAIMED\" | \"SETTLED\" | ... }`.\n\n## Anti-patterns\n\n- Do not say \"the pipeline looks healthy\" without citing the bucket\n  counts and the circuit breaker status from the actual tool output.\n- Do not list plan numbers from memory \u2014 always run the tool.\n- Do not collapse `hold` + `blocked` into a single count; they have\n  different operational meanings (blocked = jammed, hold = parked).\n\n## MCP tools used\n\n- `query_conduit_state` \u2014 full pipeline JSON\n- `runtime_list_work_requests` \u2014 list WorkRequests (status filter)\n- `get_plan_receipts` \u2014 per-plan receipt chain\n\n## Reporting shape\n\n```\nPipeline: <builder.status>, breaker <tripped|closed>\nPending: <n>, Active: <n>, Blocked: <n>, Hold: <n>, Completed: <n>\n[if blocked:] BLOCKED \u2014 plan #<n> <title>: <reason>\n```\n",
+      "mcp_tools": [
+        "query_conduit_state",
+        "runtime_list_work_requests",
+        "get_plan_receipts"
+      ],
       "roles": [
         "operator"
       ],
       "sha256": "0cd379150e58afa62665c8a0e2a2ffeec1da41f8db938a3e36e2138884712384",
-      "slug": "operator-pipeline-query"
+      "slug": "operator-pipeline-query",
+      "summary": "When the user asks about pipeline status, use query_conduit_state to fetch the full state view. Report plans by derived_status (pending/active/blocked/completed/archived/hold); circuit breaker status; builder activity; recent receipts. Do not summarize if the user is asking for a specific field \u2014 fetch it explicitly.",
+      "tags": [
+        "pipeline",
+        "conduit",
+        "status",
+        "operator"
+      ],
+      "title": "Query and report pipeline state",
+      "triggers": [
+        "how are plans",
+        "pending plans",
+        "pipeline status",
+        "what is the pipeline doing",
+        "circuit breaker",
+        "builder activity",
+        "blocked plans"
+      ]
     },
     {
+      "body_md": "# Look up requirements\n\n## When to use this card\n\nThe user asks about requirements, backlog, RMS, systems, features, or\npending work items \u2014 \"what's in the backlog\", \"show me high-priority\nrequirements\", \"what systems do we have\", \"is there a requirement for\nX\".\n\n## Procedure\n\n1. **Backlog query:** call `query_nebula_backlog`. It accepts optional\n   `{ status: \"Backlog\" | \"InProgress\" | \"Done\", priority: \"High\" |\n   \"Medium\" | \"Low\" }`. Without filters it returns the full backlog.\n2. **System hierarchy:** call `query_nebula_systems` (no args). Returns\n   the full system \u2192 subsystem \u2192 feature tree. Use this when the user\n   asks \"what systems do we have\" or \"where does feature X live\".\n3. **Cross-reference a harvest candidate to a plan:** if the user\n   mentions a harvest or candidate by ID, use\n   `tackle_list_harvest_candidates` (filters available) and, when the\n   user wants to act on one, `tackle_spawn_plan_from_candidate`.\n\n## Reporting shape\n\n- Report specific rows by their actual ID \u2014 never invented IDs.\n- For backlog: list `[reqId | status | priority | title]` rows.\n- For systems: collapse the hierarchy into nested bullet form.\n- Always quote the count returned by the tool.\n\n## Anti-patterns\n\n- Do not synthesize a requirement description from conversation memory.\n- Do not invent IDs.\n- If the tool returns 0 rows, say so plainly.\n\n## MCP tools used\n\n- `query_nebula_backlog` \u2014 list requirements (status, priority filter)\n- `query_nebula_systems` \u2014 system hierarchy tree\n- `tackle_list_harvest_candidates` \u2014 harvest candidates audit listing\n- `tackle_spawn_plan_from_candidate` \u2014 convert candidate into a plan\n",
+      "mcp_tools": [
+        "query_nebula_backlog",
+        "query_nebula_systems",
+        "tackle_list_harvest_candidates",
+        "tackle_spawn_plan_from_candidate"
+      ],
       "roles": [
         "operator"
       ],
       "sha256": "675b4684b89935662c971114b4cafd3013c1d72be7d9cbf12aa71664104d4663",
-      "slug": "operator-requirement-lookup"
+      "slug": "operator-requirement-lookup",
+      "summary": "When the user asks about backlog items, requirements, or system features, use query_nebula_backlog (filters status, priority). For system hierarchy questions, use query_nebula_systems. For audit history (harvests, candidates): tackle_list_harvest_candidates with filters. Report specific rows by ID, not summary sentences.",
+      "tags": [
+        "requirements",
+        "backlog",
+        "rms",
+        "systems",
+        "operator"
+      ],
+      "title": "Look up requirements",
+      "triggers": [
+        "requirement",
+        "backlog",
+        "what work is pending",
+        "rms",
+        "systems",
+        "features"
+      ]
     },
     {
+      "body_md": "# WorkRequest lifecycle inspection\n\n## When to use this card\n\nThe user asks about work requests \u2014 \"WR-123 status\", \"list queued\nWRs\", \"what's the event log for WR-foo\", \"transition this WR\", or\nmentions a WorkRequest ID.\n\n## Procedure\n\n1. **List** \u2192 `runtime_list_work_requests` with optional\n   `{ status: \"VALIDATED\" | \"QUEUED\" | \"CLAIMED\" | \"ACKED\" | \"SETTLED\"\n   | \"REJECTED\" | \"FAILED\", limit }`.\n2. **One WR's folded state** \u2192 `runtime_get_work_request` with\n   `{ wrId: \"<id>\" }`.\n3. **One WR's raw event log** \u2192 `runtime_get_work_request_events`\n   with `{ wrId: \"<id>\" }`.\n4. **Advance the pipeline by one tick** \u2192 `runtime_tick` (no args).\n   Use sparingly; only when the user explicitly asks \"advance the\n   pipeline\" or \"tick\".\n5. **Apply a transition** \u2192 `runtime_transition` with\n   `{ wrId, type: \"WR_CLAIMED\" | \"WR_ACKED\" | \"WR_SETTLED\" |\n   \"WR_REJECTED\" | \"WR_FAILED\" | \"WR_NOOP\" | \"WR_DEFERRED\", payload? }`.\n   **Confirm with the user first.** This mutates state.\n\n## Reporting shape\n\n- For a list: report `count` + per-WR `[id | status | intent.objective]`.\n- For a single WR's folded state: quote the `status`, `currentEvent`,\n  and any included receipt summaries.\n- For an event log: report the events in chronological order with\n  `[seq | type | timestamp]` rows from the actual payload.\n\n## Anti-patterns\n\n- Never call `runtime_transition` without user confirmation.\n- Never guess a WR ID from the conversation \u2014 confirm the ID with the\n  user before any mutating call.\n- Do not collapse `WR_NOOP` and `WR_DEFERRED` \u2014 they mean different\n  things (NOOP = nothing to do; DEFERRED = intentionally parked).\n\n## MCP tools used\n\n- `runtime_list_work_requests`\n- `runtime_get_work_request`\n- `runtime_get_work_request_events`\n- `runtime_tick` (advance pipeline by one transition)\n- `runtime_transition` (mutating \u2014 confirm first)\n",
+      "mcp_tools": [
+        "runtime_list_work_requests",
+        "runtime_get_work_request",
+        "runtime_get_work_request_events",
+        "runtime_transition"
+      ],
       "roles": [
         "operator"
       ],
       "sha256": "b39709ad483753af97088ed34ddf764eb15eeb64c833177ebe4c905eb0e306a2",
-      "slug": "operator-workrequest-lifecycle"
+      "slug": "operator-workrequest-lifecycle",
+      "summary": "When the user asks about work requests (WRs) by ID or status, use runtime_list_work_requests (status filter) first. For a specific WR: runtime_get_work_request for folded state, runtime_get_work_request_events for raw event log. The runtime_transition tool applies state-machine events (WR_CLAIMED/ACKED/SETTLED/REJECTED/FAILED/NOOP/DEFERRED) \u2014 only use it when the user explicitly asks for a state transition, and always confirm before issuing.",
+      "tags": [
+        "workrequest",
+        "wr",
+        "runtime",
+        "lifecycle",
+        "operator"
+      ],
+      "title": "WorkRequest lifecycle inspection",
+      "triggers": [
+        "work request",
+        "wr-",
+        "work-request lifecycle",
+        "wr status",
+        "transition wr"
+      ]
     },
     {
+      "body_md": "## Procedure\n\nThe conduit MCP /health endpoint includes an orphanScan section:\n- Plans deleted in DB (deleted=1) that still have .md files on disk\n- .md files on disk with no corresponding DB row\n\nUse this as a periodic check. The watcher getState() also filters soft-deleted plans from the filesystem-driven cache.",
+      "mcp_tools": [],
       "roles": [
         "engineer",
         "inspector",
         "reviewer"
       ],
       "sha256": "39a91babefdba93622be4d96f6076fe4554326093d71fc789b81663df9b2393e",
-      "slug": "orphan-detection"
+      "slug": "orphan-detection",
+      "summary": "Check for inconsistencies between DB state and filesystem artifacts.",
+      "tags": [
+        "orphan",
+        "inconsistency",
+        "health"
+      ],
+      "title": "Orphan Detection",
+      "triggers": [
+        "check health",
+        "orphan scan",
+        "inconsistency"
+      ]
     },
     {
+      "body_md": "## Per-Role Outbox Table\n\n| Role | record_type | Tags | To | When |\n|------|------------|------|----|------|\n| **Planner** | prompt | type:plan | Architect | Plan needs architecture spec |\n| | prompt | type:plan | Engineer | Plan ready to implement |\n| | assessment | type:proposal | All | New work proposal |\n| | report | type:db-change | DBA | Plan needs DB change \u2014 DBA posts to Drafts forum, applies after admin approval, before builder |\n| | prompt | type:question | Analyst | Needs analysis |\n| **Architect** | architecture_note | type:decision | Engineer | Arch decision to implement |\n| | architecture_note | type:spec_ref | Engineer | Reference spec produced |\n| | engineering_log | type:incident | Engineer | Bug/fix needed |\n| | engineering_log | type:task | Engineer | Small task |\n| | assessment | type:review | Planner | Arch review of a plan |\n| | engineering_log | type:question | Planner | Design clarification |\n| **Engineer** | engineering_log | type:task | Self | Personal backlog |\n| | engineering_log | type:question | Architect | Design question |\n| | engineering_log | type:blocker | Planner | Blocked, needs decision |\n| | report | type:implementation | Reviewer | Ready for review |\n| | analysis | type:finding | Architect | Discovered during work |\n| **Builder** | report | type:change | Reviewer | Implementation complete |\n| | engineering_log | type:blocker | Planner | Blocked on build |\n| **Reviewer** | assessment | type:approval | Archive | Approved \\u2014 done |\n| | assessment | type:rejection | Engineer | Needs fixes |\n| | inspection | type:issue | Engineer | Issue found |\n| **Analyst** | analysis | type:gap | Planner | Gap analysis |\n| | analysis | type:triage | Architect | Triaged issue |\n| | analysis | type:recommendation | Engineer | Suggestion |\n| **Critic** | inspection | type:warning | Analyst | Warning, triage first |\n| **Inspector** | inspection | type:error | Analyst | Error, triage |\n| | inspection | type:violation | Planner | Compliance violation |\n| **Archivist** | report | type:history | All | Read-only historical record |",
+      "mcp_tools": [],
       "roles": [
         "analyst",
         "architect",
@@ -230,9 +607,27 @@
         "reviewer"
       ],
       "sha256": "70407efe82c1ed21deedf6fb0f2e05e6f19b62b68f7c62b2377fefb28aab89cd",
-      "slug": "per-role-outbox-table"
+      "slug": "per-role-outbox-table",
+      "summary": "Reference: what each role sends, to whom, and when.",
+      "tags": [
+        "reference",
+        "messaging",
+        "outbox",
+        "routing"
+      ],
+      "title": "Per-Role Outbox Table",
+      "triggers": [
+        "outbox",
+        "who sends what",
+        "role messages",
+        "message routing"
+      ]
     },
     {
+      "body_md": "## Procedure\n\nDB-first health check of the WorkRequest pipeline. Canonical state lives in PostgreSQL (`vision.*`, `conduit.*`, `nebula.*`); the filesystem is a derived projection and `nexus/.conduit-data` is retired (posterity mirror: `nexus/audit/CONDUIT_DATA`). Run at the start of every conversational turn, before responding to the user:\n**Automated backstop:** a scheduled sweep (`nexus/bin/pipeline-health-sweep.py`, systemd user timer `nexus-pipeline-health.timer`, every 30 min) runs these checks **plus the projection-vs-replay drift scan** (`conduit-srv GET /wr/drift-scan`, plan 1285 \u2014 active WRs whose `conduit.work_request_state` projection disagrees with event replay) and posts findings to the Assembly `drift-reports` forum (a new thread only when the finding set changes; resolution thread when it clears). At turn start, prefer the latest pipeline-health thread in `drift-reports`; the queries below are the manual fallback.\n\n1. **Blocked plans** \u2014 plans whose latest receipt is `BLOCK`/`HOLD`, or with failed/stale tickets, mean the pipeline is jammed \u2014 report the blocker prominently. Query:\n\n   WITH latest AS (SELECT DISTINCT ON (plan_id) plan_id, type, created_at\n     FROM vision.receipts WHERE plan_id ~ '^[0-9]+$'\n     ORDER BY plan_id, created_at DESC)\n   SELECT plan_id, type FROM latest WHERE type IN ('BLOCK','HOLD') ORDER BY created_at DESC;\n\n2. **Plan-status drift** (pending/PLAN_CREATE + expired/cancelled ticket + external completion evidence) \u2014 plans that LOOK pending but the work actually finished, was abandoned, or ran outside the pipeline (the 1274/1275 and 2026-08-09 ghost-batch failure modes). Four signals in one query:\n\n   WITH latest AS (\n     SELECT DISTINCT ON (plan_id) plan_id, type, created_at\n     FROM vision.receipts WHERE plan_id ~ '^[0-9]+$'\n     ORDER BY plan_id, created_at DESC),\n   stuck AS (\n     SELECT plan_id, created_at FROM latest\n     WHERE type = 'PLAN_CREATE' AND created_at < NOW() - INTERVAL '24 hours')\n   SELECT s.plan_id, to_char(s.created_at,'YYYY-MM-DD') AS last_plan_create,\n     (SELECT count(*) FROM vision.tickets t\n       WHERE t.plan_id = s.plan_id AND (t.status = 'expired'\n         OR (t.status IN ('open','claimed','stale')\n             AND t.expires_at IS NOT NULL AND t.expires_at < NOW()))) AS expired_tickets,\n     (SELECT count(*) FROM vision.tickets t\n       WHERE t.plan_id = s.plan_id AND t.status = 'cancelled') AS cancelled_tickets,\n     (SELECT count(*) FROM nebula.agent_records ar\n       WHERE (ar.plan_ref = s.plan_id\n          OR ar.content ~* ('(^|[^0-9])' || s.plan_id || '([^0-9]|$)'))\n         AND ar.record_type IN ('report','inspection','engineering_log','assessment','analysis','decision')\n         AND COALESCE(ar.title,'') NOT ILIKE '%pre-fk-snapshot%'\n         AND COALESCE(ar.title,'') NOT ILIKE '%drift%'\n         AND COALESCE(ar.title,'') NOT ILIKE '%ghost%'\n         AND COALESCE(ar.title,'') NOT ILIKE '%cross-reference%'\n         AND COALESCE(ar.title,'') NOT ILIKE 'CROSS REFERENCES%') AS evidence_rows\n   FROM stuck s ORDER BY s.created_at LIMIT 20;\n\n   Interpretation per row:\n   - `expired_tickets > 0`: the plan's ticket(s) expired unclaimed (24h, no re-arm).\n   - `cancelled_tickets > 0`: the plan's ticket(s) were cancelled while the plan is still pending \u2014 abandoned/ghost work (the July-2026 batch signature; 142 ghosts closed via CANCELLED receipts 2026-08-09). Cleanup: issue a `CANCELLED` receipt via conduit-srv `POST /api/receipts/` (append-only closure) \u2014 NOT delete_plan (upstream already archived) and NOT re-dispatch.\n   - `evidence_rows > 0` (noise excluded \u2014 pre-fk-snapshot bulk rows, self-authored drift/ghost cleanup records, prompts/responses, cross-reference indexes): external completion evidence exists (agent records, verification inspections, engineering logs referencing the plan). The plan is implemented-but-pending (drift): fix by closure \u2014 record IMPLEMENTATION + REVIEW_PASS via conduit \u2014 NOT by re-dispatch. Heuristic signal \u2014 confirm each candidate manually before closing (UUID/substring coincidences and plan-mirror assessments can still false-positive).\n   - Oldest-first ordering with `LIMIT 20` keeps the report bounded; revisit the tail next turn.\n   - `evidence_rows = 0 AND expired_tickets = 0 AND cancelled_tickets = 0`: genuinely stuck-pending \u2014 escalate to the owning role or re-arm the ticket.\n\n3. **Flagged changes / blocker reports** \u2014 change reports that failed review and inspection blocker reports live in `nebula.agent_records`:\n\n   SELECT record_type, role, left(title,70) AS title, created_at\n   FROM nebula.agent_records\n   WHERE ((tags && ARRAY['type:rejection','type:violation','type:incident'])\n      OR record_type = 'inspection')\n     AND NOT (tags && ARRAY['status:resolved','status:done','status:closed','resolved','done','closed'])\n     AND NOT (tags && ARRAY['cycle:hourly-maintenance','hourly-maintenance'])\n     AND NOT (record_type = 'inspection' AND (title IN ('.gitkeep','REGISTRY') OR tags = '{}'))\n   ORDER BY created_at DESC LIMIT 20;\n\n   Noise excluded: records tagged resolved/done/closed (incl. bare variants), routine\n   hourly-maintenance cycle records, and empty-tag inspection artifacts (.gitkeep/REGISTRY).\n   Remaining rows are genuinely open incidents/rejections/violations and verification records.\n\n4. **Persistence** \u2014 these checks are persistent. Report on every turn until resolved. Do not suppress because you already reported before. When the automated sweep is healthy, its `drift-reports` thread is the live report; manual checks here are the fallback (sweep down or ad-hoc triage).\n\n5. **Full change-detection** \u2014 for completed plans and inspection reports, load the `pipeline-watch` skill and run its check procedure.",
+      "mcp_tools": [
+        "pipeline-watch"
+      ],
       "roles": [
         "analyst",
         "architect",
@@ -244,41 +639,149 @@
         "reviewer"
       ],
       "sha256": "1ffb2d1f09b684fb80ab4f87a4c9dbdd42681612c649fc863d0d49ac2f2a718c",
-      "slug": "pipeline-health-check"
+      "slug": "pipeline-health-check",
+      "summary": "DB-first pipeline health check: blocked plans, plan-status drift (stuck pending + expired/cancelled tickets + external completion evidence), flagged changes before each turn (resolved/maintenance noise excluded).",
+      "tags": [
+        "turn-protocol",
+        "pipeline",
+        "blocker",
+        "health-check",
+        "drift"
+      ],
+      "title": "Pipeline Health Check",
+      "triggers": [
+        "start of turn",
+        "before responding",
+        "health check",
+        "pipeline check",
+        "drift",
+        "stuck pending",
+        "expired ticket",
+        "cancelled ticket",
+        "ghost plan",
+        "implemented but pending"
+      ]
     },
     {
+      "body_md": "## Procedure\n\n1. Call `conduit-mcp_delete_plan` with the plan number.\n   - Soft-deletes in DB (deleted=1)\n   - Removes .md files from all IMPLEMENTATION_PLANS/ subdirs\n   - Cancels open tickets with closure_reason = plan_deleted\n   - Calls removePlanFromMemory() on the watcher\n   - Emits plan_deleted SSE event to the UI\n\n2. For stuck plans that cannot be recovered, use `conduit-mcp_hard_delete_plan` (irreversible). Requires confirmPlanTitle to match as a safety guard.\n\n3. Running delete_plan on an already-deleted plan is safe \u2014 it cleans up residual watcher state.",
+      "mcp_tools": [
+        "conduit-mcp_delete_plan",
+        "conduit-mcp_hard_delete_plan"
+      ],
       "roles": [
         "builder",
         "engineer"
       ],
       "sha256": "5fdb48bba237129e0cf4dc1246c008f94d72e811d1316f907c03b8573aaa137a",
-      "slug": "plan-deletion-cleanup"
+      "slug": "plan-deletion-cleanup",
+      "summary": "Soft-delete a plan, cancel its open tickets, and notify the UI.",
+      "tags": [
+        "plan",
+        "deletion",
+        "cleanup",
+        "ticket"
+      ],
+      "title": "Plan Deletion & Ticket Cleanup",
+      "triggers": [
+        "delete plan",
+        "remove plan",
+        "cancel plan",
+        "stuck plan"
+      ]
     },
     {
+      "body_md": "## Creating & Managing Plans\n\n### Create a Plan (ready for implementation)\nUse `nebula_create_plan` (nebula-mcp) with title, project, goal, filesAffected, acceptanceCriteria, and dependencies. conduit-mcp create_plan / create_proposed_plan are REMOVED stubs (TOOL_NOT_FOUND) \u2014 do not call them. The plan lands in nebula.implementation_plans (status pending) and conduit-mcp auto-bootstraps a PLAN_CREATE receipt + builder ticket within ~30s.\n\n### Proposed / Planning states\nThere is no create_proposed_plan tool. Start ideas as a full plan via nebula_create_plan; use conduit-mcp_revise_plan to create a revision copy for planning discussion. Use conduit-mcp_update_plan / report_plan_metadata to set filesAffected, acceptanceCriteria, dependencies.\n\n### \u26a0 DB-Change Routing (mandatory rule)\n**Plans that require database changes go to the DBA for the DB work BEFORE a Builder starts implementation.** When creating or updating a plan whose goal, filesAffected, or acceptance criteria involve schema changes, migrations, DDL, seed/data backfills, or index changes:\n1. Write a nebula agent record tagged `[\"to:dba\", \"type:db-change\", \"planRef:<N>\", \"status:open\"]`    describing exactly which database changes are required (tables, columns,    migrations, data). Use recordType report.\n2. Put the DB change as the FIRST acceptance criterion of the plan so the builder    knows the schema must exist before implementation.\n3. The DBA posts the proposed alterations to the Assembly Drafts forum\n    (slug `draft`) and applies them ONLY after admin approval. The Builder must\n    not start implementation until the DBA completes the DB change (approval +\n    application) and the plan is still pending/ready. If a builder ticket is\n    already open for a DB-change plan, escalate via `type:escalation` to keep\n    sequencing.\n\n### Update Metadata\nUse `conduit-mcp_update_plan` or `conduit-mcp_report_plan_metadata` to set filesAffected, acceptanceCriteria, dependencies.\n\n### Revise a Plan\nUse `conduit-mcp_revise_plan` to create a revision copy (issues PLANNING on the new copy).\n\n### Issue Receipts (state transitions)\nUse `conduit-mcp_issue_receipt` with plan_id, type (PLAN_CREATE|IMPLEMENTATION|REVIEW_PASS|REVIEW_REJECT|BLOCK|PLANNING|HOLD|CANCELLED), and agent_role.\n\n### Delete a Plan\nUse `conduit-mcp_delete_plan` for soft-delete (preserves audit trail). Use `conduit-mcp_hard_delete_plan` (with title confirmation) for permanent removal.",
+      "mcp_tools": [
+        "nebula_create_plan",
+        "conduit-mcp_update_plan",
+        "conduit-mcp_revise_plan",
+        "conduit-mcp_issue_receipt",
+        "conduit-mcp_delete_plan",
+        "conduit-mcp_hard_delete_plan"
+      ],
       "roles": [
         "engineer",
         "planner"
       ],
       "sha256": "1afb347189b8030cb301987dba650221f35a746dbce5ccb51ba3b16a01ba7359",
-      "slug": "planner-create-plan"
+      "slug": "planner-create-plan",
+      "summary": "How to create, update, and promote implementation plans (via nebula_create_plan), and route DB-change plans to the Engineer before a Builder starts.",
+      "tags": [
+        "planner",
+        "plans",
+        "create",
+        "manage",
+        "workflow",
+        "db-change"
+      ],
+      "title": "Planner: Create & Manage Plans",
+      "triggers": [
+        "create plan",
+        "new plan",
+        "propose plan",
+        "promote plan",
+        "delete plan",
+        "database change",
+        "schema change",
+        "migration"
+      ]
     },
     {
+      "body_md": "## Procedure\n\n1. **Present the plan** \u2014 show title, goal, existing metadata.\n\n2. **Discuss scope** \u2014 \"Which files or modules would this change affect?\" Capture as `filesAffected`.\n\n3. **Refine Acceptance Criteria** \u2014 define concrete, testable criteria.\n\n4. **Identify Dependencies** \u2014 check if this plan depends on others.\n\n5. **Confirm** \u2014 present summary and get explicit user confirmation.\n\n6. **Persist metadata** via `update_plan` or `report_plan_metadata`.\n\n7. **Move to Pending** \u2014 call `issue_receipt` with `PLAN_CREATE`.",
+      "mcp_tools": [
+        "conduit-mcp_update_plan",
+        "conduit-mcp_issue_receipt"
+      ],
       "roles": [
         "planner"
       ],
       "sha256": "06fc0be8a46a8c82105f664fd28851ddbe41f98e9927f24a6d31a7598589aa15",
-      "slug": "planning-elucidation"
+      "slug": "planning-elucidation",
+      "summary": "Elucidate a planning-plan before promoting it to pending.",
+      "tags": [
+        "planning",
+        "elucidation",
+        "promotion"
+      ],
+      "title": "Planning Elucidation Workflow",
+      "triggers": [
+        "discuss plan",
+        "promote plan",
+        "elucidate",
+        "planning plan"
+      ]
     },
     {
+      "body_md": "## Implementation Plan Format\n\nEvery plan written to pending/ must include these sections:\n\n```markdown\n## Goal\n<what this plan achieves>\n\n## Files Affected\n<absolute paths to every file that will be created or modified>\n\n## Acceptance Criteria\n<how to verify the plan was implemented successfully \u2014 specific commands, outputs, or observable states>\n\n## Dependencies\n<other plan names this one depends on, or \"none\">\n```",
+      "mcp_tools": [],
       "roles": [
         "builder",
         "engineer",
         "planner"
       ],
       "sha256": "2c0f380d1d29597deeff3e414ec297046f20630620834311b3504cf7b3475572",
-      "slug": "plan-template-format"
+      "slug": "plan-template-format",
+      "summary": "Required sections for every implementation plan: Goal, Files, AC, Dependencies.",
+      "tags": [
+        "reference",
+        "template",
+        "plan-format"
+      ],
+      "title": "Implementation Plan Template",
+      "triggers": [
+        "plan template",
+        "plan format",
+        "acceptance criteria",
+        "files affected"
+      ]
     },
     {
+      "body_md": "## Procedure\n\nAfter completing work on every conversational turn:\n\n1. **Write to the database first** \u2014 Use `nebula_create_agent_record` with:\n   - `recordType`: one of `report`, `analysis`, `assessment`, `inspection`, `prompt`, `response`, `engineering_log`, `architecture_note`, `decision`\n   - `role`: your current role\n   - `title`: human-readable summary\n   - `content`: the full markdown body\n   - `tags`: relevant tags for filtering (e.g., `[\"architecture\", \"phase-2\"]`)\n   - `systemId`, `subsystemId`, `planRef`: optional FK references\n   - `threadRef`: optional UUID to group messages into a thread\n\n2. **Optionally trigger a projection** via `nebula_render_projection` to regenerate the filesystem view. This is optional \u2014 the canonical record is already in the DB.\n\n3. **Do NOT write directly to audit directories** \u2014 the filesystem is a derived view. Direct writes will be overwritten by the next projection regeneration.\n\n4. **Respect folder boundaries** \u2014 Do not write to folders assigned to other roles.",
+      "mcp_tools": [
+        "nebula_create_agent_record",
+        "nebula_render_projection",
+        "nebula_list_agent_records"
+      ],
       "roles": [
         "analyst",
         "architect",
@@ -290,9 +793,29 @@
         "reviewer"
       ],
       "sha256": "0d2e7b80c3cadec9495f390942aca333ef32b5d39e6369eb2e72429c5b0cfe69",
-      "slug": "post-turn-self-update"
+      "slug": "post-turn-self-update",
+      "summary": "After every response: write agent record to DB, optionally trigger projection.",
+      "tags": [
+        "turn-protocol",
+        "persistence",
+        "audit",
+        "post-turn"
+      ],
+      "title": "Post-Turn Self-Update",
+      "triggers": [
+        "after response",
+        "turn end",
+        "post-turn",
+        "after completing"
+      ]
     },
     {
+      "body_md": "## Procedure\n\nEvery interactive prompt must be saved as the start of the audit trail.\n\n1. **Save every prompt** \u2014 Use `nebula_create_agent_record` with `recordType: \"prompt\"`. The database is the canonical store \u2014 do not write directly to filesystem directories.\n\n2. **Link plans to prompts** \u2014 When a prompt results in an implementation plan, pass the `promptRef` (prompt number) to `create_plan` or `create_proposed_plan`. This creates a bidirectional audit trail: prompt \u2192 plan references.\n\n3. **Preserve continuity** \u2014 The prompt number allows subsequent plans, proposals, and responses to reference the originating intent.",
+      "mcp_tools": [
+        "nebula_create_agent_record",
+        "conduit-mcp_create_plan",
+        "conduit-mcp_create_proposed_plan"
+      ],
       "roles": [
         "analyst",
         "architect",
@@ -304,18 +827,51 @@
         "reviewer"
       ],
       "sha256": "98b18816aea847683b1b0a9a30f13b7e3256c62e6099da448bbb6a3d67659b0e",
-      "slug": "prompt-capture"
+      "slug": "prompt-capture",
+      "summary": "Save every interactive prompt as the start of the audit trail.",
+      "tags": [
+        "audit",
+        "prompt",
+        "capture",
+        "traceability"
+      ],
+      "title": "Prompt Capture (Audit Trail)",
+      "triggers": [
+        "user prompt",
+        "new conversation",
+        "question",
+        "request"
+      ]
     },
     {
+      "body_md": "## Procedure\n\n1. After calling `suggest_followups`, call `create_proposed_plan` for each suggestion.\n2. Use the suggestion label as title and a brief description as goal.\n3. Pass the current promptRef for bidirectional audit trail: prompt \u2192 proposal \u2192 implementation plan.\n4. Proposed plans are lightweight ideas \u2014 no files or acceptance criteria.",
+      "mcp_tools": [
+        "conduit-mcp_create_proposed_plan"
+      ],
       "roles": [
         "architect",
         "engineer",
         "planner"
       ],
       "sha256": "bf2b613fffa3e8784135cdcc0e3f778d8542d59a9d48a42bb7fa37c24afa38b9",
-      "slug": "proposal-capture"
+      "slug": "proposal-capture",
+      "summary": "Persist followup suggestions as proposed plans after completing work.",
+      "tags": [
+        "proposal",
+        "followup",
+        "preservation"
+      ],
+      "title": "Proposal Capture (Followup Preservation)",
+      "triggers": [
+        "suggest followup",
+        "after completing",
+        "propose",
+        "follow-up"
+      ]
     },
     {
+      "body_md": "## Role Governance\n\nRoles form a **roundtable of epistemic agents** with competing claims. No single role may unilaterally close a decision in another's domain.\n\n### Invariants\n\n**I1 \\u2014 No single layer dominates.**\nA Planner cannot override an Architecture decision without a thread. An Engineer cannot unilaterally close a Reviewer rejection.\n\n**I2 \\u2014 Origin gating.** Each role owns its domain's binding output:\n\n| Domain | Binding Output | Owning Role |\n|--------|---------------|-------------|\n| Architecture decisions | type:decision, recordType: architecture_note | Architect |\n| Implementation work | type:change, recordType: report | Builder/Engineer |\n| Review judgement | type:approval / type:rejection | Reviewer |\n| Plan proposals | type:proposal, recordType: assessment | Planner |\n| Issue triage | type:triage, recordType: analysis | Analyst |\n| Compliance violations | type:violation, recordType: inspection | Inspector |\n\nA role may propose candidates in any domain (via type:finding, type:warning) but only the owning role emits the binding type:decision or type:approval.\n\n**I3 \\u2014 Divergence is signal, not noise.**\nConflicting assessments must be preserved as visible records \\u2014 never silently collapsed. Resolution happens through explicit threads.\n\n**I4 \\u2014 Read-only provenance records.**\nrecordType: response and recordType: prompt are immutable history. Archivist records are append-only. These must never be updated, only created.\n\n### Divergence Tags\n- type:disagreement \\u2014 Explicit conflicting position\n- type:escalation \\u2014 Request for owning role to resolve\n- type:deferred \\u2014 Known conflict tabled for later",
+      "mcp_tools": [],
       "roles": [
         "analyst",
         "architect",
@@ -330,24 +886,83 @@
         "reviewer"
       ],
       "sha256": "806b7bf1cd14500ee0b1714cba9154e67ad9fb9232bc464670faea75c198e486",
-      "slug": "role-governance"
+      "slug": "role-governance",
+      "summary": "Roundtable of epistemic agents: no single role closes decisions in another's domain.",
+      "tags": [
+        "governance",
+        "role",
+        "epistemic",
+        "constraints"
+      ],
+      "title": "Role Governance & Epistemic Constraints",
+      "triggers": [
+        "governance",
+        "role rules",
+        "epistemic",
+        "who decides"
+      ]
     },
     {
+      "body_md": "## Procedure\n\nAt the start of every turn, before processing the user's request:\n\n1. **Check for an active role lease:**\n   - Call `role_lease_status` (nebula-mcp) \u2014 filter for your role.\n   - If no ACTIVE lease exists, you are NOT authorized to consume work from the READY pool.\n   - The lease carries a time window and optional unit budget.\n\n2. **Read the lease terms:**\n   - `window_end`: the absolute deadline \u2014 you MUST stop consuming work before this time.\n   - `budget_units`: max units you may consume (NULL = unlimited).\n   - `consumed_units`: how many you have already consumed.\n   - `channel`: \"interactive\" (Freebuff), \"opencode\" (CLI), \"ollama\", \"unknown\".\n\n3. **Consume bounded units from the READY pool:**\n   - Call `role_lease_status` at turn start to confirm remaining budget.\n   - If `budget_units IS NOT NULL AND consumed_units >= budget_units`, the lease is exhausted \u2014 stop consuming, surface to user.\n   - If `NOW() > window_end`, the lease has expired \u2014 surface to user, ask about renewal.\n   - **After each completed work item:** call `POST /api/role-leases/consume` with `{\"role\":\"<your_role>\"}` to increment consumed_units.\n     The endpoint returns `{\"ok\":true,\"consumed\":N,\"budget\":M,\"exhausted\":bool}` \u2014 check `exhausted` to confirm remaining budget.\n\n4. **Exhaustion is automatic \u2014 the endpoint handles it (1285 remediation):**\n   - When `consumed_units >= budget_units`, the consume endpoint:\n     a. Auto-revokes the lease (`status \u2192 RELEASED`).\n     b. Emits a `type:lease-exhausted` agent record (visible in architect/engineer inbox).\n   - You do NOT need to manually check for exhaustion \u2014 the response includes `exhausted: true`.\n   - If exhausted, surface to the user and stop consuming. A new lease must be issued to resume.\n\n5. **Renewal is an explicit decision:**\n   - If the window or budget is running out but work remains, ask the user whether to renew.\n   - Call `role_lease_renew` with a new window_end and/or budget_units extension.\n   - Renewal auto-expires a stale ACTIVE lease before creating a new one.\n\n6. **Revoke on completion or session end:**\n   - Call `role_lease_revoke` when you are done consuming work.\n   - This frees the role so another session can acquire it.\n\n7. **Lease is NOT ownership \u2014 unclaimed work returns to READY on expiry.**\n   - The pipeline-health sweep detects stale leases (check #5) and surfaces them as findings.\n   - Handoff to scheduled OpenCode runs is a non-event because work lives in the DB.\n\n## Three-Channel Accounting (plan 1286)\n\nAll execution channels hit the same canonical endpoint:\n\n```\nPOST /api/role-leases/consume  {\"role\":\"<role>\"}\n```\n\n| Channel | Integration Point |\n|---|---|\n| execution_worker.py | `urllib.request` POST after plan-backed success (5s timeout, with-block) |\n| harness-srv (Ollama) | `fetch` POST after `/api/generate` response (5s AbortController) |\n| harness-srv (OpenCode) | `fetch` POST after spawn close (5s AbortController) |\n| Interactive (Freebuff) | Manual `curl` POST after each completed work item |\n\nOne endpoint, one implementation \u2014 no inline SQL in three places.\n\n## Emptiness Check (1285 remediation slice 1)\n\nThe scheduler (`agent_scheduler_runner.py`) now checks eligibility before launching:\n- `_has_eligible_work(role)` is called BEFORE `launch_agent()`.\n- Builder: checks `execution.requests` READY count > 0.\n- Reviewer: checks `vision.tickets` open reviewer count > 0.\n- Logs `skip (role=X, eligible=0)` and increments `skipped_empty` in the summary.\n- This prevents the runaway-reviewer incident (e6d854da) where reviewer launched with 0 plans.\n\n## T16 Runaway Guardrail (1285 remediation slice 2)\n\nharness-srv runs a watchdog loop (60s interval, 15min threshold):\n- Tracks active sessions with jobId, role, model, startedAt, promptFile, **pid**.\n- Checks `nebula.agent_records` for durable output since launch.\n- On detection of an idle session (>15min, no output):\n  1. `process.kill(pid, 'SIGTERM')` \u2014 direct PID, not `pkill -f`.\n  2. Unloads Ollama model via `POST /api/generate {keep_alive: 0}`.\n  3. Emits `type:runaway-detected` agent record.\n- `GET /sessions` on harness-srv (:3420) shows active session list.\n\n**Spawn refactor:** `executeOpencode` uses `child_process.spawn` (not `execFile`)\nso the child PID is captured for direct SIGTERM. Timeout: SIGTERM \u2192 5s grace \u2192 SIGKILL.\n\n## Conformance Test (wr-conf-002)\n\nDeterministic, LLM-free integration test \u2014 16 tests, 6 ACs:\n\n```bash\ncd /home/codex/dev/nexus\npython3 -m pytest python/nexus_core/wrp/tests/test_conformance_role_leases.py -v\n```\n\n| AC | Coverage |\n|---|---|\n| AC1 | Lease issue + status query (POST /issue, GET /role-leases, 409 on dup) |\n| AC2 | Three-channel consumption (single, triple, 404 on no-lease) |\n| AC3 | Exhaustion hook (exhausted=true, auto-revoke, agent record, multi-unit) |\n| AC4 | Scheduler emptiness check (builder READY>0, reviewer open=0) |\n| AC5 | Harness-srv session tracking (GET /sessions, health check) |\n| AC6 | Pipeline-health sweep #5 (/stale for expired-window leases) |\n\n## Lease Lifecycle\n```\nissue \u2192 ACTIVE (one per role)\n  \u251c\u2500 window_end passes \u2192 stale (sweep detects)\n  \u251c\u2500 consume \u2192 consumed_units++ (unified POST /consume)\n  \u2502   \u2514\u2500 budget exhausted \u2192 auto-revoke + type:lease-exhausted record\n  \u251c\u2500 renew \u2192 extended window/budget (resets stale check)\n  \u2514\u2500 revoke \u2192 RELEASED (voluntary release)\n```\n\n## INTERACTIVE Channel (Freebuff-Hosted Roles)\n\nRoles that run inside the Freebuff interactive session are never launched by harness-srv\nor the scheduler. They are represented in `tackle.config_bundle` with:\n\n- `invocation_mode = 'INTERACTIVE'`\n- `harness_id = 'harn-freebuff'` \u2014 a harness with `binary: null`, `execution.mode: hosted`, `host: freebuff`\n- `model_id` still resolves for lease accounting, but no launch path may spawn it\n\n### Guards\n\n**harness-srv `/run`:** HTTP 400 refuses any role whose resolved config_bundle has `invocation_mode = 'INTERACTIVE'`:\n```\nerror: \"role <role> is INTERACTIVE-hosted (Freebuff) \u2014 cannot be launched via harness-srv; run it in the Freebuff interactive session instead\"\n```\n**Scheduler:** `agent_scheduler_runner.py` calls `_is_interactive_hosted(role)`; if true,\nlogs `skip (role=X, interactive-hosted)` and increments `skipped_interactive` in the\ntick summary. The scheduler never launches an INTERACTIVE-hosted role.\n\n### Real Task\n\nThe `leased-builder` role has a real dispatchable task:\n\n```\ntackle.tasks: role=leased-builder, task_slug=implement-change, scope=\"Implement the approved change under an active role lease (bounded consumption)\"\nwind.tasks:   id=...0005, name=\"Implement Change (Leased)\" \u2192 links to the tackle task\n```\n`resolve-context` on this wind task returns `role=leased-builder, harness_id=harn-freebuff`\nwith the full leased-builder persona prompt (5561 chars). The interactive session resolves\nthe context, picks up the work, and executes it under the bounded role lease.\n\n### Conformance (wr-conf-005)\n\n7 tests asserting the INTERACTIVE guard (commit 235b8c3):\n\n```bash\ncd /home/codex/dev/nexus\npython3 -m pytest python/nexus_core/wrp/tests/test_conformance_interactive_guard.py -v\n```\n\n| AC | Assertion |\n|---|---|\n| AC1 | leased-builder config_bundle \u2192 INTERACTIVE + harn-freebuff; resolve-context maps to freebuff harness |\n| AC2 | `/run` refuses with HTTP 400 and never registers a session; control wind task still resolves launchable |\n| AC3 | Scheduler shadow skips the leased-builder entry: `skipped_interactive >= 1`, `launched = 0` |\n",
+      "mcp_tools": [
+        "role_lease_status",
+        "role_lease_issue",
+        "role_lease_renew",
+        "role_lease_revoke"
+      ],
       "roles": [
         "builder",
         "engineer"
       ],
       "sha256": "acf9a5e781bc90cdf29b7a0ab1ea31399b544beefa49e8b313ba950227544566",
-      "slug": "role-lease-orientation"
+      "slug": "role-lease-orientation",
+      "summary": "Read your active role lease, consume bounded units from the READY pool via the canonical POST /consume endpoint (unified accounting across all three channels), rely on auto-exhaustion (revoke + agent record), and respect the scheduler emptiness check + T16 runaway guardrail. Run wr-conf-002 to verify.",
+      "tags": [
+        "role-lease",
+        "orientation",
+        "plan-1286",
+        "bounded-work"
+      ],
+      "title": "Role-Lease Orientation (Plan 1286)",
+      "triggers": [
+        "start of turn",
+        "role lease",
+        "lease check",
+        "am i leased",
+        "leased builder"
+      ]
     },
     {
+      "body_md": "## Procedure\n\n1. **Execute the harvest** using Rover. Always use yourself as the inference component \u2014 do not delegate to Ollama unless explicitly told.\n\n2. **Persist harvest output** to the database via `nebula_create_harvest` (or `POST /api/harvests`).\n\n3. **Create cross-references** linking the harvest to knowledge entities:\n   a. Direct references via `nebula_create_cross_reference` with `relType: \"informs\"` (harvest \u2192 entity) and `relType: \"sourced_from\"` (entity \u2192 harvest). Use `knowledge_list_entities` to find matching entities.\n   b. Run automated discovery scripts: `embed_harvests.py`, `embed_knowledge_entities.py`, `cross_schema_classifier.py`, `provenance_linker.py` (requires Ollama + pgvector).\n\n4. **Notify Architect and Analyst** via `nebula_create_agent_record`:\n   - `tags: [\"to:architect\", \"status:open\", \"type:finding\", \"thread:...\"]`\n   - `tags: [\"to:analyst\", \"status:open\", \"type:finding\", \"thread:...\"]`\n   - Same `threadRef` UUID for both so they share a conversation thread.\n   - Title: \"New harvest material available: <topic/summary>\"",
+      "mcp_tools": [
+        "nebula_create_harvest",
+        "nebula_create_cross_reference",
+        "knowledge_list_entities",
+        "nebula_create_agent_record"
+      ],
       "roles": [
         "engineer"
       ],
       "sha256": "83fbfcfff2ca604246dfbb0567202ea6665dd2edd0f65b60f4784d9ab35b685b",
-      "slug": "rover-harvest-notification"
+      "slug": "rover-harvest-notification",
+      "summary": "After harvests, create cross-refs and notify Architect + Analyst.",
+      "tags": [
+        "harvest",
+        "post-processing",
+        "notification",
+        "cross-reference"
+      ],
+      "title": "Rover Harvest Notification",
+      "triggers": [
+        "rover",
+        "harvest",
+        "chat transcript",
+        "nebula_create_harvest"
+      ]
     },
     {
+      "body_md": "## Tackle-MCP Tool Reference\n\nTackle-mcp (port 3400) manages the AI configuration registry and Role Memory Procedure Registry.\n\n### AI Configuration Registry\n| Tool | Purpose |\n|------|---------|\n| get_ai_config | Get full AI configuration snapshot |\n| validate_ai_config | Validate configuration |\n| seed_default_ai_config | Seed default providers, harnesses, models |\n| import_ai_config | Replace entire configuration snapshot |\n\n### Providers\n| Tool | Purpose |\n|------|---------|\n| list_ai_providers | List all AI providers |\n| get_ai_provider(id) | Get a single provider |\n| upsert_ai_provider | Create or update a provider |\n| delete_ai_provider(id) | Delete a provider |\n\n### Harnesses\n| Tool | Purpose |\n|------|---------|\n| list_ai_harnesses | List all AI harnesses |\n| get_ai_harness(id) | Get a single harness |\n| upsert_ai_harness | Create or update a harness |\n| delete_ai_harness(id) | Delete a harness |\n\n### Models\n| Tool | Purpose |\n|------|---------|\n| list_ai_models | List all AI models |\n| get_ai_model(id) | Get a single model |\n| upsert_ai_model | Create or update a model |\n| delete_ai_model(id) | Delete a model |\n\n### Role Configs & Bundles\n| Tool | Purpose |\n|------|---------|\n| list_ai_role_configs | List all role configs |\n| get_ai_role_config(role) | Get a single role config |\n| upsert_ai_role_config | Create or update role config |\n| list_config_bundles(role) | List bundles for a role |\n| upsert_config_bundle | Create or update a bundle |\n| delete_config_bundle(id) | Delete a bundle |\n\n### Role Memory Procedures\n| Tool | Purpose | Reads From |\n|------|---------|------------|\n| memory_get_procedures(role) | Return procedure index for a role | Redis |\n| memory_get_procedure(slug) | Return full procedure card | Redis |\n| memory_check_since(role, since) | Check if memory changed | PostgreSQL |\n| memory_refresh() | Trigger full PG\\u2192Redis sync | role-memory-srv |",
+      "mcp_tools": [],
       "roles": [
         "analyst",
         "architect",
@@ -362,9 +977,25 @@
         "reviewer"
       ],
       "sha256": "fa89f80946beb39192f43e005743e76852f42809caf25fb117246969d4284a5d",
-      "slug": "tackle-mcp-tools"
+      "slug": "tackle-mcp-tools",
+      "summary": "Complete catalog of tackle-mcp tools for AI config and memory management.",
+      "tags": [
+        "reference",
+        "tackle-mcp",
+        "tools",
+        "appendix"
+      ],
+      "title": "Tackle-MCP Tool Reference",
+      "triggers": [
+        "list tools",
+        "what tools",
+        "tackle-mcp",
+        "MCP reference"
+      ]
     },
     {
+      "body_md": "## Tag Routing Reference\n\nAll tags are lower-kebab-case. Multiple tags form a conjunction.\n\n### Prefix Tags\n\n| Tag | Purpose | Examples |\n|-----|---------|----------|\n| `to:{role}` | Intended recipient | `to:engineer`, `to:architect`, `to:planner` |\n| `from:{role}` | Sender | `from:architect` |\n| `status:{state}` | Message lifecycle | `status:open`, `status:claimed`, `status:in_progress`, `status:resolved`, `status:archived` |\n| `type:{kind}` | Semantic kind | `type:incident`, `type:task`, `type:question`, `type:decision`, `type:spec`, `type:finding`, `type:blocker`, `type:proposal`, `type:warning`, `type:error`, `type:approval`, `type:rejection`, `type:disagreement`, `type:escalation`, `type:deferred`, `type:db-change` |\n| `thread:{id}` | Thread membership | `thread:a1b2c3` |\n\n### DB-Change Routing Tag\n- `type:db-change` \u2014 plan requires database work; recipient DBA posts the proposed alterations to the Assembly Drafts forum (slug `draft`) and applies them ONLY after admin approval, BEFORE a Builder starts (doctrine 2026-08-07). Pair with `to:dba`, `planRef:<N>`, `status:open`; completion reported with `status:resolved`/`status:done`.\n- The Drafts forum (slug `draft`) is the DBA's DB-work channel: DBA posts proposals there AND checks it for admin approval/rejection replies and incoming DB-change requests (in addition to the nebula inbox).\n\n### Divergence Tags\n- `type:disagreement` \u2014 Explicit conflicting position\n- `type:escalation` \u2014 Request for owning role to resolve\n- `type:deferred` \u2014 Known conflict tabled for later\n\n### Domain Tags (ad-hoc, lowercase)\n- `domain:knowledge-infrastructure`, `domain:type-spec`, etc.\n- `priority:high`, `priority:medium`, `priority:low`\n\n### Where these tags are used (verified)\n- **R17 inbox query:** the nebula REST endpoint (`3101`) applies `role` + `createdAfter` but IGNORES `tags`/`limit`; for exact tag-routed queries use `nexus/bin/check-inbox.sh` (MCP HTTP+SSE on 3102).\n- **R13 session-start forum check:** the Assembly `issues-and-open-questions` check now uses the Assembly REST API on 3107 (`GET /api/forums/issues-and-open-questions/threads`) \u2014 there is no `3102/tools/call` route on nebula-mcp.",
+      "mcp_tools": [],
       "roles": [
         "analyst",
         "architect",
@@ -379,16 +1010,56 @@
         "reviewer"
       ],
       "sha256": "83d7ac6d0b3d5c444447fdd755b5b936dd91a3ef7a6aeaa2717fa229d54d5302",
-      "slug": "tag-routing-reference"
+      "slug": "tag-routing-reference",
+      "summary": "Reference for valid agent message tags (to:, from:, status:, type:, thread:).",
+      "tags": [
+        "messaging",
+        "reference",
+        "tags",
+        "routing"
+      ],
+      "title": "Tag Routing Convention Reference",
+      "triggers": [
+        "tag routing",
+        "message format",
+        "tag convention",
+        "what tags"
+      ]
     },
     {
+      "body_md": "## Procedure\n\n1. **Identify the service** \u2014 name, type (api|db|queue|worker|ui), endpoint, health check, dependencies.\n\n2. **Call `terrain-mcp`** to register:\n   - `terrain_register_service` \u2014 create new entry\n   - `terrain_update_service` \u2014 update existing metadata\n   - Include: `name`, `type`, `endpoint`, `health_check`, `depends_on`, `metadata` (version, region, etc.)\n\n3. **Verify** via `terrain_list_services` \u2014 confirm the service appears with correct topology links.",
+      "mcp_tools": [
+        "terrain_register_service",
+        "terrain_list_services"
+      ],
       "roles": [
         "engineer"
       ],
       "sha256": "b064c658a02543d2cd36b279d25d3c8c29e7d261ce25c87bee2b2977dd5730af",
-      "slug": "terrain-registration"
+      "slug": "terrain-registration",
+      "summary": "Register services in terrain topology after building or deploying.",
+      "tags": [
+        "deployment",
+        "infrastructure",
+        "service-registry",
+        "topology"
+      ],
+      "title": "Terrain Registration",
+      "triggers": [
+        "deploy",
+        "build",
+        "set up",
+        "service",
+        "register"
+      ]
     },
     {
+      "body_md": "## Procedure\n\nConversations between roles use `threadRef` (a shared UUID across messages).\n\n1. **First message**: Author writes a record with a new `threadRef` UUID and tags `[\"to:recipient\", \"status:open\", \"type:kinds\"]`.\n\n2. **Response**: Recipient writes a record with the same `threadRef`, tags `[\"to:author\", \"status:in_progress\", \"type:kinds\"]`.\n\n3. **Continuation**: Any role writes to the same thread with updated `status` and appropriate `to:` tag.\n\n4. **Querying threads**: Filter for `threadRef = \"<uuid>\"` and order by `created_at`.\n\n5. **Resolving threads**: Update all messages in the thread to `status:resolved`.\n\n## Common Thread Lifecycle\n\n1. Open \u2192 Claimed \u2192 In Progress \u2192 Resolved\n2. Open \u2192 Resolved (simple acknowledgment)\n3. Open \u2192 Escalated \u2192 (owning role decision) \u2192 Resolved",
+      "mcp_tools": [
+        "nebula_list_agent_records",
+        "nebula_create_agent_record",
+        "nebula_update_agent_record"
+      ],
       "roles": [
         "analyst",
         "architect",
@@ -403,9 +1074,28 @@
         "reviewer"
       ],
       "sha256": "20a67b199b3fd6cc919dbe6faf011055362f05be880dc79575b6eb45c2775b56",
-      "slug": "thread-tracking"
+      "slug": "thread-tracking",
+      "summary": "Create and continue cross-role conversations via threadRef UUIDs.",
+      "tags": [
+        "messaging",
+        "thread",
+        "conversation",
+        "cross-role"
+      ],
+      "title": "Thread Tracking (Cross-Role Conversations)",
+      "triggers": [
+        "conversation",
+        "thread",
+        "cross-role",
+        "respond to agent"
+      ]
     },
     {
+      "body_md": "## Procedure\n\nAt the start of every turn, before processing the user's request:\n\n1. **Query the pipeline state** \u2014 Call `query_pipeline_state` (or read `/state` via HTTP) to get the current `PipelineState`.\n\n2. **Inspect `plans.planning`** \u2014 Look for plans in the `planning` array. These are plans with a `PLANNING` receipt that are awaiting elucidation.\n\n3. **Present findings to the user:**\n   > \"Before we proceed \u2014 you have [N] plan(s) in Planning that were promoted but not yet discussed:\n   > - **#NNNN**: [title] \u2014 [goal summary]\n   > Would you like to discuss any of these before we continue?\"\n\n4. **Follow the user's lead:**\n   - If they want to discuss a planning plan, help elucidate it (files affected, acceptance criteria, dependencies) then call `issue_receipt` with `PLAN_CREATE` to move it to Pending.\n   - If they say \"not now\", proceed with the original request. Planning plans remain in Planning for a future turn.\n\n5. **Do NOT auto-promote to Pending** \u2014 the user must explicitly confirm.",
+      "mcp_tools": [
+        "conduit-mcp_query_conduit_state",
+        "conduit-mcp_issue_receipt"
+      ],
       "roles": [
         "architect",
         "builder",
@@ -414,17 +1104,55 @@
         "reviewer"
       ],
       "sha256": "9c54413efe5087564504cb46d5c478aafb241296b96b3af591e3b1e2c61d235b",
-      "slug": "turn-based-planning-check"
+      "slug": "turn-based-planning-check",
+      "summary": "Check for plans promoted to Planning status before each turn.",
+      "tags": [
+        "turn-protocol",
+        "planning",
+        "conduit",
+        "elucidation"
+      ],
+      "title": "Turn-Based Planning Check (Conduit)",
+      "triggers": [
+        "start of turn",
+        "planning check",
+        "promoted plan",
+        "plan pipeline"
+      ]
     },
     {
+      "body_md": "## Verification Commands\n\n### MCP Server\n```bash\ncd nexus/typescript/conduit-mcp && npx tsc --noEmit\ncd nexus/typescript/conduit-mcp && npx vitest run\n```\n\n### Backend (LOSM)\n```bash\ncd nexus/python/ai/losm && source .venv/bin/activate && pytest\n```\n\n### UI (React)\n```bash\ncd nexus-ui/nexus-plurality-ui && npx tsc --noEmit\ncd nexus-ui/nexus-plurality-ui && npm run build\n```\n\n### Conduit UI (Angular)\n```bash\ncd nexus/angular/conduit-ui && npx ng build\n```\n\n### Chat Server\n```bash\ncd nexus/python/conduit && python3 agent_chat.py\n```",
+      "mcp_tools": [],
       "roles": [
         "builder",
         "engineer"
       ],
       "sha256": "5b231e5c928551faf77b714693254f2936eaac29ad0b4f1dbba37366e9571ec0",
-      "slug": "verification-commands"
+      "slug": "verification-commands",
+      "summary": "Build, typecheck, and test commands for the nexus workspace.",
+      "tags": [
+        "reference",
+        "commands",
+        "build",
+        "test",
+        "verification"
+      ],
+      "title": "Verification & Build Commands",
+      "triggers": [
+        "build",
+        "test",
+        "typecheck",
+        "verify",
+        "tsc",
+        "vitest",
+        "pytest"
+      ]
     },
     {
+      "body_md": "## WorkRequest Participation\n\nUnless the user explicitly asks for a different workflow, participate in the WorkRequest pattern as follows:\n\n### 1. Prompt & Intent Capture\nFor non-trivial requests, preserve the request in prompt or planning records. Query conduit-mcp pipeline state before creating new record formats. Extend existing records instead of inventing parallel files. Avoid claiming archival is complete if the storage path doesn't exist.\n\n### 2. Implementation Plan Stacking\nWhen the task is substantial, cross-file, risky, or spans sessions:\n- Create or update an implementation plan in the expected location\n- Stack new plans on top of existing state, don't overwrite history\n- Keep scope narrow enough to be executable\n- Verify no pending/active plan covers the same work\n\n### 3. WorkRequest Emission\nGenerate explicit WorkRequests when:\n- Prompted by the user\n- The active repository workflow clearly expects them\n- Follow existing schemas and lifecycle conventions\n- Supersede or version existing artifacts instead of mutating history\n\n### 4. Execution\n- Execute only work that is directly requested or already authorized\n- Respect plan boundaries, blocked states, dependency ordering\n- Update implementation records after meaningful work\n\n### 5. Recovery\nOn session restart or ambiguous state:\n- Query conduit-mcp pipeline state and .agents/ artifacts first\n- Assume work may already be partially complete\n- Prefer reconciling with durable state over conversational memory",
+      "mcp_tools": [
+        "conduit-mcp_query_conduit_state"
+      ],
       "roles": [
         "analyst",
         "architect",
@@ -436,7 +1164,21 @@
         "reviewer"
       ],
       "sha256": "fc4ec999702a31373f195990af0eefb317c98f2424eb990fdc31a834db8365d8",
-      "slug": "work-request-participation"
+      "slug": "work-request-participation",
+      "summary": "How to participate in the WorkRequest pattern: capture, plan, emit, execute, recover.",
+      "tags": [
+        "governance",
+        "workrequest",
+        "participation",
+        "pattern"
+      ],
+      "title": "WorkRequest Pattern Participation",
+      "triggers": [
+        "work request",
+        "how to work",
+        "participation pattern",
+        "WR pattern"
+      ]
     }
   ],
   "role_count": 209,

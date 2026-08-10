@@ -57,24 +57,28 @@ def card_sha256(slug: str, title: str, summary: str, body_md: str,
     return hashlib.sha256(canon.encode("utf-8")).hexdigest()
 
 
-def build_manifest(conn) -> dict:
+def build_manifest(conn, schema: str = "tackle") -> dict:
     """Read the canonical DB state and build the manifest dict.
 
     `conn` is a psycopg2 connection with access to the tackle schema.
     Returns a manifest with keys: schema, card_count, role_count, cards.
-    Each card: {slug, sha256, roles:[...sorted]}.
+    Each card carries the FULL content (slug/title/summary/body_md/tags/
+    triggers/mcp_tools) plus its sha256 and roles:[...sorted] — the manifest is
+    a self-contained snapshot from which the schema can be reconstructed
+    (apply_manifest), which is what CI uses to bootstrap a scratch DB and run
+    the AC1-AC4 live-compare tests.
     """
     cur = conn.cursor()
     cur.execute(
-        """SELECT slug, title, summary, body_md, tags, triggers, mcp_tools
-           FROM tackle.memory ORDER BY slug"""
+        f"""SELECT slug, title, summary, body_md, tags, triggers, mcp_tools
+           FROM {schema}.memory ORDER BY slug"""
     )
     cards = []
     role_count = 0
     for slug, title, summary, body_md, tags, triggers, mcp_tools in cur.fetchall():
         cur.execute(
-            """SELECT DISTINCT role FROM tackle.role_memory
-               WHERE memory_id = (SELECT id FROM tackle.memory WHERE slug = %s)
+            f"""SELECT DISTINCT role FROM {schema}.role_memory
+               WHERE memory_id = (SELECT id FROM {schema}.memory WHERE slug = %s)
                ORDER BY role""",
             (slug,),
         )
@@ -83,6 +87,12 @@ def build_manifest(conn) -> dict:
         cards.append(
             {
                 "slug": slug,
+                "title": title,
+                "summary": summary or "",
+                "body_md": body_md or "",
+                "tags": list(tags or []),
+                "triggers": list(triggers or []),
+                "mcp_tools": list(mcp_tools or []),
                 "sha256": card_sha256(
                     slug, title, summary, body_md, tags, triggers, mcp_tools
                 ),
@@ -90,11 +100,107 @@ def build_manifest(conn) -> dict:
             }
         )
     return {
-        "schema": "tackle",
+        "schema": schema,
         "card_count": len(cards),
         "role_count": role_count,
         "cards": cards,
     }
+
+
+# DDL used to reconstruct the tackle schema from the manifest (mirrors
+# tackle-srv/src/db.ts memory + role_memory, including the btree_gist EXCLUDE
+# constraint so role-assignment semantics match live).
+_MEMORY_DDL = (
+    "CREATE TABLE IF NOT EXISTS {schema}.memory ("
+    "  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),"
+    "  slug TEXT NOT NULL UNIQUE,"
+    "  title TEXT NOT NULL,"
+    "  summary TEXT NOT NULL DEFAULT '',"
+    "  body_md TEXT NOT NULL DEFAULT '',"
+    "  tags TEXT[] NOT NULL DEFAULT '{}',"
+    "  triggers TEXT[] NOT NULL DEFAULT '{}',"
+    "  mcp_tools TEXT[] NOT NULL DEFAULT '{}'"
+    ")"
+)
+
+_ROLE_MEMORY_DDL = (
+    "CREATE TABLE IF NOT EXISTS {schema}.role_memory ("
+    "  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),"
+    "  memory_id UUID NOT NULL REFERENCES {schema}.memory(id) ON DELETE CASCADE,"
+    "  role TEXT NOT NULL,"
+    "  as_of_dt TIMESTAMPTZ NOT NULL DEFAULT NOW(),"
+    "  expiration_dt TIMESTAMPTZ,"
+    "  CONSTRAINT uq_role_memory_active EXCLUDE USING gist ("
+    "    memory_id WITH =, role WITH =,"
+    "    tstzrange(as_of_dt, expiration_dt) WITH &&"
+    "  )"
+    ")"
+)
+
+
+def apply_manifest(conn, manifest: dict, schema: str = "tackle", reset: bool = True):
+    """Reconstruct the tackle schema from a manifest (the CI bootstrap).
+
+    Creates {schema}.memory + {schema}.role_memory and inserts every card and
+    role row from the manifest. With reset=True (default) the two tables are
+    dropped first (idempotent re-bootstrap — a re-run without reset would hit
+    the slug UNIQUE constraint); only the seed tables are touched — never
+    other tables in the schema. Commit is left to the caller (pass autocommit
+    or commit after). Returns {"cards": n, "roles": m} inserted.
+    """
+    cur = conn.cursor()
+    cur.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+    cur.execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
+    if reset:
+        cur.execute(f"DROP TABLE IF EXISTS {schema}.role_memory CASCADE")
+        cur.execute(f"DROP TABLE IF EXISTS {schema}.memory CASCADE")
+    # Use replace() not .format(): the DDL contains literal '{}' array
+    # defaults which .format() would try to interpolate.
+    cur.execute(_MEMORY_DDL.replace("{schema}", schema))
+    cur.execute(_ROLE_MEMORY_DDL.replace("{schema}", schema))
+    role_rows = 0
+    for card in manifest["cards"]:
+        cur.execute(
+            f"""INSERT INTO {schema}.memory
+               (slug, title, summary, body_md, tags, triggers, mcp_tools)
+               VALUES (%s, %s, %s, %s, %s, %s, %s)
+               RETURNING id""",
+            (
+                card["slug"], card["title"], card["summary"] or "",
+                card["body_md"] or "",
+                list(card.get("tags") or []),
+                list(card.get("triggers") or []),
+                list(card.get("mcp_tools") or []),
+            ),
+        )
+        memory_id = cur.fetchone()[0]
+        for role in card.get("roles") or []:
+            cur.execute(
+                f"""INSERT INTO {schema}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+                   VALUES (%s, %s, NOW(), NULL)""",
+                (memory_id, role),
+            )
+            role_rows += 1
+    return {"cards": len(manifest["cards"]), "roles": role_rows}
+
+
+def manifest_self_consistent(manifest: dict) -> tuple:
+    """Verify every card's stored sha256 matches its embedded content.
+
+    Guards against a hand-edited manifest whose content was changed without
+    recomputing the hash (the hash tests would then be comparing against a
+    lying reference). Returns (ok, [problem strings]).
+    """
+    problems = []
+    for card in manifest.get("cards", []):
+        got = card_sha256(
+            card["slug"], card.get("title", ""), card.get("summary", ""),
+            card.get("body_md", ""), card.get("tags"), card.get("triggers"),
+            card.get("mcp_tools"),
+        )
+        if got != card.get("sha256"):
+            problems.append(f"{card['slug']}: stored sha256 != sha256 of embedded content")
+    return (not problems, problems)
 
 
 def write_manifest(manifest: dict, path: str = MANIFEST_PATH) -> None:

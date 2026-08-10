@@ -1,17 +1,25 @@
 name: Seed Drift Guard
 
-# Runs the wr-conf-006 AC5 manifest guard: renders seedMemoryProcedures()
-# from typescript/tackle-seeds/index.ts with real JS semantics (node),
-# executes the DO block against a SCRATCH schema in a throwaway Postgres
-# (no live tackle schema needed), and asserts the seeded card count + role
-# count + per-card sha256 + role sets match the committed
-# typescript/tackle-seeds/seed-manifest.json.
+# Runs the full wr-conf-006 suite (AC1-AC5) in CI:
 #
-# This is the no-live-DB reference: bin/regenerate_memory_seed.py emits the
-# manifest from the canonical DB alongside the seed, so a hand-edit or stale
-# regeneration of the seed that drifts from the DB also breaks the manifest
-# compare here — seed drift is caught automatically on every push/PR, with no
-# production database required.
+#   1. Bootstrap — reconstruct tackle.memory + tackle.role_memory in a
+#      throwaway Postgres from the committed typescript/tackle-seeds/
+#      seed-manifest.json (a full-content snapshot of the canonical DB emitted
+#      by bin/regenerate_memory_seed.py). No production database is touched;
+#      bin/bootstrap_seed_manifest.py refuses a schema that looks like the
+#      live DB.
+#   2. Guard — render seedMemoryProcedures() from source with real JS
+#      semantics (node) and compare it against the bootstrapped tables:
+#        AC1  render integrity + shadow execution + dist artifact
+#        AC2  per-card byte-identity vs the bootstrapped (canonical) tables
+#        AC3  per-card role sets
+#        AC4  escape conventions (static)
+#        AC5  manifest guard: scratch-schema seed vs committed manifest,
+#             manifest content self-consistency, bootstrap round-trip
+#
+# So seed drift (hand-edits, stale regenerations) is caught automatically on
+# every push/PR, with the live-compare tests getting real table coverage in
+# CI too.
 
 on:
   push:
@@ -25,7 +33,7 @@ permissions:
 
 jobs:
   seed-manifest-guard:
-    name: "wr-conf-006 AC5: seed vs committed manifest (scratch DB)"
+    name: "wr-conf-006 full suite: seed vs bootstrapped schema + manifest"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:
@@ -53,6 +61,9 @@ jobs:
           node-version: "20"
       - name: Install test deps
         run: python3 -m pip install --quiet pytest psycopg2-binary
-      - name: Seed manifest guard (scratch schema)
+      - name: Bootstrap tackle schema from committed manifest
+        run: make seed-guard-bootstrap
+        shell: bash
+      - name: Full seed guard suite (AC1-AC5 vs bootstrapped tables + manifest)
         run: make seed-guard-test
         shell: bash

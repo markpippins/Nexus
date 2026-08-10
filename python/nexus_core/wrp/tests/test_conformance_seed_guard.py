@@ -59,8 +59,11 @@ if _NEXUS_PYTHON not in sys.path:
 
 from nexus_core.wrp.seed_manifest import (  # noqa: E402
     MANIFEST_PATH,
+    apply_manifest,
+    build_manifest,
     card_sha256,
     manifest_matches_live,
+    manifest_self_consistent,
     read_manifest,
 )
 
@@ -552,6 +555,50 @@ class TestAc5ManifestGuard(unittest.TestCase):
             self.assertRegex(c["slug"], r"^[a-z0-9-]+$")
             self.assertRegex(c["sha256"], r"^[0-9a-f]{64}$")
             self.assertIsInstance(c.get("roles"), list)
+            # Full-content snapshot: every field needed to reconstruct the
+            # schema (CI bootstrap) must be present.
+            for field in ("title", "summary", "body_md", "tags", "triggers", "mcp_tools"):
+                self.assertIn(field, c, f"{c['slug']}: manifest missing '{field}' content field")
+
+    def test_manifest_content_self_consistent(self):
+        """Each stored sha256 equals sha256 of its embedded content — a
+        hand-edit to the manifest that changed content without recomputing the
+        hash (a lying reference) is caught here."""
+        ok, problems = manifest_self_consistent(read_manifest())
+        self.assertTrue(ok, "manifest content/hash mismatch:\n  " + "\n  ".join(problems))
+
+    def test_bootstrap_roundtrip_reconstructs_manifest(self):
+        """apply_manifest (the CI bootstrap) into a scratch schema, then
+        build_manifest from it, must reproduce the committed manifest exactly —
+        the full-content snapshot round-trips through a real schema."""
+        manifest = read_manifest()
+        conn = _db()
+        try:
+            schema = "seed_roundtrip"
+            cur = conn.cursor()
+            cur.execute(f"DROP SCHEMA IF EXISTS {schema} CASCADE")
+            conn.commit()
+            try:
+                apply_manifest(conn, manifest, schema=schema, reset=True)
+                conn.commit()
+                rebuilt = build_manifest(conn, schema=schema)
+                self.assertEqual(rebuilt["card_count"], manifest["card_count"])
+                self.assertEqual(rebuilt["role_count"], manifest["role_count"])
+                rebuilt_by_slug = {c["slug"]: c for c in rebuilt["cards"]}
+                for card in manifest["cards"]:
+                    rb = rebuilt_by_slug.get(card["slug"])
+                    self.assertIsNotNone(rb, f"{card['slug']} missing after round-trip")
+                    for field in ("title", "summary", "body_md", "tags", "triggers", "mcp_tools", "sha256", "roles"):
+                        self.assertEqual(
+                            rb[field], card[field],
+                            f"{card['slug']}: {field} differs after round-trip",
+                        )
+            finally:
+                cur = conn.cursor()
+                cur.execute(f"DROP SCHEMA IF EXISTS {schema} CASCADE")
+                conn.commit()
+        finally:
+            conn.close()
 
     def test_scratch_seed_card_count_matches_manifest(self):
         """Scratch execution seeds exactly the manifest's card count."""
