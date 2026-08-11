@@ -13,19 +13,16 @@ For each ``assembly.comment.created`` event it:
 6. Consumes one unit from the role lease
 7. Emits governance receipt
 
-Architecture::
+Architecture — execution_backend dispatch::
 
-    Duality-UI → POST /api/forums/.../comments
-        └─→ assembly.comments INSERT
-                └─→ trg_comment_created → pg_notify('kernel_transition', ...)
-                        └─→ cascade/kernel_subscriber → NATS
-                                └─→ nexus.duality.v1.conversation.assembly.comment.created
-                                        └─→ interactive_turn_subscriber.py  (this daemon)
-                                                ├─→ coordinator: continue/delegate/close?
-                                                ├─→ harness-srv POST /run  (opencode agents)
-                                                ├─→ Freebuff turn.requested event  (interactive agents)
-                                                ├─→ POST assembly comment (response)
-                                                └─→ POST /api/role-leases/consume
+    assembly.comment.created event
+        └─→ watch.execution_backend?
+                ├─→ 'operator'  → operator service POST /chat (FreeBuff persistent session,
+                │                  incremental context — session already owns conversation)
+                ├─→ 'harness'   → harness-srv POST /run-direct (OpenCode ephemeral execution,
+                │                  full context reconstruction from Assembly + identities)
+                └─→ 'freebuff'  → emit conversation.turn.requested on NATS
+                                   (direct interactive, session already has context)
 
 Usage::
 
@@ -112,7 +109,7 @@ def _query_watches(pg_conn: Any, thread_id: str) -> list[dict[str, Any]]:
         cur.execute(
             """SELECT id, thread_id, forum_slug, role, lease_id,
                       max_turns, turn_count, idle_timeout_ms,
-                      last_activity, status
+                      last_activity, status, execution_backend
                FROM duality.session_watches
                WHERE thread_id = %s::uuid AND status = 'active'
                ORDER BY role""",
@@ -201,9 +198,10 @@ def _invoke_agent_operator(
 ) -> dict[str, Any]:
     """Invoke an agent via the operator service POST /chat.
 
-    The operator service (port 3018) is the same path nexus-console's
-    MessageBoxService uses. It resolves role → config bundle → model
-    and returns the LLM response. No wind task required.
+    This is the FreeBuff path — the operator service maintains a
+    persistent provider session. We only pass the new interaction
+    (not the full thread history), since the session already has
+    the conversation context.
 
     Returns { exit_code, stdout, stderr } matching harness-srv shape.
     """
@@ -230,6 +228,70 @@ def _invoke_agent_operator(
     except Exception as e:
         _log("Operator invocation failed for %s: %s", role, e)
         return {"exit_code": 1, "stdout": "", "stderr": str(e)}
+
+
+def _invoke_agent_harness(
+    role: str,
+    prompt: str,
+    model: str | None,
+    timeout_ms: int = 300_000,
+) -> dict[str, Any]:
+    """Invoke an agent via harness-srv POST /run-direct.
+
+    This is the OpenCode path — ephemeral execution that needs full
+    context reconstruction. The prompt should already contain the
+    assembled Assembly thread + participant identities + SOL facts.
+
+    Returns { exit_code, stdout, stderr }.
+    """
+    body = json.dumps({
+        "role": role,
+        "prompt": prompt,
+        **({"model": model} if model else {}),
+        "timeout_ms": timeout_ms,
+        "channel": "duality",
+    }).encode()
+
+    req = urllib.request.Request(
+        f"{HARNESS_SRV_URL}/run-direct",
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_ms // 1000 + 30) as resp:
+            data = json.loads(resp.read())
+            if data.get("error"):
+                return {"exit_code": 1, "stdout": "", "stderr": data["error"]}
+            return {
+                "exit_code": data.get("exit_code", 0),
+                "stdout": data.get("stdout", ""),
+                "stderr": data.get("stderr", ""),
+            }
+    except Exception as e:
+        _log("Harness invocation failed for %s: %s", role, e)
+        return {"exit_code": 1, "stdout": "", "stderr": str(e)}
+
+
+def _emit_turn_requested(
+    thread_id: str,
+    role: str,
+    comment_role: str,
+) -> None:
+    """Emit conversation.turn.requested on NATS for freebuff backends.
+
+    The FreeBuff session already owns its context — we just need to
+    signal that a new interaction is available. The session picks up
+    the pointer and responds within its existing continuity.
+
+    NOTE: NATS publishing requires the async nc handle from the event
+    loop, which isn't available in this synchronous handler. The stub
+    logs the turn request for now; the FreeBuff session is expected to
+    poll the Assembly thread directly (via duality-ui's polling loop)
+    rather than waiting for a NATS-delivered event.
+    """
+    _log("turn.requested for %s (thread=%s, replied_by=%s) — FreeBuff session should poll Assembly",
+         role, thread_id[:8], comment_role)
 
 
 def _post_assembly_comment(
@@ -262,11 +324,15 @@ def _post_assembly_comment(
 
 
 # ═══════════════════════════════════════════════════════════════════════
-#  Thread context builder
+#  Thread context builders
 # ═══════════════════════════════════════════════════════════════════════
 
 def _build_thread_context(pg_conn: Any, thread_id: str, role: str) -> str:
-    """Fetch recent thread comments and format as LLM prompt context."""
+    """Fetch recent thread comments and format as LLM prompt context.
+
+    Used by the 'harness' backend — full reconstruction for ephemeral
+    OpenCode execution that has no persistent conversational context.
+    """
     with pg_conn.cursor() as cur:
         cur.execute(
             """SELECT c.role, c.text, c.created,
@@ -298,6 +364,38 @@ def _build_thread_context(pg_conn: Any, thread_id: str, role: str) -> str:
         "resolved, or DELEGATE <role>: <instruction> to hand off to another agent."
     )
     return "\n".join(lines)
+
+
+def _build_incremental_context(
+    pg_conn: Any,
+    thread_id: str,
+    role: str,
+    comment_role: str,
+) -> str:
+    """Build minimal context for the operator (FreeBuff) backend.
+
+    The operator service maintains a persistent provider session — it
+    already owns the conversation history. We only pass the latest
+    interaction, not the full thread reconstruction.
+    """
+    with pg_conn.cursor() as cur:
+        cur.execute(
+            """SELECT c.role, c.text, u.alias AS author
+               FROM assembly.comments c
+               LEFT JOIN assembly.users u ON u.id = c.posted_by_id
+               WHERE c.post_id = %s::uuid
+               ORDER BY c.created DESC
+               LIMIT 1""",
+            (thread_id,),
+        )
+        row = cur.fetchone()
+
+    if row:
+        author = row[2] or row[0] or "user"
+        text = (row[1] or "")[:3000]
+        return f"**{author}** ({row[0] or 'user'}): {text}\n\nAs the **{role}**, respond to this message."
+    else:
+        return f"You are the **{role}**. Respond to the user's message."
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -356,16 +454,38 @@ async def handle_comment_created(
         # 2. Check lease
         lease = _query_lease(pg_conn, watch.get("lease_id"))
 
-        # 3. Build context if we need it (for harness or context injection)
-        context = _build_thread_context(pg_conn, thread_id, watch_role)
+        # ── Invoke the agent (backend dispatch) ──────────────────
+        backend = watch.get("execution_backend", "operator")
 
-        # ── Invoke the agent ───────────────────────────────────────
-        _log("Invoking %s via operator service...", watch_role)
-        result = _invoke_agent_operator(
-            role=watch_role,
-            prompt=context,
-            model=lease.get("model") if lease else None,
-        )
+        if backend == "freebuff":
+            # FreeBuff session already owns context — emit pointer event.
+            # The session polls Assembly directly (duality-ui polling loop).
+            # We do NOT bump turn_count here — the session owns its own
+            # accounting. Lease consumption also handled by the session.
+            _emit_turn_requested(thread_id, watch_role, comment_role)
+            continue
+
+        # Build context appropriate for the backend
+        if backend == "harness":
+            # Full reconstruction for ephemeral OpenCode execution
+            prompt = _build_thread_context(pg_conn, thread_id, watch_role)
+        else:
+            # operator: incremental — just the new comment, session has context
+            prompt = _build_incremental_context(pg_conn, thread_id, watch_role, comment_role)
+
+        _log("Invoking %s via %s backend...", watch_role, backend)
+        if backend == "harness":
+            result = _invoke_agent_harness(
+                role=watch_role,
+                prompt=prompt,
+                model=lease.get("model") if lease else None,
+            )
+        else:
+            result = _invoke_agent_operator(
+                role=watch_role,
+                prompt=prompt,
+                model=lease.get("model") if lease else None,
+            )
 
         stdout = result.get("stdout", "") or ""
         exit_code = result.get("exit_code", 1)

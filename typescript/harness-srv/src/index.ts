@@ -484,6 +484,206 @@ app.post("/resolve-context", async (req, res) => {
   }
 });
 
+// ── POST /run-direct ────────────────────────────────────────────────
+
+/**
+ * Run an agent with raw context — no wind task resolution required.
+ *
+ * For interactive conversation turns (Duality/Plurality) where the
+ * subscriber already assembled the full prompt from Assembly thread
+ * context. Bypasses wind.task lookup entirely.
+ *
+ * Body:
+ *   role: string           — agent role (maps to tackle config_bundle)
+ *   prompt: string         — full prompt text (already assembled)
+ *   model?: string         — model override (from tackle config_bundle)
+ *   work_dir?: string      — working directory override
+ *   agent?: string         — agent name override (for opencode)
+ *   timeout_ms?: number    — execution timeout (default: 300000 = 5 min)
+ *   channel?: string       — invocation channel (default: "duality")
+ *
+ * Returns:
+ *   { job_id, role, exit_code, stdout, stderr, duration_ms, prompt_preview }
+ */
+app.post("/run-direct", async (req, res) => {
+  const jobId = uuidv4();
+  const startTime = Date.now();
+
+  try {
+    const {
+      role,
+      prompt,
+      model: modelOverride,
+      work_dir,
+      agent,
+      timeout_ms = 300_000,
+      channel = "duality",
+    } = req.body;
+
+    if (!role) {
+      return res.status(400).json({ error: "role is required" });
+    }
+    if (!prompt) {
+      return res.status(400).json({ error: "prompt is required" });
+    }
+
+    // ── Resolve harness config from tackle ───────────────────────
+    const configResult = await pool.query(
+      `SELECT cb.harness_id, cb.opencode_model_id, cb.invocation_mode,
+              h.invocation_semantics
+       FROM tackle.config_bundle cb
+       JOIN tackle.harnesses h ON h.id = cb.harness_id
+       WHERE cb.role = $1 AND cb.is_active = true
+       ORDER BY cb.priority DESC
+       LIMIT 1`,
+      [role]
+    );
+
+    if (configResult.rows.length === 0) {
+      await log("warn", `run-direct job=${jobId} role=${role} — no active config_bundle found`);
+      return res.status(400).json({
+        job_id: jobId,
+        error: `No active config_bundle found for role ${role}`,
+      });
+    }
+
+    const harnessId = configResult.rows[0].harness_id;
+    const effectiveModel = modelOverride || configResult.rows[0].opencode_model_id;
+    const invocationMode = configResult.rows[0].invocation_mode;
+
+    // ── Interactive-hosted guard ─────────────────────────────────
+    // invocation_mode is a column on tackle.config_bundle (not on
+    // harnesses.invocation_semantics). It's set when a role is
+    // configured to run inside Freebuff rather than via harness-srv.
+    if (invocationMode === "INTERACTIVE") {
+      await log("warn", `run-direct job=${jobId} role=${role} — INTERACTIVE-hosted; refusing harness launch`);
+      return res.status(400).json({
+        job_id: jobId,
+        error: `role ${role} is INTERACTIVE-hosted (Freebuff) — use freebuff backend instead`,
+      });
+    }
+
+    // ── Role-lease guard ─────────────────────────────────────────
+    const lease = await checkRoleLease(role);
+    if (!lease) {
+      await log("warn", `run-direct job=${jobId} role=${role} — no active role lease`);
+    } else if (lease.expired || lease.exhausted) {
+      await log("warn", `run-direct job=${jobId} role=${role} — lease ${lease.expired ? "EXPIRED" : "EXHAUSTED"}`);
+    } else {
+      await log("info", `run-direct job=${jobId} role=${role} — active lease ok`);
+    }
+
+    const effectiveWorkDir = work_dir || WORK_DIR;
+    const effectiveAgent = agent || role;
+
+    await log("info", `run-direct job=${jobId} role=${role} model=${effectiveModel ?? "(harness default)"} channel=${channel}`);
+
+    // 1. Emit harness.started event
+    const startedEventId = await emitEvent({
+      event_type: "harness.started",
+      source: `harness-srv.run-direct.${channel}`,
+      aggregate_type: "harness_job",
+      aggregate_id: jobId,
+      payload: { role, channel, prompt_length: prompt.length },
+      actor_type: "system",
+    });
+
+    // 2. Write prompt to temp file
+    await mkdir(PROMPT_DIR, { recursive: true });
+    const promptFile = join(PROMPT_DIR, `${jobId}.md`);
+    await writeFile(promptFile, prompt, "utf-8");
+
+    // 3. Register for watchdog
+    activeSessions.set(jobId, {
+      jobId,
+      role,
+      model: effectiveModel,
+      startedAt: startTime,
+      promptFile,
+    });
+
+    // 4. Execute via harness
+    let exitCode = 0;
+    let stdout = "";
+    let stderr = "";
+
+    try {
+      const result = await executeHarness({
+        harness_id: harnessId,
+        prompt_file: promptFile,
+        work_dir: effectiveWorkDir,
+        agent: effectiveAgent,
+        role,
+        model: effectiveModel,
+        timeout_ms,
+      });
+      stdout = result.stdout;
+      stderr = result.stderr;
+      exitCode = result.exitCode;
+    } catch (execError: any) {
+      exitCode = execError.exitCode || 1;
+      stdout = execError.stdout || "";
+      stderr = execError.stderr || execError.message;
+    } finally {
+      activeSessions.delete(jobId);
+    }
+
+    await unlink(promptFile).catch(() => {});
+
+    // 5. Emit harness.completed event
+    await emitEvent({
+      event_type: exitCode === 0 ? "harness.completed" : "harness.failed",
+      source: `harness-srv.run-direct.${channel}`,
+      aggregate_type: "harness_job",
+      aggregate_id: jobId,
+      payload: {
+        role,
+        channel,
+        exit_code: exitCode,
+        duration_ms: Date.now() - startTime,
+        stdout_preview: stdout.slice(0, 500),
+        stderr_preview: stderr.slice(0, 500),
+      },
+      actor_type: "system",
+      causation_id: startedEventId,
+      caused_by_event_type: "harness.started",
+    });
+
+    await log(
+      exitCode === 0 ? "info" : "warn",
+      `run-direct job=${jobId} role=${role} exit=${exitCode} duration_ms=${Date.now() - startTime}`
+    );
+
+    res.json({
+      job_id: jobId,
+      role,
+      exit_code: exitCode,
+      stdout,
+      stderr,
+      duration_ms: Date.now() - startTime,
+      prompt_preview: prompt.slice(0, 300) + (prompt.length > 300 ? "..." : ""),
+      harness_id: harnessId,
+      model: effectiveModel || null,
+      events: { started: startedEventId },
+    });
+  } catch (error: any) {
+    await emitEvent({
+      event_type: "harness.error",
+      source: "harness-srv.run-direct",
+      aggregate_type: "harness_job",
+      aggregate_id: jobId,
+      payload: { error: error.message },
+      actor_type: "system",
+    }).catch(() => {});
+
+    res.status(500).json({
+      job_id: jobId,
+      error: error.message,
+      duration_ms: Date.now() - startTime,
+    });
+  }
+});
+
 // ── GET /health ─────────────────────────────────────────────────────
 
 app.get("/health", async (_req, res) => {
