@@ -163,6 +163,7 @@ async function createSchema(
       harness_id       TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.harnesses(id) ON DELETE CASCADE,
       provider_id      TEXT REFERENCES ${TACKLE_SCHEMA}.providers(id),
       model_identifier TEXT NOT NULL,
+      verified         BOOLEAN NOT NULL DEFAULT false,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );

@@ -165,6 +165,7 @@ async function createSchema(
       harness_id       TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.harnesses(id) ON DELETE CASCADE,
       provider_id      TEXT REFERENCES ${TACKLE_SCHEMA}.providers(id),
       model_identifier TEXT NOT NULL,
+      verified         BOOLEAN NOT NULL DEFAULT false,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -911,6 +912,74 @@ Nexus follows a database-first architecture: canonical state lives in PostgreSQL
       console.log("[tackle-migrations] v14: Created tackle.projection_configs + seeded 6 projection families");
     },
   },
+  {
+    version: 15,
+    description: "Add tackle.models.verified (BOOLEAN NOT NULL DEFAULT false) — marks models that have actually been exercised through a harness (inference test passed) and may therefore enter the resolver queue. Bundles whose model is unverified are forced inactive (verified-model gate). The live DB already carries the column; this makes green-field bootstraps match and stamps the migration.",
+    up: async (exec) => {
+      await exec(`
+        ALTER TABLE ${TACKLE_SCHEMA}.models
+          ADD COLUMN IF NOT EXISTS verified BOOLEAN NOT NULL DEFAULT false
+      `);
+      console.log("[tackle-migrations] v15: Added tackle.models.verified");
+    },
+  },
+  {
+    version: 16,
+    description: "Verified-model gate trigger on tackle.config_bundle — BEFORE INSERT OR UPDATE forces is_active=0 whenever the referenced model is unverified (or missing). One DB-level rule covers every write path (REST upserts, import, seed-defaults, CLI, external tooling) so an unverified model can never silently enter the resolver queue through a bypassing code path.",
+    up: async (exec) => {
+      await exec(`
+        CREATE OR REPLACE FUNCTION ${TACKLE_SCHEMA}.config_bundle_verified_gate()
+        RETURNS trigger AS $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM ${TACKLE_SCHEMA}.models m
+            WHERE m.id = NEW.model_id AND m.verified IS TRUE
+          ) THEN
+            NEW.is_active := 0;
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+      `);
+      await exec(`
+        DROP TRIGGER IF EXISTS trg_config_bundle_verified_gate ON ${TACKLE_SCHEMA}.config_bundle
+      `);
+      await exec(`
+        CREATE TRIGGER trg_config_bundle_verified_gate
+        BEFORE INSERT OR UPDATE ON ${TACKLE_SCHEMA}.config_bundle
+        FOR EACH ROW EXECUTE FUNCTION ${TACKLE_SCHEMA}.config_bundle_verified_gate()
+      `);
+      console.log("[tackle-migrations] v16: config_bundle verified-model gate trigger installed");
+    },
+  },
+  {
+    version: 17,
+    description: "INTERACTIVE exemption in the verified-model gate — INTERACTIVE bundles (harn-freebuff, dispatched in Freebuff where the model is the human/CLI model, not an opencode provider reference) must stay active regardless of model verification. The gate exists to stop opencode spawning unresolvable model ids, which the INTERACTIVE channel never does.",
+    up: async (exec) => {
+      await exec(`
+        CREATE OR REPLACE FUNCTION ${TACKLE_SCHEMA}.config_bundle_verified_gate()
+        RETURNS trigger AS $$
+        BEGIN
+          -- INTERACTIVE bundles never spawn a harness with the model id —
+          -- the model is the human/CLI model driving Freebuff. The verified
+          -- gate (which exists to stop opencode spawning dead model ids)
+          -- does not apply to this channel.
+          IF NEW.invocation_mode = 'INTERACTIVE' THEN
+            RETURN NEW;
+          END IF;
+          IF NOT EXISTS (
+            SELECT 1 FROM ${TACKLE_SCHEMA}.models m
+            WHERE m.id = NEW.model_id AND m.verified IS TRUE
+          ) THEN
+            NEW.is_active := 0;
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+      `);
+      console.log("[tackle-migrations] v17: verified-model gate INTERACTIVE exemption installed");
+    },
+  },
 ];
 
 /**
@@ -1007,6 +1076,7 @@ export interface AIHarnessRow {
 export interface AIModelRow {
   id: string; name: string; harness_id: string;
   provider_id: string | null; model_identifier: string;
+  verified: boolean;
   created_at: string; updated_at: string;
 }
 
@@ -1149,6 +1219,48 @@ export async function deleteAIModel(id: string): Promise<boolean> {
   return changes > 0;
 }
 
+// ── Verification ────────────────────────────────────────────────────
+// setModelVerified marks a model as verified after a successful harness
+// run; rearmBundlesForModel re-activates every config bundle referencing
+// the model (the verified-model gate trigger allows the flip now that the
+// model is verified).
+
+export async function setModelVerified(id: string, verified: boolean): Promise<void> {
+  await qRun(
+    "UPDATE models SET verified = @verified, updated_at = @updated_at WHERE id = @id",
+    { id, verified, updated_at: new Date().toISOString() }
+  );
+}
+
+export async function rearmBundlesForModel(modelId: string): Promise<number> {
+  return qRun(
+    "UPDATE config_bundle SET is_active = 1, updated_at = @updated_at WHERE model_id = @model_id AND is_active = 0",
+    { model_id: modelId, updated_at: new Date().toISOString() }
+  );
+}
+
+// ── Verified-model gate helpers ────────────────────────────────────
+// A model only becomes usable once it has been verified (an inference
+// test actually passed through a harness). Bundles referencing unverified
+// models are forced inactive on every write path so they can never enter
+// the resolver queue — the UI filters them from model dropdowns, and the
+// test-invoke endpoint refuses them outright.
+
+async function getVerifiedModelIds(ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await qAll(
+    "SELECT id FROM models WHERE id = ANY(@ids) AND verified IS TRUE",
+    { ids }
+  );
+  return new Set(rows.map((r) => r.id));
+}
+
+async function isModelVerified(id: string): Promise<boolean> {
+  if (!id) return false;
+  const row = await qOne("SELECT verified FROM models WHERE id = @id", { id });
+  return !!(row && row.verified);
+}
+
 // ── Role Configs (via config_bundle) ─────────────────────────────
 //
 // The `role_config` table was removed. Role assignments are now stored in
@@ -1187,14 +1299,19 @@ export async function upsertAIRoleConfig(
   rc: Partial<AIRoleConfigRow> & { id: string; role: string; provider_id: string; harness_id: string; model_id: string },
 ): Promise<void> {
   const now = new Date().toISOString();
+  // Verified-model gate: a primary role config over an unverified model is
+  // stored inactive so it never resolves.
+  const verified = await isModelVerified(rc.model_id);
+  const isActive = verified ? 1 : 0;
   await qRun(
     `INSERT INTO config_bundle (id, name, role, model_id, provider_id, harness_id, priority, invocation_mode, is_active, metadata, created_at, updated_at)
-     VALUES (@id, @name, @role, @model_id, @provider_id, @harness_id, 0, 'CLI', 1, '{}', @created_at, @updated_at)
+     VALUES (@id, @name, @role, @model_id, @provider_id, @harness_id, 0, 'CLI', @is_active, '{}', @created_at, @updated_at)
      ON CONFLICT (id) DO UPDATE SET
        name = EXCLUDED.name, role = EXCLUDED.role, model_id = EXCLUDED.model_id,
        provider_id = EXCLUDED.provider_id, harness_id = EXCLUDED.harness_id,
-       priority = 0, is_active = 1, updated_at = EXCLUDED.updated_at`,
+       priority = 0, is_active = EXCLUDED.is_active, updated_at = EXCLUDED.updated_at`,
     { ...rc, name: `Primary: ${rc.model_id} for ${rc.role}`,
+      is_active: isActive,
       extra_params: rc.extra_params ?? "{}",
       created_at: rc.created_at ?? now, updated_at: now }
   );
@@ -1226,6 +1343,19 @@ export async function upsertConfigBundle(
   b: Partial<ConfigBundleRow> & { id: string; name: string; role: string; model_id: string },
 ): Promise<void> {
   const now = new Date().toISOString();
+  // Verified-model gate: a bundle whose model has not been verified can never
+  // be active, regardless of what the caller requested. When the model IS
+  // verified, preserve the historic default (absent is_active → active).
+  // is_active is INTEGER in the schema; the route normalizes booleans to 1/0
+  // before calling, so 0 is the only "inactive" representation seen here.
+  const verified = await isModelVerified(b.model_id);
+  // INTERACTIVE bundles are dispatched in Freebuff — the model is the
+  // human/CLI model, not an opencode provider reference — so the verified
+  // gate (which exists to stop opencode spawning dead model ids) does not
+  // apply to this channel.
+  const isActive = b.invocation_mode === "INTERACTIVE"
+    ? (b.is_active === 0 ? 0 : 1)
+    : (verified ? (b.is_active === 0 ? 0 : 1) : 0);
   await qRun(
     `INSERT INTO config_bundle (id, name, role, model_id, provider_id, harness_id, priority, invocation_mode, command, endpoint_url, timeout_ms, valid_from, valid_to, is_active, metadata, created_at, updated_at)
      VALUES (@id, @name, @role, @model_id, @provider_id, @harness_id, @priority, @invocation_mode, @command, @endpoint_url, @timeout_ms, @valid_from, @valid_to, @is_active, @metadata, @created_at, @updated_at)
@@ -1248,7 +1378,7 @@ export async function upsertConfigBundle(
       timeout_ms: b.timeout_ms ?? null,
       valid_from: b.valid_from ?? null,
       valid_to: b.valid_to ?? null,
-      is_active: b.is_active ?? 1,
+      is_active: isActive,
       metadata: b.metadata ?? "{}",
       created_at: b.created_at ?? now,
       updated_at: now,
@@ -1274,6 +1404,11 @@ export async function upsertConfigBundles(
 
   console.log(`[upsertConfigBundles] Starting for role: ${role}, bundles: ${bundles.length}`);
 
+  // Verified-model gate: any bundle in the batch whose model is unverified is
+  // inserted inactive (this path previously hardcoded is_active=1, which would
+  // have re-activated unverified models on every role save).
+  const verifiedIds = await getVerifiedModelIds(bundles.map((b) => b.model_id));
+
   await withTransaction(async (client) => {
     const deleteResult = await tRun(client, "DELETE FROM config_bundle WHERE role = @role", { role });
     console.log(`[upsertConfigBundles] Deleted rows for role ${role}:`, deleteResult);
@@ -1287,13 +1422,20 @@ export async function upsertConfigBundles(
             command, endpoint_url, timeout_ms, is_active, metadata, created_at, updated_at)
          VALUES
            (@id, @name, @role, @model_id, @provider_id, @harness_id, @priority, @invocation_mode,
-            @command, @endpoint_url, @timeout_ms, 1, '{}', @now, @now)`,
+            @command, @endpoint_url, @timeout_ms, @is_active, '{}', @now, @now)`,
         {
           id,
           name: b.name ?? `Bundle: ${b.model_id}`,
           role,
           model_id: b.model_id,
           priority: b.priority,
+          // INTERACTIVE bundles never spawn a harness — exemption from the
+          // verified gate (see trigger v17). Note: this batch path has no
+          // is_active channel in its input, so INTERACTIVE always lands
+          // active here (the single upsert can honor an explicit inactive).
+          is_active: b.invocation_mode === "INTERACTIVE"
+            ? 1
+            : (verifiedIds.has(b.model_id) ? 1 : 0),
           provider_id: b.provider_id ?? null,
           harness_id: b.harness_id ?? null,
           invocation_mode: b.invocation_mode ?? "CLI",

@@ -31,6 +31,8 @@ import {
   updateSessionPid,
   getSession,
   endSession,
+  setModelVerified,
+  rearmBundlesForModel,
 } from "../db";
 import fs from "fs";
 import path from "path";
@@ -327,6 +329,11 @@ aiConfigRouter.post("/bundle", async (req, res) => {
       res.status(400).json({ error: "name, role, and model_id are required" });
       return;
     }
+    // Normalize the UI boolean to an integer (is_active is INTEGER in PG).
+    // The verified-model gate inside upsertConfigBundle forces this to 0 when
+    // the bundle's model is unverified, so passing 1 here is safe — the DB
+    // layer is the source of truth.
+    const isActive = is_active === true || is_active === 1 || is_active === "1" ? 1 : 0;
     // Auto-generate id for new bundles (mock-mode parity: the UI does not
     // send an id when creating). Editing bundles carries an id → upsert.
     const bundleId = id || `bundle-${Date.now().toString(36)}`;
@@ -334,7 +341,7 @@ aiConfigRouter.post("/bundle", async (req, res) => {
       id: bundleId, name, role, model_id,
       provider_id, harness_id, priority,
       invocation_mode, command, endpoint_url, timeout_ms,
-      valid_from, valid_to, is_active, metadata,
+      valid_from, valid_to, is_active: isActive, metadata,
     });
     res.json({ saved: true, id: bundleId });
   } catch (e: any) {
@@ -397,12 +404,28 @@ aiConfigRouter.post("/test", async (req, res) => {
       return;
     }
 
+    // Verified-model gate: refuse test invocations for models that have not
+    // been verified. Unverified models previously spawned opencode with an
+    // unresolvable model id — the run silently failed with "model not found"
+    // in the log and the UI hung polling an empty output.
+    if (!model.verified) {
+      res.status(400).json({
+        error: `Model ${model_id} is not verified — test invocation refused. Verify the model through a successful harness run before testing.`,
+      });
+      return;
+    }
+
     const harnesses = await getAIHarnesses();
     const harness = harnesses.find((h: any) => h.id === model.harness_id);
     if (!harness) {
       res.status(404).json({ error: `Harness ${model.harness_id} not found` });
       return;
     }
+
+    // Provider-qualify the opencode --model flag (bare ids fail to resolve).
+    const providers = await getAIProviders();
+    const provider = providers.find((p: any) => p.id === model.provider_id);
+    const runModelId = openCodeModelArg(model, provider?.type);
 
     let harnessType = "opencode";
     try {
@@ -424,20 +447,21 @@ aiConfigRouter.post("/test", async (req, res) => {
 
     const projectRoot = process.env.PIPELINE_ROOT || "/home/codex/dev";
     // .conduit-data was deleted 2026-08-09 and mirrored to audit/CONDUIT_DATA
-    const sessionsDir = path.join(projectRoot, "nexus", "audit", "CONDUIT_DATA", "sessions");
+    const sessionsDir = path.join(projectRoot, "nexus", "logs");
     fs.mkdirSync(sessionsDir, { recursive: true });
     const sessionLogPath = path.join(sessionsDir, `${sessionId}.log`);
-    const logStream = fs.createWriteStream(sessionLogPath, { flags: "a" });
+    const logFd = fs.openSync(sessionLogPath, "a");
 
     const proc = spawn(harnessType, [
-      "run", "--model", model.model_identifier,
+      "run", "--model", runModelId,
       "--dir", projectRoot,
       "--print-logs", "--log-level", "ERROR",
       test_prompt,
     ], {
       detached: true,
-      stdio: ["ignore", logStream, logStream],
+      stdio: ["ignore", logFd, logFd],
     });
+    fs.closeSync(logFd);
     proc.unref();
 
     if (proc.pid && proc.pid > 0) {
@@ -459,6 +483,227 @@ aiConfigRouter.post("/test", async (req, res) => {
     });
   } catch (e: any) {
     console.error(`[${new Date().toISOString()}] TEST INVOKE error:`, e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Verify Model ────────────────────────────────────────────────────
+// Runs a real inference through the model's harness and, on a clean exit
+// (plus a log scan for the classic unresolvable-model markers), flips the
+// model to verified=true and re-arms every config bundle referencing it.
+// Fire-and-forget like /test — the client polls GET /verify/:sessionId.
+
+// opencode resolves models as `<provider>/<id>` (e.g. ollama/qwen2.5-coder,
+// anthropic/claude-sonnet-4-20250514). Passing the bare identifier makes it
+// treat the whole string as the provider name → ProviderModelNotFoundError
+// "<id>/." — the classic "model not found" failure. Prefix with the provider
+// type when it maps to a known opencode provider family.
+const OPENCODE_PROVIDER_TYPES = ["ollama", "openai", "anthropic", "google", "codex", "opencode"];
+
+function openCodeModelArg(model: any, providerType: string | null | undefined): string {
+  const id = model.model_identifier;
+  if (!providerType) return id;
+  const t = providerType.toLowerCase();
+  if (OPENCODE_PROVIDER_TYPES.includes(t) && !id.startsWith(`${t}/`)) {
+    return `${t}/${id}`;
+  }
+  return id;
+}
+
+// Bounds a verify run: if the harness wedges (e.g. a rate-limited small
+// model blocks opencode's finalization), SIGKILL the child after 10 minutes
+// so the session always settles and the model is marked unverified.
+const VERIFY_WATCHDOG_MS = 10 * 60 * 1000;
+
+const VERIFY_DEFAULT_PROMPT =
+  "Reply with the single word OK and nothing else. Do not add any explanation.";
+// OpenCode can exit 0 while still reporting an unresolvable model — treat
+// these markers in the log tail as failure regardless of exit code.
+const VERIFY_FAIL_MARKERS =
+  /ProviderModelNotFoundError|Model not found|model not found|No such model|unauthorized/i;
+
+aiConfigRouter.post("/verify", async (req, res) => {
+  try {
+    const { model_id, test_prompt } = req.body || {};
+    if (!model_id) {
+      res.status(400).json({ error: "model_id is required" });
+      return;
+    }
+
+    const models = await getAIModels();
+    const model = models.find((m: any) => m.id === model_id);
+    if (!model) {
+      res.status(404).json({ error: `Model ${model_id} not found` });
+      return;
+    }
+
+    if (model.verified) {
+      res.json({
+        started: false,
+        alreadyVerified: true,
+        verified: true,
+        model_id,
+        message: "Model is already verified — nothing to run.",
+      });
+      return;
+    }    const harnesses = await getAIHarnesses();
+    const harness = harnesses.find((h: any) => h.id === model.harness_id);
+    if (!harness) {
+      res.status(404).json({ error: `Harness ${model.harness_id} not found` });
+      return;
+    }
+
+    // Resolve the provider type so the opencode --model flag can be
+    // provider-qualified (fixes the bare-id ProviderModelNotFoundError).
+    const providers = await getAIProviders();
+    const provider = providers.find((p: any) => p.id === model.provider_id);
+    const runModelId = openCodeModelArg(model, provider?.type);
+
+    let harnessType = "opencode";
+    try {
+      const sem = JSON.parse(harness.invocation_semantics || "{}");
+      const binary = (sem.binary || "opencode").toLowerCase();
+      if (binary.includes("codex")) harnessType = "codex";
+      else if (binary.includes("ollama")) harnessType = "ollama";
+      else harnessType = "opencode";
+    } catch { /* use default */ }
+
+    const prompt = test_prompt || VERIFY_DEFAULT_PROMPT;
+    const now = new Date().toISOString();
+    const sessionId = `verify-${model_id}-${Date.now()}`;
+    await startSession({
+      id: sessionId,
+      agent_role: "test",
+      start_iso: now,
+      model: model.model_identifier,
+    });
+
+    const projectRoot = process.env.PIPELINE_ROOT || "/home/codex/dev";
+    const sessionsDir = path.join(projectRoot, "nexus", "logs");
+    fs.mkdirSync(sessionsDir, { recursive: true });
+    const sessionLogPath = path.join(sessionsDir, `${sessionId}.log`);
+    const logFd = fs.openSync(sessionLogPath, "a");
+
+    const proc = spawn(harnessType, [
+      "run", "--model", runModelId,
+      "--dir", projectRoot,
+      "--print-logs", "--log-level", "ERROR",
+      prompt,
+    ], {
+      detached: true,
+      stdio: ["ignore", logFd, logFd],
+    });
+    fs.closeSync(logFd);
+
+    // Deliberately NOT unref'd: hold the child handle so the completion
+    // watcher below can flip verified/re-arm bundles when the run finishes.
+    let settled = false;
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
+    const onDone = async (exitCode: number | null) => {
+      if (settled) return;
+      settled = true;
+      if (watchdog) clearTimeout(watchdog);
+      const doneIso = new Date().toISOString();
+      let success = exitCode === 0;
+      if (success) {
+        // Belt-and-braces: opencode can exit 0 while printing the error.
+        try {
+          const tail = fs.readFileSync(sessionLogPath, "utf8").slice(-4000);
+          if (VERIFY_FAIL_MARKERS.test(tail)) success = false;
+        } catch {
+          /* keep exit-code verdict */
+        }
+      }
+      try {
+        if (success) {
+          await setModelVerified(model_id, true);
+          const rearmed = await rearmBundlesForModel(model_id);
+          console.log(`[verify] ${model_id} VERIFIED — ${rearmed} bundle(s) re-armed`);
+        }
+        await endSession(sessionId, exitCode ?? -1, doneIso);
+      } catch (e: any) {
+        console.error(`[verify] ${sessionId} post-exit update failed:`, e.message);
+      }
+      console.log(`[verify] model=${model_id} session=${sessionId} exit=${exitCode} → ${success ? "VERIFIED" : "FAILED"}`);
+    };
+    proc.on("exit", (code) => onDone(code));
+    proc.on("error", (err) => {
+      console.error(`[verify] ${sessionId} spawn error:`, err.message);
+      onDone(null);
+    });
+
+    // Watchdog: never let a hung harness hold the session open forever
+    // (e.g. a rate-limited small model blocks opencode's finalization).
+    // Cleared inside onDone when the run settles.
+    watchdog = setTimeout(() => {
+      if (settled) return;
+      console.error(`[verify] ${sessionId} watchdog fired after ${VERIFY_WATCHDOG_MS / 60000}min — killing hung harness`);
+      try {
+        proc.kill("SIGKILL");
+      } catch {
+        /* child already gone — exit handler settles */
+      }
+    }, VERIFY_WATCHDOG_MS);
+
+    if (proc.pid && proc.pid > 0) {
+      await updateSessionPid(sessionId, proc.pid);
+    }
+
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] VERIFY model=${model_id} session=${sessionId} pid=${proc.pid} log=${sessionLogPath}`);
+
+    res.json({
+      started: true,
+      verified: false,
+      sessionId,
+      model_id,
+      model_name: model.name,
+      model_identifier: model.model_identifier,
+      harness: harnessType,
+      logPath: `/log/${sessionId}`,
+      message: "Verification run started — the model flips to verified on a clean exit.",
+      timestamp,
+    });
+  } catch (e: any) {
+    console.error(`[${new Date().toISOString()}] VERIFY error:`, e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+aiConfigRouter.get("/verify/:sessionId", async (req, res) => {
+  try {
+    const session = await getSession(req.params.sessionId);
+    if (!session) {
+      res.status(404).json({ error: "Verify session not found" });
+      return;
+    }
+    let running = session.is_running === 1;
+    // Stale-session recovery: if the service died mid-verify the in-process
+    // watcher is gone and the session would report running forever. Treat
+    // sessions older than the watchdog window (+2 min grace) as orphaned and
+    // settle them as failed on first poll.
+    let staleSettled = false;
+    if (running && session.start_iso) {
+      const ageMs = Date.now() - new Date(session.start_iso).getTime();
+      if (ageMs > VERIFY_WATCHDOG_MS + 2 * 60 * 1000) {
+        const nowIso = new Date().toISOString();
+        await endSession(session.id, -1, nowIso);
+        session.exit_code = -1;
+        session.end_iso = nowIso;
+        running = false;
+        staleSettled = true;
+      }
+    }
+    res.json({
+      sessionId: session.id,
+      running,
+      exit_code: session.exit_code,
+      end_iso: session.end_iso,
+      model_identifier: session.model,
+      verified: running ? null : session.exit_code === 0,
+      stale_settled: staleSettled,
+    });
+  } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
 });
