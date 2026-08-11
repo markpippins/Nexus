@@ -19,7 +19,7 @@ doc alone — read them in order.
 | Doc | Pipeline stage | What it is |
 |---|---|---|
 | **`events-inventory-v2-raw-observations.md`** | 1–2 | The raw observation inventory: everything that happens per system, crawled from implementations + live DB (raise branches, return shapes, routes, state machines, error conditions). ~30 systems. *Deliberately* no worthiness decisions. |
-| **`stage3-canonical-event-types.md`** | 3–4 | Collapses raw occurrences into canonical event types with publish-worthiness, bus destination, and payload keys. Wave 1: the five gap systems (scheduler, timeclock, agent-records, harness-srv, role-lease dispenser). Wave 2: registry, voyager, execution drift-kinds, circuit-breaker, substance expiry. |
+| **`stage3-canonical-event-types.md`** | 3–4 | Collapses raw occurrences into canonical event types with publish-worthiness, bus destination, and payload keys. Wave 1: the five gap systems (scheduler, timeclock, agent-records, harness-srv, role-lease dispenser). Wave 2: registry, voyager, execution drift-kinds, circuit-breaker, substance expiry. Wave 3: MCP tool-server family, WRP core (identity/address/state-DAG/kernel/arbitration). |
 
 ## Conventions (from the stage-3 doc)
 

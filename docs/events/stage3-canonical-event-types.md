@@ -13,6 +13,9 @@
 >   watchdog), `tackle.role_leases` (role-lease dispenser, nebula-srv routes).
 > - **Wave 2** — `registry.status_events`, voyager, execution drift-kinds,
 >   circuit-breaker trips, substance segment expiry (sections 6–10).
+> - **Wave 3** — the MCP tool-server family (discovery/invocation/failure/
+>   lifecycle) and WRP core (identity, address, state-DAG, kernel, arbitration)
+>   (sections 11–12).
 
 ## Conventions
 
@@ -262,16 +265,92 @@ visibility into the segment-set catalog.
 
 ---
 
+## 11. MCP tool-server family → cascade.events (subject `nexus.mcp.v1.<server>.*`)
+
+~20 MCP servers/clients in `typescript/` share one observable shape: GET
+`/health` · POST `/` (JSON-RPC: initialize / tools/list / tools/call) · status
+400/503/500. Per-server measured specifics in v2 §26 (tools-aggregator init
+outcomes, slash-command DSL error classes, image phases, file-system UP,
+address-tts/ui-tools `unreachable`, service-broker `FAILURE`, assembly-
+/semantics-mcp bridges). One generic vocabulary with a `server` discriminator:
+
+### 11a. Generic tool-server lifecycle + invocation
+
+| # | Raw occurrence (v2 §26) | Canonical event type | Publish? | Payload keys |
+|---|---|---|---|---|
+| 1 | Server started / health OK | `mcp.server.started` | Yes | server, version |
+| 2 | Server health unreachable / degraded (status unreachable/error, 503) | `mcp.server.unreachable` | **Yes** | server, status, error |
+| 3 | Server stopped / deregistered | `mcp.server.stopped` | Yes | server |
+| 4 | Config changed (config/ai: bundles, harnesses, models, providers, roles) | `mcp.server.config_changed` | Yes | server, resource, change |
+| 5 | Tool list requested / returned / metadata read | `mcp.tools.list_requested` · `mcp.tools.list_returned` · `mcp.tool.metadata_read` | No (mechanical) | server |
+| 6 | Call received / arguments parsed | `mcp.call.received` · `mcp.call.arguments_parsed` | No (too hot) | server, tool |
+| 7 | Arguments invalid (CoercionError / DslParseError) | `mcp.call.arguments_invalid` | **Yes** (error) | server, tool, error_class |
+| 8 | Authorization denied | `mcp.call.unauthorized` | **Yes** (error) | server, tool |
+| 9 | Call dispatched / started | `mcp.call.started` | No by default | server, tool |
+| 10 | Call completed (result serialized + returned) | `mcp.call.completed` | Yes (sampled) | server, tool, duration_ms |
+| 11 | Call failed (server exception; DispatchError; `FAILURE`) | `mcp.call.failed` | **Yes** | server, tool, error_class |
+| 12 | Call timed out | `mcp.call.timed_out` | **Yes** | server, tool, timeout_ms |
+| 13 | Tool not found (unknown tool) | `mcp.call.tool_not_found` | **Yes** | server, tool |
+| 14 | Dependency/transport failure (upstream unreachable) | `mcp.call.transport_failed` | **Yes** | server, tool, error |
+
+### 11b. Per-server specifics (mapped to 11a)
+
+| Server | Measured fact (v2 §26) | Maps to |
+|---|---|---|
+| tools-aggregator | `POST /init` → initialized \| initialization_failed | `mcp.aggregator.initialized` · `mcp.aggregator.init_failed` (Yes) |
+| tools-aggregator | `/registry`, `/tools/by-service/:service` read | no-publish (mechanical) |
+| slash-command-mcp | DslParseError×5, CoercionError×12, DispatchError×4 | `mcp.call.arguments_invalid` · `mcp.call.failed` |
+| image-server | phases evaluation \| source, status UP/DOWN | `phase` payload key on call events |
+| file-system-server / secure | status UP, Error×11 | `mcp.call.failed` |
+| address-tts-mcp / ui-tools-mcp | status ok \| unreachable \| error | `mcp.server.unreachable` |
+| service-broker-mcp | status ok \| FAILURE | `mcp.call.failed` |
+| assembly-mcp / semantics-mcp | bridges (forum-agenda, post-artifact, supporting-refs, move-thread) | `mcp.call.completed` / `mcp.call.failed` with `bridge` payload key |
+
+Notes: calls are hot — terminal outcomes (#10–#14) publish, mechanics
+(#5/#6/#9) default no. This is the family-wide vocabulary chat outlined; each
+server fills in `server` + tool-specific payload.
+
+## 12. WRP core → cascade.events (subject `nexus.wrp.v1.*`)
+
+`python/nexus_core/wrp` + `python/ir` (v2 §2). Pure functions default
+no-publish; error outcomes and the ledger write publish.
+
+| # | Raw occurrence (v2 §2) | Canonical event type | Publish? | Payload keys |
+|---|---|---|---|---|
+| 1 | Intent normalized (action, target) | `wrp.intent.normalized` | No (mechanical) | action, target |
+| 2 | Intent rejected — empty action (ValueError) | `wrp.intent.rejected` | **Yes** (error) | intent, reason |
+| 3 | Identity derived → (entity_key, 'event', scope) | `wrp.identity.derived` | **Yes** | entity_key, scope |
+| 4 | Identity missing — no action in intent (ValueError) | `wrp.identity.missing` | **Yes** (error) | intent, reason |
+| 5 | Identity matched (strong/medium/none) | `wrp.identity.matched` | Yes (sampled) | entity_key, match_strength |
+| 6 | Ambiguous / conflicting identity | No — not produced by `wrp/identity.py` yet; resolution vocabulary is `semantics.asset_identity_claim` (identity, supersession, derivation, consolidation, split) + claim status open/resolved/rejected | |
+| 7 | Address minted (`make_address` → cal://) | `wrp.address.minted` | No (mechanical) | address |
+| 8 | Address parsed | `wrp.address.parsed` | No | address |
+| 9 | Address unparseable (`parse_address` → None) | `wrp.address.unparseable` | **Yes** (error) | address, reason |
+| 10 | Content hash computed (`content_hash` sha256[:12]) | `wrp.hash.computed` | No (pure function) | hash |
+| 11 | State version committed (`state_dag.mutate` → version) | `wrp.state.mutated` | Yes (sampled — the ledger write) | version_id, parents, source_event_id, edge_type |
+| 12 | Mutation rejected (invalid delta/heads — ValueError) | `wrp.state.mutation_rejected` | **Yes** (error) | reason |
+| 13 | Transition invalid (`states.is_valid_transition` False) | `wrp.state.transition_invalid` | **Yes** (error) | from_state, to_state |
+| 14 | Kernel delta applied | `wrp.kernel.delta_applied` | No (kernel_delta_log is the store) | version |
+| 15 | Kernel invariant violated (INVARIANT_VIOLATION) | `wrp.kernel.invariant_violated` | **Yes** (error) | version, error |
+| 16 | Kernel validation error (VALIDATION_ERROR) | `wrp.kernel.validation_error` | **Yes** (error) | version, error |
+| 17 | Replay fingerprint mismatch (`byte_identical_replay`) | `wrp.replay.mismatch` | **Yes** (error) | fingerprint_1, fingerprint_2, deltas |
+| 18 | Projection reduced (abstraction level L1–L4) | `wrp.projection.reduced` | No (mechanical) | plan_id, level, scope |
+| 19 | Lease arbitration selected / no match / preempted / consolidated (`ir/` lease pool) | `wrp.arbitration.selected` · `wrp.arbitration.no_match` · `wrp.lease.preempted` · `wrp.lease.consolidated` | Yes (sampled) | event, lease_id, score |
+
+Notes: #19 is the in-memory `ir/` arbitration machinery — same family as the
+wave-1 `lease.*` types (channel='wrp-arbitration'); preemption/consolidation
+are the governance observables (SOCO rules land here). #6 is deliberately
+marked no-publish until a resolver produces it — the semantics claim
+vocabulary is the target.
+
+---
+
 ## Next wave (same method, not yet collapsed)
 
-- The MCP tool-server family — discovery/invocation/failure/lifecycle
-  decomposition (v2 §26, chat's canonical outline)
-- WRP core — identity resolution outcomes (canonical/existing/derived/
-  ambiguous/missing/conflicting), address parse, state-DAG mutations, lease
-  arbitration/preemption
 - `bin/` operational script surface (v2 §28)
-- Assembly (post/comment/thread outcomes) and nebula knowledge graph
-  (embedding/cross-ref/reconcile outcomes) if not covered by the above
+- Assembly (post/comment/thread outcomes) and the nebula knowledge graph
+  (embedding / cross-ref / reconcile outcomes)
+- vision/losm orchestration outcomes — only if a consumer demands them
 
 **Decision rule carried forward:** collapse first, judge second. An occurrence
 becomes a canonical type if it (a) is observable by at least one other system,
