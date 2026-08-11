@@ -1,0 +1,26 @@
+-- V094: Drop legacy nebula.work_request_history (superseded by work_requests_history + work_requests VIEW)
+--
+-- Background:
+--   nebula.work_request_history (singular, text PK) was an early ingestion table
+--   populated by bin/ingest_conduit_data.py from .conduit-data/WORK_REQUESTS/ JSON
+--   files (~1,880 rows).  It was never created by a formal migration.
+--
+--   In 2026-08 the table was superseded by the SCD-type-4 bitemporal model:
+--     nebula.work_requests_history  — canonical temporal base table (UUID PK)
+--     nebula.work_requests          — active-row VIEW (temporal filter)
+--
+--   All 1,880 legacy rows were migrated into work_requests_history via the
+--   legacy_id column.  The dedup gate (bin/dedup_gate.py) was redirected to
+--   query nebula.work_requests instead.  The ingestion script was updated.
+--
+--   This migration ensures fresh-DB bootstraps never create the legacy table.
+--   If the table already exists, it is dropped.  If not, the IF EXISTS makes
+--   this a no-op (safe for idempotent re-runs).
+--
+-- Timeline:
+--   2026-07    Created on-the-fly by bin/ingest_conduit_data.py
+--   2026-08-07 All 1,880 rows migrated into nebula.work_requests_history (V082)
+--   2026-08-11 Table dropped on live DB, scripts updated
+--   now        This migration for fresh-DB bootstrap parity
+
+DROP TABLE IF EXISTS nebula.work_request_history;
