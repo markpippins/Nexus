@@ -68,6 +68,18 @@ export const BundleModal: React.FC<BundleModalProps> = ({
         : '{\n  "environment": "production"\n}'
   );
 
+  // Verified-model gate: only verified models are offered in the dropdown.
+  // When editing a bundle that still points at an unverified model, the
+  // current model is kept as a flagged option so the form never silently
+  // retargets it — and the bundle is forced inactive until the model is
+  // verified (mirrors the server-side gate in upsertConfigBundle).
+  const selectableModels = models.filter(m => m.verified);
+  const currentModel = models.find(m => m.id === formModelId);
+  const currentModelUnverified = !!currentModel && !currentModel.verified;
+  const currentModelMissing =
+    !!formModelId && !currentModel && !selectableModels.some(m => m.id === formModelId);
+  const effectiveIsActive = currentModelUnverified ? false : formIsActive;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -91,7 +103,7 @@ export const BundleModal: React.FC<BundleModalProps> = ({
         timeout_ms: formTimeout,
         valid_from: formValidFrom ? new Date(formValidFrom).toISOString() : undefined,
         valid_to: formValidTo ? new Date(formValidTo).toISOString() : undefined,
-        is_active: formIsActive,
+        is_active: effectiveIsActive,
         command: formCommand || undefined,
         endpoint_url: formEndpoint || undefined,
         metadata: parsedMeta
@@ -159,12 +171,28 @@ export const BundleModal: React.FC<BundleModalProps> = ({
                 onChange={e => setFormModelId(e.target.value)}
                 className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-color)]"
               >
-                {models.map(m => (
+                {selectableModels.length === 0 && !currentModelUnverified && !currentModelMissing && (
+                  <option value="">(No verified models — verify a model first)</option>
+                )}
+                {currentModelUnverified && (
+                  <option value={currentModel.id}>
+                    {currentModel.name} ({currentModel.model_identifier}) — UNVERIFIED
+                  </option>
+                )}
+                {currentModelMissing && (
+                  <option value={formModelId}>{formModelId} — MISSING (deleted)</option>
+                )}
+                {selectableModels.map(m => (
                   <option key={m.id} value={m.id}>
                     {m.name} ({m.model_identifier})
                   </option>
                 ))}
               </select>
+              {currentModelUnverified && (
+                <p className="text-[10px] text-amber-400 mt-1 font-mono">
+                  ⚠ Model is unverified — this bundle will be saved INACTIVE until the model is verified.
+                </p>
+              )}
             </div>
 
             {/* Priority */}
@@ -271,13 +299,19 @@ export const BundleModal: React.FC<BundleModalProps> = ({
             <input
               type="checkbox"
               id="bundleActiveCheck"
-              checked={formIsActive}
+              checked={effectiveIsActive}
+              disabled={currentModelUnverified}
               onChange={e => setFormIsActive(e.target.checked)}
-              className="rounded border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--accent-color)] focus:ring-0"
+              className="rounded border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--accent-color)] focus:ring-0 disabled:opacity-40"
             />
             <label htmlFor="bundleActiveCheck" className="text-sm text-[var(--text-primary)] font-semibold cursor-pointer">
               Bundle Active in Resolver Queue
             </label>
+            {currentModelUnverified && (
+              <span className="text-[10px] font-mono text-amber-400">
+                (locked — unverified model)
+              </span>
+            )}
           </div>
 
           {/* Metadata JSON */}

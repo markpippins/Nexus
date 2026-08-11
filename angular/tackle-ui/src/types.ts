@@ -33,6 +33,8 @@ export interface AIModel {
   harness_id: string;
   provider_id?: string;
   model_identifier: string; // e.g. gemini-3.6-flash, gpt-4o, claude-3-7-sonnet
+  /** true when the model has been exercised through a harness successfully — only verified models may be selected in dropdowns or enter the resolver queue. */
+  verified?: boolean;
   created_at?: string;
   updated_at?: string;
 }

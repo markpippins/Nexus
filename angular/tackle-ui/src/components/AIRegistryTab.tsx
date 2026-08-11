@@ -31,6 +31,9 @@ interface AIRegistryTabProps {
   onSaveModel: (mod: Partial<AIModel>) => Promise<void>;
   onDeleteModel: (id: string) => Promise<void>;
   onSaveBundle: (bundle: Partial<ConfigBundle>) => Promise<void>;
+  onVerifyModel: (modelId: string, prompt?: string) => Promise<any>;
+  onVerifyStatus: (sessionId: string) => Promise<any>;
+  onRefresh: () => Promise<void>;
 }
 
 export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
@@ -44,7 +47,10 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
   onDeleteHarness,
   onSaveModel,
   onDeleteModel,
-  onSaveBundle
+  onSaveBundle,
+  onVerifyModel,
+  onVerifyStatus,
+  onRefresh
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'providers' | 'harnesses' | 'models'>('models');
   const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
@@ -54,6 +60,61 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
   const [bundlePrefill, setBundlePrefill] = useState<Partial<ConfigBundle> | null>(null);
   // Bumped on every open so the modal remounts with fresh form state.
   const [bundleModalKey, setBundleModalKey] = useState<number>(0);
+
+  // Verify-model state — one verification at a time; outcome keyed by model id
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const [verifyOutcome, setVerifyOutcome] = useState<Record<string, { ok: boolean; message: string }>>({});
+
+  // ── Verify Model flow ──────────────────────────────────────────────
+  // Runs a real inference through the harness (POST /config/ai/verify),
+  // polls the session status until it settles, then refreshes so the badge
+  // flips to VERIFIED and the model's bundles re-arm server-side.
+  const verifyModel = async (m: AIModel) => {
+    if (verifyingId) return;
+    if (!confirm(
+      `Run a verification inference against "${m.name}" (${m.model_identifier})?\n\n` +
+      `On success the model becomes VERIFIED and every config bundle referencing it is re-armed (active).`
+    )) return;
+
+    setVerifyingId(m.id);
+    setVerifyOutcome(prev => { const n = { ...prev }; delete n[m.id]; return n; });
+    try {
+      const started = await onVerifyModel(m.id);
+      if (started?.alreadyVerified) {
+        setVerifyOutcome(prev => ({ ...prev, [m.id]: { ok: true, message: 'Already verified' } }));
+        return;
+      }
+
+      const sessionId: string | undefined = started?.sessionId;
+      if (!sessionId) throw new Error('No verify session returned');
+
+      const deadline = Date.now() + 180_000;
+      let status: any = null;
+      do {
+        await new Promise(r => setTimeout(r, 1500));
+        status = await onVerifyStatus(sessionId);
+      } while (status?.running && Date.now() < deadline);
+
+      if (!status) {
+        setVerifyOutcome(prev => ({ ...prev, [m.id]: { ok: false, message: 'Could not read verify status' } }));
+      } else if (status.running) {
+        setVerifyOutcome(prev => ({ ...prev, [m.id]: { ok: false, message: 'Verification timed out after 180s — check the session log' } }));
+      } else {
+        const ok = status.exit_code === 0;
+        setVerifyOutcome(prev => ({ ...prev, [m.id]: {
+          ok,
+          message: ok
+            ? 'Verified — model is now selectable and its bundles are re-armed'
+            : `Failed (exit ${status.exit_code ?? '?'}) — see the session log for details`
+        } }));
+      }
+    } catch (err: any) {
+      setVerifyOutcome(prev => ({ ...prev, [m.id]: { ok: false, message: `Verify failed: ${err instanceof Error ? err.message : String(err)}` } }));
+    } finally {
+      setVerifyingId(null);
+      try { await onRefresh(); } catch { /* refresh is best-effort */ }
+    }
+  };
 
   // Modals state
   const [provModalOpen, setProvModalOpen] = useState<boolean>(false);
@@ -337,6 +398,23 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                       <h4 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-2">
                         <Cpu className="w-4 h-4 text-[var(--accent-color)]" />
                         <span>{m.name}</span>
+                        <span
+                          title={m.verified
+                            ? 'Verified — exercised successfully through a harness; selectable in dropdowns and eligible for the resolver queue'
+                            : 'Unverified — not exercised through a harness; hidden from model dropdowns and bundles referencing it are forced inactive'}
+                          className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold uppercase border inline-flex items-center gap-1 ${
+                            m.verified
+                              ? 'bg-emerald-950/50 text-emerald-300 border-emerald-800/40'
+                              : 'bg-amber-950/50 text-amber-300 border-amber-800/40'
+                          }`}
+                        >
+                          {m.verified ? (
+                            <CheckCircle className="w-3 h-3" />
+                          ) : (
+                            <XCircle className="w-3 h-3" />
+                          )}
+                          {m.verified ? 'VERIFIED' : 'UNVERIFIED'}
+                        </span>
                       </h4>
                       <span className="font-mono text-[11px] text-[var(--text-secondary)] block mt-0.5">
                         ID: {m.id}
@@ -392,14 +470,61 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                   </div>
                 </div>
 
-                <button
-                  onClick={() => openBundleModalForModel(m)}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--accent-color)] hover:text-[var(--accent-color)] transition cursor-pointer"
-                  title="Create a config bundle from this model and assign it to a role"
-                >
-                  <Package className="w-3.5 h-3.5 text-[var(--accent-color)]" />
-                  <span>Add to Role</span>
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => verifyModel(m)}
+                    disabled={!!verifyingId || m.verified}
+                    title={
+                      m.verified
+                        ? 'Verified — exercised through a harness; bundles referencing it are active'
+                        : 'Run a real inference test — on success the model becomes VERIFIED and its bundles are re-armed'
+                    }
+                    className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold border transition ${
+                      m.verified
+                        ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50 cursor-default'
+                        : verifyingId === m.id
+                          ? 'bg-[var(--bg-tertiary)] border-[var(--accent-color)] text-[var(--accent-color)] cursor-wait'
+                          : 'bg-amber-950/30 border-amber-800/50 text-amber-300 hover:border-amber-500/70 hover:text-amber-200 cursor-pointer'
+                    }`}
+                  >
+                    {m.verified ? (
+                      <CheckCircle className="w-3.5 h-3.5" />
+                    ) : verifyingId === m.id ? (
+                      <ShieldCheck className="w-3.5 h-3.5 animate-pulse" />
+                    ) : (
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                    )}
+                    <span>
+                      {m.verified ? 'Verified' : verifyingId === m.id ? 'Verifying…' : 'Verify Model'}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => openBundleModalForModel(m)}
+                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--accent-color)] hover:text-[var(--accent-color)] transition cursor-pointer"
+                    title="Create a config bundle from this model and assign it to a role"
+                  >
+                    <Package className="w-3.5 h-3.5 text-[var(--accent-color)]" />
+                    <span>Add to Role</span>
+                  </button>
+                </div>
+
+                {verifyOutcome[m.id] && (
+                  <div
+                    className={`flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-mono ${
+                      verifyOutcome[m.id].ok
+                        ? 'bg-emerald-950/30 border-emerald-800/40 text-emerald-300'
+                        : 'bg-rose-950/30 border-rose-800/40 text-rose-300'
+                    }`}
+                  >
+                    {verifyOutcome[m.id].ok ? (
+                      <CheckCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                    ) : (
+                      <XCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                    )}
+                    <span>{verifyOutcome[m.id].message}</span>
+                  </div>
+                )}
 
                 <div className="pt-2 border-t border-[var(--border-subtle)] text-[10px] font-mono text-[var(--text-muted)] flex justify-between">
                   <span>Registered</span>

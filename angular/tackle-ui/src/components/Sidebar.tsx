@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Layers,
-  Cpu,
   Server,
   BookOpen,
   Terminal,
@@ -29,9 +28,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'Configuration',
       items: [
-        { id: 'overview', label: 'Resolver & Overview', icon: Layers },
-        { id: 'bundles', label: 'Config Bundles', icon: Cpu },
         { id: 'registry', label: 'AI Registry', icon: Server },
+        { id: 'overview', label: 'Resolver & Overview', icon: Layers },
       ]
     },
     {
