@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: tackle-srv — Tackle Role Memory + Agent Orchestration
-  version: 1.0.9905f9bc
+  version: 1.0.93c006c2
   description: 'Tackle role memory and orchestration: AI config, sessions, roles, scheduler, memory, prompts, tool access,
     failure recovery, tasks, and logs.
 
@@ -13,6 +13,7 @@ servers:
 tags:
 - name: config
 - name: health
+- name: log
 - name: logs
 - name: memory
 - name: projections
@@ -1036,6 +1037,72 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /config/ai/verify:
+    post:
+      tags:
+      - config
+      operationId: post_config_ai_verify
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /config/ai/verify/{sessionId}:
+    get:
+      tags:
+      - config
+      operationId: get_config_ai_verify_sessionId
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
   /config/failure-recovery:
     get:
       tags:
@@ -1218,6 +1285,44 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       summary: POST /health/simulate-load — no-op stub (live server has no load simulation)
+  /log/{sessionId}:
+    get:
+      tags:
+      - log
+      operationId: get_log_sessionId
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: Route mounting Session log SSE Stream nexus/logs/<sessionId>.log (test/verify invocations write there). Mirrors
+        tackle-mcp's /log/:sessionId
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
   /logs:
     delete:
       tags:

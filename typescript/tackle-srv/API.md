@@ -5,7 +5,7 @@
 
 Tackle role memory and orchestration: AI config, sessions, roles, scheduler, memory, prompts, tool access, failure recovery, tasks, and logs.
 
-**73 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**76 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -40,12 +40,15 @@ Tackle role memory and orchestration: AI config, sessions, roles, scheduler, mem
 | PATCH | `/config/ai/tool-access/:id` |  |
 | GET | `/config/ai/tool-access/:role` |  |
 | GET | `/config/ai/validate` |  |
+| POST | `/config/ai/verify` |  |
+| GET | `/config/ai/verify/:sessionId` |  |
 | GET | `/config/failure-recovery` |  |
 | POST | `/config/failure-recovery` |  |
 | GET | `/health` |  |
 | GET | `/health/history` | GET /health/history — time-series metrics |
 | GET | `/health/metrics` | GET /health/metrics — current snapshot with full details |
 | POST | `/health/simulate-load` | POST /health/simulate-load — no-op stub (live server has no load simulation) |
+| GET | `/log/:sessionId` | Route mounting Session log SSE Stream nexus/logs/<sessionId>.log (test/verify invocations write there). Mirrors tackle-mcp's /log/:sessionId so the UI proxy chain (tackle-ui :4202 → tackle-srv :3410) can stream logs — previously the route only existed on tackle-mcp and the UI's log polls 404'd. |
 | DELETE | `/logs` | DELETE /logs — clear all logs |
 | GET | `/logs` | GET /logs — query with optional filters |
 | POST | `/logs/emit` | POST /logs/emit — insert a single log entry |
