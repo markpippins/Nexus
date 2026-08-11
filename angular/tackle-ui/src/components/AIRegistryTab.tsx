@@ -61,6 +61,14 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
   // Bumped on every open so the modal remounts with fresh form state.
   const [bundleModalKey, setBundleModalKey] = useState<number>(0);
 
+  // ── Models toolbar state ──────────────────────────────────────────
+  const [modelSearch, setModelSearch] = useState('');
+  const [modelSort, setModelSort] = useState<'name' | 'provider' | 'verified' | 'date'>('name');
+  const [modelSortAsc, setModelSortAsc] = useState(true);
+  const [modelFilterProvider, setModelFilterProvider] = useState<string>('all');
+  const [modelFilterHarness, setModelFilterHarness] = useState<string>('all');
+  const [modelFilterVerified, setModelFilterVerified] = useState<'all' | 'verified' | 'unverified'>('all');
+
   // Verify-model state — one verification at a time; outcome keyed by model id
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [verifyOutcome, setVerifyOutcome] = useState<Record<string, { ok: boolean; message: string }>>({});
@@ -309,6 +317,41 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
 
   const defaultBundleRole = roles.find(r => r.name === 'engineer')?.name || roles[0]?.name || '';
 
+  // ── Derived: filtered + sorted models ──────────────────────────────
+  const uniqueProviderIds = [...new Set(models.map(m => m.provider_id).filter(Boolean))];
+  const uniqueHarnessIds = [...new Set(models.map(m => m.harness_id).filter(Boolean))];
+
+  const filteredModels = models
+    .filter(m => {
+      // Text search
+      if (modelSearch) {
+        const q = modelSearch.toLowerCase();
+        const providerObj = providers.find(p => p.id === m.provider_id);
+        const harnessObj = harnesses.find(h => h.id === m.harness_id);
+        const haystack = [m.name, m.id, m.model_identifier, providerObj?.name || '', harnessObj?.name || ''].join(' ').toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      // Provider filter
+      if (modelFilterProvider !== 'all' && m.provider_id !== modelFilterProvider) return false;
+      // Harness filter
+      if (modelFilterHarness !== 'all' && m.harness_id !== modelFilterHarness) return false;
+      // Verified filter
+      if (modelFilterVerified === 'verified' && !m.verified) return false;
+      if (modelFilterVerified === 'unverified' && m.verified) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      let cmp = 0;
+      if (modelSort === 'name') cmp = a.name.localeCompare(b.name);
+      else if (modelSort === 'provider') {
+        const pa = providers.find(p => p.id === a.provider_id)?.name || '';
+        const pb = providers.find(p => p.id === b.provider_id)?.name || '';
+        cmp = pa.localeCompare(pb) || a.name.localeCompare(b.name);
+      } else if (modelSort === 'verified') cmp = (a.verified ? 0 : 1) - (b.verified ? 0 : 1);
+      else if (modelSort === 'date') cmp = new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+      return modelSortAsc ? cmp : -cmp;
+    });
+
   return (
     <div className="space-y-6">
       {/* Sub-navigation */}
@@ -382,8 +425,101 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
 
       {/* 1. MODELS VIEW */}
       {activeSubTab === 'models' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {models.map(m => {
+        <>
+          {/* Toolbar: search + sort + filters */}
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[200px]">
+              <input
+                type="text"
+                value={modelSearch}
+                onChange={e => setModelSearch(e.target.value)}
+                placeholder="Search models by name, ID, provider…"
+                className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg pl-8 pr-3 py-1.5 font-mono text-[var(--text-primary)] text-xs placeholder:text-[var(--text-muted)]"
+              />
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              {modelSearch && (
+                <button onClick={() => setModelSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              )}
+            </div>
+
+            {/* Sort */}
+            <select
+              value={`${modelSort}-${modelSortAsc}`}
+              onChange={e => {
+                const [s, d] = e.target.value.split('-');
+                setModelSort(s as any);
+                setModelSortAsc(d === 'true');
+              }}
+              className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-2 py-1.5 text-xs font-mono text-[var(--text-primary)] cursor-pointer"
+            >
+              <option value="name-true">Name A→Z</option>
+              <option value="name-false">Name Z→A</option>
+              <option value="provider-true">Provider A→Z</option>
+              <option value="provider-false">Provider Z→A</option>
+              <option value="verified-false">Verified first</option>
+              <option value="verified-true">Unverified first</option>
+              <option value="date-false">Newest first</option>
+              <option value="date-true">Oldest first</option>
+            </select>
+
+            {/* Provider filter */}
+            <select
+              value={modelFilterProvider}
+              onChange={e => setModelFilterProvider(e.target.value)}
+              className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-2 py-1.5 text-xs font-mono text-[var(--text-primary)] cursor-pointer"
+            >
+              <option value="all">All providers</option>
+              {uniqueProviderIds.map(pid => {
+                const p = providers.find(pr => pr.id === pid);
+                return <option key={pid} value={pid}>{p?.name || pid}</option>;
+              })}
+            </select>
+
+            {/* Harness filter */}
+            <select
+              value={modelFilterHarness}
+              onChange={e => setModelFilterHarness(e.target.value)}
+              className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-2 py-1.5 text-xs font-mono text-[var(--text-primary)] cursor-pointer"
+            >
+              <option value="all">All harnesses</option>
+              {uniqueHarnessIds.map(hid => {
+                const h = harnesses.find(hr => hr.id === hid);
+                return <option key={hid} value={hid}>{h?.name || hid}</option>;
+              })}
+            </select>
+
+            {/* Verified filter */}
+            <select
+              value={modelFilterVerified}
+              onChange={e => setModelFilterVerified(e.target.value as any)}
+              className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-2 py-1.5 text-xs font-mono text-[var(--text-primary)] cursor-pointer"
+            >
+              <option value="all">All status</option>
+              <option value="verified">Verified</option>
+              <option value="unverified">Unverified</option>
+            </select>
+
+            {/* Count badge */}
+            <span className="text-[10px] font-mono text-[var(--text-muted)]">
+              {filteredModels.length} of {models.length}
+            </span>
+
+            {/* Reset filters */}
+            {(modelSearch || modelFilterProvider !== 'all' || modelFilterHarness !== 'all' || modelFilterVerified !== 'all') && (
+              <button
+                onClick={() => { setModelSearch(''); setModelFilterProvider('all'); setModelFilterHarness('all'); setModelFilterVerified('all'); }}
+                className="px-2 py-1 rounded text-[10px] font-bold text-[var(--accent-color)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] cursor-pointer"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredModels.map(m => {
             const harnessObj = harnesses.find(h => h.id === m.harness_id);
             const providerObj = providers.find(p => p.id === (m.provider_id || harnessObj?.id));
 
@@ -533,7 +669,8 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
               </div>
             );
           })}
-        </div>
+          </div>
+        </>
       )}
 
       {/* 2. PROVIDERS VIEW */}
