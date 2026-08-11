@@ -14,6 +14,7 @@ import {
   Layers,
   Sparkles
 } from 'lucide-react';
+import { showToast } from '../components/Toast';
 import { SystemRole, PromptTemplate, TaskDefinition, InspectorTaskDispatch } from '../types';
 
 interface RolesTasksTabProps {
@@ -69,7 +70,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
       await onSaveRole({ name: roleName, description: roleDesc });
       setRoleModalOpen(false);
     } catch (err) {
-      alert(`Error saving role: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error saving role: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -109,7 +110,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
       });
       setPromptModalOpen(false);
     } catch (err) {
-      alert(`Error saving prompt: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error saving prompt: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -136,7 +137,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
       });
       setTaskModalOpen(false);
     } catch (err) {
-      alert(`Error saving task: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error saving task: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -421,7 +422,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
                       try {
                         await onDeleteRole(r.id);
                       } catch (err) {
-                        alert(`Error deleting role: ${err instanceof Error ? err.message : String(err)}`);
+                        showToast(`Error deleting role: ${err instanceof Error ? err.message : String(err)}`);
                       }
                     }}
                     className="p-1 text-rose-400 hover:text-rose-300 cursor-pointer"

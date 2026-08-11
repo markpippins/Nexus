@@ -14,6 +14,8 @@ import {
   BarChart2,
   Layers
 } from 'lucide-react';
+import { showToast } from '../components/Toast';
+import { showConfirm } from '../components/ConfirmDialog';
 import { SessionLedger, SystemRole, AIModel } from '../types';
 
 interface SessionsPlaygroundTabProps {
@@ -343,11 +345,11 @@ export const SessionsPlaygroundTab: React.FC<SessionsPlaygroundTabProps> = ({
                   {sess.status === 'running' && (
                     <button
                       onClick={async () => {
-                        if (confirm(`Send SIGKILL to session '${sess.id}'?`)) {
+                        if (await showConfirm(`Send SIGKILL to session '${sess.id}'?`)) {
                           try {
                             await onKillSession(sess.id);
                           } catch (err) {
-                            alert(`Error killing session: ${err instanceof Error ? err.message : String(err)}`);
+                            showToast(`Error killing session: ${err instanceof Error ? err.message : String(err)}`);
                           }
                         }
                       }}

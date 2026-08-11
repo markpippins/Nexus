@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Zap, X, Code } from 'lucide-react';
+import { showToast } from '../components/Toast';
 import { ConfigBundle, AIModel, Provider, Harness, SystemRole } from '../types';
 
 interface BundleModalProps {
@@ -110,7 +111,7 @@ export const BundleModal: React.FC<BundleModalProps> = ({
       });
       onClose();
     } catch (err) {
-      alert(`Error saving bundle: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error saving bundle: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsSaving(false);
     }

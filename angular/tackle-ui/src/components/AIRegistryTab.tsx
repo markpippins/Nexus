@@ -16,6 +16,8 @@ import {
   ShieldCheck,
   Package
 } from 'lucide-react';
+import { showToast } from '../components/Toast';
+import { showConfirm } from '../components/ConfirmDialog';
 import { Provider, Harness, AIModel, SystemRole, ConfigBundle } from '../types';
 import { BundleModal } from './BundleModal';
 
@@ -82,10 +84,10 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
   // flips to VERIFIED and the model's bundles re-arm server-side.
   const verifyModel = async (m: AIModel) => {
     if (verifyingId) return;
-    if (!confirm(
+    if (!(await showConfirm(
       `Run a verification inference against "${m.name}" (${m.model_identifier})?\n\n` +
       `On success the model becomes VERIFIED and every config bundle referencing it is re-armed (active).`
-    )) return;
+    ))) return;
 
     setVerifyingId(m.id);
     setVerifyOutcome(prev => { const n = { ...prev }; delete n[m.id]; return n; });
@@ -196,7 +198,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
       });
       setProvModalOpen(false);
     } catch (err) {
-      alert(`Error saving provider: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error saving provider: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -240,7 +242,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
       });
       setHarnModalOpen(false);
     } catch (err) {
-      alert(`Error saving harness: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error saving harness: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -276,7 +278,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
       });
       setModModalOpen(false);
     } catch (err) {
-      alert(`Error saving model: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error saving model: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -585,11 +587,11 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                       </button>
                       <button
                         onClick={async () => {
-                          if (confirm(`Delete model '${m.name}'?`)) {
+                          if (await showConfirm(`Delete model '${m.name}'?`)) {
                             try {
                               await onDeleteModel(m.id);
                             } catch (err) {
-                              alert(`Error deleting model: ${err instanceof Error ? err.message : String(err)}`);
+                              showToast(`Error deleting model: ${err instanceof Error ? err.message : String(err)}`);
                             }
                           }
                         }}
@@ -724,11 +726,11 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                       </button>
                       <button
                         onClick={async () => {
-                          if (confirm(`Delete provider '${p.name}'?`)) {
+                          if (await showConfirm(`Delete provider '${p.name}'?`)) {
                             try {
                               await onDeleteProvider(p.id);
                             } catch (err) {
-                              alert(`Error deleting provider: ${err instanceof Error ? err.message : String(err)}`);
+                              showToast(`Error deleting provider: ${err instanceof Error ? err.message : String(err)}`);
                             }
                           }
                         }}
@@ -837,11 +839,11 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                       </button>
                       <button
                         onClick={async () => {
-                          if (confirm(`Delete harness '${h.name}'?`)) {
+                          if (await showConfirm(`Delete harness '${h.name}'?`)) {
                             try {
                               await onDeleteHarness(h.id);
                             } catch (err) {
-                              alert(`Error deleting harness: ${err instanceof Error ? err.message : String(err)}`);
+                              showToast(`Error deleting harness: ${err instanceof Error ? err.message : String(err)}`);
                             }
                           }
                         }}

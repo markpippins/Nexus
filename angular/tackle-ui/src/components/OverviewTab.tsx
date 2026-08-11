@@ -21,6 +21,7 @@ import {
   X,
   Package
 } from 'lucide-react';
+import { showConfirm } from '../components/ConfirmDialog';
 import { SystemRole, ValidationReport, AIModel, Provider, Harness, ConfigBundle } from '../types';
 import { BundleModal } from './BundleModal';
 
@@ -449,7 +450,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                         </div>
                         <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] p-1 rounded-lg border border-[var(--border-subtle)]">
                           <button onClick={() => openEditModal(bundle)} className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded transition cursor-pointer" title="Edit Bundle"><Edit2 className="w-3.5 h-3.5" /></button>
-                          <button onClick={async () => { if (confirm(`Delete config bundle '${bundle.name}'?`)) { try { await onDeleteBundle(bundle.id); } catch (err) { setBundleError(`Error deleting bundle: ${err instanceof Error ? err.message : String(err)}`); } } }} className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 rounded transition cursor-pointer" title="Delete Bundle"><Trash2 className="w-3.5 h-3.5" /></button>
+                          <button onClick={async () => { if (await showConfirm(`Delete config bundle '${bundle.name}'?`)) { try { await onDeleteBundle(bundle.id); } catch (err) { setBundleError(`Error deleting bundle: ${err instanceof Error ? err.message : String(err)}`); } } }} className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 rounded transition cursor-pointer" title="Delete Bundle"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
                       </div>
                     </div>

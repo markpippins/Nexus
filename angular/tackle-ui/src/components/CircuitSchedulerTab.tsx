@@ -19,6 +19,7 @@ import {
   AlertCircle,
   X
 } from 'lucide-react';
+import { showToast } from '../components/Toast';
 import { FailureRecoveryConfig, AgentScheduleEntry, SystemRole, AIModel, TaskDefinition, PromptTemplate } from '../types';
 import { validateScheduleExpression } from '../utils/scheduleValidation';
 
@@ -116,7 +117,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
       setCircuitSavedSuccess(true);
       setTimeout(() => setCircuitSavedSuccess(false), 3000);
     } catch (e) {
-      alert('Error updating circuit breaker configuration');
+      showToast('Error updating circuit breaker configuration');
     } finally {
       setIsSavingCircuit(false);
     }
@@ -167,7 +168,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
       });
       closeSchedModal();
     } catch (err) {
-      alert(`Error saving schedule: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error saving schedule: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -175,7 +176,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
     try {
       await onToggleSchedule(s.id, !s.enabled);
     } catch (err) {
-      alert(`Error toggling schedule: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error toggling schedule: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -183,7 +184,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
     try {
       await onDeleteSchedule(id);
     } catch (err) {
-      alert(`Error deleting schedule: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error deleting schedule: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 

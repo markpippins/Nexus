@@ -11,6 +11,10 @@ import { SessionsPlaygroundTab } from './components/SessionsPlaygroundTab';
 import { SystemLogsTab } from './components/SystemLogsTab';
 import { SystemInsightsTab } from './components/SystemInsightsTab';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ToastContainer } from './components/Toast';
+import { ConfirmDialog } from './components/ConfirmDialog';
+import { showToast } from './components/Toast';
+import { showConfirm } from './components/ConfirmDialog';
 import {
   ThemeMode,
   Provider,
@@ -154,12 +158,12 @@ export default function App() {
 
   // Seed Defaults
   const handleSeedDefaults = async () => {
-    if (confirm('Reset and re-seed default tackle configurations?')) {
+    if (await showConfirm('Reset and re-seed default tackle configurations?')) {
       try {
         await fetch('/config/ai/seed-defaults', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: false }) });
         await fetchAllData();
       } catch (e) {
-        alert('Seed error');
+        showToast('Seed error');
       }
     }
   };
@@ -561,6 +565,8 @@ export default function App() {
           </footer>
         </div>
       </div>
+      <ToastContainer />
+      <ConfirmDialog />
     </div>
   );
 }
