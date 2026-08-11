@@ -491,6 +491,12 @@ async def handle_comment_created(
     comment_role = normalized["comment_role"]
     forum_slug = normalized["forum_slug"]
 
+    # ── Guard: never process system-level comments (error reports, etc).
+    # These are posted by the subscriber itself when an agent fails;
+    # re-processing them would create an infinite error loop.
+    if comment_role == "system":
+        return
+
     if not thread_id:
         _log("Missing thread_id in event — skipping")
         return

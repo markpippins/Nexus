@@ -529,11 +529,12 @@ app.post("/run-direct", async (req, res) => {
 
     // ── Resolve harness config from tackle ───────────────────────
     const configResult = await pool.query(
-      `SELECT cb.harness_id, cb.opencode_model_id, cb.invocation_mode,
+      `SELECT cb.harness_id, m.model_identifier, cb.invocation_mode,
               h.invocation_semantics
        FROM tackle.config_bundle cb
        JOIN tackle.harnesses h ON h.id = cb.harness_id
-       WHERE cb.role = $1 AND cb.is_active = true
+       JOIN tackle.models m ON m.id = cb.model_id
+       WHERE cb.role = $1 AND cb.is_active = 1
        ORDER BY cb.priority DESC
        LIMIT 1`,
       [role]
@@ -548,7 +549,7 @@ app.post("/run-direct", async (req, res) => {
     }
 
     const harnessId = configResult.rows[0].harness_id;
-    const effectiveModel = modelOverride || configResult.rows[0].opencode_model_id;
+    const effectiveModel = modelOverride || configResult.rows[0].model_identifier;
     const invocationMode = configResult.rows[0].invocation_mode;
 
     // ── Interactive-hosted guard ─────────────────────────────────
