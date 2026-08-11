@@ -38,6 +38,7 @@ import asyncio
 import json
 import os
 import re
+import select
 import signal
 import sys
 import time
@@ -69,6 +70,7 @@ NATS_SUBJECT = os.getenv(
     "INTERACTIVE_NATS_SUBJECT",
     "nexus.duality.v1.conversation.>",
 )
+
 HARNESS_SRV_URL = os.getenv("HARNESS_SRV_URL", "http://localhost:3420")
 ASSEMBLY_URL = os.getenv("ASSEMBLY_URL", "http://localhost:3107")
 NEBULA_URL = os.getenv("NEBULA_URL", "http://localhost:3101")
@@ -273,25 +275,38 @@ def _invoke_agent_harness(
         return {"exit_code": 1, "stdout": "", "stderr": str(e)}
 
 
-def _emit_turn_requested(
+async def _emit_turn_requested(
+    nc: Any,
     thread_id: str,
     role: str,
     comment_role: str,
-) -> None:
+) -> bool:
     """Emit conversation.turn.requested on NATS for freebuff backends.
 
     The FreeBuff session already owns its context — we just need to
     signal that a new interaction is available. The session picks up
     the pointer and responds within its existing continuity.
 
-    NOTE: NATS publishing requires the async nc handle from the event
-    loop, which isn't available in this synchronous handler. The stub
-    logs the turn request for now; the FreeBuff session is expected to
-    poll the Assembly thread directly (via duality-ui's polling loop)
-    rather than waiting for a NATS-delivered event.
+    Subject: nexus.duality.v1.conversation.turn.requested
+    Payload: { event_type, thread_id, role, comment_role, timestamp }
+
+    Returns True if published successfully, False on failure.
     """
-    _log("turn.requested for %s (thread=%s, replied_by=%s) — FreeBuff session should poll Assembly",
-         role, thread_id[:8], comment_role)
+    try:
+        payload = json.dumps({
+            "event_type": "conversation.turn.requested",
+            "thread_id": thread_id,
+            "role": role,
+            "comment_role": comment_role,
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }).encode()
+        await nc.publish("nexus.duality.v1.conversation.turn.requested", payload)
+        _log("turn.requested published for %s (thread=%s, replied_by=%s)",
+             role, thread_id[:8], comment_role)
+        return True
+    except Exception as e:
+        _log("Failed to publish turn.requested for %s: %s", role, e)
+        return False
 
 
 def _post_assembly_comment(
@@ -402,25 +417,79 @@ def _build_incremental_context(
 #  Event handling
 # ═══════════════════════════════════════════════════════════════════════
 
+def _normalize_comment_event(
+    data: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Normalize both kernel-transition and duality-conversation envelopes.
+
+    Kernel transition path:
+        pg_notify payload → _build_envelope → CanonicalEnvelope
+        → NATS on nexus.kernel.v1.transition.assembly.comment.created
+        Shape: { type, payload: { raw: { payload: { thread_id, role, forum_slug } } } }
+
+    Duality conversation path:
+        Direct NATS publish on nexus.duality.v1.conversation.assembly.comment.created
+        Shape: { event_type, payload: { thread_id, role, forum_slug } }
+
+    Returns normalized dict with { thread_id, comment_role, forum_slug } or None.
+    """
+    # ── Kernel transition envelope (deeply nested via _build_envelope) ──
+    raw = data.get("payload", {}).get("raw", {})
+    if raw and raw.get("event_type") == "assembly.comment.created":
+        inner = raw.get("payload", {})
+        if isinstance(inner, dict) and inner.get("thread_id"):
+            return {
+                "thread_id": inner["thread_id"],
+                "comment_role": inner.get("role", ""),
+                "forum_slug": inner.get("forum_slug", ""),
+                "comment_id": inner.get("comment_id", ""),
+            }
+
+    # ── Duality conversation envelope (flat) ──
+    payload = data.get("payload", {}) or {}
+    inner = (
+        payload.get("payload", payload)
+        if isinstance(payload, dict) else payload
+    )
+    if isinstance(inner, dict) and inner.get("thread_id"):
+        return {
+            "thread_id": inner["thread_id"],
+            "comment_role": inner.get("role", ""),
+            "forum_slug": inner.get("forum_slug", ""),
+            "comment_id": inner.get("comment_id", ""),
+        }
+
+    return None
+
+
 async def handle_comment_created(
+    nc: Any,
     pg_conn: Any,
     event_envelope: dict[str, Any],
 ) -> None:
     """Process an assembly.comment.created event.
 
-    1. Query watch table → find target roles
-    2. For each watch: coordinator → continue/delegate/close
-    3. If continue: invoke agent → post response → consume lease
+    1. Dedup via _seen set (protects both PG LISTEN and NATS paths)
+    2. Query watch table → find target roles
+    3. For each watch: coordinator → continue/delegate/close
+    4. If continue: invoke agent → post response → consume lease
     """
-    payload = event_envelope.get("payload", {}) or {}
-    inner = (
-        payload.get("payload", payload)
-        if isinstance(payload, dict) else payload
-    )
+    # ── Dedup (protects both PG LISTEN and NATS paths) ──
+    dedup_id = event_envelope.get("aggregate_id") or event_envelope.get("event_id", "")
+    if dedup_id and dedup_id in _seen:
+        return
 
-    thread_id = inner.get("thread_id", "") if isinstance(inner, dict) else ""
-    comment_role = inner.get("role", "") if isinstance(inner, dict) else ""
-    forum_slug = inner.get("forum_slug", "") if isinstance(inner, dict) else ""
+    normalized = _normalize_comment_event(event_envelope)
+    if not normalized:
+        _log("Could not normalize comment event — skipping")
+        return
+
+    if dedup_id:
+        _remember(dedup_id)
+
+    thread_id = normalized["thread_id"]
+    comment_role = normalized["comment_role"]
+    forum_slug = normalized["forum_slug"]
 
     if not thread_id:
         _log("Missing thread_id in event — skipping")
@@ -462,7 +531,7 @@ async def handle_comment_created(
             # The session polls Assembly directly (duality-ui polling loop).
             # We do NOT bump turn_count here — the session owns its own
             # accounting. Lease consumption also handled by the session.
-            _emit_turn_requested(thread_id, watch_role, comment_role)
+            await _emit_turn_requested(nc, thread_id, watch_role, comment_role)
             continue
 
         # Build context appropriate for the backend
@@ -535,16 +604,31 @@ async def handle_comment_created(
 # ═══════════════════════════════════════════════════════════════════════
 
 def _is_comment_created(data: dict[str, Any], subject: str) -> bool:
-    """True when this event is assembly.comment.created."""
+    """True when this event is assembly.comment.created.
+
+    Matches both kernel transition subjects
+    (``nexus.kernel.v1.transition.assembly.comment.created``) and
+    duality conversation subjects
+    (``nexus.duality.v1.conversation.assembly.comment.created``).
+    """
     if subject.endswith("assembly.comment.created"):
         return True
-    return data.get("event_type") == "assembly.comment.created"
+    return False
 
 
-async def run_interactive_turn_subscriber() -> None:
-    """Main loop: connect NATS + DB, subscribe, process comment events."""
+async def run_interactive_turn_subscriber() -> None:  # noqa: C901
+    """Main loop: connect NATS + DB, subscribe, process comment events.
+
+    Two event sources:
+    1. PostgreSQL LISTEN on ``kernel_transition`` — receives trigger events
+       directly from ``trg_comment_created`` (bypasses the NATS bridge).
+       Channel: ``kernel_transition`` (same channel the trigger uses).
+    2. NATS on ``nexus.duality.v1.conversation.>`` — future duality-specific
+       events and turn.requested replies from freebuff sessions.
+    """
     try:
         import psycopg2
+        import psycopg2.extensions
     except ImportError as e:
         _log("FATAL: %s — install with: pip install psycopg2-binary", e)
         sys.exit(1)
@@ -558,49 +642,87 @@ async def run_interactive_turn_subscriber() -> None:
     # ── Connect to PostgreSQL ──
     _log("Connecting to PostgreSQL...")
     pg_conn = psycopg2.connect(DATABASE_URL)
-    pg_conn.autocommit = True
+    pg_conn.set_isolation_level(
+        psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT
+    )
     _log("PostgreSQL connected")
 
-    # ── Connect to NATS ──
+    # ── LISTEN for trigger events directly (bypass NATS bridge) ──
+    _PG_LISTEN_CHANNEL = "kernel_transition"
+    cur = pg_conn.cursor()
+    cur.execute(f"LISTEN {_PG_LISTEN_CHANNEL};")
+    _log("Listening on PostgreSQL channel '%s' for comment triggers",
+         _PG_LISTEN_CHANNEL)
+
+    # ── Connect to NATS (for duality conversation events + publishing) ──
     _log("Connecting to NATS at %s...", NATS_URL)
     nc = await nats.connect(NATS_URL, name="interactive_turn_subscriber")
     _log("NATS connected")
 
     processed_count = 0
 
-    # ── Message handler ──
-    async def on_message(msg: Any) -> None:
+    # ── NATS message handler (duality conversation events) ──
+    async def on_nats_message(msg: Any) -> None:
         nonlocal processed_count
 
         try:
             data: dict[str, Any] = json.loads(msg.data.decode())
-            event_id = str(data.get("event_id", ""))
-            _log("Received event on %s (event_id=%s)", msg.subject, event_id[:8])
-
-            if event_id and event_id in _seen:
-                _log("Event %s already processed — skipping (dedup)", event_id[:8])
-                return
+            _log("Received NATS event on %s", msg.subject)
 
             if not _is_comment_created(data, msg.subject):
                 return
 
-            await handle_comment_created(pg_conn, data)
-
-            if event_id:
-                _remember(event_id)
+            await handle_comment_created(nc, pg_conn, data)
             processed_count += 1
 
         except json.JSONDecodeError as e:
             _log("Invalid JSON: %s", e)
         except Exception as e:
-            _log("Error processing message: %s", e)
+            _log("Error processing NATS message: %s", e)
             import traceback
             _log(traceback.format_exc())
 
-    # ── Subscribe ──
-    sub = await nc.subscribe(NATS_SUBJECT, cb=on_message)
-    _log("Subscribed to %s — waiting for comment events...", NATS_SUBJECT)
+    # ── Subscribe to NATS ──
+    sub = await nc.subscribe(NATS_SUBJECT, cb=on_nats_message)
+    _log("Subscribed to NATS %s", NATS_SUBJECT)
     _log("Forum: %s | Harness: %s", FORUM_SLUG, HARNESS_SRV_URL)
+
+    # ── PG notification polling loop ──
+
+    async def poll_pg_notifications() -> None:
+        """Background task: poll PG for trigger notifications."""
+        nonlocal processed_count
+        while not _shutdown.is_set():
+            try:
+                ready = select.select([pg_conn], [], [], 0.5)
+                if ready[0]:
+                    pg_conn.poll()
+                while pg_conn.notifies:
+                    notify = pg_conn.notifies.pop(0)
+                    if notify.channel != _PG_LISTEN_CHANNEL:
+                        continue
+                    try:
+                        payload: dict[str, Any] = json.loads(notify.payload)
+                        event_type = payload.get("event_type", "")
+                        if event_type != "assembly.comment.created":
+                            continue
+                        _log("PG NOTIFY: %s (%s)",
+                             event_type, payload.get("aggregate_id", "?")[:8])
+                        # Wrap in the format handle_comment_created expects
+                        await handle_comment_created(nc, pg_conn, payload)
+                        processed_count += 1
+                    except json.JSONDecodeError as e:
+                        _log("Invalid PG payload: %s", e)
+                    except Exception as e:
+                        _log("Error processing PG notification: %s", e)
+                        import traceback
+                        _log(traceback.format_exc())
+                await asyncio.sleep(0.1)
+            except Exception as e:
+                _log("PG poll error: %s", e)
+                await asyncio.sleep(1)
+
+    pg_task = asyncio.create_task(poll_pg_notifications())
 
     # ── Wait for shutdown ──
     try:
@@ -609,8 +731,14 @@ async def run_interactive_turn_subscriber() -> None:
         pass
     finally:
         _log("Shutting down — %d events processed", processed_count)
+        pg_task.cancel()
+        try:
+            await pg_task
+        except asyncio.CancelledError:
+            pass
         await sub.unsubscribe()
         await nc.drain()
+        cur.close()
         pg_conn.close()
         _log("Connections closed")
 
