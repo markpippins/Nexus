@@ -43,6 +43,20 @@ import time
 import unittest
 import uuid
 
+import pytest
+
+# ── CI guard: integration ACs (1-5) require the interactive_turn_subscriber ──
+# daemon running (PG LISTEN + NATS publish). GitHub Actions cannot provision
+# the full cascade infrastructure (PostgreSQL schema, NATS, systemd daemon).
+# The AC0 schema smoke tests run everywhere (CI + local).
+#
+# The skip is applied at the class level via _skip_if_ci; AC0 does not use it.
+
+_skip_if_ci = pytest.mark.skipif(
+    os.environ.get("CI") == "true",
+    reason="wr-conf-014 integration ACs require interactive_turn_subscriber daemon + NATS (local only)",
+)
+
 # ── Path setup ──
 _SELF_DIR = os.path.dirname(os.path.abspath(__file__))
 _NEXUS_PYTHON = os.path.abspath(os.path.join(_SELF_DIR, "..", "..", ".."))
@@ -205,6 +219,7 @@ class _NatsListener:
 #  AC1 — Event delivery: watched thread produces exactly one event
 # ═══════════════════════════════════════════════════════════════════════
 
+@_skip_if_ci
 class TestAc1EventDelivery(unittest.TestCase):
     """A comment on a freebuff-watched thread produces a turn.requested event."""
 
@@ -236,6 +251,7 @@ class TestAc1EventDelivery(unittest.TestCase):
 #  AC2 — Payload correctness: all fields present and valid
 # ═══════════════════════════════════════════════════════════════════════
 
+@_skip_if_ci
 class TestAc2PayloadCorrectness(unittest.TestCase):
     """The turn.requested payload has correct field types and values."""
 
@@ -286,6 +302,7 @@ class TestAc2PayloadCorrectness(unittest.TestCase):
 #  AC3 — Self-reply guard: comment by watch role does NOT fire
 # ═══════════════════════════════════════════════════════════════════════
 
+@_skip_if_ci
 class TestAc3SelfReplyGuard(unittest.TestCase):
     """A comment posted BY the watch role is not treated as a turn request."""
 
@@ -315,6 +332,7 @@ class TestAc3SelfReplyGuard(unittest.TestCase):
 #  AC4 — Unwatched threads: no watch → no event
 # ═══════════════════════════════════════════════════════════════════════
 
+@_skip_if_ci
 class TestAc4UnwatchedThread(unittest.TestCase):
     """A comment on an unwatched thread does not produce a turn.requested event."""
 
@@ -358,6 +376,7 @@ class TestAc4UnwatchedThread(unittest.TestCase):
 #  AC5 — Two rapid comments each produce one event (no dedup-at-source)
 # ═══════════════════════════════════════════════════════════════════════
 
+@_skip_if_ci
 class TestAc5TwoCommentsTwoEvents(unittest.TestCase):
     """Two distinct comments each produce their own turn.requested event."""
 
@@ -382,6 +401,64 @@ class TestAc5TwoCommentsTwoEvents(unittest.TestCase):
                 self.assertEqual(e["thread_id"], thread_id)
         finally:
             _teardown(thread_id)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  AC0 — CI-safe schema smoke check (runs in CI, no daemon required)
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestAc0SchemaSmoke(unittest.TestCase):
+    """Schema invariants that CI can verify without the daemon.
+
+    These tests run everywhere (including CI) because they only query
+    PostgreSQL catalog tables — no NATS, no systemd daemon, no writes.
+    """
+
+    def test_duality_session_watches_table_exists(self):
+        """The duality.session_watches table must exist with expected columns."""
+        rows = _db_rows(
+            "SELECT column_name, data_type "
+            "FROM information_schema.columns "
+            "WHERE table_schema = 'duality' AND table_name = 'session_watches' "
+            "ORDER BY ordinal_position"
+        )
+        cols = {r[0] for r in rows}
+        required = {
+            "id", "thread_id", "forum_slug", "role", "execution_backend",
+            "max_turns", "turn_count", "status",
+        }
+        missing = required - cols
+        self.assertFalse(missing, f"session_watches missing columns: {missing}")
+
+    def test_execution_backend_has_check_constraint(self):
+        """The execution_backend column must have the CHECK constraint (V096)."""
+        rows = _db_rows(
+            "SELECT pg_get_constraintdef(oid) "
+            "FROM pg_constraint "
+            "WHERE conrelid = 'duality.session_watches'::regclass "
+            "  AND conname LIKE '%execution%'"
+        )
+        self.assertTrue(rows, "execution_backend CHECK constraint must exist")
+        constraint_def = rows[0][0] or ""
+        for val in ("operator", "harness", "freebuff"):
+            self.assertIn(val, constraint_def,
+                          f"CHECK must include '{val}'")
+
+    def test_trg_comment_created_exists(self):
+        """The trg_comment_created trigger (V095) must exist on assembly.comments."""
+        count = _db_scalar(
+            "SELECT count(*) FROM pg_trigger "
+            "WHERE tgname = 'trg_comment_created' "
+            "  AND tgrelid = 'assembly.comments'::regclass"
+        )
+        self.assertEqual(count, 1, "trg_comment_created must exist")
+
+    def test_duality_sessions_forum_exists(self):
+        """The duality-sessions forum must exist for watch registration."""
+        forum_id = _db_scalar(
+            "SELECT id FROM assembly.forums WHERE slug = 'duality-sessions'"
+        )
+        self.assertIsNotNone(forum_id, "duality-sessions forum must exist")
 
 
 # ═══════════════════════════════════════════════════════════════════════
