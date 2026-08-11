@@ -1,0 +1,35 @@
+[Unit]
+# Nexus Execution Worker — the READY consumer for execution.requests.
+# Per architect decision 096bab33 (2026-08-09): legacy DCO-file dispatch retired;
+# vision.work_requests + execution.requests + cascade admission are the ONLY
+# dispatch authority. This daemon reconciles eligible builder plans into READY
+# execution requests, acquires leases, claims tickets, runs the real opencode
+# builder (executor_cloud.run_opencode), and advances the conduit plan lifecycle
+# (IMPLEMENTATION/BLOCK receipts, cursor, next tickets).
+# Closes the gap recorded in gap-analysis 3884a66b: "the gate is a missing live
+# executor for execution.requests". Worker plan record feaf90c4.
+Description=Nexus Execution Worker (conduit READY consumer, ADR-006)
+After=network.target postgresql.service conduit-mcp.service
+Wants=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/codex/dev/nexus/python
+Environment=PYTHONPATH=/home/codex/dev/nexus/python
+Environment=CONDUIT_PG_DSN=postgresql://pguser:pgpass@localhost:5432/nexus
+# PIPELINE_MODEL deliberately neutralized (empty): a stale
+# PIPELINE_MODEL=ollama/qwen2.5-coder-ctx32k in the systemd user manager
+# env (and conduit/.env) was force-selecting Ollama as the builder model,
+# bypassing the tackle chain. Per user directive 2026-08-10 the worker
+# walks the tackle model chain: NVIDIA glm-5.2 primary → fallbacks →
+# Ollama last, advancing on rate-limit/failure. An explicit --model CLI
+# arg still overrides (single-entry chain).
+Environment=PIPELINE_MODEL=
+ExecStart=/home/codex/opt/anaconda3/bin/python3 -u -m conduit.execution_worker --loop --interval 60
+Restart=always
+RestartSec=10
+StandardOutput=append:/tmp/nexus-execution-worker.log
+StandardError=append:/tmp/nexus-execution-worker.log
+
+[Install]
+WantedBy=default.target

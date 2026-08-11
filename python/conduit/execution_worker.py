@@ -13,6 +13,8 @@ no live executor consumed those rows. This worker closes that gap:
         acquire lease (mutual exclusion)
         claim builder ticket (Invariant 1)
         create + start attempt
+        walk the tackle model chain (primary NVIDIA glm-5.2 → fallbacks
+            → Ollama last; advance on rate-limit/harness failure)
         run real opencode builder via executor_cloud.run_opencode
         complete attempt + issue execution receipt
         release lease, mark request COMPLETED / FAILED
@@ -46,7 +48,12 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from db_adapter import DBAdapter  # noqa: E402
+from db_adapter import (  # noqa: E402
+    DBAdapter,
+    fallback_provider_prefix_slug,
+    provider_prefix_slug,
+    qualify_opencode_model_id,
+)
 from env_config import load_env  # noqa: E402 — shared .env loader (fires at import)
 import executor_cloud  # noqa: E402
 from executor_registry import ModelConfig  # noqa: E402
@@ -65,6 +72,109 @@ SUCCESS_RECEIPT = "IMPLEMENTATION"
 FAIL_RECEIPT = "BLOCK"
 LEASE_TTL = 600  # 10 min — renewed in the background during a run; crash recovery ≤10 min
 RENEW_INTERVAL = 240  # renew every 4 min (well inside the 10-min TTL)
+
+# ── API usage limit detection (ported from conduit/main.py, v075) ───
+_API_LIMIT_PATTERNS = [
+    "usage limit",
+    "rate limit",
+    "usage exceeded",
+    "api usage",
+    "insufficient_quota",
+    "quota exceeded",
+    "billing",
+    "credit",
+    "429",
+    "402",
+    "exceeded your current quota",
+    "your account must be",
+    "payment required",
+    "freeusagelimiterror",
+]
+
+
+def _detect_api_limit_error(exit_code: int, output: str) -> bool:
+    output_lower = output.lower()
+    if exit_code == 0:
+        return False
+    for pattern in _API_LIMIT_PATTERNS:
+        if pattern in output_lower:
+            return True
+    return False
+
+
+def _resolve_model_chain(db: DBAdapter, role: str) -> list:
+    """Build the primary + fallback model chain via tackle.
+
+    Mirrors conduit/main.py::_resolve_model_chain (v120): returns a list
+    of dicts, primary first, each entry's ``model`` being the
+    fully-qualified opencode ID for that model's OWN provider.  This is
+    what lets the worker "move NVIDIA up and fall back to Ollama on rate
+    limits" — the tackle role config already orders NVIDIA first, and the
+    chain walk in _process_one advances on API-limit failures.
+    """
+    chain: list = []
+    primary = None
+    try:
+        primary = db.get_role_model_config(role)
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("_resolve_model_chain: primary lookup failed role=%s: %s", role, exc)
+
+    primary_slug = ""
+    provider_map: dict = {}
+    if primary:
+        primary_slug = provider_prefix_slug(
+            primary.get("provider_name", ""),
+            primary.get("provider_type", ""),
+            primary.get("provider_id", ""),
+        )
+        pid = primary.get("provider_id", "")
+        if pid and primary_slug:
+            provider_map[pid] = primary_slug
+
+    if primary and primary.get("harness") and primary.get("model"):
+        chain.append({
+            "harness": primary["harness"],
+            "model": qualify_opencode_model_id(primary["model"], primary_slug),
+            "priority": -1,
+        })
+
+    try:
+        fallbacks = db.get_fallback_models(role)
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("_resolve_model_chain: fallback lookup failed role=%s: %s", role, exc)
+        fallbacks = []
+
+    primary_model = (primary or {}).get("model", "")
+    for fb in fallbacks:
+        semantics = fb.get("invocation_semantics") or {}
+        binary = semantics.get("binary", "")
+        if not binary:
+            _log.warning(
+                "_resolve_model_chain: skipping fallback role=%s model=%s harness '%s' has no binary",
+                role, fb.get("model_identifier", "?"), fb.get("harness_name", "?"),
+            )
+            continue
+        model_id = fb.get("model_identifier", "")
+        if model_id and model_id == primary_model:
+            continue
+        fbid = fb.get("provider_id", "")
+        slug = provider_map.get(fbid, "") or fallback_provider_prefix_slug(
+            fb.get("provider_name", ""), fb.get("provider_type", ""),
+            fbid, primary_slug,
+        )
+        chain.append({
+            "harness": binary,
+            "model": qualify_opencode_model_id(model_id, slug),
+            "priority": fb.get("priority", 0),
+        })
+
+    if not chain:
+        env_model = os.environ.get("PIPELINE_MODEL", "")
+        if env_model:
+            _log.info("_resolve_model_chain: PIPELINE_MODEL fallback role=%s model=%s", role, env_model)
+            chain.append({"harness": "opencode", "model": env_model, "priority": -1})
+
+    return chain
 
 
 def _log_ok(msg: str):
@@ -328,18 +438,56 @@ def _process_one(db: DBAdapter, row: dict, executor_id: str, dry_run: bool, mode
             "session_logs", f"{session_id}.log",
         )
 
-        _log.info("launching opencode builder via executor_cloud.run_opencode …")
-        result = executor_cloud.run_opencode(req, PROJECT_ROOT, session_log_path=session_log_path)
-        _log.info("builder finished (chars=%d)", len(result or ""))
+        # ── Model chain walk (NVIDIA first, fall back on rate limits) ──
+        # v121: walk the tackle model chain exactly like legacy
+        # _dispatch_one — primary (NVIDIA glm-5.2) first, then fallbacks,
+        # advancing on API-limit / harness failure. The old single-shot
+        # launch used whatever PIPELINE_MODEL forced (systemd env had
+        # ollama/qwen2.5-coder-ctx32k, bypassing tackle entirely, so
+        # Ollama always won). User directive 2026-08-10: NVIDIA up top,
+        # rate limits push us back to Ollama.
+        if model:
+            # Explicit --model override (legacy manual mode): single entry.
+            chain = [{"harness": "opencode", "model": model}]
+        else:
+            chain = _resolve_model_chain(db, ROLE)
+        if not chain:
+            raise RuntimeError(f"no model chain resolved for role={ROLE} (tackle role config empty)")
+        _log.info("model chain: %s", [e["model"] for e in chain])
+
+        result = ""
+        last_error = ""
+        used_model = ""
+        for idx, entry in enumerate(chain):
+            entry_model = entry.get("model", "")
+            req["metadata"]["model"] = entry_model
+            req["metadata"]["harness"] = entry.get("harness", "opencode")
+            label = "primary" if idx == 0 else f"fallback#{idx}"
+            try:
+                _log.info("launching opencode builder via run_opencode [%s] model=%s …", label, entry_model)
+                result = executor_cloud.run_opencode(req, PROJECT_ROOT, session_log_path=session_log_path)
+                used_model = entry_model
+                _log.info("builder finished via [%s] model=%s (chars=%d)", label, entry_model, len(result or ""))
+                break
+            except Exception as e:  # noqa: BLE001
+                last_error = str(e)
+                is_limit = _detect_api_limit_error(-1, last_error)
+                _log.warning("[%s] model=%s failed rate_limit=%s: %s",
+                             label, entry_model, is_limit, last_error[:300])
+                continue
+        if not used_model:
+            raise RuntimeError(
+                f"all {len(chain)} model(s) in chain failed for request {request_id}: {last_error[:500]}")
+        _log.info("builder succeeded via model=%s", used_model)
 
         # ── Success path ────────────────────────────────────────────
         db.complete_attempt(attempt_id, "SUCCEEDED", exit_code=0,
-                            result={"work_request_id": req.get("id"), "model": req.get("metadata", {}).get("model", "")})
+                            result={"work_request_id": req.get("id"), "model": used_model})
         db.issue_execution_receipt(
             attempt_id=attempt_id, request_id=request_id,
             receipt_type=SUCCESS_RECEIPT, agent_role=executor_id,
-            summary=f"builder completed via {req.get('id')}",
-            metadata={"work_request_id": req.get("id"), "executor": executor_id},
+            summary=f"builder completed via {req.get('id')} (model={used_model})",
+            metadata={"work_request_id": req.get("id"), "executor": executor_id, "model": used_model},
         )
         db.release_lease(lease_id)
         with db._get_connection() as conn:
@@ -350,7 +498,7 @@ def _process_one(db: DBAdapter, row: dict, executor_id: str, dry_run: bool, mode
         if plan_id:
             _complete_conduit_lifecycle(
                 db, plan_id, session_id, ticket_id, req.get("id", ""),
-                req.get("metadata", {}).get("model", ""), success=True,
+                used_model, success=True,
             )
             # ── consumed_units tracking (RoleLeases plan 1286) ──────
             # Unified accounting: POST /api/role-leases/consume (canonical endpoint)
@@ -511,7 +659,14 @@ def _show_status(db: DBAdapter) -> None:
     except Exception as e:  # noqa: BLE001
         print(f"  error: {e}")
     print()
-    print(f"model chain (tackle): {executor_cloud._resolve_model_name({'metadata': {'role': 'builder'}})}")
+    try:
+        chain = _resolve_model_chain(db, ROLE)
+        print("model chain (tackle):")
+        for e in chain:
+            marker = "  primary" if e["priority"] == -1 else f"  fallback#{e['priority']}"
+            print(f"  {marker} {e['harness']:>9}  {e['model']}")
+    except Exception as e:  # noqa: BLE001
+        print(f"  model chain error: {e}")
 
 
 def main():
@@ -524,9 +679,11 @@ def main():
     parser.add_argument("--executor-id", default="conduit-worker", help="Executor identity (default: conduit-worker)")
     parser.add_argument("--include-legacy", action="store_true", help="Also consume non-plan READY rows (default: plan-backed only)")
     parser.add_argument("--model", default=os.environ.get("PIPELINE_MODEL", ""),
-                        help="Model override (e.g. ollama/qwen2.5-coder-ctx32k). "
-                             "Takes precedence over the tackle role config; "
-                             "defaults to $PIPELINE_MODEL.")
+                        help="Hard model override (e.g. ollama/qwen2.5-coder-ctx32k) — "
+                             "used as a single-entry chain, bypassing the tackle "
+                             "fallbacks. Omit to walk the tackle chain "
+                             "(primary NVIDIA glm-5.2 → fallbacks → Ollama). "
+                             "Defaults to $PIPELINE_MODEL if set.")
     args = parser.parse_args()
 
     db = DBAdapter("")

@@ -133,13 +133,19 @@ def _get_pending_plan_count(pg_conn) -> int:
 
 
 def _get_active_builder_count(pg_conn) -> int:
-    """Count distinct work requests claimed in the last hour (proxy for active builders)."""
+    """Count active execution leases held by the worker (proxy for active builders).
+
+    NOTE: Query the execution domain's lease table (execution.leases), NOT the
+    legacy conduit.work_request_events WR_CLAIMED events — the event table
+    reports stale claims that outlive the actual build (e.g. after a worker
+    restart), which misreported idle pipelines as "active". A lease is the
+    live signal: it is ACTIVE only while the worker actually holds the build.
+    """
     try:
         with pg_conn.cursor() as cur:
             cur.execute(
-                "SELECT COUNT(DISTINCT work_request_id) FROM conduit.work_request_events "
-                "WHERE event_type = 'WR_CLAIMED' "
-                "AND occurred_at > NOW() - INTERVAL '1 hour'"
+                "SELECT COUNT(*) FROM execution.leases "
+                "WHERE status = 'ACTIVE'"
             )
             row = cur.fetchone()
             return row[0] if row else 0
