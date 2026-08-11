@@ -135,6 +135,19 @@ WHERE ((tags && ARRAY['type:rejection','type:violation','type:incident'])
 ORDER BY created_at DESC LIMIT 20
 """
 
+QUERY_WR_ASSETS = """
+-- T01 invariant (V092 guard): every live vision WorkRequest must carry a
+-- canonical asset (asset:nexus:vision_work_requests:<uuid>, kind work_request).
+-- Regression: V089 was a one-shot backfill; 2 settled WRs slipped through
+-- before trg_vision_work_requests_asset landed (maint-2026-08-09-1733,
+-- wr-conf-001). A row here means the trigger did NOT fire (row pre-dates V092,
+-- or an explicit-asset path bypassed it) — flag for backfill, never auto-fix.
+SELECT wr_id, work_request_uuid, status, to_char(recorded_on_dt,'YYYY-MM-DD HH24:MI') AS recorded
+FROM vision.work_requests
+WHERE asset_id IS NULL
+ORDER BY recorded_on_dt
+"""
+
 
 def run_checks(cur):
     """Return dict of DB findings: blocked/drift/flagged rows.
@@ -145,7 +158,9 @@ def run_checks(cur):
     drift = cur.fetchall()
     cur.execute(QUERY_FLAGGED)
     flagged = cur.fetchall()
-    return {"blocked": blocked, "drift": drift, "flagged": flagged}
+    cur.execute(QUERY_WR_ASSETS)
+    wr_assets = cur.fetchall()
+    return {"blocked": blocked, "drift": drift, "flagged": flagged, "wr_assets": wr_assets}
 
 
 def emit_drift_findings(conn, drift_rows, nebula_url, role, model, dry_run=False):
@@ -359,6 +374,31 @@ def build_report(findings, role, model):
         lines.append("**Latest 20** (older flagged records exist; tail the query for more).")
     else:
         lines.append("\nNone.")
+    lines.append("")
+
+    lines.append("## 3b. WorkRequest canonical-asset invariant (T01 / V092 guard)")
+    wr_assets = findings.get("wr_assets") or []
+    if wr_assets:
+        lines += [
+            "",
+            "| wr_id | work_request_uuid | status | recorded |",
+            "|---|---|---|---|",
+        ]
+        for wr_id, wr_uuid, status, recorded in wr_assets:
+            lines.append(f"| {wr_id} | {wr_uuid} | {status} | {recorded} |")
+        lines.append("")
+        lines.append(
+            f"**{len(wr_assets)} WRs missing canonical assets.** The `trg_vision_work_requests_asset` "
+            "BEFORE INSERT trigger (V092) auto-registers assets for new WRs; rows here pre-date V092 or "
+            "bypassed it via an explicit-asset path. **Remediation:** re-run "
+            "`nexus/sql/V089__vision_work_requests_asset_id_backfill.sql` (idempotent) or call "
+            "`semantics.ensure_registered_work_request_asset('<uuid>')` — report-only, never auto-fix."
+        )
+    else:
+        lines.append(
+            "\nNone — every live `vision.work_requests` row carries a canonical asset "
+            "(guard: `trg_vision_work_requests_asset`, V092)."
+        )
     lines.append("")
 
     lines.append("## 4. Projection drift (event replay vs live work_request_state)")
