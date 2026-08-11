@@ -1,4 +1,4 @@
-# Events — Stage 3: Canonical Event Types (waves 1–2: ten systems)
+# Events — Stage 3: Canonical Event Types (waves 1–3: twelve system families)
 
 > **Pipeline position:** v2 inventory (`events-inventory-v2-raw-observations.md`)
 > cataloged raw occurrences (stages 1–2). This doc is **stage 3** for the first
