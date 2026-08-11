@@ -24,6 +24,7 @@ interface AIRegistryTabProps {
   harnesses: Harness[];
   models: AIModel[];
   roles: SystemRole[];
+  bundles?: ConfigBundle[];
   onSaveProvider: (prov: Partial<Provider>) => Promise<void>;
   onDeleteProvider: (id: string) => Promise<void>;
   onSaveHarness: (harn: Partial<Harness>) => Promise<void>;
@@ -41,6 +42,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
   harnesses,
   models,
   roles,
+  bundles,
   onSaveProvider,
   onDeleteProvider,
   onSaveHarness,
@@ -68,6 +70,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
   const [modelFilterProvider, setModelFilterProvider] = useState<string>('all');
   const [modelFilterHarness, setModelFilterHarness] = useState<string>('all');
   const [modelFilterVerified, setModelFilterVerified] = useState<'all' | 'verified' | 'unverified'>('all');
+  const [modelFilterAssigned, setModelFilterAssigned] = useState<'all' | 'assigned' | 'unassigned'>('all');
 
   // Verify-model state — one verification at a time; outcome keyed by model id
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
@@ -320,6 +323,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
   // ── Derived: filtered + sorted models ──────────────────────────────
   const uniqueProviderIds = [...new Set(models.map(m => m.provider_id).filter(Boolean))];
   const uniqueHarnessIds = [...new Set(models.map(m => m.harness_id).filter(Boolean))];
+  const assignedModelIds = new Set((bundles || []).map(b => b.model_id).filter(Boolean));
 
   const filteredModels = models
     .filter(m => {
@@ -338,6 +342,9 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
       // Verified filter
       if (modelFilterVerified === 'verified' && !m.verified) return false;
       if (modelFilterVerified === 'unverified' && m.verified) return false;
+      // Assigned filter
+      if (modelFilterAssigned === 'assigned' && !assignedModelIds.has(m.id)) return false;
+      if (modelFilterAssigned === 'unassigned' && assignedModelIds.has(m.id)) return false;
       return true;
     })
     .sort((a, b) => {
@@ -502,15 +509,26 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
               <option value="unverified">Unverified</option>
             </select>
 
+            {/* Assigned filter */}
+            <select
+              value={modelFilterAssigned}
+              onChange={e => setModelFilterAssigned(e.target.value as any)}
+              className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-2 py-1.5 text-xs font-mono text-[var(--text-primary)] cursor-pointer"
+            >
+              <option value="all">All assignment</option>
+              <option value="assigned">Assigned</option>
+              <option value="unassigned">Unassigned</option>
+            </select>
+
             {/* Count badge */}
             <span className="text-[10px] font-mono text-[var(--text-muted)]">
               {filteredModels.length} of {models.length}
             </span>
 
             {/* Reset filters */}
-            {(modelSearch || modelFilterProvider !== 'all' || modelFilterHarness !== 'all' || modelFilterVerified !== 'all') && (
+            {(modelSearch || modelFilterProvider !== 'all' || modelFilterHarness !== 'all' || modelFilterVerified !== 'all' || modelFilterAssigned !== 'all') && (
               <button
-                onClick={() => { setModelSearch(''); setModelFilterProvider('all'); setModelFilterHarness('all'); setModelFilterVerified('all'); }}
+                onClick={() => { setModelSearch(''); setModelFilterProvider('all'); setModelFilterHarness('all'); setModelFilterVerified('all'); setModelFilterAssigned('all'); }}
                 className="px-2 py-1 rounded text-[10px] font-bold text-[var(--accent-color)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] cursor-pointer"
               >
                 Reset

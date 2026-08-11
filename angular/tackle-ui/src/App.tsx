@@ -466,6 +466,7 @@ export default function App() {
                 harnesses={harnesses}
                 models={models}
                 roles={roles}
+                bundles={bundles}
                 onSaveProvider={handleSaveProvider}
                 onDeleteProvider={handleDeleteProvider}
                 onSaveHarness={handleSaveHarness}
