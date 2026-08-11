@@ -190,10 +190,8 @@
                 <!-- Component Library for Creator Mode -->
                 <app-component-library></app-component-library>
               } @else {
-                <!-- Component Palette for Canvas Mode -->
-                <app-component-palette
-                  (addComponent)="onAddComponent($event)"
-                ></app-component-palette>
+                <!-- Object Inspector for Canvas Mode (replaces the component palette) -->
+                <app-object-inspector></app-object-inspector>
               }
             } @else if (viewMode() === 'service-mesh') {
               <app-service-tree

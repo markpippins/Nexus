@@ -148,6 +148,21 @@ WHERE asset_id IS NULL
 ORDER BY recorded_on_dt
 """
 
+QUERY_WR_ENTITY_KEY = """
+-- Q4 P1 invariant (V093 backfill): every live vision WorkRequest must carry a
+-- CCNF content identity (entity_key) — the pure-Python/Go/Rust-identical hash
+-- of the canonical WR shape (system execute on workrequest:<wr_id>), derived
+-- at birth by vision_bridge / vision-srv / losm-host write paths. Regression:
+-- migration v37 added the column but no write path populated it (all 24 rows
+-- were NULL) until V093. A row here means the write path did NOT stamp an
+-- entity_key (pre-dates V093, or a bypass path like the runtime kernel's
+-- explicit-asset insert) — flag for backfill, never auto-fix.
+SELECT wr_id, work_request_uuid, status, to_char(recorded_on_dt,'YYYY-MM-DD HH24:MI') AS recorded
+FROM vision.work_requests
+WHERE entity_key IS NULL
+ORDER BY recorded_on_dt
+"""
+
 
 def run_checks(cur):
     """Return dict of DB findings: blocked/drift/flagged rows.
@@ -160,7 +175,10 @@ def run_checks(cur):
     flagged = cur.fetchall()
     cur.execute(QUERY_WR_ASSETS)
     wr_assets = cur.fetchall()
-    return {"blocked": blocked, "drift": drift, "flagged": flagged, "wr_assets": wr_assets}
+    cur.execute(QUERY_WR_ENTITY_KEY)
+    wr_entity_key = cur.fetchall()
+    return {"blocked": blocked, "drift": drift, "flagged": flagged,
+            "wr_assets": wr_assets, "wr_entity_key": wr_entity_key}
 
 
 def emit_drift_findings(conn, drift_rows, nebula_url, role, model, dry_run=False):
@@ -292,6 +310,13 @@ def signature(findings):
         items.append(f"drift|{row[0]}|{row[2]}|{row[3]}|{row[4]}|{row[5]}|{row[6]}")
     for row in findings["flagged"]:
         items.append(f"flagged|{row[2]}|{row[3]}")  # title|created
+    # canonical-asset findings (V092 guard — stable set, but keep them so a
+    # row clearing re-posts a resolution)
+    for row in findings["wr_assets"]:
+        items.append(f"wr_asset|{row[0]}|{row[1]}")  # wr_id|work_request_uuid
+    # entity_key findings (Q4 P1 / V093 — same discipline so fixes re-post)
+    for row in findings["wr_entity_key"]:
+        items.append(f"wr_entity_key|{row[0]}|{row[1]}")  # wr_id|work_request_uuid
     # projection drift (work_request_uuid + state signals so fixes re-post)
     for f in findings.get("projection") or []:
         items.append(
@@ -398,6 +423,34 @@ def build_report(findings, role, model):
         lines.append(
             "\nNone — every live `vision.work_requests` row carries a canonical asset "
             "(guard: `trg_vision_work_requests_asset`, V092)."
+        )
+    lines.append("")
+
+    lines.append("## 3c. WorkRequest entity_key invariant (Q4 P1 / V093 guard)")
+    wr_ek = findings.get("wr_entity_key") or []
+    if wr_ek:
+        lines += [
+            "",
+            "| wr_id | work_request_uuid | status | recorded |",
+            "|---|---|---|---|",
+        ]
+        for wr_id, wr_uuid, status, recorded in wr_ek:
+            lines.append(f"| {wr_id} | {wr_uuid} | {status} | {recorded} |")
+        lines.append("")
+        lines.append(
+            f"**{len(wr_ek)} WRs missing entity_key.** The CCNF content identity "
+            "(SHA256 over the sorted {{domain,intent,actor,scope}} signature of the "
+            "canonical WR shape) is derived at birth by the vision_bridge / vision-srv / "
+            "losm-host write paths; `vision.work_requests` rows here pre-date V093 or "
+            "bypassed those paths. **Remediation:** re-run "
+            "`nexus/sql/V093__vision_work_requests_entity_key_backfill.sql` (idempotent) "
+            "or wire the creating caller to derive `entity_key` via "
+            "`nexus_core.wrp.identity` — report-only, never auto-fix."
+        )
+    else:
+        lines.append(
+            "\nNone — every live `vision.work_requests` row carries a CCNF content "
+            "identity (entity_key; backfill: V093)."
         )
     lines.append("")
 

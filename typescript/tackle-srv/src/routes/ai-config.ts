@@ -425,7 +425,7 @@ aiConfigRouter.post("/test", async (req, res) => {
     // Provider-qualify the opencode --model flag (bare ids fail to resolve).
     const providers = await getAIProviders();
     const provider = providers.find((p: any) => p.id === model.provider_id);
-    const runModelId = openCodeModelArg(model, provider?.type);
+    const runModelId = openCodeModelArg(model, provider);
 
     let harnessType = "opencode";
     try {
@@ -493,27 +493,52 @@ aiConfigRouter.post("/test", async (req, res) => {
 // model to verified=true and re-arms every config bundle referencing it.
 // Fire-and-forget like /test — the client polls GET /verify/:sessionId.
 
-// opencode resolves models as `<provider>/<id>` (e.g. ollama/qwen2.5-coder,
-// anthropic/claude-sonnet-4-20250514). Passing the bare identifier makes it
-// treat the whole string as the provider name → ProviderModelNotFoundError
-// "<id>/." — the classic "model not found" failure. Prefix with the provider
-// type when it maps to a known opencode provider family.
+// opencode resolves models as `<providerKey>/<modelId>` (e.g.
+// ollama/qwen2.5-coder, nvidia/z-ai/glm-5.2, openrouter/~anthropic/...).
+// Passing the bare identifier makes opencode treat the whole string as the
+// provider name → ProviderModelNotFoundError "<id>/." — the classic
+// "model not found" failure.
+//
+// The provider key is the models.dev provider id (nvidia, openrouter,
+// mistral, opencode-go, ...) — which is NOT expressible in tackle's
+// providers.type (CHECK-constrained to openai/anthropic/google/ollama/
+// opencode/codex/...). bin/sync_modelsdev_models.py stores the key in
+// config_json.opencodeProvider; the type is the fallback for the built-ins
+// whose type already matches their models.dev key.
 const OPENCODE_PROVIDER_TYPES = ["ollama", "openai", "anthropic", "google", "codex", "opencode"];
 
-function openCodeModelArg(model: any, providerType: string | null | undefined): string {
-  const id = model.model_identifier;
-  if (!providerType) return id;
-  const t = providerType.toLowerCase();
-  if (OPENCODE_PROVIDER_TYPES.includes(t) && !id.startsWith(`${t}/`)) {
-    return `${t}/${id}`;
+function opencodeProviderKey(provider: any): string | null {
+  if (!provider) return null;
+  try {
+    const cfg = JSON.parse(provider.config_json || "{}");
+    if (cfg.opencodeProvider) return String(cfg.opencodeProvider);
+  } catch {
+    /* malformed config_json — fall through to type */
   }
-  return id;
+  const t = provider.type ? String(provider.type).toLowerCase() : "";
+  return OPENCODE_PROVIDER_TYPES.includes(t) ? t : null;
 }
 
-// Bounds a verify run: if the harness wedges (e.g. a rate-limited small
-// model blocks opencode's finalization), SIGKILL the child after 10 minutes
-// so the session always settles and the model is marked unverified.
-const VERIFY_WATCHDOG_MS = 10 * 60 * 1000;
+// The canonical reference is ALWAYS `providerKey/modelId` — prefix
+// unconditionally. models.dev ids may themselves contain a provider/org
+// path (nvidia ids like `z-ai/glm-5.2` or `nvidia/nemotron-3-ultra-
+// 550b-a55b`, openrouter ids like `~anthropic/...` or the literal
+// `openrouter/free` router) — opencode splits at the first slash and passes
+// the remainder to the provider API verbatim, so the identifier must never
+// be rewritten or stripped.
+function openCodeModelArg(model: any, provider: any): string {
+  const id = model.model_identifier;
+  const key = opencodeProviderKey(provider);
+  if (!key) return id;
+  return `${key}/${id}`;
+}
+
+// Bounds a verify run: if the harness wedges, SIGKILL the child so the
+// session always settles and the model is marked unverified. 20 minutes
+// gives slow local (CPU ollama) models room to finish — the classic wedge
+// (a rate-limited title-generation small model blocking finalization) is
+// addressed by pinning small_model to a local model in opencode.json.
+const VERIFY_WATCHDOG_MS = 20 * 60 * 1000;
 
 const VERIFY_DEFAULT_PROMPT =
   "Reply with the single word OK and nothing else. Do not add any explanation.";
@@ -557,7 +582,7 @@ aiConfigRouter.post("/verify", async (req, res) => {
     // provider-qualified (fixes the bare-id ProviderModelNotFoundError).
     const providers = await getAIProviders();
     const provider = providers.find((p: any) => p.id === model.provider_id);
-    const runModelId = openCodeModelArg(model, provider?.type);
+    const runModelId = openCodeModelArg(model, provider);
 
     let harnessType = "opencode";
     try {

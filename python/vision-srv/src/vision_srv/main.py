@@ -25,6 +25,8 @@ from losm_ir.dag import (
     EventEnvelope, WorkRequestDAG,
 )
 
+from nexus_core.wrp.identity import ccnf_input_from_intent_string, emit_identity
+
 app = FastAPI(title="vision-srv", version="0.1.0")
 
 # ── CORS ────────────────────────────────────────────────────────────────────
@@ -114,6 +116,19 @@ def get_wr(wr_id: str):
         db.close()
 
 
+def _stamp_entity_key(db, wr):
+    """Derive the CCNF content identity at WR birth and persist it on the
+    WR record (context). The canonical WR shape is always emittable (the
+    action is the controlled verb ``execute``), so the write path never
+    null-defaults — every WR born here carries its entity_key.
+    """
+    entity_key, _, _ = emit_identity(
+        ccnf_input_from_intent_string(wr.intent, wr.wr_id))
+    context = dict(wr.context_data or {})
+    context["entity_key"] = entity_key
+    return update_work_request(db, wr.wr_id, context_data=context)
+
+
 @app.post("/api/work-requests", status_code=201)
 def create_wr(body: WorkRequestCreate):
     db = next(get_db())
@@ -123,9 +138,9 @@ def create_wr(body: WorkRequestCreate):
             intent=body.intent,
             constraints=body.constraints,
             priority=body.priority,
-            context_data=body.context_data,
+            context_data=dict(body.context_data or {}),
         )
-        return wr
+        return _stamp_entity_key(db, wr) or wr
     finally:
         db.close()
 

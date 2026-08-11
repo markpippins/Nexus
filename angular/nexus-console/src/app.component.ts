@@ -1921,6 +1921,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onMeshViewModeChange(mode: 'console' | 'graph'): void {
     this.meshViewMode.set(mode);
+    // The object inspector lives in the left sidebar in graph mode, so the
+    // right details pane is not needed there — hide it when entering the view.
+    if (mode === 'graph') {
+      this.uiPreferencesService.setDetailPaneOpen(false);
+    }
   }
 
   onGraphSubViewChange(view: 'canvas' | 'creator'): void {

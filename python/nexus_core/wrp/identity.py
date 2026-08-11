@@ -38,6 +38,7 @@ Usage::
 from __future__ import annotations
 
 import hashlib
+import json
 from typing import Any, Dict, List, Optional, Tuple
 
 __all__ = [
@@ -46,6 +47,8 @@ __all__ = [
     "derive_entity_key",
     "derive_identity",
     "emit_identity",
+    "ccnf_input_from_intent_string",
+    "ccnf_input_from_dco_json",
     "normalize_intent",
 ]
 
@@ -261,3 +264,70 @@ def emit_identity(doc: Dict[str, Any]) -> Tuple[str, str, str]:
     doc = dict(doc)
     doc["intent"] = normalized
     return derive_identity(doc)
+
+
+def _wr_ccnf_input(wr_id: str, agent_id: str = "conduit") -> Dict[str, Any]:
+    """Canonical CCNF input shape for a WorkRequest identity.
+
+    A WR is a system ``execute`` action on its ``workrequest`` target. The
+    identity hashes only ``{domain, intent, actor, scope}`` (Go
+    ``DeriveIdentity``), so this document is deterministic and stable across
+    re-derivation — no timestamp or payload is required. Mirrors
+    ``tackle.vision_bridge._dco_ccnf_input`` (and the ``ccnf_bridge``
+    adapter) so a backfilled key equals the key the WR would have received
+    at birth.
+    """
+    return {
+        "event_id": wr_id,
+        "actor": {"type": "system", "id": agent_id},
+        "intent": {
+            "action": "execute",
+            "target_type": "workrequest",
+            "target_id": f"workrequest:{wr_id}",
+        },
+        "domain": "execution",
+    }
+
+
+def ccnf_input_from_intent_string(intent: str, wr_id: str = "") -> Dict[str, Any]:
+    """Build the CCNF input document for a WR born from an intent string.
+
+    LOSM-style WRs carry ``intent`` as free text (never a controlled verb), so
+    the document wraps it as a system ``execute`` action on the WR's own
+    ``workrequest`` target — the same canonical shape the bridge emits at
+    creation. ``wr_id`` becomes event_id + target_id so the key is per-WR;
+    ``intent`` is recorded as the document ``payload`` for provenance only
+    (the identity never hashes it). ``emit_identity`` on the result never
+    raises (the action is the controlled verb ``execute``).
+
+    Args:
+        intent: The caller-supplied intent string (free text).
+        wr_id: The WR's stable id (its ``vision.work_requests.wr_id``).
+    """
+    doc = _wr_ccnf_input(wr_id)
+    if intent:
+        doc["payload"] = {"intent_source": intent}
+    return doc
+
+
+def ccnf_input_from_dco_json(dco_json: str, wr_id: str = "") -> Dict[str, Any]:
+    """Build the CCNF input document for a stored WorkRequest DCO.
+
+    Used to re-derive (backfill) the entity_key of a pre-existing
+    ``vision.work_requests`` row. The document mirrors the canonical WR shape,
+    so the backfilled key equals the key the WR would have received at birth.
+    ``wr_id`` (the row's ``vision.work_requests.wr_id``) wins; when omitted,
+    an ``id``/``wrId`` embedded in the DCO JSON is used instead.
+
+    Args:
+        dco_json: The stored ``dco_json`` (JSON string or dict).
+        wr_id: The WR's stable id, if known.
+    """
+    if not wr_id:
+        try:
+            parsed = json.loads(dco_json) if isinstance(dco_json, str) else dco_json
+        except (TypeError, ValueError):
+            parsed = {}
+        if isinstance(parsed, dict):
+            wr_id = parsed.get("id") or parsed.get("wrId") or ""
+    return _wr_ccnf_input(wr_id)

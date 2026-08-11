@@ -23,6 +23,12 @@ Tested invariants:
         vocabulary raise (INTENT_NORMALIZATION_FAILURE parity).
   AC5 — CanonicalJSON determinism: key order never affects the entity_key,
         and the derivation is stable across calls (pure function).
+  AC6 — Q4 P1 (plan 1287): the canonical WR birth shape (built by
+        ccnf_input_from_dco_json / ccnf_input_from_intent_string) hashes to
+        the golden value, and no live vision.work_requests row carries a NULL
+        entity_key — every stored key must equal the pure-Python mirror
+        re-derived from the row's dco_json + wr_id (locks the V093 SQL
+        backfill). DB-backed test skips when the local nexus DB is absent.
 
 Deterministic and LLM-free. The Go/Rust binaries are repo-committed under
 go/wrp/ccnf-ref/bin and rust/wrp/ccnf-verifier/target/release; tests skip
@@ -42,6 +48,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from nexus_core.wrp.identity import (                               # noqa: E402
     canonical_json,
+    ccnf_input_from_dco_json,
+    ccnf_input_from_intent_string,
     derive_entity_key,
     emit_identity,
     normalize_intent,
@@ -51,6 +59,26 @@ NEXUS_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 GO_BIN = os.path.join(NEXUS_ROOT, "go", "wrp", "ccnf-ref", "bin", "ccnf-conformance")
 RUST_BIN = os.path.join(NEXUS_ROOT, "rust", "wrp", "ccnf-verifier", "target", "release", "ccnf-verifier")
+
+
+def _connect():
+    import psycopg2
+    return psycopg2.connect(
+        host=os.environ.get("PGHOST", "localhost"),
+        port=int(os.environ.get("PGPORT", "5432")),
+        user=os.environ.get("PGUSER", "pguser"),
+        password=os.environ.get("PGPASSWORD", "pgpass"),
+        dbname=os.environ.get("PGDATABASE", "nexus"),
+    )
+
+
+def _db_available():
+    try:
+        conn = _connect()
+        conn.close()
+        return True
+    except Exception:  # noqa: BLE001 — graceful skip, no DB in CI
+        return False
 
 # Golden value recorded in the governance thread (ded5b0de) — the probe doc
 # below is the exact document whose entity_key the architect's inventory cites.
@@ -84,6 +112,17 @@ VECTORS = [
         "domain": "system",
         "timestamp": 1720000002,
         "confidence": 0.5,
+    },
+    # Canonical WR birth shape (Q4 P1 / V093 backfill): a WR is a system
+    # `execute` on its workrequest target. This is the exact shape the
+    # ccnf_input_from_* builders emit, so Python/Go parity here locks the
+    # backfill shape to the reference binaries.
+    {
+        "event_id": "wr-0004",
+        "actor": {"type": "system", "id": "conduit"},
+        "intent": {"action": "execute", "target_type": "workrequest",
+                   "target_id": "workrequest:wr-0004"},
+        "domain": "execution",
     },
 ]
 
@@ -211,6 +250,60 @@ class TestAc5CanonicalJsonDeterminism(unittest.TestCase):
 
     def test_derivation_stable_across_calls(self):
         self.assertEqual(emit_identity(GOLDEN_PROBE), emit_identity(GOLDEN_PROBE))
+
+
+class TestWrBirthShapeIdentity(unittest.TestCase):
+    """Q4 P1 / V093 — the canonical WR birth shape carries the golden CCNF
+    identity, so the backfill document and the app-layer write paths produce
+    the exact reference value (aa512485…)."""
+
+    def test_birth_shape_is_golden(self):
+        doc = ccnf_input_from_dco_json(
+            json.dumps({"wrId": "wr-0001", "intent": {"type": "test"}}),
+            "wr-0001")
+        self.assertEqual(emit_identity(doc)[0], GOLDEN_ENTITY_KEY)
+        key_from_intent = emit_identity(
+            ccnf_input_from_intent_string("free-text intent", "wr-0001"))[0]
+        self.assertEqual(key_from_intent, GOLDEN_ENTITY_KEY)
+
+    def test_dco_json_falls_back_to_embedded_wr_id(self):
+        doc = ccnf_input_from_dco_json(json.dumps({"wrId": "asof-final"}))
+        self.assertEqual(doc["event_id"], "asof-final")
+        self.assertEqual(doc["intent"]["target_id"], "workrequest:asof-final")
+
+    def test_free_text_intent_never_breaks_birth_shape(self):
+        # action is the controlled verb `execute`, so the WR shape is always
+        # emittable — the caller-side write path never null-defaults.
+        for intent in ("", "build the thing", "run the pipeline"):
+            key, _, _ = emit_identity(ccnf_input_from_intent_string(intent, "wr-x"))
+            self.assertTrue(key)
+
+
+@unittest.skipUnless(_db_available(), "no local nexus DB")
+class TestNoLiveWrNullEntityKey(unittest.TestCase):
+    """Q4 P1 — no live vision.work_requests row has a NULL entity_key, and
+    every stored key equals the pure-Python mirror re-derived from the row's
+    dco_json + wr_id (locks the V093 SQL backfill to the emitter)."""
+
+    def test_no_live_wr_null_entity_key(self):
+        conn = _connect()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT count(*) FILTER (WHERE entity_key IS NULL), count(*) "
+                "FROM vision.work_requests")
+            nulls, total = cur.fetchone()
+            cur.execute(
+                "SELECT wr_id, dco_json, entity_key FROM vision.work_requests")
+            rows = cur.fetchall()
+        finally:
+            conn.close()
+        self.assertEqual(nulls, 0, f"{nulls}/{total} live WRs have NULL entity_key")
+        for wr_id, dco_json, ek in rows:
+            with self.subTest(wr_id=wr_id):
+                self.assertEqual(
+                    emit_identity(ccnf_input_from_dco_json(dco_json, wr_id))[0],
+                    ek, "stored entity_key diverges from pure-Python mirror")
 
 
 if __name__ == "__main__":

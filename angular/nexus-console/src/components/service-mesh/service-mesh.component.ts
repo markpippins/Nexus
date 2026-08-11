@@ -4,7 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
 import { ServiceMeshService } from '../../services/service-mesh.service.js';
-import { UiPreferencesService } from '../../services/ui-preferences.service.js';
+
 import { ServiceGraphComponent } from '../service-graph/service-graph.component.js';
 import { ServiceDetailsComponent } from '../service-details/service-details.component.js';
 
@@ -65,7 +65,6 @@ interface MockEventLogEntry {
 })
 export class ServiceMeshComponent implements OnInit {
   private serviceMeshService = inject(ServiceMeshService);
-  private uiPreferencesService = inject(UiPreferencesService);
 
   // Input from parent (controlled mode)
   meshViewMode = input<'console' | 'graph'>('console');
@@ -199,9 +198,8 @@ export class ServiceMeshComponent implements OnInit {
 
   onServiceSelected(service: ServiceInstance): void {
     this.serviceMeshService.selectService(service);
-    if (!this.uiPreferencesService.isDetailPaneOpen()) {
-      this.uiPreferencesService.toggleDetailPane();
-    }
+    // The object inspector now lives in the left sidebar (canvas mode), so
+    // selecting a graph node no longer auto-opens the right details pane.
   }
 
   // --- Toolbar action handler ---
