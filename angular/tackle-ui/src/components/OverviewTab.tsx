@@ -25,6 +25,16 @@ import { showConfirm } from '../components/ConfirmDialog';
 import { SystemRole, ValidationReport, AIModel, Provider, Harness, ConfigBundle } from '../types';
 import { BundleModal } from './BundleModal';
 
+// Badge colors per invocation channel (matches the tackle.config_bundle
+// vocabulary: CLI | HTTP | SDK | MCP | INTERACTIVE).
+const INVOCATION_MODE_COLORS: Record<ConfigBundle['invocation_mode'], string> = {
+  CLI: 'bg-cyan-950/50 text-cyan-300 border-cyan-800/40',
+  HTTP: 'bg-indigo-950/50 text-indigo-300 border-indigo-800/40',
+  SDK: 'bg-emerald-950/50 text-emerald-300 border-emerald-800/40',
+  MCP: 'bg-purple-950/50 text-purple-300 border-purple-800/40',
+  INTERACTIVE: 'bg-amber-950/50 text-amber-300 border-amber-800/40',
+};
+
 interface OverviewTabProps {
   roles: SystemRole[];
   models: AIModel[];
@@ -425,9 +435,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                         <div className="space-y-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-bold text-sm text-[var(--text-primary)]">{bundle.name}</span>
-                            <span className={`text-[10px] font-mono px-2 py-0.5 rounded border uppercase font-semibold ${
-                              bundle.invocation_mode === 'stream' ? 'bg-cyan-950/50 text-cyan-300 border-cyan-800/40' : bundle.invocation_mode === 'fallback' ? 'bg-amber-950/50 text-amber-300 border-amber-800/40' : 'bg-indigo-950/50 text-indigo-300 border-indigo-800/40'
-                            }`}>{bundle.invocation_mode}</span>
+                            <span className={`text-[10px] font-mono px-2 py-0.5 rounded border uppercase font-semibold ${INVOCATION_MODE_COLORS[bundle.invocation_mode] ?? 'bg-slate-800 text-slate-300 border-slate-700'}`}>{bundle.invocation_mode}</span>
                             <button onClick={() => handleToggleActive(bundle)} className={`text-[10px] font-mono px-2 py-0.5 rounded border font-semibold cursor-pointer transition ${bundle.is_active ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>{bundle.is_active ? 'ACTIVE' : 'INACTIVE'}</button>
                           </div>
                           <div className="text-sm text-[var(--text-secondary)] font-mono flex items-center gap-3 flex-wrap">

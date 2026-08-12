@@ -830,7 +830,7 @@ async function startServer() {
       provider_id,
       harness_id,
       priority: typeof priority === 'number' ? priority : 1,
-      invocation_mode: invocation_mode || 'direct',
+      invocation_mode: invocation_mode || 'CLI',
       command,
       endpoint_url,
       timeout_ms: timeout_ms || 30000,

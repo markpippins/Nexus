@@ -39,6 +39,14 @@ export interface AIModel {
   updated_at?: string;
 }
 
+/**
+ * How the model is invoked once a config_bundle resolves — the DB
+ * constraint on tackle.config_bundle.invocation_mode (also consumed by
+ * tackle-mcp and harness-srv). INTERACTIVE = Freebuff-hosted role; the
+ * other four are harness-launchable (CLI spawns opencode/codex).
+ */
+export type InvocationMode = 'CLI' | 'HTTP' | 'SDK' | 'MCP' | 'INTERACTIVE';
+
 export interface ConfigBundle {
   id: string;
   name: string;
@@ -47,7 +55,7 @@ export interface ConfigBundle {
   provider_id?: string;
   harness_id?: string;
   priority: number; // lower number = higher priority
-  invocation_mode: 'direct' | 'stream' | 'batch' | 'fallback';
+  invocation_mode: InvocationMode;
   command?: string;
   endpoint_url?: string;
   timeout_ms?: number;

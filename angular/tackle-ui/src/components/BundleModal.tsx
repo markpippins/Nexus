@@ -49,7 +49,7 @@ export const BundleModal: React.FC<BundleModalProps> = ({
   );
   const [formPriority, setFormPriority] = useState<number>(initial?.priority || 1);
   const [formMode, setFormMode] = useState<ConfigBundle['invocation_mode']>(
-    initial?.invocation_mode || 'stream'
+    initial?.invocation_mode || 'CLI'
   );
   const [formTimeout, setFormTimeout] = useState<number>(initial?.timeout_ms || 30000);
   const [formValidFrom, setFormValidFrom] = useState<string>(
@@ -253,11 +253,18 @@ export const BundleModal: React.FC<BundleModalProps> = ({
                 onChange={e => setFormMode(e.target.value as ConfigBundle['invocation_mode'])}
                 className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-color)]"
               >
-                <option value="stream">stream (Real-time SSE Chunking)</option>
-                <option value="direct">direct (Single Round-Trip JSON)</option>
-                <option value="fallback">fallback (Secondary Circuit Breaker Standby)</option>
-                <option value="batch">batch (Asynchronous Queued Queue)</option>
+                <option value="CLI">CLI (opencode / codex harness launch)</option>
+                <option value="HTTP">HTTP (direct endpoint round-trip)</option>
+                <option value="SDK">SDK (provider SDK client)</option>
+                <option value="MCP">MCP (model-context-protocol tool)</option>
+                <option value="INTERACTIVE">INTERACTIVE (Freebuff-hosted — not harness-launchable)</option>
               </select>
+              {formMode === 'INTERACTIVE' && (
+                <p className="text-[10px] text-amber-400 mt-1 font-mono">
+                  ⚠ INTERACTIVE roles are dispatched in Freebuff (harn-freebuff) and are refused by
+                  harness-srv — use this only for interactive-channel bundles.
+                </p>
+              )}
             </div>
 
             {/* Timeout MS */}
