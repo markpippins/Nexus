@@ -9,15 +9,19 @@ export const dualityRouter = Router();
 /** POST /api/duality/watches — create a session watch for a thread. */
 dualityRouter.post('/watches', async (req, res, next) => {
   try {
-    const { threadId, forumSlug, role, executionBackend, maxTurns, idleTimeoutMs } = req.body;
+    const { threadId, forumSlug, role, executionBackend, maxTurns, idleTimeoutMs, leaseId } = req.body;
     if (!threadId || !forumSlug || !role) {
       throw new BadRequestError('threadId, forumSlug, and role are required');
+    }
+    if (leaseId !== undefined && leaseId !== null
+        && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(leaseId))) {
+      throw new BadRequestError('leaseId must be a UUID');
     }
     const result = await pool.query(
       `INSERT INTO duality.session_watches
          (thread_id, forum_slug, role, execution_backend, max_turns, idle_timeout_ms,
-          turn_count, status, last_activity, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 0, 'active', now(), now(), now())
+          lease_id, turn_count, status, last_activity, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 'active', now(), now(), now())
        RETURNING id`,
       [
         threadId,
@@ -26,6 +30,7 @@ dualityRouter.post('/watches', async (req, res, next) => {
         executionBackend || 'freebuff',
         maxTurns ?? 20,
         idleTimeoutMs ?? 300_000,
+        leaseId ?? null,
       ]
     );
     res.status(201).json(result.rows[0]);

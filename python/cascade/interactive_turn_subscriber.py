@@ -139,6 +139,32 @@ def _query_lease(pg_conn: Any, lease_id: str) -> dict[str, Any] | None:
         return dict(zip(cols, row)) if row else None
 
 
+def _query_active_lease_for_role(pg_conn: Any, role: str) -> dict[str, Any] | None:
+    """Return the most recent ACTIVE role lease for a role, or None.
+
+    Fallback when a watch has no lease_id (every watch created through the
+    assembly-srv POST /api/duality/watches API, which does not set the
+    column). One ACTIVE lease per role is enforced at issue time (409), so
+    this lookup is deterministic. Without a resolved lease the coordinator
+    closes the watch after one turn (R1: no active lease) and the harness
+    falls back to the config_bundle default model.
+    """
+    with pg_conn.cursor() as cur:
+        cur.execute(
+            """SELECT id, role, channel, model,
+                      budget_units, consumed_units,
+                      status, window_end, expires_at
+               FROM tackle.role_leases
+               WHERE role = %s AND status = 'ACTIVE'
+               ORDER BY created_at DESC
+               LIMIT 1""",
+            (role,),
+        )
+        cols = [d[0] for d in cur.description]
+        row = cur.fetchone()
+        return dict(zip(cols, row)) if row else None
+
+
 def _bump_turn_count(pg_conn: Any, watch_id: str) -> None:
     """Increment turn_count and update last_activity."""
     with pg_conn.cursor() as cur:
@@ -180,7 +206,7 @@ def _consume_lease(role: str) -> None:
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
             _log("Lease consumed for %s: consumed=%s", role,
-                 data.get("consumed_units", "?"))
+                 data.get("consumed", data.get("consumed_units", "?")))
     except Exception as e:
         _log("Lease consume failed for %s: %s", role, e)
 
@@ -232,6 +258,45 @@ def _invoke_agent_operator(
         return {"exit_code": 1, "stdout": "", "stderr": str(e)}
 
 
+def _extract_opencode_text(stdout: str) -> str:
+    """Extract assistant text from an opencode `--format json` event stream.
+
+    opencode emits JSON-lines events (step_start / text / reasoning / ...);
+    posting the raw envelope as a conversation response is unreadable. This
+    collects every `{"type":"text","part":{"text":...}}` payload and joins
+    them.
+
+    The whole stream is scanned rather than gating on the first character:
+    opencode may emit a leading non-JSON banner/notice line, and the earlier
+    gate (`stdout.lstrip().startswith("{")`) made extraction bail out and
+    post the raw event envelopes to the session thread. If the stream is not
+    JSON at all it is returned unchanged; if it is a JSON stream but the
+    agent produced no text events (e.g. a tool-only turn), a readable marker
+    is returned instead of raw envelopes.
+    """
+    if not stdout:
+        return stdout
+    texts: list[str] = []
+    json_events = 0
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        json_events += 1
+        if ev.get("type") == "text":
+            part = ev.get("part") or {}
+            t = part.get("text")
+            if isinstance(t, str) and t.strip():
+                texts.append(t)
+    if json_events:
+        return "\n".join(texts) if texts else "(agent produced no text output this turn)"
+    return stdout
+
+
 def _invoke_agent_harness(
     role: str,
     prompt: str,
@@ -267,7 +332,10 @@ def _invoke_agent_harness(
                 return {"exit_code": 1, "stdout": "", "stderr": data["error"]}
             return {
                 "exit_code": data.get("exit_code", 0),
-                "stdout": data.get("stdout", ""),
+                # opencode --format json emits a JSON-lines event stream;
+                # reduce it to the assistant's text so the conversation
+                # response is readable rather than raw event envelopes.
+                "stdout": _extract_opencode_text(data.get("stdout", "")),
                 "stderr": data.get("stderr", ""),
             }
     except Exception as e:
@@ -526,8 +594,15 @@ async def handle_comment_created(
              watch_id[:8], watch_role,
              watch.get("turn_count", 0), watch.get("max_turns", "?"))
 
-        # 2. Check lease
+        # 2. Check lease — watch.lease_id is the explicit binding, but the
+        #    assembly-srv watch API doesn't set it; fall back to the role's
+        #    most recent ACTIVE lease so the model + budget governance work.
         lease = _query_lease(pg_conn, watch.get("lease_id"))
+        if lease is None:
+            lease = _query_active_lease_for_role(pg_conn, watch_role)
+            if lease:
+                _log("Watch %s: no lease_id, resolved active lease %s for role %s",
+                     watch_id[:8], str(lease["id"])[:8], watch_role)
 
         # ── Invoke the agent (backend dispatch) ──────────────────
         backend = watch.get("execution_backend", "operator")
@@ -601,8 +676,13 @@ async def handle_comment_created(
         else:
             _bump_turn_count(pg_conn, watch_id)
 
-        # 7. Consume lease unit
-        _consume_lease(watch_role)
+        # 7. Consume lease unit — the harness backend accounts for itself
+        #    (harness-srv increments consumed_units on exit 0 via
+        #    incrementConsumedUnits), so only the operator backend needs the
+        #    subscriber-side consume. Without this guard each successful
+        #    harness turn double-counts (2 units per turn).
+        if backend != "harness":
+            _consume_lease(watch_role)
 
 
 # ═══════════════════════════════════════════════════════════════════════
