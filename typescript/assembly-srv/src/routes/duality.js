@@ -32,6 +32,38 @@ dualityRouter.post('/watches', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/** GET /api/duality/watches/active?role=X&forumSlug=Y
+ *  — find the most recent active session thread for a role.
+ *  Replaces localStorage for session persistence across browser clears. */
+dualityRouter.get('/watches/active', async (req, res, next) => {
+  try {
+    const { role, forumSlug } = req.query;
+    if (!role || !forumSlug) {
+      throw new BadRequestError('role and forumSlug query params are required');
+    }
+    const result = await pool.query(
+      `SELECT thread_id, role, execution_backend, status, last_activity
+       FROM duality.session_watches
+       WHERE role = $1 AND forum_slug = $2 AND status = 'active'
+       ORDER BY last_activity DESC
+       LIMIT 1`,
+      [role, forumSlug]
+    );
+    if (result.rows.length === 0) {
+      return res.json({ threadId: null });
+    }
+    // Verify the thread still exists
+    const threadCheck = await pool.query(
+      'SELECT id FROM assembly.posts WHERE id = $1',
+      [result.rows[0].thread_id]
+    );
+    if (threadCheck.rows.length === 0) {
+      return res.json({ threadId: null });
+    }
+    res.json({ threadId: result.rows[0].thread_id, role: result.rows[0].role });
+  } catch (err) { next(err); }
+});
+
 /** GET /api/duality/watches/:threadId — get watches for a thread. */
 dualityRouter.get('/watches/:threadId', async (req, res, next) => {
   try {
