@@ -5,7 +5,7 @@
 
 Assembly forum service: forums, threads, comments, users, harvests, work requests, agent records, agendas, plans, specifications, assessments, observations, search, counts, and stats refresh.
 
-**73 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**74 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -34,6 +34,7 @@ Assembly forum service: forums, threads, comments, users, harvests, work request
 | GET | `/api/counts` |  |
 | POST | `/api/duality/watches` |  |
 | GET | `/api/duality/watches/:threadId` |  |
+| GET | `/api/duality/watches/active` |  |
 | GET | `/api/feed` |  |
 | POST | `/api/feed` |  |
 | DELETE | `/api/feed/:id` |  |
