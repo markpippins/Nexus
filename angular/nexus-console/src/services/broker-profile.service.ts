@@ -56,7 +56,7 @@ export class BrokerProfileService {
       return { brokerUrl: active.brokerUrl, imageUrl: active.imageUrl ?? '' };
     }
     const first = this.profiles()[0];
-    return { brokerUrl: first?.brokerUrl ?? 'localhost:8081', imageUrl: first?.imageUrl ?? 'http://localhost:8081' };
+    return { brokerUrl: first?.brokerUrl ?? 'localhost:8081', imageUrl: first?.imageUrl ?? 'http://localhost:9081' };
   });
 
   constructor() {

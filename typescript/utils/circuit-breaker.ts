@@ -182,7 +182,7 @@ const SERVICES: ServiceConfig[] = [
   {
     name: 'image-server',
     healthEndpoint: '/health',
-    port: 8081,
+    port: 9081, // Image Server (typescript/image-server) — 8081 is Broker Gateway
     protocol: 'http'
   },
   {
