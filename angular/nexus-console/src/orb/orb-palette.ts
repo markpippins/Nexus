@@ -72,7 +72,7 @@ const BOUNDS: Array<{ min: number; max: number }> = [
 ];
 
 /** Epoch of the avatar's clock — everything integrates from here. */
-const EPOCH_MS = Date.UTC(2026, 0, 1);
+export const EPOCH_MS = Date.UTC(2026, 0, 1);
 
 /** Cadence of the synthetic event stream — one event per hour. */
 const TICK_MS = 3600 * 1000;
