@@ -217,6 +217,16 @@ ON_DEMAND_SERVICES=(
     "terrain-mcp.service"
 )
 
+# Services whose canonical units live at SYSTEM level, not user level.
+# file-system-server + secure-file-system-server were ratified as system-level
+# canonical (decision 793cf1f6); their user-level units were disabled to stop
+# the EADDRINUSE thrash loop against the system-level :4040/:4042 instances.
+# Status/start/stop must operate on the system manager for these.
+SYSTEM_SCOPE_SERVICES=(
+    "file-system-server.service"
+    "secure-file-system-server.service"
+)
+
 # ── Helpers ─────────────────────────────────────────────────────────────
 
 # Check if a service is in an array
@@ -256,21 +266,30 @@ _http_healthy() {
     curl -s --max-time 2 "http://localhost:${port}${path}" >/dev/null 2>&1
 }
 
-# Get systemd SubState for a service
+# Get systemd SubState for a service (system manager for SYSTEM_SCOPE_SERVICES)
 _substate() {
-    systemctl --user show -p SubState --value "$1" 2>/dev/null || echo "-"
+    if _in_array "$1" "${SYSTEM_SCOPE_SERVICES[@]}"; then
+        systemctl show -p SubState --value "$1" 2>/dev/null || echo "-"
+    else
+        systemctl --user show -p SubState --value "$1" 2>/dev/null || echo "-"
+    fi
 }
 
-# Get systemd ActiveState for a service
+# Get systemd ActiveState for a service (system manager for SYSTEM_SCOPE_SERVICES)
 _is_active() {
-    systemctl --user is-active --quiet "$1" 2>/dev/null
+    if _in_array "$1" "${SYSTEM_SCOPE_SERVICES[@]}"; then
+        systemctl is-active --quiet "$1" 2>/dev/null
+    else
+        systemctl --user is-active --quiet "$1" 2>/dev/null
+    fi
 }
 
 # ── Commands ────────────────────────────────────────────────────────────
 
 cmd_start_all() {
     echo "=== Starting Nexus Services ==="
-    systemctl --user daemon-reload
+    systemctl --user daemon-reload 2>/dev/null || true
+    systemctl daemon-reload 2>/dev/null || true
     for svc in "${ALL_SERVICES[@]}"; do
         echo -n "  $svc ... "
         if _is_active "$svc"; then
@@ -288,7 +307,11 @@ cmd_start_all() {
                 echo "already running"
             fi
         else
-            systemctl --user start "$svc" 2>&1 | tail -1 || echo "FAILED"
+            if _in_array "$svc" "${SYSTEM_SCOPE_SERVICES[@]}"; then
+                systemctl start "$svc" 2>&1 | tail -1 || echo "FAILED"
+            else
+                systemctl --user start "$svc" 2>&1 | tail -1 || echo "FAILED"
+            fi
             sleep 0.5
         fi
     done
@@ -430,7 +453,11 @@ cmd_stop_all() {
     for svc in "${ALL_SERVICES[@]}"; do
         echo -n "  $svc ... "
         if _is_active "$svc"; then
-            systemctl --user stop "$svc" 2>&1 | tail -1 || echo "FAILED"
+            if _in_array "$svc" "${SYSTEM_SCOPE_SERVICES[@]}"; then
+                systemctl stop "$svc" 2>&1 | tail -1 || echo "FAILED"
+            else
+                systemctl --user stop "$svc" 2>&1 | tail -1 || echo "FAILED"
+            fi
         else
             echo "not running"
         fi
@@ -465,7 +492,11 @@ cmd_enable_all() {
             continue
         fi
         echo -n "  $svc ... "
-        systemctl --user enable "$svc" 2>&1 | tail -1 || echo "FAILED"
+        if _in_array "$svc" "${SYSTEM_SCOPE_SERVICES[@]}"; then
+            systemctl enable "$svc" 2>&1 | tail -1 || echo "FAILED"
+        else
+            systemctl --user enable "$svc" 2>&1 | tail -1 || echo "FAILED"
+        fi
     done
 }
 
