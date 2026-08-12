@@ -1,0 +1,17 @@
+[Unit]
+# Analyst answer open questions — deterministic LLM loop (tackle/harness/analyst.py).
+# Restored 2026-08-12 (T17): the unit had been removed and the cron line
+# commented out, leaving open questions unanswered. Re-created per the
+# scheduled-tasks registry (nexus/tests/scheduled/checks.py) at the original
+# */10 min cadence.
+Description=Analyst Answer Open Questions (open questions with no answer)
+After=network.target postgresql.service
+Wants=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/codex/dev/nexus
+Environment=PYTHONPATH=/home/codex/dev/nexus/python:/home/codex/dev/nexus/python/tackle
+ExecStart=/home/codex/dev/nexus/python/rover/.venv/bin/python3 /home/codex/dev/nexus/bin/analyst_answer_questions.py --limit 5
+StandardOutput=append:/home/codex/dev/nexus/logs/analyst-answer-questions.service.log
+StandardError=append:/home/codex/dev/nexus/logs/analyst-answer-questions.service.log
