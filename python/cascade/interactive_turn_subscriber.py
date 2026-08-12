@@ -391,6 +391,11 @@ def _compose_failure_detail(
     """
     if stderr.strip():
         detail = stderr[:500]
+        # harness-srv now reports timeouts honestly (exit 124 + marker in
+        # stderr). The user wants the partial output the agent produced
+        # before the wall — append the stdout tail when the marker is there.
+        if "timeout after" in stderr.lower() and stdout.strip():
+            detail = f"{detail}\nlast output: {stdout[-400:]}"
     elif stdout.strip():
         # stdout here is whatever the invoke function returned on failure —
         # it is normally already reduced to assistant text, but may be raw
@@ -407,7 +412,7 @@ def _invoke_agent_harness(
     role: str,
     prompt: str,
     model: str | None,
-    timeout_ms: int = 300_000,
+    timeout_ms: int = 600_000,
 ) -> dict[str, Any]:
     """Invoke an agent via harness-srv POST /run-direct.
 
@@ -542,6 +547,22 @@ def _post_assembly_comment(
 #  Thread context builders
 # ═══════════════════════════════════════════════════════════════════════
 
+# One-shot execution frame for the harness backend. Prepended to every
+# run-direct prompt: persona files / AGENTS.md bake in an interactive
+# session-start ritual (clock-in, inbox check, service verification,
+# pipeline-health scans, persona re-fetch) that eats the whole execution
+# budget in an ephemeral single-turn run. An ephemeral run has no session
+# to boot — say so explicitly so the agent answers instead of ritualizing.
+_HARNESS_ONESHOT_PREAMBLE = (
+    "You are a ONE-SHOT harnessed invocation of the **{role}** role — an "
+    "ephemeral single-turn run with NO persistent session.\n\n"
+    "Session-start rituals DO NOT APPLY. Do NOT clock in or out, check your "
+    "inbox or forum todos, verify services, run boot or pipeline-health "
+    "checks, or re-fetch personas. The harness sets HARNESS_ROLE and "
+    "HARNESS_JOB_ID for identification only.\n\n"
+    "Answer the user's latest message directly and stop when done.\n"
+)
+
 def _build_thread_context(pg_conn: Any, thread_id: str, role: str) -> str:
     """Fetch recent thread comments and format as LLM prompt context.
 
@@ -562,7 +583,10 @@ def _build_thread_context(pg_conn: Any, thread_id: str, role: str) -> str:
         rows = cur.fetchall()
 
     if not rows:
-        return f"You are the {role}. No prior conversation. Respond to the user's message."
+        return (
+            _HARNESS_ONESHOT_PREAMBLE.format(role=role)
+            + f"You are the **{role}**. No prior conversation. Respond to the user's message."
+        )
 
     # Build in chronological order (oldest first)
     rows.reverse()
@@ -578,7 +602,7 @@ def _build_thread_context(pg_conn: Any, thread_id: str, role: str) -> str:
         "When you are done, include CONVERSATION_CLOSED if the topic is fully "
         "resolved, or DELEGATE <role>: <instruction> to hand off to another agent."
     )
-    return "\n".join(lines)
+    return _HARNESS_ONESHOT_PREAMBLE.format(role=role) + "\n".join(lines)
 
 
 def _build_incremental_context(

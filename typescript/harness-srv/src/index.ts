@@ -516,7 +516,7 @@ app.post("/run-direct", async (req, res) => {
       model: modelOverride,
       work_dir,
       agent,
-      timeout_ms = 300_000,
+      timeout_ms = 600_000,
       channel = "duality",
     } = req.body;
 
@@ -902,10 +902,12 @@ async function executeOpencode(
 
     let stdout = '';
     let stderr = '';
+    let timedOut = false;
     child.stdout?.on('data', (data: Buffer) => { stdout += data.toString(); });
     child.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
 
     const timer = setTimeout(() => {
+      timedOut = true;
       child.kill('SIGTERM');
       // Give it 5s to exit gracefully, then force-kill
       setTimeout(() => {
@@ -915,11 +917,26 @@ async function executeOpencode(
 
     child.on('close', (code) => {
       clearTimeout(timer);
-      const exitCode = code ?? 1;
+      let exitCode = code ?? 1;
+      let stderrOut = stderr;
+      if (timedOut) {
+        // A signal-killed child reports code=null, which otherwise surfaces
+        // as a misleading '(no stderr; exit 1)'. Mirror the ollama path's
+        // exitCode 124 + message so callers know this was a timeout, and
+        // keep the partial stdout for the caller to surface.
+        exitCode = 124;
+        stderrOut = `opencode timeout after ${timeout_ms}ms — partial output below`;
+      } else if (code === null) {
+        // Killed by a signal outside the timeout (e.g. the 15-min runaway
+        // watchdog or an external kill) — report it honestly too instead of
+        // the generic exit 1.
+        exitCode = 137;
+        stderrOut = 'opencode killed by signal (watchdog or external kill) — partial output below';
+      }
       if (exitCode === 0) {
         incrementConsumedUnits(role).catch(() => {});
       }
-      resolve({ exitCode, stdout, stderr });
+      resolve({ exitCode, stdout, stderr: stderrOut });
     });
 
     child.on('error', (err) => {
