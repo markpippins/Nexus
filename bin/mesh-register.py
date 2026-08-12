@@ -164,7 +164,14 @@ CANDIDATES: tuple[Candidate, ...] = (
         port=None,
         kind="mcp_server",
         transport_type="stdio",
+        # Stdio-only candidate; no HTTP health endpoint. Use the systemd
+        # unit as the liveness proxy (mirrors terrain-mcp): nebula-mcp.service
+        # is a launcher stub with RemainAfterExit=yes, so is-active returns 0
+        # once the unit has been started even with no client currently
+        # spawned. Prevents the recurring OFFLINE status that flipped
+        # terrainUp=false every mesh-register cycle (5-min timer).
         health_url="",
+        health_cmd="systemctl --user is-active nebula-mcp.service",
         description=(
             "Stdio MCP server for Nebula RMS. Client-launched (not a daemon). "
             "Referenced by dependency edges as the primary Nebula MCP "
@@ -270,10 +277,10 @@ CANDIDATES: tuple[Candidate, ...] = (
         service_type="Express",
         health_url="http://localhost:4042/health",
         description=(
-            "Node.js file system proxy server for edit-ui. Provides CRUD "
+            "Node.js file system proxy server for monaco-judge. Provides CRUD "
             "operations over a remote filesystem root directory (ls, cd, "
             "mkdir, rmdir, newfile, deletefile, rename, copy, move). "
-            "Consumer: angular/edit-ui (port 4042)."
+            "Consumer: angular/monaco-judge (port 4042)."
         ),
         startup="systemd: systemctl --user start file-system-server.service",
         workspace_path="nexus/typescript/file-system-server",

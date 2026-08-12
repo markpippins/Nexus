@@ -29,7 +29,7 @@ ALL_SERVICES=(
     "quarkus-broker-gateway.service"  # port 8091 — service broker gateway (Quarkus)
     "helidon-user-access-service.service"  # port 9093 — user access control (Helidon MP)
     "terrain.service"          # port 8084 — topology registry
-    "file-system-server.service"        # port 4042 — file system operations (edit-ui)
+    "file-system-server.service"        # port 4042 — file system operations (monaco-judge)
     "secure-file-system-server.service" # port 4040 — secure file system operations (service-broker)
     "ui-event-bus.service"     # port 3200 — cross-app UI event bus (SSE)
     "peb-kernel.service"       # port 8080 — engineering brain

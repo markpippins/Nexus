@@ -38,7 +38,7 @@
     "healthCheckUrl": "http://localhost:4042/health",
     "status": "ONLINE",
     "version": "1.0.0",
-    "description": "Node.js file system proxy server for edit-ui (Angular). Consumer: angular/edit-ui.",
+    "description": "Node.js file system proxy server for monaco-judge (React). Consumer: angular/monaco-judge.",
     "repositoryUrl": "typescript/file-system-server",
     "activeFlag": true,
     "startup": "systemd: systemctl --user start file-system-server.service",
