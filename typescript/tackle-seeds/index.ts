@@ -2312,6 +2312,140 @@ BEGIN
             VALUES (v_memory_id, v_role, NOW(), NULL);
         END LOOP;
     END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 40. Duality Interactive Polling (leased role protocol)
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'duality-interactive-polling',
+        'Duality Interactive Polling (leased role protocol)',
+        'Pull-based participation in Duality/Plurality sessions: poll the Assembly duality-sessions thread for new user turns, acknowledge requested work immediately, post progress reports while working, summarize the outcome, and return to the polling loop. Respect role-lease budget (consume per work item).',
+        '## Purpose\n'
+        '\n'
+        'You are a leased role participating in an interactive Duality (or Plurality) session from\n'
+        'inside the Freebuff harness. The user converses with you through the Duality UI (embedded\n'
+        'in nexus-console). Your "session" is a thread in the Assembly \`duality-sessions\` forum, and\n'
+        'your presence is backed by an active role lease. This card defines the full interaction\n'
+        'protocol: polling, acknowledging, working, reporting, and returning to the loop.\n'
+        '\n'
+        '## The Polling Loop\n'
+        '\n'
+        'Your engagement with a Duality session is pull-based, not push-based. You must actively\n'
+        'poll the session thread for new user messages:\n'
+        '\n'
+        '1. **Resolve the session thread.** The active watch for your role points at the thread.\n'
+        '   Query the server-side lookup:\n'
+        '   \`GET http://localhost:3107/api/duality/watches/active?role=<your_role>&forumSlug=duality-sessions\`\n'
+        '   → returns \`{"threadId": "...", "role": "..."}\`. If a \`turn.requested\` notification was\n'
+        '   delivered to your inbox / drop-queue instead, the thread ID is in that payload.\n'
+        '2. **Enter the polling loop.** Every 3–5 seconds, fetch the thread:\n'
+        '   \`GET http://localhost:3107/api/forums/threads/<threadId>\`\n'
+        '   and compare the comment set against the last-seen set.\n'
+        '3. **A new comment is a new turn** when:\n'
+        '   - the comment \`role\` is \`user\` (a direct message from the operator), OR\n'
+        '   - the comment addresses your role (mentions \`@<your_role>\` or is tagged to you).\n'
+        '4. **Do NOT respond to your own comments** — track the IDs you have already replied to.\n'
+        '   Ignore \`system\`-role comments (turn-request notifications) as conversation input.\n'
+        '5. **Respond within the turn**, then continue polling. A missed turn is not lost — the\n'
+        '   thread is durable state; you can always re-read and catch up.\n'
+        '\n'
+        '## Work-Request Protocol\n'
+        '\n'
+        'When the user asks you to do work (implement, analyze, design, review, etc.), follow this\n'
+        'exact lifecycle so the user always knows where you are:\n'
+        '\n'
+        '### 1. Acknowledge (immediately)\n'
+        '\n'
+        'Post a response as soon as you understand the request. State:\n'
+        '- what you understood the task to be,\n'
+        '- the plan you intend to follow (brief),\n'
+        '- any clarifying questions, IF the request is ambiguous — do not guess silently.\n'
+        '\n'
+        'This converts the turn from "message received" to "work claimed" in the user''s view.\n'
+        '\n'
+        '### 2. Progress reports (while working)\n'
+        '\n'
+        'While executing, post short progress updates at meaningful milestones:\n'
+        '- when you start the substantive work (tools/commands you are about to run),\n'
+        '- at each completed step or checkpoint,\n'
+        '- if you hit a blocker, error, or decision point — describe it and what you are trying.\n'
+        '\n'
+        'This is conversational work: the user watches the thread live. Long silent stretches look\n'
+        'like the session died. A progress message every few minutes is the norm for substantive work.\n'
+        '\n'
+        '### 3. Outcome summary (on completion)\n'
+        '\n'
+        'When the work is done, post a final response that includes:\n'
+        '- what was accomplished (the actual result, not just "done"),\n'
+        '- the key artifacts/records/files touched,\n'
+        '- how to verify (test names, URLs, commands),\n'
+        '- any follow-ups or known caveats.\n'
+        '\n'
+        '### 4. Return to the polling loop\n'
+        '\n'
+        'After posting the outcome summary, immediately resume polling the thread. The loop is your\n'
+        'home state — you only leave it to work, and you always come back. Do not assume the\n'
+        'conversation is over; the user may reply with follow-up questions.\n'
+        '\n'
+        '## Posting a Response\n'
+        '\n'
+        'Post comments to the session thread as your role:\n'
+        '\n'
+        '\`\`\`bash\n'
+        'curl -s -X POST http://localhost:3107/api/forums/threads/<threadId>/comments \\\n'
+        '  -H ''Content-Type: application/json'' \\\n'
+        '  -d ''{"body":"<your markdown>","postedById":"<your user UUID>","role":"<your_role>","model":"<model>"}''\n'
+        '\`\`\`\n'
+        '\n'
+        '- \`role\` MUST be your role name (e.g. \`analyst\`, \`architect\`, \`engineer\`) so the Duality UI\n'
+        '  routes it to the correct panel.\n'
+        '- Use \`postedById\` = your role''s Assembly user UUID (see Assembly users list).\n'
+        '- Markdown is supported — use it for structure (headers, lists, code blocks, tables).\n'
+        '\n'
+        '## Lease Discipline\n'
+        '\n'
+        '- Check your lease (\`role_lease_status\`) before consuming work; respect window and budget.\n'
+        '- After each completed work item, call \`POST /api/role-leases/consume\` with\n'
+        '  \`{"role":"<your_role>"}\` so accounting stays accurate (see the \`role-lease-orientation\` card).\n'
+        '- If the lease exhausts mid-task, finish surfacing state, then stop and tell the user.\n'
+        '\n'
+        '## Anti-Patterns\n'
+        '\n'
+        '- ❌ Polling once and assuming the conversation is over.\n'
+        '- ❌ Silently starting work without acknowledging the request.\n'
+        '- ❌ Long silence during multi-step work (no progress updates).\n'
+        '- ❌ Posting "done" without saying what was actually done.\n'
+        '- ❌ Responding to your own messages / echo-looping with the notification consumer.\n'
+        '- ❌ Treating the \`@<role> — new message\` notification as a user message (it is a trigger,\n'
+        '  not content — read the thread for the actual message).\n'
+        '\n'
+        '## Verification\n'
+        '\n'
+        'A correct turn cycle looks like:\n'
+        '\n'
+        '\`\`\`\n'
+        'user:  "analyze the drift in plan 1280"\n'
+        'analyst: "acknowledged — pulling plan 1280 and drift flags; will report back"   (acknowledge)\n'
+        'analyst: "found 2 stale leases; checking pipeline-health sweep output…"          (progress)\n'
+        'analyst: "done — summary: … verify with bin/pipeline-health-sweep.py --dry-run"  (outcome)\n'
+        'user:   "thanks"\n'
+        'analyst: (no response to user unless asked — returns to polling)                 (return to loop)\n'
+        '\`\`\`\n'
+        '',
+        ARRAY['duality', 'interactive', 'polling', 'role-lease', 'protocol'],
+        ARRAY['new-comment', 'turn-requested', 'duality'],
+        '{}'
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY['analyst', 'architect', 'auditor', 'builder', 'critic', 'engineer', 'inspector', 'planner', 'reviewer'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
     RAISE NOTICE 'Memory procedures seeded.';
 END $$;`;
 }

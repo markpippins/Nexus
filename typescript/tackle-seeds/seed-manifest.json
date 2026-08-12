@@ -1,5 +1,5 @@
 {
-  "card_count": 39,
+  "card_count": 40,
   "cards": [
     {
       "body_md": "## Agent Config Role Definition\n\nEach agent role .md file (in .opencode/agents/) MUST include a message block in its frontmatter:\n\n```yaml\n---\nassumes_role: <role>\nmessage:\n  inbox_query:\n    - tags contain \"to:<role>\"\n    - tags contain \"status:open\"\n  record_types: [list of valid record types for this role]\n  auto_present: true\n  enrich_context: true\n---\n```\n\n### Fields\n- assumes_role: The role this agent config activates (engineer, architect, planner, etc.)\n- inbox_query: Tag filters for inbox querying\n- record_types: Valid agent record types this role may write\n- auto_present: Whether to surface inbox items on every turn start\n- enrich_context: Whether to load linked system/subsystem/plan data on boot\n\n### Valid record_type values\nreport, analysis, assessment, inspection, prompt, response, engineering_log, architecture_note, decision",
@@ -158,6 +158,37 @@
         "turn boundary",
         "perceptual cycle",
         "reconciliation"
+      ]
+    },
+    {
+      "body_md": "## Purpose\n\nYou are a leased role participating in an interactive Duality (or Plurality) session from\ninside the Freebuff harness. The user converses with you through the Duality UI (embedded\nin nexus-console). Your \"session\" is a thread in the Assembly `duality-sessions` forum, and\nyour presence is backed by an active role lease. This card defines the full interaction\nprotocol: polling, acknowledging, working, reporting, and returning to the loop.\n\n## The Polling Loop\n\nYour engagement with a Duality session is pull-based, not push-based. You must actively\npoll the session thread for new user messages:\n\n1. **Resolve the session thread.** The active watch for your role points at the thread.\n   Query the server-side lookup:\n   `GET http://localhost:3107/api/duality/watches/active?role=<your_role>&forumSlug=duality-sessions`\n   \u2192 returns `{\"threadId\": \"...\", \"role\": \"...\"}`. If a `turn.requested` notification was\n   delivered to your inbox / drop-queue instead, the thread ID is in that payload.\n2. **Enter the polling loop.** Every 3\u20135 seconds, fetch the thread:\n   `GET http://localhost:3107/api/forums/threads/<threadId>`\n   and compare the comment set against the last-seen set.\n3. **A new comment is a new turn** when:\n   - the comment `role` is `user` (a direct message from the operator), OR\n   - the comment addresses your role (mentions `@<your_role>` or is tagged to you).\n4. **Do NOT respond to your own comments** \u2014 track the IDs you have already replied to.\n   Ignore `system`-role comments (turn-request notifications) as conversation input.\n5. **Respond within the turn**, then continue polling. A missed turn is not lost \u2014 the\n   thread is durable state; you can always re-read and catch up.\n\n## Work-Request Protocol\n\nWhen the user asks you to do work (implement, analyze, design, review, etc.), follow this\nexact lifecycle so the user always knows where you are:\n\n### 1. Acknowledge (immediately)\n\nPost a response as soon as you understand the request. State:\n- what you understood the task to be,\n- the plan you intend to follow (brief),\n- any clarifying questions, IF the request is ambiguous \u2014 do not guess silently.\n\nThis converts the turn from \"message received\" to \"work claimed\" in the user's view.\n\n### 2. Progress reports (while working)\n\nWhile executing, post short progress updates at meaningful milestones:\n- when you start the substantive work (tools/commands you are about to run),\n- at each completed step or checkpoint,\n- if you hit a blocker, error, or decision point \u2014 describe it and what you are trying.\n\nThis is conversational work: the user watches the thread live. Long silent stretches look\nlike the session died. A progress message every few minutes is the norm for substantive work.\n\n### 3. Outcome summary (on completion)\n\nWhen the work is done, post a final response that includes:\n- what was accomplished (the actual result, not just \"done\"),\n- the key artifacts/records/files touched,\n- how to verify (test names, URLs, commands),\n- any follow-ups or known caveats.\n\n### 4. Return to the polling loop\n\nAfter posting the outcome summary, immediately resume polling the thread. The loop is your\nhome state \u2014 you only leave it to work, and you always come back. Do not assume the\nconversation is over; the user may reply with follow-up questions.\n\n## Posting a Response\n\nPost comments to the session thread as your role:\n\n```bash\ncurl -s -X POST http://localhost:3107/api/forums/threads/<threadId>/comments \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"body\":\"<your markdown>\",\"postedById\":\"<your user UUID>\",\"role\":\"<your_role>\",\"model\":\"<model>\"}'\n```\n\n- `role` MUST be your role name (e.g. `analyst`, `architect`, `engineer`) so the Duality UI\n  routes it to the correct panel.\n- Use `postedById` = your role's Assembly user UUID (see Assembly users list).\n- Markdown is supported \u2014 use it for structure (headers, lists, code blocks, tables).\n\n## Lease Discipline\n\n- Check your lease (`role_lease_status`) before consuming work; respect window and budget.\n- After each completed work item, call `POST /api/role-leases/consume` with\n  `{\"role\":\"<your_role>\"}` so accounting stays accurate (see the `role-lease-orientation` card).\n- If the lease exhausts mid-task, finish surfacing state, then stop and tell the user.\n\n## Anti-Patterns\n\n- \u274c Polling once and assuming the conversation is over.\n- \u274c Silently starting work without acknowledging the request.\n- \u274c Long silence during multi-step work (no progress updates).\n- \u274c Posting \"done\" without saying what was actually done.\n- \u274c Responding to your own messages / echo-looping with the notification consumer.\n- \u274c Treating the `@<role> \u2014 new message` notification as a user message (it is a trigger,\n  not content \u2014 read the thread for the actual message).\n\n## Verification\n\nA correct turn cycle looks like:\n\n```\nuser:  \"analyze the drift in plan 1280\"\nanalyst: \"acknowledged \u2014 pulling plan 1280 and drift flags; will report back\"   (acknowledge)\nanalyst: \"found 2 stale leases; checking pipeline-health sweep output\u2026\"          (progress)\nanalyst: \"done \u2014 summary: \u2026 verify with bin/pipeline-health-sweep.py --dry-run\"  (outcome)\nuser:   \"thanks\"\nanalyst: (no response to user unless asked \u2014 returns to polling)                 (return to loop)\n```\n",
+      "mcp_tools": [],
+      "roles": [
+        "analyst",
+        "architect",
+        "auditor",
+        "builder",
+        "critic",
+        "engineer",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "0f3f3bec960847447f0766a9d27bead5070d45a2e7ae3ef910af09b7bf9f3559",
+      "slug": "duality-interactive-polling",
+      "summary": "Pull-based participation in Duality/Plurality sessions: poll the Assembly duality-sessions thread for new user turns, acknowledge requested work immediately, post progress reports while working, summarize the outcome, and return to the polling loop. Respect role-lease budget (consume per work item).",
+      "tags": [
+        "duality",
+        "interactive",
+        "polling",
+        "role-lease",
+        "protocol"
+      ],
+      "title": "Duality Interactive Polling (leased role protocol)",
+      "triggers": [
+        "new-comment",
+        "turn-requested",
+        "duality"
       ]
     },
     {
@@ -1209,6 +1240,6 @@
       ]
     }
   ],
-  "role_count": 212,
+  "role_count": 221,
   "schema": "tackle"
 }
