@@ -756,7 +756,7 @@ async function executeHarness(params: HarnessExecParams): Promise<HarnessExecRes
   if (binary === "ollama") {
     return executeOllama(promptContent, role, params.model, timeout_ms);
   } else if (binary === "opencode") {
-    return executeOpencode(params);
+    return executeOpencode(params, promptContent);
   } else {
     throw new Error(`Harness ${harness_id} binary '${binary}' not yet supported`);
   }
@@ -827,24 +827,38 @@ async function executeOllama(
  * Uses child_process.spawn (not execFile) so the T16 runaway watchdog can
  * directly SIGTERM the child process by PID instead of pattern-matching pkill.
  */
-async function executeOpencode(params: HarnessExecParams): Promise<HarnessExecResult> {
+async function executeOpencode(
+  params: HarnessExecParams,
+  promptContent: string
+): Promise<HarnessExecResult> {
   const { prompt_file, work_dir, agent, role, model, timeout_ms } = params;
   const opencodeBin = process.env.OPENCODE_BIN || "opencode";
   // Extract jobId from prompt filename (${jobId}.md) for watchdog PID tracking
   const jobId = prompt_file.split("/").pop()?.replace(".md", "") || "";
 
+  // NOTE (opencode 1.18.x): `opencode run [message..]` requires the prompt as
+  // a message. We pipe the prompt via stdin instead of passing it as a
+  // positional arg: opencode's resolveRunInput() uses piped stdin when the
+  // positional message is empty, and piping avoids argv-length limits (E2BIG)
+  // for large Assembly-thread prompts.
+  //
+  // `--file` is deliberately NOT passed: (a) the prompt file only contains the
+  // same text we already deliver as the message, so attaching it adds nothing;
+  // and (b) empirically, passing `--file` breaks model resolution for custom
+  // config providers (`Model not found: <provider>/<model>`) — with --file,
+  // opencode 1.18.16 resolves the model against a provider registry that has
+  // not yet loaded config providers. The prompt file stays on disk for jobId/
+  // watchdog bookkeeping (prompt_file.split("/").pop() below).
   const cmdArgs = [
     "run",
     "--agent", agent,
     ...(model ? ["--model", model] : []),
     "--dir", work_dir,
     "--format", "json",
-    "--file", prompt_file,
     "--dangerously-skip-permissions",
-    "",
   ];
 
-  await log("info", `opencode exec agent=${agent} model=${model ?? "(unset)"} file=${prompt_file} dir=${work_dir} bin=${opencodeBin}`);
+  await log("info", `opencode exec agent=${agent} model=${model ?? "(unset)"} file=${prompt_file} dir=${work_dir} bin=${opencodeBin} prompt_chars=${promptContent.length}`);
 
   return new Promise((resolve) => {
     const child = spawn(opencodeBin, cmdArgs, {
@@ -854,8 +868,16 @@ async function executeOpencode(params: HarnessExecParams): Promise<HarnessExecRe
         HARNESS_ROLE: role,
         HARNESS_JOB_ID: prompt_file.split("/").pop()?.replace(".md", "") || "",
       },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
+
+    // Pipe the prompt as the run message (opencode reads non-TTY stdin as the
+    // message via resolveRunInput). Ignore EPIPE — the child may exit early.
+    if (child.stdin) {
+      child.stdin.on("error", () => { /* child may have exited early */ });
+      child.stdin.write(promptContent);
+      child.stdin.end();
+    }
 
     // Register PID for runaway watchdog (direct SIGTERM instead of pkill -f)
     if (jobId) {
