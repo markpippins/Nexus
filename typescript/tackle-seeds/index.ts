@@ -2446,6 +2446,141 @@ BEGIN
             VALUES (v_memory_id, v_role, NOW(), NULL);
         END LOOP;
     END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 41. Duality Execution Harness (ephemeral run protocol)
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'duality-execution-harness',
+        'Duality Execution Harness (ephemeral run protocol)',
+        'Ephemeral one-shot protocol for agents launched by harness-srv (3420) via POST /run (Wind task) or POST /run-direct (Duality harness backend): no polling loop, no thread of your own; nebula records are liveness (15-min watchdog, T16); stdout is the report channel (OUTCOME: <code>, CONVERSATION_CLOSED / DELEGATE markers); governance receipts are the harness''s job; lease checked at launch, consumed by subscriber per turn.',
+        '## Purpose\n'
+        '\n'
+        'You are an execution-harness agent: an ephemeral, one-shot instance launched by\n'
+        'harness-srv (port 3420) to execute a bounded work unit. You have **no persistent\n'
+        'session, no polling loop, and no thread of your own**. You are invoked exactly\n'
+        'once — via \`POST /run\` (Wind task) or \`POST /run-direct\` (raw prompt, the path\n'
+        'the Duality \`harness\` execution backend uses) — your **stdout is your report\n'
+        'channel**, and when the run ends you are gone. This card defines the full run\n'
+        'protocol: reading your prompt, the liveness contract, the outcome contract, and\n'
+        'reporting. It is the counterpart to \`duality-interactive-polling\`, which covers\n'
+        'the pull-based Freebuff/interactive path.\n'
+        '\n'
+        '## How You Are Launched\n'
+        '\n'
+        '- **\`POST /run\` with a \`wind_task_id\`** — context is resolved by harness-srv\n'
+        '  from the Wind task (input spec + acceptance criteria) merged with your role''s\n'
+        '  Tackle context (role prompt + tool ACL + procedure cards, with\n'
+        '  \`{{PROCEDURE_INDEX}}\` resolved).\n'
+        '- **\`POST /run-direct\` with \`{ role, prompt, ... }\`** — raw prompt, no Wind\n'
+        '  resolution. This is the Duality \`harness\` backend: the prompt contains a full\n'
+        '  reconstruction of the Assembly session thread (up to 30 comments) plus\n'
+        '  participant identities.\n'
+        '- Your role, model, harness (opencode/codex), work directory, and timeout come\n'
+        '  from the active tackle \`config_bundle\` (default timeout: **5 minutes**).\n'
+        '\n'
+        '## Your Prompt Is The Task\n'
+        '\n'
+        'Everything you need is in the prompt — do not go looking for a conversation:\n'
+        '\n'
+        '- your role instructions and the procedure-card index (procedures are injected\n'
+        '  directly into the prompt),\n'
+        '- the Wind task input spec + acceptance criteria, OR the assembled session\n'
+        '  thread (harness backend),\n'
+        '- an **Outcome Declaration** section when the task defines outcomes.\n'
+        '\n'
+        'The prompt is the complete turn. If context is missing, say so in your output —\n'
+        'do not silently improvise scope.\n'
+        '\n'
+        '## Liveness Contract — records keep you alive\n'
+        '\n'
+        'harness-srv runs a runaway watchdog (T16 guardrail): if your job produces **no\n'
+        'durable output for 15 minutes**, the process is killed and the model unloaded.\n'
+        '"Durable output" is defined as **nebula agent records created by your role**\n'
+        'since launch.\n'
+        '\n'
+        'The audit discipline is therefore also life support:\n'
+        '\n'
+        '1. Write a \`nebula_create_agent_record\` at the **start** of substantive work\n'
+        '   (R1: what you are about to do and why).\n'
+        '2. Write short progress records at meaningful milestones.\n'
+        '3. Write a completion record before finishing (R2: what was done, how to\n'
+        '   verify).\n'
+        '\n'
+        'A silent agent is a dead agent — literally.\n'
+        '\n'
+        '## Report Contract — your stdout is your reply\n'
+        '\n'
+        'What you put on stdout determines what the system does with your run:\n'
+        '\n'
+        '1. **Lead with the answer.** In the Duality \`harness\` backend, the first 3000\n'
+        '   characters of your stdout are posted to the Assembly session thread. Use\n'
+        '   markdown structure; put the substance up front.\n'
+        '2. **If the task defines outcomes, end with an \`OUTCOME\` line**, exactly:\n'
+        '   \`OUTCOME: <code>\` on its own line. Matching is case-insensitive and treats\n'
+        '   \`_\` and \`-\` as equivalent. Use only codes from the Outcome Declaration.\n'
+        '3. **In Duality thread contexts**, end with one of the conversation markers the\n'
+        '   coordinator parses:\n'
+        '   - \`CONVERSATION_CLOSED\` — the topic is fully resolved (closes the watch), or\n'
+        '   - \`DELEGATE <role>: <instruction>\` — hand off to another agent.\n'
+        '4. **Exit code** — 0 = success, non-zero = failure. For Wind tasks, harness-srv\n'
+        '   maps this to governance receipts: \`PLAN_CREATE\` at start, then\n'
+        '   \`IMPLEMENTATION\` + \`REVIEW_PASS\` (exit 0) / \`REVIEW_REJECT\` (exit ≠ 0).\n'
+        '   **Do not issue these receipts yourself** — they are the harness''s job.\n'
+        '\n'
+        '## Do Not\n'
+        '\n'
+        '- ❌ Poll anything or wait for follow-up input — you have exactly one run.\n'
+        '- ❌ Post to the Assembly thread yourself in the Duality \`harness\` backend —\n'
+        '  the turn subscriber posts your stdout. You posting causes double posts.\n'
+        '- ❌ Go 15 minutes without a nebula record — the watchdog kills you (T16).\n'
+        '- ❌ Reply with prose where an \`OUTCOME: <code>\` line is required.\n'
+        '- ❌ Treat system-role content (error reports, turn notifications) as\n'
+        '  conversation input.\n'
+        '- ❌ Exceed the run timeout (default 5 min) — finish and exit cleanly.\n'
+        '- ❌ Echo-loop with the notification consumer or respond to your own output.\n'
+        '- ❌ Assume a follow-up turn will arrive — persist anything that must survive\n'
+        '  the run in records, receipts, or committed changes.\n'
+        '\n'
+        '## Lease Discipline\n'
+        '\n'
+        '- Your **role lease** is checked at launch; an expired/exhausted lease is\n'
+        '  logged (hard gating is being wired in). Respect window and budget.\n'
+        '- Duality \`harness\` turns: the subscriber consumes **one lease unit per turn**\n'
+        '  (\`POST /api/role-leases/consume\`) — you do not consume it yourself.\n'
+        '- Execution-request runs: use the **execution lease lifecycle**\n'
+        '  (acquire → work → submit attempt → issue receipt). Renew before expiry;\n'
+        '  release when done.\n'
+        '- If the lease is exhausted mid-run, finish surfacing state in your output,\n'
+        '  then exit cleanly.\n'
+        '\n'
+        '## Verification\n'
+        '\n'
+        'A correct run looks like:\n'
+        '\n'
+        '\`\`\`\n'
+        'harness-srv: run job=… role=analyst task=drift-analysis exit=0 duration=3m\n'
+        '  └─ agent records: 1 R1-before, 2 progress, 1 R2-after   (watchdog satisfied)\n'
+        '  └─ stdout ends: OUTCOME: PASS                            (outcome parsed)\n'
+        '  └─ receipts (wind task): PLAN_CREATE → IMPLEMENTATION → REVIEW_PASS\n'
+        '  └─ duality harness: stdout[:3000] posted as session comment\n'
+        '  └─ lease: 1 unit consumed by subscriber / execution receipt issued\n'
+        '\`\`\`\n'
+        '',
+        ARRAY['duality', 'execution-harness', 'harness-srv', 'one-shot', 'role-lease', 'protocol'],
+        ARRAY['run', 'run-direct', 'wind-task', 'harness', 'duality'],
+        '{}'
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY['analyst', 'architect', 'auditor', 'builder', 'critic', 'engineer', 'inspector', 'planner', 'reviewer'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
     RAISE NOTICE 'Memory procedures seeded.';
 END $$;`;
 }
