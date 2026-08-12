@@ -1,10 +1,10 @@
 [Unit]
-# Analyst answer open questions — every 10 min (original cron cadence).
-Description=Analyst Answer Open Questions (every 10 min)
+# Analyst answer open questions — every 50 min (slowed 5x from 10 min, 2026-08-12).
+Description=Analyst Answer Open Questions (every 50 min)
 
 [Timer]
-OnCalendar=*:0/10
-OnUnitActiveSec=10min
+OnCalendar=*:0/50
+OnUnitActiveSec=50min
 Persistent=true
 
 [Install]

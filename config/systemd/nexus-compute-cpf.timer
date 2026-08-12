@@ -1,11 +1,13 @@
 [Unit]
-Description=Compute CPF Scores (hourly)
+Description=Compute CPF Scores (every 75 minutes)
 
 [Timer]
-OnBootSec=2min
-OnUnitActiveSec=60min
+# Slowed 5x from 15 min (2026-08-12). 75 min cannot be expressed as an
+# OnCalendar minute step, so OnActiveSec arms the timer shortly after
+# (re)start and OnUnitActiveSec repeats every 75 min from there.
+OnActiveSec=2min
+OnUnitActiveSec=75min
 Persistent=true
-RandomizedDelaySec=2min
 
 [Install]
 WantedBy=timers.target
