@@ -38,6 +38,38 @@ import fs from "fs";
 import path from "path";
 import { spawn } from "child_process";
 
+// ── Config bundle invocation_mode validation ─────────────────────
+// The DB CHECK on tackle.config_bundle.invocation_mode only accepts the
+// invocation-channel vocabulary CLI | HTTP | SDK | MCP | INTERACTIVE
+// (consumed by tackle-mcp and harness-srv; INTERACTIVE is the Freebuff-
+// hosted channel). Older UIs sent a legacy dispatch vocabulary
+// (stream/direct/batch/fallback/sync/async) that the DB rejects with a
+// raw constraint error — validate here instead so every client gets a
+// friendly 400 with the allowed values.
+const INVOCATION_MODES = ["CLI", "HTTP", "SDK", "MCP", "INTERACTIVE"] as const;
+const LEGACY_INVOCATION_MODES = new Set(["stream", "direct", "batch", "fallback", "sync", "async"]);
+
+function invocationModeError(mode: unknown): string | null {
+  if (mode === undefined || mode === null) return null; // server default (CLI) applies
+  if (typeof mode !== "string" || !(INVOCATION_MODES as readonly string[]).includes(mode)) {
+    const legacyHint =
+      typeof mode === "string" && LEGACY_INVOCATION_MODES.has(mode.toLowerCase())
+        ? ` '${mode}' is the old dispatch vocabulary — pick an invocation channel instead.`
+        : "";
+    return `Invalid invocation_mode '${String(mode)}'. Allowed values: ${INVOCATION_MODES.join(", ")}.${legacyHint}`;
+  }
+  return null;
+}
+
+function bundlesInvocationModeError(bundles: unknown): string | null {
+  if (!Array.isArray(bundles)) return null;
+  for (const b of bundles) {
+    const err = invocationModeError((b as any)?.invocation_mode);
+    if (err) return err;
+  }
+  return null;
+}
+
 export const aiConfigRouter = Router();
 
 // ── Full snapshot ──────────────────────────────────────────────
@@ -78,8 +110,13 @@ aiConfigRouter.post("/seed-defaults", async (req, res) => {
 aiConfigRouter.post("/import", async (req, res) => {
   try {
     const { providers, harnesses, models, roles, bundles } = req.body || {};
-    if (!providers && !harnesses && !models && !roles) {
+    if (!providers && !harnesses && !models && !roles && !bundles) {
       res.status(400).json({ error: "No import data provided" });
+      return;
+    }
+    const modeErr = bundlesInvocationModeError(bundles);
+    if (modeErr) {
+      res.status(400).json({ error: modeErr, allowed: INVOCATION_MODES });
       return;
     }
     const result = await importAIConfig({
@@ -267,6 +304,11 @@ aiConfigRouter.post("/role", async (req, res) => {
     }
 
     if (Array.isArray(bundles) && bundles.length > 0) {
+      const modeErr = bundlesInvocationModeError(bundles);
+      if (modeErr) {
+        res.status(400).json({ error: modeErr, allowed: INVOCATION_MODES });
+        return;
+      }
       console.log('[tackle-srv] Saving bundles for role:', role, 'count:', bundles.length);
       await upsertConfigBundles(role, bundles);
     } else {
@@ -329,6 +371,11 @@ aiConfigRouter.post("/bundle", async (req, res) => {
       res.status(400).json({ error: "name, role, and model_id are required" });
       return;
     }
+    const modeErr = invocationModeError(invocation_mode);
+    if (modeErr) {
+      res.status(400).json({ error: modeErr, allowed: INVOCATION_MODES });
+      return;
+    }
     // Normalize the UI boolean to an integer (is_active is INTEGER in PG).
     // The verified-model gate inside upsertConfigBundle forces this to 0 when
     // the bundle's model is unverified, so passing 1 here is safe — the DB
@@ -363,6 +410,11 @@ aiConfigRouter.post("/bundles/:role", async (req, res) => {
     const { bundles } = req.body || {};
     if (!Array.isArray(bundles) || bundles.length === 0) {
       res.status(400).json({ error: "bundles array is required" });
+      return;
+    }
+    const modeErr = bundlesInvocationModeError(bundles);
+    if (modeErr) {
+      res.status(400).json({ error: modeErr, allowed: INVOCATION_MODES });
       return;
     }
     await upsertConfigBundles(req.params.role, bundles);
