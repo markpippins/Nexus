@@ -35,6 +35,7 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import datetime
 import json
 import os
 import re
@@ -42,6 +43,7 @@ import select
 import signal
 import sys
 import time
+import urllib.error
 import urllib.request
 from typing import Any
 
@@ -121,6 +123,55 @@ def _query_watches(pg_conn: Any, thread_id: str) -> list[dict[str, Any]]:
         return [dict(zip(cols, r)) for r in cur.fetchall()]
 
 
+def _lease_valid(lease: dict[str, Any] | None) -> bool:
+    """True when the lease is usable.
+
+    Mirrors the coordinator's R1 lease governance (inverted). The role_leases
+    queries already filter status='ACTIVE', so the checks here are the None
+    case, budget exhaustion, and window expiry.
+    """
+    if lease is None:
+        return False
+    if lease.get("status") in ("EXPIRED", "RELEASED"):
+        return False
+    budget = lease.get("budget_units") or 0
+    consumed = lease.get("consumed_units") or 0
+    if budget > 0 and consumed >= budget:
+        return False
+    expires_at = lease.get("expires_at") or lease.get("window_end")
+    if expires_at:
+        if isinstance(expires_at, str):
+            expires_at = datetime.datetime.fromisoformat(
+                expires_at.replace("Z", "+00:00")
+            )
+        if expires_at.timestamp() * 1000 < time.time() * 1000:
+            return False
+    return True
+
+
+def _lease_failure_reason(lease: dict[str, Any] | None) -> str:
+    """Exact R1 reason strings — identical to conversation_coordinator."""
+    if lease is None:
+        return "No active role lease"
+    status = lease.get("status", "")
+    if status in ("EXPIRED", "RELEASED"):
+        return f"Role lease status={status}"
+    budget = lease.get("budget_units") or 0
+    consumed = lease.get("consumed_units") or 0
+    remaining = max(0, budget - consumed)
+    if budget > 0 and remaining <= 0:
+        return f"Role lease exhausted ({consumed}/{budget} units consumed)"
+    expires_at = lease.get("expires_at")
+    if expires_at:
+        if isinstance(expires_at, str):
+            expires_at = datetime.datetime.fromisoformat(
+                expires_at.replace("Z", "+00:00")
+            )
+        if expires_at.timestamp() * 1000 < time.time() * 1000:
+            return f"Role lease expired at {expires_at.isoformat()}"
+    return "No active role lease"
+
+
 def _query_lease(pg_conn: Any, lease_id: str) -> dict[str, Any] | None:
     """Return the active lease row, or None."""
     if not lease_id:
@@ -172,6 +223,24 @@ def _bump_turn_count(pg_conn: Any, watch_id: str) -> None:
             """UPDATE duality.session_watches
                SET turn_count = turn_count + 1,
                    last_activity = now(),
+                   updated_at = now()
+               WHERE id = %s::uuid""",
+            (watch_id,),
+        )
+    pg_conn.commit()
+
+
+def _touch_watch_activity(pg_conn: Any, watch_id: str) -> None:
+    """Update last_activity only — used when a turn is NOT consumed.
+
+    The leased-mode gate failure is not a turn: touching last_activity keeps
+    the watch fresh for idle sweeps while leaving turn_count (and thus the
+    max_turns budget) untouched.
+    """
+    with pg_conn.cursor() as cur:
+        cur.execute(
+            """UPDATE duality.session_watches
+               SET last_activity = now(),
                    updated_at = now()
                WHERE id = %s::uuid""",
             (watch_id,),
@@ -253,6 +322,19 @@ def _invoke_agent_operator(
             if data.get("error"):
                 return {"exit_code": 1, "stdout": "", "stderr": data["error"]}
             return {"exit_code": 0, "stdout": response_text, "stderr": ""}
+    except urllib.error.HTTPError as e:
+        # Same as the harness path: surface the service's error body rather
+        # than the generic 'HTTP Error N'.
+        try:
+            detail = (
+                json.loads(e.read().decode("utf-8", "replace")).get("error")
+                or str(e)
+            )
+        except Exception:
+            detail = str(e)
+        _log("Operator invocation failed for %s (HTTP %s): %s",
+             role, e.code, str(detail))
+        return {"exit_code": 1, "stdout": "", "stderr": str(detail)[:500]}
     except Exception as e:
         _log("Operator invocation failed for %s: %s", role, e)
         return {"exit_code": 1, "stdout": "", "stderr": str(e)}
@@ -297,6 +379,30 @@ def _extract_opencode_text(stdout: str) -> str:
     return stdout
 
 
+def _compose_failure_detail(
+    stderr: str, stdout: str, exit_code: int, job_id: str | None = None,
+) -> str:
+    """Build an actionable '[system] Agent … encountered an error:' detail.
+
+    Never returns empty: falls back from stderr to the stdout tail to an
+    explicit 'no-output' marker, and appends the harness job id when known.
+    Without this, an exit-code failure with empty stderr posts a bare
+    'encountered an error:' prefix and the user never sees why.
+    """
+    if stderr.strip():
+        detail = stderr[:500]
+    elif stdout.strip():
+        # stdout here is whatever the invoke function returned on failure —
+        # it is normally already reduced to assistant text, but may be raw
+        # opencode event envelopes if extraction bailed. Last-resort anyway.
+        detail = f"(no stderr; exit {exit_code}) last output: {stdout[-400:]}"
+    else:
+        detail = f"exit code {exit_code} with no output"
+    if job_id:
+        detail = f"{detail} [job {job_id}]"
+    return detail
+
+
 def _invoke_agent_harness(
     role: str,
     prompt: str,
@@ -329,7 +435,12 @@ def _invoke_agent_harness(
         with urllib.request.urlopen(req, timeout=timeout_ms // 1000 + 30) as resp:
             data = json.loads(resp.read())
             if data.get("error"):
-                return {"exit_code": 1, "stdout": "", "stderr": data["error"]}
+                return {
+                    "exit_code": 1,
+                    "stdout": "",
+                    "stderr": data["error"],
+                    "job_id": data.get("job_id"),
+                }
             return {
                 "exit_code": data.get("exit_code", 0),
                 # opencode --format json emits a JSON-lines event stream;
@@ -337,7 +448,28 @@ def _invoke_agent_harness(
                 # response is readable rather than raw event envelopes.
                 "stdout": _extract_opencode_text(data.get("stdout", "")),
                 "stderr": data.get("stderr", ""),
+                "job_id": data.get("job_id"),
             }
+    except urllib.error.HTTPError as e:
+        # 4xx/5xx from harness-srv: urllib raises before reading the body,
+        # so the real reason (e.g. 'No active config_bundle found for role X')
+        # would be lost behind 'HTTP Error 400'. Read the JSON error field
+        # and the job id so failures stay traceable in harness-srv logs.
+        job_id = None
+        try:
+            err_data = json.loads(e.read().decode("utf-8", "replace"))
+            detail = err_data.get("error") or str(e)
+            job_id = err_data.get("job_id")
+        except Exception:
+            detail = str(e)
+        _log("Harness invocation failed for %s (HTTP %s): %s",
+             role, e.code, str(detail))
+        return {
+            "exit_code": 1,
+            "stdout": "",
+            "stderr": str(detail)[:500],
+            "job_id": job_id,
+        }
     except Exception as e:
         _log("Harness invocation failed for %s: %s", role, e)
         return {"exit_code": 1, "stdout": "", "stderr": str(e)}
@@ -607,6 +739,35 @@ async def handle_comment_created(
         # ── Invoke the agent (backend dispatch) ──────────────────
         backend = watch.get("execution_backend", "operator")
 
+        # ── Leased-mode gate (R1 hard stop, pre-invocation) ──────
+        # 'freebuff' is the LEASED interactive path: an agent must have
+        # acquired an ACTIVE role lease AND be in a polling loop for the
+        # turn to run. Without one the send fails immediately with the
+        # exact reason — no silent 90s timeout while nobody picks up the
+        # NATS turn.requested.
+        #
+        # The watch is deliberately kept OPEN on this failure: closing it
+        # orphans the session (the UI could no longer resume it, so the
+        # error history became unreachable and messages looked like they
+        # vanished). Staying active means every send to a lease-less role
+        # fails fast with the same visible reason until a lease is issued.
+        #
+        # The gate failure is NOT a consumed turn: last_activity is touched
+        # (so idle sweeps keep the session fresh while the user tries) but
+        # turn_count is left alone — a lease-less role that keeps failing
+        # must not burn its 20-turn budget on failures that never ran.
+        if backend == "freebuff" and not _lease_valid(lease):
+            reason = _lease_failure_reason(lease)
+            _log("Watch %s: leased role %s has no valid lease — failing turn (%s)",
+                 watch_id[:8], watch_role, reason)
+            _post_assembly_comment(
+                thread_id,
+                f"[system] Agent {watch_role} encountered an error: {reason}",
+                "system",
+            )
+            _touch_watch_activity(pg_conn, watch_id)
+            continue
+
         if backend == "freebuff":
             # FreeBuff session already owns context — emit pointer event.
             # The session polls Assembly directly (duality-ui polling loop).
@@ -642,11 +803,15 @@ async def handle_comment_created(
 
         if exit_code != 0:
             stderr = result.get("stderr", "") or ""
+            stdout = result.get("stdout", "") or ""
             _log("Agent %s failed (exit=%s): %s",
                  watch_role, exit_code, stderr[:200])
+            detail = _compose_failure_detail(
+                stderr, stdout, exit_code, result.get("job_id")
+            )
             _post_assembly_comment(
                 thread_id,
-                f"[system] Agent {watch_role} encountered an error: {stderr[:500]}",
+                f"[system] Agent {watch_role} encountered an error: {detail}",
                 "system",
             )
             _bump_turn_count(pg_conn, watch_id)
@@ -661,10 +826,19 @@ async def handle_comment_created(
         if comment_id:
             _log("Posted response as comment %s", comment_id[:8])
 
-        # 6. Re-check coordinator with the actual response
+        # 6. Re-check coordinator with the actual response.
+        #    Harness (cloud executor) needs no role lease — it launches
+        #    opencode/codex/gemini with a prompt. Treat its lease as
+        #    always-valid so R1 doesn't close the watch after one turn.
+        lease_for_resolution = (
+            {"status": "ACTIVE", "budget_units": None,
+             "consumed_units": 0, "expires_at": None}
+            if backend == "harness"
+            else lease
+        )
         post_resolution = resolve_conversation_outcome(
             watch=watch,
-            lease=lease,
+            lease=lease_for_resolution,
             last_agent_response=stdout,
             now_ms=int(time.time() * 1000),
         )
@@ -726,8 +900,14 @@ async def run_interactive_turn_subscriber() -> None:  # noqa: C901
         sys.exit(1)
 
     # ── Connect to PostgreSQL ──
+    # application_name tags this connection so liveness probes (nebula-srv
+    # /api/cascade/subscriber-status → pg_stat_activity) can tell whether the
+    # subscriber daemon is alive before a user sends a message.
     _log("Connecting to PostgreSQL...")
-    pg_conn = psycopg2.connect(DATABASE_URL)
+    pg_conn = psycopg2.connect(
+        DATABASE_URL,
+        application_name="cascade-interactive-turn",
+    )
     pg_conn.set_isolation_level(
         psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT
     )

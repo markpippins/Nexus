@@ -6956,6 +6956,39 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // GET /api/cascade/subscriber-status — live liveness check for the
+  // cascade interactive-turn subscriber (the daemon that turns duality
+  // comments into agent turns). The subscriber tags its PG connection with
+  // application_name='cascade-interactive-turn'; when the daemon dies its
+  // socket closes and the backend disappears from pg_stat_activity. The
+  // duality-ui TopBar polls this so users know BEFORE sending whether a
+  // response is even possible.
+  router.get('/cascade/subscriber-status', async (_req: Request, res: Response) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT application_name, state, backend_start, pid
+         FROM pg_stat_activity
+         WHERE application_name = 'cascade-interactive-turn'
+           AND datname = current_database()
+         LIMIT 1`
+      );
+      const row = rows[0] || null;
+      // NOTE: backend_start is the server backend's start time; for a
+      // LISTEN connection the backend is spawned at connect, so it is a
+      // close approximation of when the subscriber connected.
+      res.json({
+        up: !!row,
+        state: row?.state ?? null,
+        backendSince: row?.backend_start
+          ? new Date(row.backend_start).toISOString()
+          : null,
+        backendPid: row?.pid ?? null,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // GET /api/role-leases/stale — ACTIVE leases past window/budget (for sweep)
   router.get('/role-leases/stale', async (_req: Request, res: Response) => {
     try {
