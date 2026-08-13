@@ -355,3 +355,48 @@ class TestAc6StaleLeaseSweep(unittest.TestCase):
                       "ACTIVE lease with expired window should appear in /stale")
         # Clean up the now-stale lease
         _revoke(lease["id"])
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  AC7 — Admission enforcement (T20 B3): config validity gates harness work
+# ═══════════════════════════════════════════════════════════════════════
+
+# wr-conf-002 has NO config_bundle rows → the admission gate must deny
+# /run-direct with reason=NO_CONFIG (deterministic, no real role touched).
+# ROLE_REVOKED / CONFIG_INVALIDATED are covered at the unit level
+# (tests/admission.test.ts). Lease outcomes are enforced on the worker-pool
+# path (execution_worker.py), not harness-srv.
+NO_CONFIG_ROLE = "wr-conf-002"
+
+
+def _run_direct(role: str, prompt: str = "ping", timeout_ms: int = 2000) -> tuple:
+    """POST /run-direct to harness-srv. Returns (status_code, body_dict)."""
+    data = json.dumps({
+        "role": role,
+        "prompt": prompt,
+        "timeout_ms": timeout_ms,
+        "channel": "wr-conf-002",
+    }).encode()
+    req = urllib.request.Request(
+        f"{HARNESS_URL}/run-direct",
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.status, json.loads(resp.read())
+    except urllib.request.HTTPError as e:
+        return e.code, json.loads(e.read())
+
+
+class TestAc7AdmissionEnforcement(unittest.TestCase):
+    """T20 B3: harness-srv denies work for roles with no valid config."""
+
+    def test_no_config_denies_run_direct(self):
+        """A role with no config_bundle → /run-direct returns 403 NO_CONFIG."""
+        status, body = _run_direct(NO_CONFIG_ROLE, "ping")
+        self.assertEqual(status, 403, f"expected 403, got {status}: {body}")
+        admission = body.get("admission", {})
+        self.assertEqual(admission.get("outcome"), "ADMISSION_DENIED")
+        self.assertEqual(admission.get("reason"), "NO_CONFIG")

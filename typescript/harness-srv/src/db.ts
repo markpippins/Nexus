@@ -9,6 +9,7 @@
 import { Pool } from "pg";
 import Redis from "ioredis";
 import { opencodeModelId, opencodeProviderFromConfig } from "./model";
+import { decideConfigAdmission, type ConfigAdmission } from "./admission";
 
 const pool = new Pool({
   host: process.env.PG_HOST || "localhost",
@@ -242,6 +243,8 @@ export async function resolveRoleModel(role: string): Promise<ResolvedModelConfi
      LEFT JOIN tackle.providers p  ON COALESCE(cb.provider_id, m.provider_id) = p.id
      LEFT JOIN tackle.harnesses h  ON COALESCE(cb.harness_id, m.harness_id) = h.id
      WHERE cb.role = $1 AND cb.is_active = 1
+       AND (cb.valid_from IS NULL OR cb.valid_from <= NOW())
+       AND (cb.valid_to IS NULL OR cb.valid_to > NOW())
      ORDER BY cb.priority ASC`,
     [role]
   );
@@ -291,6 +294,26 @@ export async function resolveRoleModel(role: string): Promise<ResolvedModelConfi
       opencodeProviderFromConfig(primary.provider_config_json)
     ),
   };
+}
+
+/**
+ * Check whether a role is admissible via its config_bundle validity.
+ *
+ * Distinguishes three denial reasons (T20 admission gate):
+ *   - NO_CONFIG           — no config_bundle rows for the role
+ *   - ROLE_REVOKED        — bundles exist but all is_active=0
+ *   - CONFIG_INVALIDATED  — active bundles but none within valid_from/valid_to
+ */
+export async function checkConfigAdmission(role: string): Promise<ConfigAdmission> {
+  const result = await pool.query(
+    `SELECT is_active,
+            (valid_from IS NOT NULL AND valid_from > NOW()) AS not_yet_valid,
+            (valid_to IS NOT NULL AND valid_to <= NOW()) AS expired
+     FROM tackle.config_bundle
+     WHERE role = $1`,
+    [role]
+  );
+  return decideConfigAdmission(result.rows as any[]);
 }
 
 /**

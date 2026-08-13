@@ -596,12 +596,56 @@ def _recover_orphans(db: DBAdapter) -> int:
     return released
 
 
+def _role_lease_blocked(role: str) -> str | None:
+    """Return a denial reason (LEASE_EXPIRED/LEASE_EXHAUSTED) if the role's
+    ACTIVE lease is expired/exhausted, else None (allowed or no lease).
+
+    T20 two-tier governance: lease quota gates the WORKER POOL (this path).
+    Scheduled/system-triggered runs are governed by admission (config
+    validity) in harness-srv, not by lease expiry here.
+    """
+    try:
+        url = f"http://localhost:3101/api/role-leases?role={role}"
+        req = urllib.request.Request(url, headers={"Content-Type": "application/json"}, method="GET")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+        now = datetime.now(timezone.utc)
+        for item in data.get("items", []):
+            if item.get("status") != "ACTIVE":
+                continue
+            window_end = item.get("window_end")
+            budget = item.get("budget_units")
+            consumed = item.get("consumed_units", 0)
+            if window_end:
+                try:
+                    we = datetime.fromisoformat(str(window_end).replace("Z", "+00:00"))
+                    if we < now:
+                        return "LEASE_EXPIRED"
+                except ValueError:
+                    pass
+            if budget is not None and consumed >= budget:
+                return "LEASE_EXHAUSTED"
+            break
+        return None
+    except Exception as e:  # noqa: BLE001
+        _log.warning("role-lease check failed (proceeding): %s", e)
+        return None
+
+
 def _run_pass(db: DBAdapter, executor_id: str, dry_run: bool, include_legacy: bool, model: str = "") -> dict:
     """One full pass: recover + reconcile + consume. Returns summary."""
-    summary = {"recovered": 0, "reconciled": 0, "consumed": 0, "skipped_leased": 0, "failed": 0, "dry_run": 0}
+    summary = {"recovered": 0, "reconciled": 0, "consumed": 0, "skipped_leased": 0, "failed": 0, "dry_run": 0, "lease_blocked": None}
 
     # 0. Self-heal after a crashed run
     summary["recovered"] = _recover_orphans(db)
+
+    # 0.5 Role-lease gate (T20 B3): an expired/exhausted role lease blocks
+    #     worker-pool consumption — skip reconcile + consume this pass.
+    blocked = _role_lease_blocked(ROLE)
+    if blocked:
+        summary["lease_blocked"] = blocked
+        _log.warning("role lease %s — skipping reconcile + READY consumption (role=%s)", blocked, ROLE)
+        return summary
 
     # 1. Reconcile eligible plans → READY requests
     try:

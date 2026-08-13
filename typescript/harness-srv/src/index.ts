@@ -14,7 +14,8 @@
  */
 
 import express from "express";
-import { resolveContext, resolveRoleModel, emitEvent, pool, redis, checkRoleLease, incrementConsumedUnits, emitGovernanceReceipt } from "./db";
+import { resolveContext, resolveRoleModel, emitEvent, pool, redis, checkConfigAdmission, incrementConsumedUnits, emitGovernanceReceipt } from "./db";
+import { ADMISSION_OUTCOME } from "./admission";
 import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import { writeFile, readFile, unlink, mkdir, appendFile } from "fs/promises";
@@ -230,23 +231,49 @@ app.post("/run", async (req, res) => {
       });
     }
 
-    // ── Role-lease guard (RoleLeases plan 1286, slice 3) ─────────────
-    const lease = await checkRoleLease(resolved.role);
-    if (!lease) {
+    // ── Admission gate (T20 two-tier): config validity, uniform across paths ──
+    const configAdmission = await checkConfigAdmission(resolved.role);
+    if (!configAdmission.valid) {
       await log(
         "warn",
-        `run job=${jobId} role=${resolved.role} — no active role lease (proceeding anyway; lease-less runs will be gated in a follow-up)`
+        `run job=${jobId} role=${resolved.role} — admission denied: ${configAdmission.outcome}`
       );
-    } else if (lease.expired || lease.exhausted) {
-      await log(
-        "warn",
-        `run job=${jobId} role=${resolved.role} — role lease ${lease.expired ? "EXPIRED" : "EXHAUSTED"} (window_end=${lease.window_end}, consumed=${lease.consumed_units}/${lease.budget_units ?? "unlimited"}) — proceeding but lease should be renewed`
-      );
-    } else {
-      await log(
-        "info",
-        `run job=${jobId} role=${resolved.role} — active lease ok (consumed=${lease.consumed_units}/${lease.budget_units ?? "unlimited"}, window_end=${lease.window_end})`
-      );
+      await emitEvent({
+        event_type: "admission.denied",
+        source: "harness-srv.run",
+        aggregate_type: "harness_job",
+        aggregate_id: jobId,
+        payload: {
+          wind_task_id,
+          role: resolved.role,
+          outcome: ADMISSION_OUTCOME.ADMISSION_DENIED,
+          reason: configAdmission.outcome,
+        },
+        actor_type: "system",
+      });
+      // BLOCK is the always-valid terminal receipt and a valid first receipt
+      // for a fresh plan_id — durable "admission denied" audit trail.
+      await emitGovernanceReceipt({
+        planId: wind_task_id,
+        type: "BLOCK",
+        agentRole: resolved.role,
+        sessionId: jobId,
+        summary: `harness-srv ${jobId.slice(0, 8)}: admission denied (${configAdmission.outcome})`,
+        metadata: {
+          stage: "admission_denied",
+          wind_task_id,
+          outcome: ADMISSION_OUTCOME.ADMISSION_DENIED,
+          reason: configAdmission.outcome,
+        },
+      });
+      return res.status(403).json({
+        job_id: jobId,
+        error: configAdmission.message,
+        admission: {
+          outcome: ADMISSION_OUTCOME.ADMISSION_DENIED,
+          reason: configAdmission.outcome,
+        },
+      });
     }
 
     // 2. Merge overrides
@@ -528,6 +555,36 @@ app.post("/run-direct", async (req, res) => {
       return res.status(400).json({ error: "prompt is required" });
     }
 
+    // ── Admission gate (T20 two-tier): config validity, uniform across paths ──
+    const configAdmission = await checkConfigAdmission(role);
+    if (!configAdmission.valid) {
+      await log(
+        "warn",
+        `run-direct job=${jobId} role=${role} — admission denied: ${configAdmission.outcome}`
+      );
+      await emitEvent({
+        event_type: "admission.denied",
+        source: `harness-srv.run-direct.${channel}`,
+        aggregate_type: "harness_job",
+        aggregate_id: jobId,
+        payload: {
+          role,
+          channel,
+          outcome: ADMISSION_OUTCOME.ADMISSION_DENIED,
+          reason: configAdmission.outcome,
+        },
+        actor_type: "system",
+      });
+      return res.status(403).json({
+        job_id: jobId,
+        error: configAdmission.message,
+        admission: {
+          outcome: ADMISSION_OUTCOME.ADMISSION_DENIED,
+          reason: configAdmission.outcome,
+        },
+      });
+    }
+
     // ── Resolve the role's model/harness config from tackle ──────
     // Reuse resolveRoleModel — the same resolver as the /run workflow path —
     // so both paths agree on the SAME primary bundle, model wire id, and
@@ -562,16 +619,6 @@ app.post("/run-direct", async (req, res) => {
         job_id: jobId,
         error: `role ${role} is INTERACTIVE-hosted (Freebuff) — use freebuff backend instead`,
       });
-    }
-
-    // ── Role-lease guard ─────────────────────────────────────────
-    const lease = await checkRoleLease(role);
-    if (!lease) {
-      await log("warn", `run-direct job=${jobId} role=${role} — no active role lease`);
-    } else if (lease.expired || lease.exhausted) {
-      await log("warn", `run-direct job=${jobId} role=${role} — lease ${lease.expired ? "EXPIRED" : "EXHAUSTED"}`);
-    } else {
-      await log("info", `run-direct job=${jobId} role=${role} — active lease ok`);
     }
 
     const effectiveWorkDir = work_dir || WORK_DIR;
