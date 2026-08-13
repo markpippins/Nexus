@@ -14,7 +14,7 @@
  */
 
 import express from "express";
-import { resolveContext, emitEvent, pool, redis, checkRoleLease, incrementConsumedUnits, emitGovernanceReceipt, opencodeModelId } from "./db";
+import { resolveContext, resolveRoleModel, emitEvent, pool, redis, checkRoleLease, incrementConsumedUnits, emitGovernanceReceipt } from "./db";
 import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import { writeFile, readFile, unlink, mkdir, appendFile } from "fs/promises";
@@ -333,6 +333,7 @@ app.post("/run", async (req, res) => {
           agent: effectiveAgent,
           role: resolved.role,
           model: effectiveModel,
+          model_identifier: resolved.model?.model_identifier,
           timeout_ms,
         });
         stdout = result.stdout;
@@ -527,20 +528,16 @@ app.post("/run-direct", async (req, res) => {
       return res.status(400).json({ error: "prompt is required" });
     }
 
-    // ── Resolve harness config from tackle ───────────────────────
-    const configResult = await pool.query(
-      `SELECT cb.harness_id, cb.provider_id, m.model_identifier, cb.invocation_mode,
-              h.invocation_semantics
-       FROM tackle.config_bundle cb
-       JOIN tackle.harnesses h ON h.id = cb.harness_id
-       JOIN tackle.models m ON m.id = cb.model_id
-       WHERE cb.role = $1 AND cb.is_active = 1
-       ORDER BY cb.priority DESC
-       LIMIT 1`,
-      [role]
-    );
+    // ── Resolve the role's model/harness config from tackle ──────
+    // Reuse resolveRoleModel — the same resolver as the /run workflow path —
+    // so both paths agree on the SAME primary bundle, model wire id, and
+    // harness. (Previously this ran its own SQL with `ORDER BY priority DESC`,
+    // which inverted the primary-bundle selection vs resolveRoleModel's
+    // ascending priority sort — picking the fallback model instead of the
+    // primary. One role reference must resolve deterministically, T20.)
+    const modelConfig = await resolveRoleModel(role);
 
-    if (configResult.rows.length === 0) {
+    if (!modelConfig) {
       await log("warn", `run-direct job=${jobId} role=${role} — no active config_bundle found`);
       return res.status(400).json({
         job_id: jobId,
@@ -548,21 +545,12 @@ app.post("/run-direct", async (req, res) => {
       });
     }
 
-    const harnessId = configResult.rows[0].harness_id;
-    // Map the tackle model_identifier to the opencode model id the same way
-    // the workflow `run` path does (via resolveContext/opencodeModelId) — the
-    // wire id is the config key verbatim, so a namespaced identifier like
-    // `z-ai/glm-5.2` must become `z-ai/z-ai/glm-5.2` (provider `z-ai`, model
-    // key `z-ai/glm-5.2`) or opencode fails to resolve the model. Explicit
-    // modelOverride values are passed through as-is: callers must supply an
-    // opencode-formatted id (e.g. `opencode/big-pickle` or `z-ai/z-ai/glm-5.2`).
-    const effectiveModel =
-      modelOverride ||
-      opencodeModelId(
-        configResult.rows[0].provider_id ?? "",
-        configResult.rows[0].model_identifier
-      );
-    const invocationMode = configResult.rows[0].invocation_mode;
+    const harnessId = modelConfig.harness_id;
+    // Explicit modelOverride values are passed through as-is: callers must
+    // supply an opencode-formatted id (e.g. `opencode/big-pickle`). Otherwise
+    // the canonical opencode_model_id from resolveRoleModel is used.
+    const effectiveModel = modelOverride || modelConfig.opencode_model_id;
+    const invocationMode = modelConfig.invocation_mode;
 
     // ── Interactive-hosted guard ─────────────────────────────────
     // invocation_mode is a column on tackle.config_bundle (not on
@@ -628,6 +616,7 @@ app.post("/run-direct", async (req, res) => {
         agent: effectiveAgent,
         role,
         model: effectiveModel,
+        model_identifier: modelConfig.model_identifier,
         timeout_ms,
       });
       stdout = result.stdout;
@@ -730,6 +719,7 @@ interface HarnessExecParams {
   agent: string;
   role: string;
   model?: string; // opencode --model value (from tackle config_bundle)
+  model_identifier?: string; // bare model_identifier (for binary=ollama)
   timeout_ms: number;
 }
 
@@ -766,7 +756,15 @@ async function executeHarness(params: HarnessExecParams): Promise<HarnessExecRes
   // config_bundle) is honored on both paths — opencode via --model, and
   // ollama via the model_identifier passed to the generate API.
   if (binary === "ollama") {
-    return executeOllama(promptContent, role, params.model, timeout_ms);
+    // Ollama's /api/generate expects the bare model_identifier (e.g.
+    // `qwen2.5-coder`), not the opencode-qualified wire id
+    // (`ollama/qwen2.5-coder`) — feeding the latter 404s.
+    return executeOllama(
+      promptContent,
+      role,
+      params.model_identifier ?? params.model,
+      timeout_ms
+    );
   } else if (binary === "opencode") {
     return executeOpencode(params, promptContent);
   } else {

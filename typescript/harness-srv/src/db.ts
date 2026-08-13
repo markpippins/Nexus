@@ -8,6 +8,7 @@
 
 import { Pool } from "pg";
 import Redis from "ioredis";
+import { opencodeModelId, opencodeProviderFromConfig } from "./model";
 
 const pool = new Pool({
   host: process.env.PG_HOST || "localhost",
@@ -108,28 +109,6 @@ export interface ResolvedFallbackModel {
 }
 
 /**
- * Map a tackle provider + model_identifier to the opencode --model value.
- *
- * opencode config keys its provider models by the wire model ID, and the
- * wire `model` field is the map key verbatim — so the opencode model ID is
- * `<opencode-provider>/<wire-id>`:
- *   - Nvidia:    identifier already namespaced (nvidia/x, z-ai/x) → nvidia/nvidia/x
- *   - DeepSeek:  identifier already namespaced (deepseek-ai/x)     → deepseek-ai/deepseek-ai/x
- *   - OpenCode:  bare identifier (big-pickle)                      → opencode/big-pickle
- *   - OpenCode Go: bare identifier (gemini-3.5-flash)              → opencode-go/gemini-3.5-flash
- *   - Ollama:    bare identifier (qwen2.5-coder)                   → ollama/qwen2.5-coder
- *   - OpenRouter: bare identifier (gpt-oss-120b)                   → openrouter/gpt-oss-120b
- */
-const OPENCODE_PROVIDER_BY_TACKLE: Record<string, string> = {
-  "prov-1783906359513": "nvidia", // Nvidia
-  "prov-1782144397043": "openrouter", // OpenRouter
-  "prov-opencode-go": "opencode-go",
-  "prov-opencode": "opencode",
-  "prov-ollama": "ollama",
-  "prov-deepseek": "deepseek-ai",
-};
-
-/**
  * Provider preference rank for fallback ordering — matches the operating
  * ladder: Nvidia first, then free OpenRouter, then free OpenCode Go,
  * then OpenCode (big-pickle), then Ollama (local, last resort), and the
@@ -143,20 +122,6 @@ const PROVIDER_RANK: Record<string, number> = {
   "prov-ollama": 4, // Ollama
   "prov-deepseek": 5, // DeepSeek (key currently invalid)
 };
-
-export function opencodeModelId(providerId: string, modelIdentifier: string): string {
-  const slash = modelIdentifier.indexOf("/");
-  if (slash > 0) {
-    // Already namespaced (nvidia/x, z-ai/x, deepseek-ai/x) — the opencode
-    // provider name is the first segment of the wire id, and the model key
-    // is the full wire id: nvidia/nvidia/x, z-ai/z-ai/x, deepseek-ai/deepseek-ai/x.
-    return modelIdentifier.slice(0, slash) + "/" + modelIdentifier;
-  }
-  // Bare identifier — map the tackle provider to its opencode provider.
-  const opencodeProvider = OPENCODE_PROVIDER_BY_TACKLE[providerId];
-  if (!opencodeProvider) return modelIdentifier; // unknown provider — pass through
-  return `${opencodeProvider}/${modelIdentifier}`;
-}
 
 // ── Resolution functions ────────────────────────────────────────────
 
@@ -265,6 +230,7 @@ export async function resolveRoleModel(role: string): Promise<ResolvedModelConfi
             p.name AS provider_name,
             COALESCE(p.type, '') AS provider_type,
             p.api_key,
+            p.config_json AS provider_config_json,
             COALESCE(cb.endpoint_url, p.endpoint_url) AS endpoint_url,
             COALESCE(h.id, '') AS harness_id,
             COALESCE(h.name, '') AS harness_name,
@@ -319,7 +285,11 @@ export async function resolveRoleModel(role: string): Promise<ResolvedModelConfi
     invocation_semantics: parseJson(primary.invocation_semantics),
     invocation_mode: primary.invocation_mode ?? "",
     fallback_models: fallbacks,
-    opencode_model_id: opencodeModelId(primary.provider_id ?? "", primary.model_identifier),
+    opencode_model_id: opencodeModelId(
+      primary.provider_id ?? "",
+      primary.model_identifier,
+      opencodeProviderFromConfig(primary.provider_config_json)
+    ),
   };
 }
 
