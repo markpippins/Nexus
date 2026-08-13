@@ -773,14 +773,12 @@ def _run_from_path(dco_path: str) -> int:
             call_ccnf_conformance,
         )
 
-        _binary = os.environ.get(
-            "CCNF_CONFORMANCE_BIN",
-            os.path.join(os.path.dirname(__file__),
-                         "../../go/wrp/ccnf-ref/bin/ccnf-conformance"),
-        )
+        # T21 (D-T21-1): emission is delegated to nexus_core.wrp.compile — the
+        # bridge is a caller, not an emitter. No Go binary, no
+        # CCNF_CONFORMANCE_BIN.
         try:
             _ccnf_input = CCNFAdapter.from_work_request(req)
-            _ccnf_result = call_ccnf_conformance(_ccnf_input, _binary)
+            _ccnf_result = call_ccnf_conformance(_ccnf_input)
             _ccnf_cer_json = _ccnf_result.cer
             _ccnf_hash = _ccnf_result.hash
             _ccnf_started_at = int(time.time())
@@ -846,7 +844,7 @@ def _run_from_path(dco_path: str) -> int:
                     "id": f"rec-ccnf-{wr_id}-{int(time.time())}",
                     "type": "CCNF_EXECUTION",
                     "agent_role": "builder",
-                    "plan_id": plan_id if plan_id else wr_id,
+                    "plan_id": wr_id,
                     "summary": f"CCNF conformance: {_receipt.get('status', 'UNKNOWN')}",
                     "ccnf_hash": _receipt.get("ccnf_hash", ""),
                     "created_at": datetime.utcnow().isoformat() + "Z",

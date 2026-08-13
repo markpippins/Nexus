@@ -1,0 +1,5 @@
+# CCNF protocol version — canonical record (T07 item 4 / T21 item 4).
+# The embedded constant CCNF_VERSION in compile.py MUST equal this value.
+# CI verifies manifest == constant (nexus_core.wrp.compile.manifest_matches_constant).
+# Bump this file AND the constant together; anything else fails closed.
+1

@@ -2,9 +2,15 @@
 CCNF Bridge: Connects Conduit's WorkRequest execution pipeline to the CCNF
 reference implementation for deterministic canonicalization and execution receipts.
 
+T21 re-point (D-T21-1): the bridge is now a **caller** of the nexus_core
+compile entry point — ``nexus_core.wrp.compile.compile_ccnf_input`` (the
+pure-Python, byte-identical mirror of Go ``ccnf.Run``) — instead of shelling
+out to the Go ``ccnf-conformance`` binary. There is exactly one emitter in the
+system (T21: conduit is a caller, never a second emitter).
+
 When CONDUIT_USE_CCNF=true, the bridge:
   1. Translates a WorkRequestDCO into a CCNF input document (payload.meta namespace)
-  2. Invokes ``ccnf-conformance process`` as a subprocess → CER JSON
+  2. Compiles it via ``nexus_core.wrp.compile`` → CER (fail-closed)
   3. Extracts the deterministic hash from the CER signature
   4. Builds an ExecutionReceipt from CER + runtime timing (no DCO field access)
 
@@ -15,12 +21,11 @@ CCNFBridgeError and fall back to the non-CCNF path.
 from __future__ import annotations
 
 import hashlib
-import json
-import os
-import subprocess
 import time
 from datetime import datetime
 from typing import NamedTuple
+
+from nexus_core.wrp.compile import CompileError, compile_ccnf_input
 
 
 # ── Exceptions ──────────────────────────────────────────────────────
@@ -50,17 +55,11 @@ class CCNFResult(NamedTuple):
     hash: str
 
 
-# ── Configuration ───────────────────────────────────────────────────
-
-# Default path to the ccnf-conformance binary (relative to repo root).
-# Override via CCNF_CONFORMANCE_BIN env var.
-_DEFAULT_BINARY = os.path.join(
-    os.path.dirname(__file__),
-    "../../go/wrp/ccnf-ref/bin/ccnf-conformance",
-)
-
-# Timeout for ccnf-conformance subprocess (seconds). Override via env var.
-CCNF_CONFORMANCE_TIMEOUT = int(os.environ.get("CCNF_CONFORMANCE_TIMEOUT", "30"))
+# ── Compile delegation (T21) ───────────────────────────────────────
+# CER emission is delegated to nexus_core.wrp.compile.compile_ccnf_input — the
+# single compile entry point (fail-closed, deterministic). The legacy
+# ccnf-conformance binary path / timeout config are gone: there is no
+# subprocess and no alternate emitter.
 
 
 # ── Adapter: DCO → CCNF Input ───────────────────────────────────────
@@ -135,62 +134,33 @@ def call_ccnf_conformance(
     input_dict: dict,
     binary_path: str | None = None,
 ) -> CCNFResult:
-    """Invoke ``ccnf-conformance process`` and return the CER with its hash.
+    """Compile a CCNF input document through nexus_core.wrp.compile and return
+    the CER with its deterministic hash.
 
-    The subprocess uses the ``process`` command which reads CCNF input
-    from stdin and writes the full CER JSON to stdout. No temporary files
-    are created.
+    T21 re-point (D-T21-1): emission is delegated to
+    ``nexus_core.wrp.compile.compile_ccnf_input`` — the single compile entry
+    point (fail-closed). There is no subprocess and no Go binary dependency.
+
+    *binary_path* is retained for backward compatibility with existing callers
+    (``executor_cloud.py``) but is **ignored** — the pure-Python compiler is
+    authoritative; no divergent emission remains.
 
     Preconditions:
-        - *input_dict* has the five required CCNF top-level fields
-        - *binary_path* (if provided) points to the ``ccnf-conformance``
-          executable; if *None*, the default path is used.
+        - *input_dict* is a dict with the four required CCNF top-level fields
+          (actor, intent, domain, event_id)
 
     Postconditions:
         - Returns a :class:`CCNFResult` with the parsed CER dict and hash.
-        - Raises :class:`CCNFBridgeError` if:
-            - the binary is not found or not executable
-            - the binary exits non-zero
-            - stdout is not valid JSON
-            - the parsed CER does not contain ``signature.hash``
+        - Raises :class:`CCNFBridgeError` if the input cannot be compiled
+          (missing fields, invalid intent, version mismatch, non-finite
+          numbers, ...) — the fail-closed :class:`CompileError` is wrapped so
+          callers keep the same fall-back contract.
         - No filesystem side effects.
     """
-    resolved = binary_path or _DEFAULT_BINARY
-    if not os.path.isfile(resolved):
-        raise CCNFBridgeError(
-            f"ccnf-conformance binary not found: {resolved}"
-        )
-
-    payload_bytes = json.dumps(input_dict).encode("utf-8")
-
     try:
-        proc = subprocess.run(
-            [resolved, "process"],
-            input=payload_bytes,
-            capture_output=True,
-            timeout=CCNF_CONFORMANCE_TIMEOUT,
-        )
-    except FileNotFoundError:
-        raise CCNFBridgeError(
-            f"ccnf-conformance binary not found: {resolved}"
-        )
-    except subprocess.TimeoutExpired:
-        raise CCNFBridgeError(
-            f"ccnf-conformance timed out after {CCNF_CONFORMANCE_TIMEOUT}s"
-        )
-
-    if proc.returncode != 0:
-        stderr = (proc.stderr or b"").decode("utf-8", errors="replace")[:500]
-        raise CCNFBridgeError(
-            f"ccnf-conformance exited {proc.returncode}: {stderr}"
-        )
-
-    try:
-        cer = json.loads(proc.stdout)
-    except json.JSONDecodeError as e:
-        raise CCNFBridgeError(
-            f"ccnf-conformance output is not valid JSON: {e}"
-        )
+        cer = compile_ccnf_input(input_dict)
+    except CompileError as e:
+        raise CCNFBridgeError(f"ccnf compile failed: {e}") from e
 
     sig = cer.get("signature") or {}
     h = sig.get("hash")
