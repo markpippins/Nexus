@@ -100,6 +100,16 @@ def dockling_html_path(html_path: Path) -> dict | None:
             stats = dl.get("stats", {})
             log.info("  DockLang: %d units, %d blocks",
                      stats.get("total_units", 0), stats.get("total_blocks", 0))
+            # Surface dockling's own diagnostics (dropped turns / truncated
+            # opening) which it writes to stderr; stdout stays pure JSON.
+            # dockling's lines look like "WARNING dockling: <msg>" — strip the
+            # leading level+logger so the harvest log re-emits them cleanly.
+            for line in result.stderr.strip().splitlines():
+                msg = line.partition(": ")[2] if ": " in line else line
+                if line.startswith("WARNING"):
+                    log.warning("  dockling: %s", msg)
+                elif line.startswith("INFO"):
+                    log.info("  dockling: %s", msg)
             return dl
         else:
             log.warning("  Dockling failed: %s", result.stderr.strip()[:200])

@@ -14,8 +14,10 @@ Schema per DAL spec:
       provenance: { block_index }
 """
 
-import json, sys, re
+import json, sys, re, logging
 from bs4 import BeautifulSoup, Tag
+
+log = logging.getLogger("dockling")
 
 MERMAID_KEYWORDS = {'graph', 'flowchart', 'sequenceDiagram', 'classDiagram',
     'stateDiagram', 'stateDiagram-v2', 'erDiagram', 'gantt', 'pie',
@@ -27,6 +29,13 @@ ASCII_DIAGRAM_PATTERNS = [
     re.compile(r'^[\s]*[A-Za-z]+\s*[│└├┌┐┘┴┬├─┼╔╗╚╝║═].*[\s]*[A-Za-z]'),
     re.compile(r'^[\s]*[A-Za-z_.]+\s*[-←→↔↑↓↕]+.*[-←→↔↑↓↕]'),  # arrows
 ]
+
+# Speaker prefixes for Claude.ai / Copilot SPA exports (role='article' nodes).
+_CLAUDE_USER_PREFIX = 'You said'
+_CLAUDE_ASSISTANT_PREFIXES = (
+    'Claude responded', 'Copilot said', 'ChatGPT said',
+    'Gemini said', 'Assistant:',
+)
 
 
 def clean_html_text(text):
@@ -286,22 +295,35 @@ def _detect_format(soup):
 
 
 def _parse_claude_ai(soup):
-    """Parse Claude.ai / Copilot SPA exports. Messages are in role='article' elements."""
+    """Parse Claude.ai / Copilot SPA exports. Messages are in role='article' elements.
+
+    Enforces a user opening: the first emitted turn must be a user turn; a
+    conversation that opens with an assistant reply is a truncated capture and
+    is logged as a warning.  Dropped turns (unrecognized speaker prefix or no
+    extractable content) are logged so silent turn loss is no longer invisible.
+    """
     articles = soup.find_all(attrs={'role': 'article'})
     turns = []
 
-    for article in articles:
+    if not articles:
+        log.warning("claude: no role='article' elements found; nothing parsed")
+        return turns
+
+    leading_dropped = 0  # turns dropped before the first emitted turn
+
+    for idx, article in enumerate(articles):
         # Determine role from text prefix (Claude, Copilot, etc.)
         # Some use colon ("You said:"), some use space ("You said ")
         raw_text = article.get_text(' ', strip=True)
-        if raw_text.startswith('You said'):
+        if raw_text.startswith(_CLAUDE_USER_PREFIX):
             role = 'user'
-        elif any(raw_text.startswith(p) for p in [
-            'Claude responded', 'Copilot said', 'ChatGPT said',
-            'Gemini said', 'Assistant:'
-        ]):
+        elif any(raw_text.startswith(p) for p in _CLAUDE_ASSISTANT_PREFIXES):
             role = 'assistant'
         else:
+            log.info("claude: dropped turn %d — unrecognized speaker prefix %r",
+                     idx, raw_text[:40])
+            if not turns:
+                leading_dropped += 1
             continue
 
         # Find the content div — try multiple class patterns
@@ -316,8 +338,25 @@ def _parse_claude_ai(soup):
             content_div = article
 
         blocks = extract_content_blocks(content_div)
-        if blocks:
-            turns.append({'role': role, 'blocks': blocks})
+        if not blocks:
+            log.info("claude: dropped turn %d (%s) — no content blocks extracted",
+                     idx, role)
+            if not turns:
+                leading_dropped += 1
+            continue
+
+        turns.append({'role': role, 'blocks': blocks})
+
+        # Require a user opening: the first emitted turn must be a user turn.
+        if len(turns) == 1:
+            if leading_dropped:
+                log.info("claude: dropped %d leading turn(s) before first emitted turn",
+                         leading_dropped)
+            if role != 'user':
+                log.warning(
+                    "claude: transcript starts mid-conversation — first turn is %r, "
+                    "not a user opening (truncated capture suspected)", role
+                )
 
     return turns
 
@@ -384,6 +423,9 @@ def parse_html(filepath):
 
 
 if __name__ == '__main__':
+    # Logs go to stderr so stdout stays pure JSON for subprocess consumers.
+    logging.basicConfig(level=logging.INFO, stream=sys.stderr,
+                        format='%(levelname)s %(name)s: %(message)s')
     if len(sys.argv) < 2:
         print('Usage: dockling.py <chat.html> [output.json]', file=sys.stderr)
         sys.exit(1)
