@@ -1,7 +1,7 @@
 /**
  * admission.ts — execution admission decisions (side-effect-free).
  *
- * T20 two-tier governance (operator-approved, architect ruling pending):
+ * T20 two-tier governance (binding ruling D-2026-08-14-001 APPROVED):
  *
  *   1. ADMISSION (uniform, every launch path) — is this role allowed to run
  *      at all? Governed by config_bundle validity: is_active (revoked),
@@ -34,6 +34,15 @@ export const ADMISSION_OUTCOME = {
   CONFIG_INVALIDATED: "CONFIG_INVALIDATED",
   /** Role has no config bundle rows at all. */
   NO_CONFIG: "NO_CONFIG",
+  /**
+   * Model credential not yet verifiable (G1, binding ruling D-2026-08-14-001).
+   *
+   * ADVISORY-ONLY: this outcome MUST NOT block a launch. Until real credential
+   * verification exists, an unverifiable model check is a warning at most —
+   * never a hard denial. It is documented here to keep the T20 vocabulary
+   * complete, but `decideConfigAdmission` intentionally never returns it.
+   */
+  MODEL_UNVERIFIED: "MODEL_UNVERIFIED",
   // Lease outcomes are emitted by the worker-pool path (execution_worker.py),
   // not by harness-srv. Kept here to document the full T20 vocabulary.
   LEASE_EXPIRED: "LEASE_EXPIRED",

@@ -7029,22 +7029,30 @@ export function createRoutes(pool: Pool): Router {
       const exhausted = lease.budget_units !== null && lease.consumed_units >= lease.budget_units;
 
       if (exhausted) {
-        // Auto-revoke — budget consumed, no more work under this lease
-        await pool.query(
-          `UPDATE tackle.role_leases SET status = 'RELEASED', updated_at = NOW() WHERE id = $1`,
+        // Auto-revoke — budget consumed, no more work under this lease.
+        // G2 (binding, D-2026-08-14-001): dedup the exhaustion notification.
+        // Only the call that performs the ACTIVE → RELEASED transition emits
+        // the type:lease-exhausted agent record. Concurrent/duplicate consume
+        // calls that find the lease already RELEASED fall through silently,
+        // collapsing the wr-conf-002 spam (4+ records in ~40s) to a single
+        // record per (role, lease) exhaustion episode.
+        const revoked = await pool.query(
+          `UPDATE tackle.role_leases SET status = 'RELEASED', updated_at = NOW()
+           WHERE id = $1 AND status = 'ACTIVE' RETURNING id`,
           [lease.id]
         );
-        // Emit exhaustion record (fire-and-forget — don't block the response)
-        const exhaustId = randomUUID();
-        const now = new Date().toISOString();
-        pool.query(
-          `INSERT INTO nebula.agent_records_history (id, record_type, role, title, content, tags, created_at, recorded_on_dt)
-           VALUES ($1::uuid, 'report', $2, $3, $4, $5, $6, $6)`,
-          [
-            exhaustId,
-            'architect',
-            `Role-lease exhausted: ${role} (${lease.consumed_units}/${lease.budget_units})`,
-            `## Role lease exhausted
+        if (revoked.rows.length > 0) {
+          // Emit exhaustion record (fire-and-forget — don't block the response)
+          const exhaustId = randomUUID();
+          const now = new Date().toISOString();
+          pool.query(
+            `INSERT INTO nebula.agent_records_history (id, record_type, role, title, content, tags, created_at, recorded_on_dt)
+             VALUES ($1::uuid, 'report', $2, $3, $4, $5, $6, $6)`,
+            [
+              exhaustId,
+              'architect',
+              `Role-lease exhausted: ${role} (${lease.consumed_units}/${lease.budget_units})`,
+              `## Role lease exhausted
 
 - **Role:** ${role}
 - **Channel:** ${lease.channel || 'unknown'}
@@ -7054,10 +7062,11 @@ export function createRoutes(pool: Pool): Router {
 - **Lease ID:** ${lease.id}
 
 The lease has been auto-revoked. Issue a new lease to resume work.`,
-            ['type:lease-exhausted', 'to:architect', 'to:engineer', `role:${role}`],
-            now
-          ]
-        ).catch(() => { /* best-effort — don't fail the response */ });
+              ['type:lease-exhausted', 'to:architect', 'to:engineer', `role:${role}`],
+              now
+            ]
+          ).catch(() => { /* best-effort — don't fail the response */ });
+        }
       }
 
       res.json({
