@@ -13,8 +13,8 @@ so re-runs are idempotent: any decision record whose id already appears as a
 `source_url` on a decisions-forum thread is skipped. No duplicates are ever
 created.
 
-Attribution: the thread's `role` comes from the agent record. The `model` is
-left null because agent records do not persist a model id (no such column).
+Attribution: the thread's `role` comes from the agent record. The `model`
+comes from the record's `model` column (nullable; added migration 048).
 
 Usage:
     python3 bin/mirror-decisions.py               # mirror all unmirrored decisions
@@ -59,7 +59,7 @@ def load_decisions(conn) -> list[dict]:
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT id, role, title, content, created_at
+        SELECT id, role, title, content, created_at, model
         FROM nebula.agent_records
         WHERE record_type = 'decision'
         ORDER BY created_at ASC
@@ -72,6 +72,7 @@ def load_decisions(conn) -> list[dict]:
             "title": row[2] or "",
             "content": row[3] or "",
             "created_at": row[4],
+            "model": row[5] if len(row) > 5 else None,
         }
         for row in cur.fetchall()
     ]
@@ -101,7 +102,7 @@ def mirror_one(record: dict, user_id: str) -> str:
         "postedById": user_id,
         "source_url": f"nebula://agent-record/{record['id']}",
         "role": record["role"],
-        "model": None,
+        "model": record.get("model"),
     }
     result = _http_json(
         f"{ASSEMBLY_URL}/api/forums/by-id/{DECISIONS_FORUM_ID}/threads",

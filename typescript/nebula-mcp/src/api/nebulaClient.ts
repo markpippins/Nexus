@@ -317,13 +317,13 @@ export const NebulaClient = {
     recordType: string; role?: string; title?: string; content?: string;
     sourcePath?: string; metadata?: any; tags?: string[];
     systemId?: string; subsystemId?: string; featureId?: string; planRef?: string;
-    level?: number; visibilityScope?: string;
+    level?: number; visibilityScope?: string; model?: string;
   }) => httpRequest("POST", "/api/agent-records", body),
   /** PATCH /api/agent-records/:id */
   updateAgentRecord: (id: string, body: {
     title?: string; content?: string; metadata?: any; tags?: string[];
     systemId?: string | null; subsystemId?: string | null; featureId?: string | null; planRef?: string | null;
-    level?: number; visibilityScope?: string;
+    level?: number; visibilityScope?: string; model?: string | null;
   }) => httpRequest("PATCH", `/api/agent-records/${encodeURIComponent(id)}`, body),
   /** DELETE /api/agent-records/:id */
   deleteAgentRecord: (id: string) => httpRequest("DELETE", `/api/agent-records/${encodeURIComponent(id)}`),

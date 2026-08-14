@@ -18,6 +18,7 @@ Options:
   --level            Knowledge level (default: 3)
                      1=raw/operational, 2=structured, 3=planning/architectural, 4=meta
   --visibility       Visibility scope (default: architect)
+  --model            AI model identifier for per-model attribution (optional)
   --nebula-url       Nebula API base URL (default: http://localhost:3101)
   -h, --help         Show this help
 
@@ -40,6 +41,7 @@ def parse_args():
     p.add_argument("--record-type", default="engineering_log")
     p.add_argument("--level", type=int, default=3)
     p.add_argument("--visibility", default="architect")
+    p.add_argument("--model", default=None)
     p.add_argument("--nebula-url", default="http://localhost:3101")
     p.add_argument("-h", "--help", action="store_true")
     return p.parse_args()
@@ -78,6 +80,7 @@ def main():
         "tags": tag_list,
         "level": args.level,
         "visibilityScope": args.visibility,
+        "model": args.model,
     }
 
     url = f"{args.nebula_url}/api/agent-records"

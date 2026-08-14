@@ -1065,6 +1065,7 @@ export function registerTools(server: McpServer) {
       planRef: z.string().optional().describe("Conduit plan reference (e.g. '0136')"),
       level: z.number().optional().describe("Abstraction level 1-4 (default 1)"),
       visibilityScope: z.string().optional().describe("Visibility scope: builder, architect, planner, reviewer, all (default 'all')"),
+      model: z.string().optional().describe("AI model identifier (e.g. 'deepseek/deepseek-v4-pro')"),
     },
     async (args) => {
       const result = await NebulaClient.createAgentRecord({
@@ -1081,6 +1082,7 @@ export function registerTools(server: McpServer) {
         planRef: args.planRef,
         level: args.level,
         visibilityScope: args.visibilityScope,
+        model: args.model,
       });
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
@@ -1101,6 +1103,7 @@ export function registerTools(server: McpServer) {
       planRef: z.string().nullable().optional().describe("Conduit plan reference"),
       level: z.number().optional().describe("New abstraction level (1-4)"),
       visibilityScope: z.string().optional().describe("New visibility scope (builder, architect, planner, reviewer, all)"),
+      model: z.string().nullable().optional().describe("AI model identifier"),
     },
     async (args) => {
       const { id, ...body } = args;

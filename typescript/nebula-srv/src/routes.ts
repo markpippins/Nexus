@@ -4807,7 +4807,7 @@ export function createRoutes(pool: Pool): Router {
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
-          `SELECT id, record_type, role, title, source_path, tags, system_id, subsystem_id, feature_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
+          `SELECT id, record_type, role, model, title, source_path, tags, system_id, subsystem_id, feature_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
            FROM nebula.agent_records ${where}
            ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
           [...vals, pageSize, offset]
@@ -4891,7 +4891,7 @@ export function createRoutes(pool: Pool): Router {
       const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
 
       const { rows } = await pool.query(
-        `SELECT id, record_type, role, title, source_path, tags, system_id, subsystem_id, feature_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
+        `SELECT id, record_type, role, model, title, source_path, tags, system_id, subsystem_id, feature_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
          FROM nebula.agent_records ${where}
          ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
         [...vals, maxLimit, offset]
@@ -4948,7 +4948,7 @@ export function createRoutes(pool: Pool): Router {
           postedById: userId,
           source_url: `nebula://agent-record/${record.id}`,
           role: record.role,
-          model: null,
+          model: record.model || null,
         }),
       });
       if (!resp.ok) {
@@ -4962,7 +4962,7 @@ export function createRoutes(pool: Pool): Router {
   // POST /api/agent-records — create a new agent record (canonical write path)
   router.post('/agent-records', async (req: Request, res: Response) => {
     try {
-      const { recordType, role, title, content, sourcePath, metadata, tags, systemId, subsystemId, featureId, planRef, level, visibilityScope } = req.body;
+      const { recordType, role, title, content, sourcePath, metadata, tags, systemId, subsystemId, featureId, planRef, level, visibilityScope, model } = req.body;
 
       const validTypes = ['report', 'analysis', 'assessment', 'inspection', 'prompt', 'response', 'engineering_log', 'architecture_note', 'decision'];
       if (!recordType || !validTypes.includes(recordType)) {
@@ -4974,13 +4974,13 @@ export function createRoutes(pool: Pool): Router {
       }
 
       const { rows: [row] } = await pool.query(
-        `INSERT INTO nebula.agent_records (record_type, role, title, content, source_path, metadata, tags, system_id, subsystem_id, feature_id, plan_ref, level, visibility_scope)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+        `INSERT INTO nebula.agent_records (record_type, role, title, content, source_path, metadata, tags, system_id, subsystem_id, feature_id, plan_ref, level, visibility_scope, model)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
         [
           recordType, role || '', title || '', content || '',
           sourcePath || null, metadata || {}, tags || [],
           systemId || null, subsystemId || null, featureId || null, planRef || null,
-          level ?? 1, visibilityScope || 'all',
+          level ?? 1, visibilityScope || 'all', model || null,
         ]
       );
       res.status(201).json(row);
@@ -4998,7 +4998,7 @@ export function createRoutes(pool: Pool): Router {
   router.patch('/agent-records/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { title, content, metadata, tags, systemId, subsystemId, featureId, planRef, level, visibilityScope } = req.body;
+      const { title, content, metadata, tags, systemId, subsystemId, featureId, planRef, level, visibilityScope, model } = req.body;
       if (level !== undefined && (level < 1 || level > 4)) {
         return res.status(400).json({ error: 'level must be between 1 and 4' });
       }
@@ -5015,6 +5015,7 @@ export function createRoutes(pool: Pool): Router {
       if (planRef !== undefined) { sets.push(`plan_ref = $${i++}`); vals.push(planRef); }
       if (level !== undefined) { sets.push(`level = $${i++}`); vals.push(level); }
       if (visibilityScope !== undefined) { sets.push(`visibility_scope = $${i++}`); vals.push(visibilityScope); }
+      if (model !== undefined) { sets.push(`model = $${i++}`); vals.push(model); }
       if (sets.length === 0) return res.json({ ok: true });
       vals.push(id);
       const { rows: [row] } = await pool.query(
@@ -7064,8 +7065,8 @@ export function createRoutes(pool: Pool): Router {
           const exhaustId = randomUUID();
           const now = new Date().toISOString();
           pool.query(
-            `INSERT INTO nebula.agent_records_history (id, record_type, role, title, content, tags, created_at, recorded_on_dt)
-             VALUES ($1::uuid, 'report', $2, $3, $4, $5, $6, $6)`,
+            `INSERT INTO nebula.agent_records_history (id, record_type, role, title, content, tags, created_at, recorded_on_dt, model)
+             VALUES ($1::uuid, 'report', $2, $3, $4, $5, $6, $6, $7)`,
             [
               exhaustId,
               'architect',
@@ -7081,7 +7082,8 @@ export function createRoutes(pool: Pool): Router {
 
 The lease has been auto-revoked. Issue a new lease to resume work.`,
               ['type:lease-exhausted', 'to:architect', 'to:engineer', `role:${role}`],
-              now
+              now,
+              lease.model || null
             ]
           ).catch(() => { /* best-effort — don't fail the response */ });
         }
