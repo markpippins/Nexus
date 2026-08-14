@@ -49,8 +49,6 @@ HEALTH_URLS = {
 # Documented here for awareness; not updated.
 #
 #   cascade-* subscribers     port=0   (NATS subscribers, no HTTP)
-#   edit-ui                   port=4222 (not running)
-#   ide-ui                    port=3000 (not running)
 #   mildred-dam-api           port=3140 (custom endpoint)
 #   substance                 port=3115 (no standard /health)
 #   voyager-srv               port=3114 (no standard /health)
