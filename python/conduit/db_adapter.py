@@ -213,6 +213,29 @@ DEFAULT_TICKET_TTL_HOURS = 24  # tickets expire after 24h of inactivity
 DEFAULT_STALE_SECONDS = 3600 * 6  # claimed tickets become stale after 6h idle
 
 
+def derive_wr_entity_key(dco_json: str, wr_id: str) -> Optional[str]:
+    """Derive the deterministic WR entity_key at birth (T26 Item B).
+
+    Mirrors ``nexus_core.wrp.identity`` — the key is the SHA256 over the
+    sorted ``{domain, intent, actor, scope}`` fields of the canonical WR
+    ``execute workrequest:{wr_id}`` document, so it equals the key
+    ``tackle.vision_bridge`` / ``vision-srv`` stamp at creation and the key
+    ``ccnf_input_from_dco_json`` would re-derive on backfill. The DCO content
+    is provenance only (the entity identity is keyed on ``wr_id``); content
+    identity is tracked separately by ``content_hash`` (T08 three-way split).
+
+    Returns None when derivation cannot produce a key (identity-unknown).
+    The canonical shape never raises, but the guard keeps the WR write path
+    fail-safe against a malformed intent.
+    """
+    try:
+        from nexus_core.wrp.identity import ccnf_input_from_dco_json, derive_entity_key
+        return derive_entity_key(ccnf_input_from_dco_json(dco_json, wr_id))
+    except ValueError:
+        _log.warning("derive_wr_entity_key: no entity_key for wr=%s (intent not emittable)", wr_id)
+        return None
+
+
 class DBAdapter:
     def __init__(self, db_path: str = None, schema: str = None):
         dsn = os.environ.get("CONDUIT_PG_DSN")
@@ -905,6 +928,9 @@ class DBAdapter:
         import uuid
         _log.info("add_work_request: wr=%s plan=%s title=%s", wr_id, plan_id, title or '(empty)')
         now = datetime.utcnow().isoformat() + "Z"
+        # T26 Item B (T07 emission boundary): derive the entity_key at birth so
+        # the row carries content identity from creation, not retroactively.
+        entity_key = derive_wr_entity_key(dco_json, wr_id)
         with self._get_connection() as conn:
             # SCD-type-4 temporal upgrade: nebula.work_requests is a VIEW over
             # work_requests_history. INSERT ... ON CONFLICT through views is not
@@ -920,11 +946,30 @@ class DBAdapter:
             if existing:
                 _log.info("add_work_request: wr=%s already exists, skipping", wr_id)
             else:
+                # T26 Item B: idempotent emission dedup — when the derived key
+                # is already active (same entity re-emitted), reuse the existing
+                # row instead of inserting a duplicate. The 045 exclusion
+                # constraint backstops overlap at the DB level.
+                if entity_key:
+                    active = conn.execute(
+                        "SELECT 1 FROM nebula.work_requests_history "
+                        "WHERE entity_key = %s "
+                        "AND now() >= valid_from AND now() < valid_until LIMIT 1",
+                        (entity_key,),
+                    ).fetchone()
+                    if active:
+                        _log.info(
+                            "add_work_request: wr=%s entity_key already active, "
+                            "reusing row (idempotent emission)", wr_id)
+                        conn.commit()
+                        return
                 conn.execute(
                     "INSERT INTO nebula.work_requests_history "
-                    "(id, legacy_id, plan_id, title, business_status, dco_json, created_at, updated_at) "
-                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-                    (str(uuid.uuid4()), wr_id, plan_id, title, 'DRAFT', dco_json, now, now),
+                    "(id, legacy_id, plan_id, title, business_status, dco_json, "
+                    "created_at, updated_at, entity_key) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (str(uuid.uuid4()), wr_id, plan_id, title, 'DRAFT', dco_json,
+                     now, now, entity_key),
                 )
             conn.commit()
 
