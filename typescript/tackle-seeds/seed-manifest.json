@@ -32,10 +32,11 @@
       ]
     },
     {
-      "body_md": "## Procedure\n\nOn role activation (every session start):\n\n1. **Ensure projection target directories exist:**\n   ```\n   mkdir -p nexus/audit/{PROMPTS,RESPONSES,PLANS/pending,IMPLEMENTATION_PLANS/active,CHANGES/committed,ENGINEERING/reports,...}\n   find nexus/audit -type d -empty -not -path '*/.git/*' -exec touch {}/.gitkeep \\;\n   ```\n   These are on-demand projection targets, not the canonical store.\n\n2. **Query your inbox:**\n   - Use `nebula_list_agent_records` and filter for tags containing `\"to:<your_role>\"` and `\"status:open\"`\n   - If nebula-mcp is unreachable, surface this as a blocking infrastructure issue \u2014 do not silently proceed without checking the inbox\n   - Present any open items to the user before proceeding\n\n3. **Query nebula projection config** to verify current role\u2192folder assignments. Read `nexus/audit/AGENT_FOLDER_MAP.md` as a static reference copy.\n\n4. **Present any new items** to the user before proceeding with their request.",
+      "body_md": "## Procedure\n\nOn role activation (every session start):\n\n1. **Ensure projection target directories exist:**\n   ```\n   mkdir -p nexus/audit/{PROMPTS,RESPONSES,PLANS/pending,IMPLEMENTATION_PLANS/active,CHANGES/committed,ENGINEERING/reports,...}\n   find nexus/audit -type d -empty -not -path '*/.git/*' -exec touch {}/.gitkeep \\;\n   ```\n   These are on-demand projection targets, not the canonical store.\n\n2. **Base boot \u2014 Assembly forum checks (all channels):**\n   - **Issues forum** (R13): `GET http://localhost:3107/api/forums/issues-and-open-questions/threads` \u2014 surface unresolved issues before proceeding.\n   - **To Do forum** (R16): `GET http://localhost:3107/api/forums/to-do/threads` \u2014 surface open todos (Engineer: undertake UI-only items missing a completion reply).\n   - **Inbox** (R17): use `nebula_list_agent_records` filtered for tags containing `\"to:<your_role>\"` and `\"status:open\"` (or the single-call `nebula_get_inbox`) \u2014 present new messages.\n   - If nebula-mcp is unreachable, surface this as a blocking infrastructure issue \u2014 do not silently proceed without checking the inbox.\n\n3. **Query nebula projection config** to verify current role\u2192folder assignments. Read `nexus/audit/AGENT_FOLDER_MAP.md` as a static reference copy.\n\n4. **Channel-adaptive extended boot (Freebuff only):**\n   If you are running on Freebuff (model prefix `freebuff/*`, role-lease `channel` = `interactive`, or harness `harn-freebuff`), you have a long-lived session with your own context and the token budget for a deeper boot AFTER the base checks:\n   - **Scan the change-log forum** (`GET http://localhost:3107/api/forums/change-log/threads`) for entries since your last session \u2014 learn what has already been completed or reported.\n   - **Check to-do threads for completion replies** (`Completed: ...` comments) so you do not re-report finished work.\n   - **Dedupe your report**: surface only NEW issues or changes since the previous session. Do NOT repeat the same set of issues the previous agent already reported; mention still-open items in one line (\"still open\").\n   \n   On opencode (model prefix `opencode/*`, role-lease `channel` = `opencode`, or one-shot harness runs) you are token-constrained: skip this step and keep the base boot (steps 2\u20133) only. Redundant reporting across opencode sessions is accepted \u2014 the user prefers tokens spent on the task itself.\n\n5. **Present any new items** to the user before proceeding with their request.\n",
       "mcp_tools": [
         "nebula_list_agent_records",
-        "nebula_create_agent_record"
+        "nebula_create_agent_record",
+        "nebula_get_inbox"
       ],
       "roles": [
         "analyst",
@@ -47,14 +48,16 @@
         "planner",
         "reviewer"
       ],
-      "sha256": "af0c875e302196137b3405ca770b12a1358d6db8ac3116ab4ba4df46dfb2720d",
+      "sha256": "bd6589270775bfdd183ddd3fd4531ca9c60401a470c96d28445c04d97467c305",
       "slug": "bootstrap-self-update",
-      "summary": "On activation: ensure audit directories, query inbox, present open items.",
+      "summary": "On activation: base boot (inbox + issues forum + to-do forum); Freebuff adds change-log scan + completion dedupe.",
       "tags": [
         "turn-protocol",
         "activation",
         "bootstrap",
-        "inbox"
+        "inbox",
+        "channel-adaptive",
+        "freebuff"
       ],
       "title": "Bootstrap Self-Update (Activation)",
       "triggers": [

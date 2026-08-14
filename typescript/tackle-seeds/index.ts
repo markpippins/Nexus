@@ -115,7 +115,7 @@ BEGIN
     VALUES (
         'bootstrap-self-update',
         'Bootstrap Self-Update (Activation)',
-        'On activation: ensure audit directories, query inbox, present open items.',
+        'On activation: base boot (inbox + issues forum + to-do forum); Freebuff adds change-log scan + completion dedupe.',
         '## Procedure\n'
         '\n'
         'On role activation (every session start):\n'
@@ -127,17 +127,27 @@ BEGIN
         '   \`\`\`\n'
         '   These are on-demand projection targets, not the canonical store.\n'
         '\n'
-        '2. **Query your inbox:**\n'
-        '   - Use \`nebula_list_agent_records\` and filter for tags containing \`"to:<your_role>"\` and \`"status:open"\`\n'
-        '   - If nebula-mcp is unreachable, surface this as a blocking infrastructure issue — do not silently proceed without checking the inbox\n'
-        '   - Present any open items to the user before proceeding\n'
+        '2. **Base boot — Assembly forum checks (all channels):**\n'
+        '   - **Issues forum** (R13): \`GET http://localhost:3107/api/forums/issues-and-open-questions/threads\` — surface unresolved issues before proceeding.\n'
+        '   - **To Do forum** (R16): \`GET http://localhost:3107/api/forums/to-do/threads\` — surface open todos (Engineer: undertake UI-only items missing a completion reply).\n'
+        '   - **Inbox** (R17): use \`nebula_list_agent_records\` filtered for tags containing \`"to:<your_role>"\` and \`"status:open"\` (or the single-call \`nebula_get_inbox\`) — present new messages.\n'
+        '   - If nebula-mcp is unreachable, surface this as a blocking infrastructure issue — do not silently proceed without checking the inbox.\n'
         '\n'
         '3. **Query nebula projection config** to verify current role→folder assignments. Read \`nexus/audit/AGENT_FOLDER_MAP.md\` as a static reference copy.\n'
         '\n'
-        '4. **Present any new items** to the user before proceeding with their request.',
-        ARRAY['turn-protocol', 'activation', 'bootstrap', 'inbox'],
+        '4. **Channel-adaptive extended boot (Freebuff only):**\n'
+        '   If you are running on Freebuff (model prefix \`freebuff/*\`, role-lease \`channel\` = \`interactive\`, or harness \`harn-freebuff\`), you have a long-lived session with your own context and the token budget for a deeper boot AFTER the base checks:\n'
+        '   - **Scan the change-log forum** (\`GET http://localhost:3107/api/forums/change-log/threads\`) for entries since your last session — learn what has already been completed or reported.\n'
+        '   - **Check to-do threads for completion replies** (\`Completed: ...\` comments) so you do not re-report finished work.\n'
+        '   - **Dedupe your report**: surface only NEW issues or changes since the previous session. Do NOT repeat the same set of issues the previous agent already reported; mention still-open items in one line ("still open").\n'
+        '   \n'
+        '   On opencode (model prefix \`opencode/*\`, role-lease \`channel\` = \`opencode\`, or one-shot harness runs) you are token-constrained: skip this step and keep the base boot (steps 2–3) only. Redundant reporting across opencode sessions is accepted — the user prefers tokens spent on the task itself.\n'
+        '\n'
+        '5. **Present any new items** to the user before proceeding with their request.\n'
+        '',
+        ARRAY['turn-protocol', 'activation', 'bootstrap', 'inbox', 'channel-adaptive', 'freebuff'],
         ARRAY['activate', 'session start', 'boot', 'turn start'],
-        ARRAY['nebula_list_agent_records', 'nebula_create_agent_record']
+        ARRAY['nebula_list_agent_records', 'nebula_create_agent_record', 'nebula_get_inbox']
     )
     ON CONFLICT (slug) DO NOTHING
     RETURNING id INTO v_memory_id;
