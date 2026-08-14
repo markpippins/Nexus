@@ -273,7 +273,19 @@ def run_ollama(req, system_base, prompt_body, session_log_path=None):
     if ollama is None:
         _log.error("run_ollama: ollama package not installed")
         raise RuntimeError("ollama package is not installed — cannot use ollama harness")
-    model = _resolve_model_name(req)
+    # The ollama harness talks to the local ollama server directly, which
+    # expects bare model names (e.g. "qwen2.5-coder:latest"). Prefer the DCO's
+    # explicit metadata.model verbatim (stripping an opencode-style
+    # "ollama/" provider prefix if present) — role-config resolution returns
+    # opencode-qualified IDs (e.g. "nvidia/z-ai/glm-5.2") that local ollama
+    # cannot serve. Fall back to that resolution only when no explicit model
+    # is set (finding 8b1a8623, option D).
+    explicit = (req.get("metadata") or {}).get("model", "")
+    if explicit:
+        model = explicit[len("ollama/") :] if explicit.startswith("ollama/") else explicit
+        _log.info("run_ollama: explicit model=%s → ollama model=%s", explicit, model)
+    else:
+        model = _resolve_model_name(req)
     _log.info("run_ollama: entry model=%s prompt_len=%d", model, len(prompt_body) if prompt_body else 0)
 
     # Retry loop: local models sometimes produce empty output on first attempt.
@@ -850,7 +862,7 @@ def _run_from_path(dco_path: str) -> int:
                     "created_at": datetime.utcnow().isoformat() + "Z",
                     "metadata": _receipt,
                 }],
-                "affected_plans": [plan_id] if plan_id else [],
+                "affected_plans": [wr_id] if wr_id else [],
                 "invalidated_plans": [],
             }
 

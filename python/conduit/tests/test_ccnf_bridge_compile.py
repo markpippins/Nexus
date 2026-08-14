@@ -26,8 +26,11 @@ Usage:
     python3 -m pytest conduit/tests/test_ccnf_bridge_compile.py -v
 """
 
+import json
 import os
+import shutil
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))  # python/
@@ -158,6 +161,289 @@ class TestBridgeReceiptPath(unittest.TestCase):
         self.assertEqual(receipt["trace_event_count"], 1)
         self.assertEqual(receipt["status"], "SUCCESS")
         self.assertIsNone(receipt["failure"])
+
+
+class TestExecutorCcnfReceiptBlock(unittest.TestCase):
+    """B6 — executor_cloud._run_from_path CCNF receipt block builds + posts.
+
+    Guards the T21 re-point end-to-end shape inside the executor: with
+    CONDUIT_USE_CCNF=true the delta payload is built from the compiled CER
+    (no NameError — ``affected_plans`` is ``[wr_id]``, not the undefined
+    ``plan_id``) and the receipt is POSTed to the kernel ``/delta/`` endpoint.
+    The harness invocation is monkeypatched (LLM-free); the kernel URL is
+    pointed at a local stub HTTP server.
+    """
+
+    @staticmethod
+    def _valid_dco(wr_id):
+        """A full WorkRequestDCO-valid document (schema-complete)."""
+        return {
+            "id": wr_id,
+            "version": 1,
+            "path": "/tmp",
+            "intent": {
+                "problem_statement": "Verify the CCNF receipt block",
+                "desired_outcome": "Receipt posts to kernel",
+                "domain": "execution",
+                "priority": "medium",
+                "user_intent_trace": "b6-test",
+                "abstraction_level": "task",
+            },
+            "decomposition": {
+                "strategy": "sequential",
+                "steps": [{
+                    "step_id": "s1",
+                    "description": "run",
+                    "dependencies": [],
+                    "outputs": ["out"],
+                    "type": "execution",
+                }],
+                "parallelism_model": "none",
+                "recursion_allowed": False,
+            },
+            "requirements": {
+                "functional": ["works"],
+                "non_functional": [],
+                "system_requirements": [],
+                "tool_requirements": [],
+            },
+            "constraints": {
+                "forbidden_actions": [],
+                "safety_constraints": [],
+                "resource_limits": None,
+                "architectural_constraints": [],
+            },
+            "success_criteria": {
+                "validation_rules": [],
+                "acceptance_tests": [],
+                "completion_conditions": [],
+                "failure_modes": [],
+            },
+            "execution_state": {
+                "status": "pending",
+                "current_step": None,
+                "progress": None,
+                "retries": None,
+                "error_state": None,
+                "context_snapshot_ref": None,
+                "last_updated": None,
+            },
+            "lineage": {
+                "derived_from": [],
+                "supersedes": None,
+                "branches": [],
+                "merge_history": [],
+            },
+            "artifacts": {
+                "produced_files": [{"path": "out.txt", "type": "text"}],
+                "intermediate_outputs": [],
+            },
+            "metadata": {
+                "created_at": "2026-05-16T00:00:00Z",
+                "updated_at": None,
+                "agent_id": "builder",
+                "mode": "oneshot",
+                "tags": [],
+                "session_id": "sess-b6",
+                "role": "builder",
+                "harness": "opencode",
+                "model": "",
+            },
+        }
+
+    @staticmethod
+    def _write_dco(path, wr_id):
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(TestExecutorCcnfReceiptBlock._valid_dco(wr_id), f)
+        return path
+
+    def _patch_executor(self, ec, urlopen=None):
+        """Shared monkeypatch + env scaffolding for executor tests."""
+        saved = {
+            "use_ccnf": os.environ.get("CONDUIT_USE_CCNF"),
+            "kernel": os.environ.get("KERNEL_API_URL"),
+            "run_opencode": ec.run_opencode,
+            "urlopen": ec.urlopen,
+            "capture_cost": ec._capture_session_cost,
+            "heartbeat": ec.HEARTBEAT_INTERVAL_SECONDS,
+        }
+        ec.HEARTBEAT_INTERVAL_SECONDS = 1
+        ec.run_opencode = lambda *a, **k: "[stub] done"
+        ec._capture_session_cost = lambda *a, **k: None
+        if urlopen is not None:
+            ec.urlopen = urlopen
+        return saved
+
+    @staticmethod
+    def _restore_executor(ec, saved):
+        ec.run_opencode = saved["run_opencode"]
+        ec.urlopen = saved["urlopen"]
+        ec._capture_session_cost = saved["capture_cost"]
+        ec.HEARTBEAT_INTERVAL_SECONDS = saved["heartbeat"]
+        if saved["use_ccnf"] is None:
+            os.environ.pop("CONDUIT_USE_CCNF", None)
+        else:
+            os.environ["CONDUIT_USE_CCNF"] = saved["use_ccnf"]
+        if saved["kernel"] is None:
+            os.environ.pop("KERNEL_API_URL", None)
+        else:
+            os.environ["KERNEL_API_URL"] = saved["kernel"]
+
+    def test_ccnf_receipt_block_builds_and_posts(self):
+        import executor_cloud as ec
+
+        tmpdir = tempfile.mkdtemp(prefix="b6-")
+        wr_id = "wr-b6-receipt-block"
+        dco_path = self._write_dco(os.path.join(tmpdir, f"{wr_id}.json"), wr_id)
+
+        received = {}
+
+        class _KernelStub:
+            """Fake urllib response for the kernel /delta/ POST."""
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def read(self):
+                return json.dumps({"success": True, "version": 7}).encode()
+
+        def _fake_urlopen(req, timeout=5):
+            received["url"] = req.full_url
+            received["method"] = req.get_method()
+            received["data"] = json.loads(req.data.decode())
+            return _KernelStub()
+
+        saved = self._patch_executor(ec, urlopen=_fake_urlopen)
+        try:
+            os.environ["CONDUIT_USE_CCNF"] = "true"
+            os.environ["KERNEL_API_URL"] = "http://stub-kernel:3103"
+
+            exit_code = ec._run_from_path(dco_path)
+            self.assertEqual(exit_code, 0)
+
+            self.assertIn("url", received, "kernel /delta/ POST was not attempted")
+            self.assertEqual(received["url"], "http://stub-kernel:3103/delta/")
+            self.assertEqual(received["method"], "POST")
+            payload = received["data"]
+            self.assertEqual(payload["affected_plans"], [wr_id])
+            receipt = payload["receipts"][0]
+            self.assertEqual(receipt["type"], "CCNF_EXECUTION")
+            self.assertEqual(receipt["plan_id"], wr_id)
+            self.assertTrue(receipt["ccnf_hash"])
+            self.assertEqual(receipt["metadata"]["request_id"], wr_id)
+        finally:
+            self._restore_executor(ec, saved)
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    def test_ccnf_disabled_skips_receipt_post(self):
+        import executor_cloud as ec
+
+        tmpdir = tempfile.mkdtemp(prefix="b6-")
+        wr_id = "wr-b6-disabled"
+        dco_path = self._write_dco(os.path.join(tmpdir, f"{wr_id}.json"), wr_id)
+
+        posted = []
+
+        def _recording_urlopen(req, timeout=5):
+            posted.append(req.full_url)
+            raise RuntimeError("urlopen should never fire when CCNF is disabled")
+
+        saved = self._patch_executor(ec, urlopen=_recording_urlopen)
+        try:
+            os.environ["CONDUIT_USE_CCNF"] = "false"
+
+            exit_code = ec._run_from_path(dco_path)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                posted, [],
+                "kernel /delta/ POST attempted with CONDUIT_USE_CCNF=false")
+        finally:
+            self._restore_executor(ec, saved)
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+class TestOllamaHarnessExplicitModel(unittest.TestCase):
+    """B7 — run_ollama honors the DCO's explicit metadata.model verbatim.
+
+    Guards the finding 8b1a8623 option D fix: the ollama harness talks to the
+    local ollama server, which expects bare model names. An opencode-style
+    ``ollama/<name>`` ID must be stripped to the bare name, a bare name must
+    pass through untouched, and the role-config resolution (which returns
+    opencode-qualified IDs like ``nvidia/z-ai/glm-5.2``) must only be used as
+    a fallback when no explicit model is set. LLM-free (fake ollama module).
+    """
+
+    class _FakeOllama:
+        """Records the model passed to ollama.generate and returns output."""
+
+        def __init__(self):
+            self.calls = []
+
+        def generate(self, model, system=None, prompt=None, options=None):
+            self.calls.append(model)
+            return {"response": "verified"}
+
+    def _patch_ollama(self, ec, fake):
+        saved = ec.ollama
+        ec.ollama = fake
+        return saved
+
+    def test_explicit_ollama_prefixed_model_stripped(self):
+        import executor_cloud as ec
+
+        fake = self._FakeOllama()
+        saved = self._patch_ollama(ec, fake)
+        try:
+            req = {"metadata": {"model": "ollama/qwen2.5-coder-ctx32k"}}
+            result = ec.run_ollama(req, "sys", "prompt")
+            self.assertEqual(result, "verified")
+            self.assertEqual(
+                fake.calls, ["qwen2.5-coder-ctx32k"],
+                "opencode-style ollama/ prefix must be stripped for the local server")
+        finally:
+            ec.ollama = saved
+
+    def test_explicit_bare_model_passes_through(self):
+        import executor_cloud as ec
+
+        fake = self._FakeOllama()
+        saved = self._patch_ollama(ec, fake)
+        try:
+            req = {"metadata": {"model": "qwen2.5-coder:latest"}}
+            ec.run_ollama(req, "sys", "prompt")
+            self.assertEqual(fake.calls, ["qwen2.5-coder:latest"])
+        finally:
+            ec.ollama = saved
+
+    def test_no_explicit_model_falls_back_to_role_config(self):
+        import executor_cloud as ec
+
+        fake = self._FakeOllama()
+        saved_ollama = self._patch_ollama(ec, fake)
+        saved_resolve = ec._resolve_model_name
+        ec._resolve_model_name = lambda req: "nvidia/z-ai/glm-5.2"
+        try:
+            req = {"metadata": {"model": ""}}  # no explicit model
+            ec.run_ollama(req, "sys", "prompt")
+            # Role-config fallback is still used (and still opencode-qualified),
+            # preserving pre-fix behavior when no model is specified.
+            self.assertEqual(fake.calls, ["nvidia/z-ai/glm-5.2"])
+        finally:
+            ec.ollama = saved_ollama
+            ec._resolve_model_name = saved_resolve
+
+    def test_ollama_module_missing_raises(self):
+        import executor_cloud as ec
+
+        saved = ec.ollama
+        ec.ollama = None
+        try:
+            with self.assertRaises(RuntimeError):
+                ec.run_ollama({"metadata": {}}, "sys", "prompt")
+        finally:
+            ec.ollama = saved
 
 
 if __name__ == "__main__":
