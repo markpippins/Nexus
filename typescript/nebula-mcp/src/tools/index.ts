@@ -1183,7 +1183,16 @@ export function registerTools(server: McpServer) {
   //  CROSS-REFERENCES
   // ════════════════════════════════════════════════════════════════
 
-  const CROSSREF_TYPES_HINT = "Valid types: wrp:depends_on, wrp:implements, wrp:tracked_by, wrp:impacts_system, wrp:supersedes, ag:references_plan, ag:same_thread_as, ag:prompted_by, ag:spawns_plan, kv:sourced_from, kv:informs, kv:cross_schema, kv:name_overlap, kv:description_overlap";
+  // Canonical enum lives in nebula-srv/src/crossref-taxonomy.ts (plan #0175).
+  // nebula-srv re-validates at the write boundary; this client-side list only
+  // fails fast with a clean MCP error and must stay in sync with the enum.
+  const CROSSREF_TYPES: readonly string[] = [
+    "wrp:depends_on", "wrp:implements", "wrp:tracked_by", "wrp:impacts_system", "wrp:supersedes",
+    "ag:references_plan", "ag:same_thread_as", "ag:prompted_by", "ag:spawns_plan", "ag:evidences_candidate",
+    "kv:sourced_from", "kv:informs", "kv:cross_schema", "kv:name_overlap", "kv:description_overlap",
+    "req:blocks", "req:depends_on",
+  ];
+  const CROSSREF_TYPES_HINT = `Valid types: ${CROSSREF_TYPES.join(", ")}`;
 
   server.tool(
     "nebula_list_cross_references",
@@ -1231,6 +1240,12 @@ export function registerTools(server: McpServer) {
       metadata: z.any().optional().describe("Optional JSON metadata for the link"),
     },
     async (args) => {
+      if (!CROSSREF_TYPES.includes(args.relType)) {
+        return {
+          content: [{ type: "text" as const, text: `Invalid rel_type "${args.relType}". ${CROSSREF_TYPES_HINT}` }],
+          isError: true,
+        };
+      }
       const result = await NebulaClient.createCrossReference({
         sourceType: args.sourceType,
         sourceId: args.sourceId,
