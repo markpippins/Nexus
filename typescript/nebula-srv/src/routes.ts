@@ -4910,6 +4910,55 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // ── Assembly decisions-forum mirror (T27) ─────────────────────────
+  // On-create hook: when a `decision` record is written, deterministically
+  // mirror it into the Assembly `decisions` forum (admin-facing projection).
+  // Fire-and-forget: a mirror failure never fails the record write.
+  const ASSEMBLY_URL = process.env.ASSEMBLY_URL || 'http://localhost:3107';
+  const DECISIONS_FORUM_ID = '703bc0f9-faf4-4c94-a52d-8f0d4024a89b';
+
+  let assemblyUserMapCache: Record<string, string> | null = null;
+  async function getAssemblyUserMap(): Promise<Record<string, string>> {
+    if (assemblyUserMapCache) return assemblyUserMapCache;
+    const resp = await fetch(`${ASSEMBLY_URL}/api/users`);
+    if (!resp.ok) throw new Error(`assembly /api/users -> HTTP ${resp.status}`);
+    const users = (await resp.json()) as any[];
+    const map: Record<string, string> = {};
+    for (const u of users) {
+      if (u && u.name) map[String(u.name).toLowerCase()] = u.id;
+    }
+    assemblyUserMapCache = map;
+    return map;
+  }
+
+  async function mirrorDecisionToForum(record: any): Promise<void> {
+    try {
+      const users = await getAssemblyUserMap();
+      const userId = users[String(record.role || '').toLowerCase()];
+      if (!userId) {
+        console.warn(`[decisions-mirror] no assembly user for role '${record.role}' — skipping ${record.id}`);
+        return;
+      }
+      const resp = await fetch(`${ASSEMBLY_URL}/api/forums/by-id/${DECISIONS_FORUM_ID}/threads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: record.title,
+          body: record.content,
+          postedById: userId,
+          source_url: `nebula://agent-record/${record.id}`,
+          role: record.role,
+          model: null,
+        }),
+      });
+      if (!resp.ok) {
+        console.warn(`[decisions-mirror] forum post HTTP ${resp.status} for ${record.id}`);
+      }
+    } catch (err: any) {
+      console.warn(`[decisions-mirror] error for ${record.id}: ${err?.message || err}`);
+    }
+  }
+
   // POST /api/agent-records — create a new agent record (canonical write path)
   router.post('/agent-records', async (req: Request, res: Response) => {
     try {
@@ -4935,6 +4984,11 @@ export function createRoutes(pool: Pool): Router {
         ]
       );
       res.status(201).json(row);
+
+      // T27: deterministically mirror decision records into the decisions forum.
+      if (recordType === 'decision') {
+        mirrorDecisionToForum(row).catch((e: any) => console.warn('[decisions-mirror]', e?.message || e));
+      }
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
