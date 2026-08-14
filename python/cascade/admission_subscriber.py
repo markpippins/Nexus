@@ -342,6 +342,7 @@ class AdmissionFailure(Exception):
 
 
 async def handle_work_request_created(
+    nc: Any,
     pg_conn: Any,
     event_envelope: dict[str, Any],
     event_id: str,
@@ -370,6 +371,19 @@ async def handle_work_request_created(
         # Transition failed transiently (conduit-mcp down/error). Do NOT mirror
         # — an execution.requests READY row for a WR still VALIDATED would be
         # inconsistent cross-domain state.
+        # D-T19 item 5: admission failure is observable on the canonical channel.
+        try:
+            from nats_publisher import build_failure_envelope
+            subject, env = build_failure_envelope(
+                "admission",
+                f"runtime_transition WR_VALIDATED failed for {wr_uuid}",
+                aggregate_id=wr_uuid,
+                correlation_id=wr_uuid,
+            )
+            await nc.publish(subject, json.dumps(env.to_dict()).encode())
+            await nc.flush()
+        except Exception as e:  # noqa: BLE001
+            _log("failed to emit admission.failed: %s", e)
         raise AdmissionFailure(
             f"runtime_transition WR_VALIDATED failed for {wr_uuid[:8]}"
         )
@@ -425,7 +439,7 @@ async def run_admission_subscriber() -> None:
                 return  # not an admission event; ignore silently
 
             try:
-                await handle_work_request_created(pg_conn, data, event_id)
+                await handle_work_request_created(nc, pg_conn, data, event_id)
             except Exception:  # noqa: BLE001
                 # Keep the event UNSEEN so redelivery / restart can retry it.
                 # Idempotency is guaranteed by the state machine (rejects a

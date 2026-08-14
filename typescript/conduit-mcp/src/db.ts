@@ -609,37 +609,10 @@ async function createSchema(
     CREATE INDEX IF NOT EXISTS idx_peb_governance_events_event_type ON ${PEB_SCHEMA}.governance_events(event_type);
     CREATE INDEX IF NOT EXISTS idx_peb_governance_events_created_at ON ${PEB_SCHEMA}.governance_events(created_at);
 
-    -- AFTER INSERT trigger: fire-and-forget event emission from vision → peb.
-    -- No coupling to decision engine yet. This is eventual consistency only —
-    -- governance is observable before it becomes authoritative.
-    CREATE OR REPLACE FUNCTION vision.receipt_governance_trigger()
-    RETURNS TRIGGER AS $TRIG$
-    BEGIN
-      INSERT INTO ${PEB_SCHEMA}.governance_events (receipt_id, event_type, work_request_id, plan_id, agent_role, payload)
-      VALUES (
-        NEW.id,
-        'receipt:' || NEW.type,
-        NULL,
-        NEW.plan_id,
-        NEW.agent_role,
-        jsonb_build_object(
-          'session_id', NEW.session_id,
-          'artifact_path', NEW.artifact_path,
-          'summary', NEW.summary,
-          'ticket_id', NEW.ticket_id,
-          'tokens_used', NEW.tokens_used
-        )
-      )
-      ON CONFLICT (receipt_id) DO NOTHING;
-      RETURN NEW;
-    END;
-    $TRIG$ LANGUAGE plpgsql;
-
-    DROP TRIGGER IF EXISTS trg_receipt_governance ON ${VISION_SCHEMA}.receipts;
-    CREATE TRIGGER trg_receipt_governance
-    AFTER INSERT ON ${VISION_SCHEMA}.receipts
-    FOR EACH ROW
-    EXECUTE FUNCTION vision.receipt_governance_trigger();
+    -- NOTE (D-T19-2c, V099): the vision → peb governance trigger is RETIRED.
+    -- The canonical governance projection now lives on execution.receipts
+    -- (execution.receipt_governance_trigger, created by nexus/sql/V099).
+    -- vision.receipts is frozen (D-T19-2d) and no longer projects governance.
 
     -- work_requests: canonical store for decomposition objects
     -- Note: INDEX creation is handled in migrations (v12/v13) to avoid
@@ -888,37 +861,10 @@ const migrations: Migration[] = [
       await exec(`CREATE INDEX IF NOT EXISTS idx_peb_governance_events_created_at ON ${PEB_SCHEMA}.governance_events(created_at)`);
 
       // Trigger function and trigger
-      await exec(`
-        CREATE OR REPLACE FUNCTION vision.receipt_governance_trigger()
-        RETURNS TRIGGER AS $TRIG$
-        BEGIN
-          INSERT INTO ${PEB_SCHEMA}.governance_events (receipt_id, event_type, work_request_id, plan_id, agent_role, payload)
-          VALUES (
-            NEW.id,
-            'receipt:' || NEW.type,
-            NULL,
-            NEW.plan_id,
-            NEW.agent_role,
-            jsonb_build_object(
-              'session_id', NEW.session_id,
-              'artifact_path', NEW.artifact_path,
-              'summary', NEW.summary,
-              'ticket_id', NEW.ticket_id,
-              'tokens_used', NEW.tokens_used
-            )
-          )
-          ON CONFLICT (receipt_id) DO NOTHING;
-          RETURN NEW;
-        END;
-        $TRIG$ LANGUAGE plpgsql
-      `);
-      await exec(`
-        DROP TRIGGER IF EXISTS trg_receipt_governance ON ${VISION_SCHEMA}.receipts;
-        CREATE TRIGGER trg_receipt_governance
-        AFTER INSERT ON ${VISION_SCHEMA}.receipts
-        FOR EACH ROW
-        EXECUTE FUNCTION vision.receipt_governance_trigger()
-      `);
+      // NOTE (D-T19-2c, V099): the vision → peb receipt_governance_trigger is
+      // RETIRED. Governance projection now lives on execution.receipts
+      // (execution.receipt_governance_trigger, created by nexus/sql/V099).
+      // vision.receipts is frozen (D-T19-2d) and no longer projects governance.
 
       // Backfill: emit governance events for all existing receipts that don't have one yet
       await exec(`
@@ -1048,42 +994,10 @@ const migrations: Migration[] = [
       `);
 
       // Step 5: Update the governance trigger to propagate work_request_uuid.
-      // When a receipt is inserted and its plan_id matches a work_request's
-      // wr_id, the work_request_uuid is copied into the governance event.
-      await exec(`
-        CREATE OR REPLACE FUNCTION vision.receipt_governance_trigger()
-        RETURNS TRIGGER AS $TRIG$
-        DECLARE
-          v_wr_uuid TEXT;
-        BEGIN
-          -- Look up the work_request_uuid from vision.work_requests
-          -- using NEW.plan_id as the wr_id lookup key
-          SELECT wr.work_request_uuid INTO v_wr_uuid
-          FROM ${VISION_SCHEMA}.work_requests wr
-          WHERE wr.wr_id = NEW.plan_id
-          LIMIT 1;
-
-          INSERT INTO ${PEB_SCHEMA}.governance_events (
-            receipt_id, event_type, work_request_id, plan_id, agent_role, payload
-          ) VALUES (
-            NEW.id,
-            'receipt:' || NEW.type,
-            v_wr_uuid,
-            NEW.plan_id,
-            NEW.agent_role,
-            jsonb_build_object(
-              'session_id', NEW.session_id,
-              'artifact_path', NEW.artifact_path,
-              'summary', NEW.summary,
-              'ticket_id', NEW.ticket_id,
-              'tokens_used', NEW.tokens_used
-            )
-          )
-          ON CONFLICT (receipt_id) DO NOTHING;
-          RETURN NEW;
-        END;
-        $TRIG$ LANGUAGE plpgsql
-      `);
+      // NOTE (D-T19-2c, V099): RETIRED. The vision.receipt_governance_trigger
+      // update is removed — governance now projects from execution.receipts
+      // (execution.receipt_governance_trigger, nexus/sql/V099). The
+      // work_request_id stitch lives in that trigger, not on vision.receipts.
 
       // Step 6: Backfill existing governance events with work_request_uuid
       // for receipts that have a matching work request
@@ -3188,7 +3102,80 @@ export interface ReceiptRow {
   created_at: string;
 }
 
+/**
+ * D-T19-2(b): resolve (or get-or-create) the execution.requests id for a plan.
+ * Tiered: 1) reuse existing (source_plan_id); 2) get-or-create a
+ * legacy-provisioned request for a real plan (nebula.plans row); 3) null for
+ * test/synthetic plans. Idempotent via ON CONFLICT (business_key).
+ */
+export async function resolveRequestForPlan(planId: string): Promise<string | null> {
+  const existing = await qOne(
+    `SELECT id::text AS id FROM execution.requests WHERE source_plan_id = @planId LIMIT 1`,
+    { planId },
+  );
+  if (existing?.id) return existing.id;
+
+  const plan = await qOne(
+    `SELECT id, title, goal FROM nebula.plans WHERE id = @planId LIMIT 1`,
+    { planId },
+  );
+  if (!plan) return null;
+
+  const businessKey = `legacy-plan-${planId}`;
+  const created = await qOne(
+    `INSERT INTO execution.requests
+       (business_key, title, objective, intent_type, source_plan_id, source_wr_id, status)
+     VALUES (@businessKey, @title, @objective, 'legacy', @planId, NULL, 'READY')
+     ON CONFLICT (business_key) DO UPDATE SET business_key = EXCLUDED.business_key
+     RETURNING id::text AS id`,
+    {
+      businessKey,
+      title: plan.title || `Legacy plan ${planId}`,
+      objective: plan.goal || "",
+      planId,
+    },
+  );
+  return created?.id ?? null;
+}
+
 export async function insertReceipt(r: ReceiptRow): Promise<void> {
+  const requestId = await resolveRequestForPlan(r.plan_id);
+  if (requestId) {
+    // Canonical: execution.receipts, request-scoped (attempt_id NULL).
+    // The legacy "rec-*" id is preserved in lineage_original_id.
+    let baseMeta: Record<string, unknown> = {};
+    try {
+      baseMeta = r.metadata_json ? JSON.parse(r.metadata_json) : {};
+    } catch {
+      baseMeta = {};
+    }
+    const execMeta = {
+      ...baseMeta,
+      session_id: r.session_id ?? "",
+      artifact_path: r.artifact_path ?? null,
+      ticket_id: r.ticket_id ?? null,
+      tokens_used: r.tokens_used ?? 0,
+    };
+    await qRun(
+      `INSERT INTO execution.receipts
+         (request_id, attempt_id, type, agent_role, summary, metadata,
+          lineage_source, lineage_original_id, issued_at)
+       VALUES (@requestId::uuid, NULL, @type, @agent_role, @summary, @metadata::jsonb,
+               'conduit', @id, @created_at)
+       ON CONFLICT (lineage_original_id) WHERE lineage_source = 'conduit' DO NOTHING`,
+      {
+        requestId,
+        type: r.type,
+        agent_role: r.agent_role,
+        summary: r.summary ?? "",
+        metadata: JSON.stringify(execMeta),
+        id: r.id,
+        created_at: r.created_at,
+      },
+    );
+    return;
+  }
+  // Test/synthetic plan: preserve legacy write surface (frozen in D-T19-2(d)).
   await qRun(
     `INSERT INTO ${VISION_SCHEMA}.receipts
       (id, plan_id, type, agent_role, session_id, ticket_id, artifact_path, summary, metadata_json, tokens_used, created_at)
@@ -4227,12 +4214,28 @@ export async function appendEvent(
     const fromStatus = currentRow?.status || "unknown";
 
     const eventId = crypto.randomUUID();
+
+    // T19: populate correlation_id (the WR's identity) and causation_id
+    // (the immediately-preceding event) so the WR's events form a queryable
+    // causal chain under one correlation identity. correlation_id = the
+    // work_request UUID; causation_id = the prior event's event_id (NULL for
+    // the root WR_SUBMITTED event).
+    const prevRow = await tOne(
+      client,
+      `SELECT event_id FROM ${PG_SCHEMA}.work_request_events
+        WHERE work_request_id = @uuid
+        ORDER BY sequence_number DESC
+        LIMIT 1`,
+      { uuid },
+    );
+    const prevEventId: string | null = prevRow?.event_id || null;
+
     await tQuery(
       client,
       `INSERT INTO ${PG_SCHEMA}.work_request_events
-         (event_id, work_request_id, event_type, payload, actor_type, actor_id)
-       VALUES (@eventId::uuid, @uuid::uuid, @eventType, @payload::jsonb, 'system', '')`,
-      { eventId, uuid, eventType, payload: JSON.stringify(payload) },
+         (event_id, work_request_id, event_type, payload, actor_type, actor_id, correlation_id, causation_id)
+       VALUES (@eventId::uuid, @uuid::uuid, @eventType, @payload::jsonb, 'system', '', @uuid::uuid, @prevEventId::uuid)`,
+      { eventId, uuid, eventType, payload: JSON.stringify(payload), prevEventId },
     );
 
     const statusMap: Record<string, string> = {
@@ -4285,6 +4288,7 @@ export async function appendEvent(
       authority: "builder",
       payload: { from_status: fromStatus, to_status: newStatus, conduit_event_type: eventType, event_id: eventId },
       causationId: eventId,
+      correlationId: uuid,
     });
   });
 }

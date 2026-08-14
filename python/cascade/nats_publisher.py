@@ -41,7 +41,7 @@ _PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PARENT not in sys.path:
     sys.path.insert(0, _PARENT)
 
-from nats_envelope.envelope import CanonicalEnvelope
+from nats_envelope.envelope import CanonicalEnvelope, Classification
 
 # ── Shared state ────────────────────────────────────────────────────
 _publish_queue: queue.Queue[tuple[str, CanonicalEnvelope]] = queue.Queue(maxsize=10_000)
@@ -150,6 +150,12 @@ def _nats_worker(nats_url: str) -> None:
                     except Exception as e:
                         _log("NATS publish error: %s", e)
                         _log("[STUB] %s: %s", subject, json.dumps(envelope.to_dict(), indent=2))
+                        # D-T19 item 5: bridge-delivery failure is observable
+                        # on the canonical channel, not just in logs.
+                        publish_failure_event(
+                            "bridge_delivery", str(e),
+                            correlation_id=envelope.correlation_id,
+                        )
                 else:
                     _log("[LOGGER] %s: %s", subject, json.dumps(envelope.to_dict(), indent=2))
             except queue.Empty:
@@ -281,5 +287,84 @@ def enqueue_publish(subject: str, envelope: CanonicalEnvelope) -> None:
     try:
         _publish_queue.put_nowait((subject, envelope))
     except queue.Full:
-        _log("[QUEUE_FULL] dropping event — %s: %s",
+        _log("[QUEUE_FULL] dropping event — %s: %s [DEAD_LETTER] nexus.kernel.v1.failure.dead_letter",
              subject, json.dumps(envelope.to_dict()))
+
+
+# ── D-T19 item 5: canonical failure-visibility events ──────────────
+# Each failure class emits a canonical-channel failure event
+# (<class>.failed / dead-letter) so the spine's failure modes are
+# observable on the same NATS namespace as the success path. These are
+# published directly via CanonicalEnvelope — the kernel.transition_event
+# event_type enum is closed, so failures use their own subject taxonomy.
+
+FAILURE_EVENTS: dict[str, tuple[str, str]] = {
+    "admission": ("nexus.kernel.v1.transition.admission.failed", "admission.failed"),
+    "bridge_delivery": ("nexus.kernel.v1.transition.bridge_delivery.failed", "bridge_delivery.failed"),
+    "receipt": ("nexus.kernel.v1.transition.receipt.failed", "receipt.failed"),
+    "watchdog": ("nexus.kernel.v1.transition.watchdog.refused", "watchdog.refused"),
+    "queue": ("nexus.kernel.v1.failure.dead_letter", "queue.dropped"),
+}
+
+
+def build_failure_envelope(
+    failure_class: str,
+    error: str,
+    *,
+    aggregate_id: str | None = None,
+    correlation_id: str | None = None,
+    causation_id: str | None = None,
+) -> tuple[str, "CanonicalEnvelope"]:
+    """Build the (subject, CanonicalEnvelope) for a failure event. Pure.
+
+    Used by both the sync sidecar path (publish_failure_event) and async
+    subscribers that own their own NATS connection (admission_subscriber).
+    """
+    subject, event_type = FAILURE_EVENTS.get(
+        failure_class,
+        (f"nexus.kernel.v1.transition.{failure_class}.failed", f"{failure_class}.failed"),
+    )
+    # NOTE: correlation_id may legitimately be None for a failure event —
+    # e.g. a bridge-delivery failure where the failing envelope's own
+    # identity was lost. CanonicalEnvelope declares correlation_id required,
+    # but for failures it is best-effort (carried when known).
+    envelope = CanonicalEnvelope(
+        event_type=event_type,
+        origin_component="cascade",
+        correlation_id=correlation_id,
+        subject=subject,
+        payload={
+            "failure_class": failure_class,
+            "error": str(error)[:2000],
+            "aggregate_id": aggregate_id,
+        },
+        domain="kernel",
+        causation_id=causation_id,
+        classification=Classification.INTERNAL,
+    )
+    return subject, envelope
+
+
+def publish_failure_event(
+    failure_class: str,
+    error: str,
+    *,
+    aggregate_id: str | None = None,
+    correlation_id: str | None = None,
+    causation_id: str | None = None,
+) -> None:
+    """Enqueue a canonical failure event via the sidecar (sync callers).
+
+    Best-effort: if NATS is unavailable the sidecar already logs the
+    envelope, so the failure is never silently dropped.
+    """
+    try:
+        subject, envelope = build_failure_envelope(
+            failure_class, error,
+            aggregate_id=aggregate_id,
+            correlation_id=correlation_id,
+            causation_id=causation_id,
+        )
+        enqueue_publish(subject, envelope)
+    except Exception as e:
+        _log("publish_failure_event(%s) failed: %s", failure_class, e)

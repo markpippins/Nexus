@@ -115,34 +115,59 @@ def get_latest_receipt_type(plan_id: str):
 
 @router.post("/")
 def insert_receipt(body: ReceiptInsertRequest):
-    """Insert a receipt. Equivalent to db.ts insertReceipt().
+    """Insert a receipt. D-T19-2(b): execution.receipts (request-scoped) when the
+    plan resolves to an execution.requests row; vision.receipts fallback for
+    test/synthetic plans.
     Validation (validateReceipt) is done client-side in conduit-mcp."""
     from db_adapter import DBAdapter
     db = DBAdapter()
 
-    with db._get_connection() as conn:
-        conn.execute(
-            "INSERT INTO vision.receipts "
-            "(id, plan_id, type, agent_role, session_id, ticket_id, "
-            "artifact_path, summary, metadata_json, tokens_used, created_at) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
-            "ON CONFLICT (id) DO NOTHING",
-            (
-                body.id,
-                body.plan_id,
-                body.type,
-                body.agent_role,
-                body.session_id or "",
-                body.ticket_id,
-                body.artifact_path,
-                body.summary or "",
-                body.metadata_json or "{}",
-                body.tokens_used or 0,
-                body.created_at,
-            ))
-        conn.commit()
+    request_id = db.resolve_request_for_receipt(body.plan_id)
+    if request_id is not None:
+        base_meta = json.loads(body.metadata_json) if body.metadata_json else {}
+        exec_meta = {
+            **base_meta,
+            "session_id": body.session_id or "",
+            "artifact_path": body.artifact_path,
+            "ticket_id": body.ticket_id,
+            "tokens_used": body.tokens_used or 0,
+        }
+        with db._get_connection() as conn:
+            conn.execute(
+                "INSERT INTO execution.receipts "
+                "(request_id, attempt_id, type, agent_role, summary, metadata, "
+                "lineage_source, lineage_original_id, issued_at) "
+                "VALUES (%s, NULL, %s, %s, %s, %s, 'conduit', %s, %s) "
+                "ON CONFLICT (lineage_original_id) WHERE lineage_source = 'conduit' DO NOTHING",
+                (request_id, body.type, body.agent_role, body.summary or "",
+                 json.dumps(exec_meta), body.id, body.created_at),
+            )
+            conn.commit()
+    else:
+        with db._get_connection() as conn:
+            conn.execute(
+                "INSERT INTO vision.receipts "
+                "(id, plan_id, type, agent_role, session_id, ticket_id, "
+                "artifact_path, summary, metadata_json, tokens_used, created_at) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+                "ON CONFLICT (id) DO NOTHING",
+                (
+                    body.id,
+                    body.plan_id,
+                    body.type,
+                    body.agent_role,
+                    body.session_id or "",
+                    body.ticket_id,
+                    body.artifact_path,
+                    body.summary or "",
+                    body.metadata_json or "{}",
+                    body.tokens_used or 0,
+                    body.created_at,
+                ))
+            conn.commit()
 
-    _log.info("insert_receipt: plan=%s type=%s id=%s", body.plan_id, body.type, body.id)
+    _log.info("insert_receipt: plan=%s type=%s id=%s request=%s",
+              body.plan_id, body.type, body.id, request_id)
     return {"ok": True, "id": body.id, "plan_id": body.plan_id}
 
 

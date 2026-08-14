@@ -165,10 +165,55 @@ def run_kernel_subscriber() -> None:
                     # (nexus.cascade.v1.workflow.*). Kernel events must
                     # stay in the kernel namespace (nexus.kernel.v1.transition.*).
                     try:
-                        from nats_publisher import enqueue_publish
+                        from nats_publisher import enqueue_publish, publish_failure_event
                         from nats_envelope.envelope import CanonicalEnvelope, Classification
 
                         event_dict = _build_envelope(payload)
+
+                        # ── D-T19-1: enforce identity, no self-correlation ──
+                        # WorkRequest transitions MUST carry correlation_id
+                        # (the WR identity) and causation_id (the conduit event
+                        # that caused this transition). The retired legacy
+                        # conduit.notify_work_request_event path emitted these as
+                        # NULL, which the old `or event_id` fallback masked by
+                        # self-correlating. Reject instead of self-correlating.
+                        # NOTE: non-WR kernel events (observation.captured, etc.)
+                        # intentionally pass correlation_id=None until their
+                        # families get correlation wired (out of D-T19-1 scope).
+                        correlation_id = payload.get("correlation_id")
+                        causation_id = payload.get("causation_id")
+                        if event_type.startswith("work_request.") and not correlation_id:
+                            print(
+                                f"[kernel_subscriber] SCHEMA VIOLATION: "
+                                f"WorkRequest event {event_type} "
+                                f"({payload.get('event_id', '?')}) missing "
+                                f"correlation_id — rejecting (no self-correlation)",
+                                file=sys.stderr,
+                            )
+                            # D-T19 item 5: refusal is observable on the canonical channel.
+                            publish_failure_event(
+                                "watchdog",
+                                f"WorkRequest event {event_type} missing correlation_id",
+                                aggregate_id=payload.get("aggregate_id"),
+                                causation_id=causation_id,
+                            )
+                            continue
+                        if event_type.startswith("work_request.") and not causation_id:
+                            print(
+                                f"[kernel_subscriber] SCHEMA VIOLATION: "
+                                f"WorkRequest event {event_type} "
+                                f"({payload.get('event_id', '?')}) missing "
+                                f"causation_id — rejecting (no self-correlation)",
+                                file=sys.stderr,
+                            )
+                            # D-T19 item 5: refusal is observable on the canonical channel.
+                            publish_failure_event(
+                                "watchdog",
+                                f"WorkRequest event {event_type} missing causation_id",
+                                aggregate_id=payload.get("aggregate_id"),
+                                correlation_id=correlation_id,
+                            )
+                            continue
 
                         envelope = CanonicalEnvelope(
                             event_id=payload.get("event_id", ""),
@@ -176,8 +221,8 @@ def run_kernel_subscriber() -> None:
                             occurred_at=payload.get("timestamp", ""),
                             origin_component="kernel",
                             domain="kernel",
-                            correlation_id=payload.get("event_id"),
-                            causation_id=None,
+                            correlation_id=correlation_id,
+                            causation_id=causation_id,
                             classification=Classification.INTERNAL,
                             subject=subject,
                             payload=event_dict,
