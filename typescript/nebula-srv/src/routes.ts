@@ -7245,19 +7245,20 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
       let i = 1;
       if (requirementId) { clauses.push(`requirement_id = $${i++}`); vals.push(requirementId); }
       if (candidateId) { clauses.push(`candidate_id = $${i++}`); vals.push(candidateId); }
-      // Entity-scoped filter (e.g. specification-detail / work-request-detail views)
-      // joins through nebula.open_question_entities, which holds current-valid
-      // (entity_type, entity_id) → open_question_id links. Both params must be
-      // present; otherwise the filter is ignored to match prior behavior.
+      // Entity-scoped filtering now uses the canonical direct foreign-key
+      // columns. The retired junction table only ever contained candidate and
+      // requirement links in live data; reject unsupported legacy entity types
+      // rather than silently returning an unscoped result.
       if (entityType && entityId) {
-        clauses.push(`EXISTS (
-          SELECT 1 FROM nebula.open_question_entities oqe
-          WHERE oqe.open_question_id = oq.id
-            AND oqe.entity_type = $${i++}
-            AND oqe.entity_id = $${i++}
-            AND oqe.valid_until > now()
-        )`);
-        vals.push(entityType, entityId);
+        if (entityType !== 'candidate' && entityType !== 'requirement') {
+          return res.status(400).json({ error: 'entityType must be candidate or requirement' });
+        }
+        if (typeof entityId !== 'string' || !isUuid(entityId)) {
+          return res.status(400).json({ error: 'entityId must be a UUID' });
+        }
+        const directColumn = entityType === 'candidate' ? 'candidate_id' : 'requirement_id';
+        clauses.push(`oq.${directColumn} = $${i++}`);
+        vals.push(entityId);
       }
       if (status) { clauses.push(`status = $${i++}`); vals.push(status); }
       else { clauses.push(`status = 'OPEN'`); }
@@ -7344,6 +7345,18 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
       if ((entityType && !entityId) || (!entityType && entityId)) {
         return res.status(400).json({ error: 'Both entityType and entityId are required' });
       }
+      if (entityType && !['candidate', 'requirement'].includes(entityType)) {
+        return res.status(400).json({ error: 'entityType must be candidate or requirement' });
+      }
+      if (entityId && !isUuid(entityId)) {
+        return res.status(400).json({ error: 'entityId must be a UUID' });
+      }
+      if (requirementId && !isUuid(requirementId)) {
+        return res.status(400).json({ error: 'requirementId must be a UUID' });
+      }
+      if (candidateId && !isUuid(candidateId)) {
+        return res.status(400).json({ error: 'candidateId must be a UUID' });
+      }
 
       // Normalize legacy IDs
       let linkEntityType = entityType || null;
@@ -7370,14 +7383,6 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
             createdBy || null,
           ]
         );
-
-        if (linkEntityType && linkEntityId && isUuid(linkEntityId)) {
-          await client.query(
-            `INSERT INTO nebula.open_question_entities (open_question_id, entity_type, entity_id)
-             VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-            [result.rows[0].id, linkEntityType, linkEntityId]
-          );
-        }
 
         await client.query('COMMIT');
         res.status(201).json({ id: result.rows[0].id });
@@ -7772,21 +7777,19 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
                 link.entity_type, link.entity_id, link.entity_title
          FROM nebula.open_questions oq
          LEFT JOIN LATERAL (
-           SELECT
-             qe.entity_type, qe.entity_id,
-             CASE
-               WHEN qe.entity_type = 'requirement' THEN (SELECT title FROM nebula.requirements WHERE id = qe.entity_id)
-               WHEN qe.entity_type = 'candidate' THEN (SELECT title FROM nebula.harvest_candidates WHERE id = qe.entity_id)
-               WHEN qe.entity_type = 'harvest' THEN (SELECT source_filename FROM nebula.harvests WHERE id = qe.entity_id)
-               WHEN qe.entity_type IN ('report', 'agent_record') THEN (SELECT title FROM nebula.agent_records WHERE id = qe.entity_id)
-               WHEN qe.entity_type = 'specification' THEN ('Rev #' || (SELECT revision_number::text FROM nebula.specifications WHERE id = qe.entity_id))
-               WHEN qe.entity_type = 'agenda' THEN (SELECT title FROM nebula.agendas WHERE id = qe.entity_id)
-               WHEN qe.entity_type = 'work_request' THEN (SELECT title FROM nebula.work_requests WHERE id = qe.entity_id)
-               ELSE qe.entity_id::text
-             END AS entity_title
-           FROM nebula.open_question_entities qe
-           WHERE qe.open_question_id = oq.id AND qe.valid_until > now()
-           ORDER BY qe.entity_type
+           SELECT entity_type, entity_id, entity_title
+           FROM (
+             SELECT 'candidate'::text AS entity_type,
+                    oq.candidate_id AS entity_id,
+                    (SELECT title FROM nebula.harvest_candidates WHERE id = oq.candidate_id) AS entity_title
+             WHERE oq.candidate_id IS NOT NULL
+             UNION ALL
+             SELECT 'requirement'::text AS entity_type,
+                    oq.requirement_id AS entity_id,
+                    (SELECT title FROM nebula.requirements WHERE id = oq.requirement_id) AS entity_title
+             WHERE oq.requirement_id IS NOT NULL
+           ) direct_link
+           ORDER BY entity_type
            LIMIT 1
          ) link ON true
          WHERE oq.id = $1`,
