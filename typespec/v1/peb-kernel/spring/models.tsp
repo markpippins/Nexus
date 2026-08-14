@@ -128,6 +128,14 @@ namespace org.nexus.peb {
     @maxLength(64)
     afterHash?: string;
 
+    /** PostgreSQL Semantic Kernel transition event identifier, when linked */
+    @format("uuid")
+    kernelEventId?: string;
+
+    /** PostgreSQL Semantic Kernel event type, when linked */
+    @maxLength(32)
+    kernelEventType?: string;
+
     /** Arbitrary JSON — changed keys with new checksums */
     stateDelta?: unknown;
 
@@ -186,9 +194,9 @@ namespace org.nexus.peb {
     @format("uuid")
     id: string;
 
-    /** FK to the transaction that produced this decision */
+    /** FK to the transaction that produced this decision (non-null in the Java schema) */
     @format("uuid")
-    transactionId?: string;
+    transactionId: string;
 
     /** ADR identifier (e.g. "ADR-007") */
     @maxLength(32)
@@ -352,7 +360,12 @@ namespace org.nexus.peb {
 
   /** Request payload for the PEB MCP facade endpoint */
   model PebTransactionRequest {
+    /** Optional caller-supplied UUID; the Python domain assigns one when omitted */
+    @format("uuid")
+    id?: string;
+
     /** Caller-provided idempotency key for safe retry */
+    @maxLength(128)
     idempotencyKey: string;
 
     /** Entity identifier initiating this request */
@@ -364,5 +377,95 @@ namespace org.nexus.peb {
 
     /** Arbitrary JSON payload for the tool */
     input: unknown;
+  }
+
+  /** Structural validation payload for peb_validate_transition. */
+  model ValidateTransitionInput {
+    entity_id: string;
+    from_state: string;
+    to_state: string;
+  }
+
+  /** Structural validation payload for peb_check_invariants. */
+  model CheckInvariantsInput {
+    entity_id: string;
+    proposed_action: unknown;
+  }
+
+  /** Decision mutation payload for peb_record_decision. */
+  model RecordDecisionInput {
+    entity_id: string;
+    title: string;
+    summary: unknown;
+    affected_keys: string[];
+    entropy_class: EntropyClass;
+    commit_ref?: string;
+  }
+
+  /** Transform validation payload for peb_validate_transform. */
+  model ValidateTransformInput {
+    entity_id: string;
+    state_view: unknown;
+    context: unknown;
+    proposed_delta: unknown;
+    work_request_id: string;
+  }
+
+  /** Violation report payload for peb_report_violation. */
+  model ReportViolationInput {
+    entity_id: string;
+    violation_type: string;
+    severity: string;
+    context: unknown;
+    capability_attempted?: string;
+  }
+
+  /** Observational trace payload for peb_append_trace_segment. */
+  model AppendTraceSegmentInput {
+    entity_id: string;
+    work_request_id: string;
+    parent_trace_id?: string;
+    stage: string;
+    inputs: unknown;
+    causal_entries: unknown;
+    rejected_alternatives: unknown;
+    confidence: float32;
+  }
+
+  /** Clarification request payload for peb_request_clarification. */
+  model RequestClarificationInput {
+    entity_id: string;
+    work_request_id: string;
+    ambiguity: string;
+    options_considered: unknown;
+    proposed_resolution?: string;
+  }
+
+  /** Extension proposal payload for peb_extension_proposal. */
+  model ExtensionProposalInput {
+    entity_id: string;
+    gap_description: string;
+    proposed_content: unknown;
+    target_key: string;
+    rationale: string;
+  }
+
+  /** Actuator-compatible health response for the PEB database boundary. */
+  model PebHealthResponse {
+    /** Health status, normally UP or DOWN. */
+    status: string;
+    /** Database connectivity summary. */
+    database?: string;
+    /** PEB schema name. */
+    schema?: string;
+    /** Database catalog when available. */
+    catalog?: string;
+    /** Diagnostic detail when the database is unavailable. */
+    error?: string;
+  }
+
+  /** Error body returned for malformed admission requests. */
+  model MalformedAdmissionError {
+    message: string;
   }
 }
