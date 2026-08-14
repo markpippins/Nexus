@@ -1,0 +1,255 @@
+{
+  "recovered_from": "graph/nexus-knowledge-graph.json.bak (v2.4.0)",
+  "description": "31 clean types->actors edges surviving issue #33 reconciliation. Recovery anchor so these edges survive the 08-08 rebuild that zeroed graph_edges.",
+  "edge_count": 31,
+  "edges": [
+    {
+      "source_section": "types",
+      "source_id": "authority-arbitration-layer",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "xil",
+      "target_name": "XIL (External Intelligence Layer)"
+    },
+    {
+      "source_section": "types",
+      "source_id": "capability-operator",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "conduit",
+      "target_name": "Conduit"
+    },
+    {
+      "source_section": "types",
+      "source_id": "cognitive-compiler-tier",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "conduit",
+      "target_name": "Conduit"
+    },
+    {
+      "source_section": "types",
+      "source_id": "context-as-rule-system",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "conduit",
+      "target_name": "Conduit"
+    },
+    {
+      "source_section": "types",
+      "source_id": "context-scope-token",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "observer",
+      "target_name": "Observer"
+    },
+    {
+      "source_section": "types",
+      "source_id": "context-scope-token",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "xil",
+      "target_name": "XIL (External Intelligence Layer)"
+    },
+    {
+      "source_section": "types",
+      "source_id": "epistemic-proj",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "atten",
+      "target_name": "Atten"
+    },
+    {
+      "source_section": "types",
+      "source_id": "epistemic-proj",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "nebula",
+      "target_name": "Nebula"
+    },
+    {
+      "source_section": "types",
+      "source_id": "epistemic-proj",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "throttler",
+      "target_name": "Throttler"
+    },
+    {
+      "source_section": "types",
+      "source_id": "epistemic-syn",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "canonicalizer",
+      "target_name": "Canonicalizer / Commit Layer"
+    },
+    {
+      "source_section": "types",
+      "source_id": "execution-mode",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "conduit",
+      "target_name": "Conduit"
+    },
+    {
+      "source_section": "types",
+      "source_id": "external-agent-model",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "xil",
+      "target_name": "XIL (External Intelligence Layer)"
+    },
+    {
+      "source_section": "types",
+      "source_id": "five-spaces",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "pipeline_wrp",
+      "target_name": "WorkRequest Pipeline (WRP)"
+    },
+    {
+      "source_section": "types",
+      "source_id": "five-spaces",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "reconciler",
+      "target_name": "Reconciler"
+    },
+    {
+      "source_section": "types",
+      "source_id": "generative-pipeline-8stage",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "reconciler",
+      "target_name": "Reconciler"
+    },
+    {
+      "source_section": "types",
+      "source_id": "losing-branches-learning",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "reconciler",
+      "target_name": "Reconciler"
+    },
+    {
+      "source_section": "types",
+      "source_id": "observation-evidentiary",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "observer",
+      "target_name": "Observer"
+    },
+    {
+      "source_section": "types",
+      "source_id": "persistence-triad",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "conduit",
+      "target_name": "Conduit"
+    },
+    {
+      "source_section": "types",
+      "source_id": "premise-conclusion",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "conduit",
+      "target_name": "Conduit"
+    },
+    {
+      "source_section": "types",
+      "source_id": "provenance-causal-chain",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "reconciler",
+      "target_name": "Reconciler"
+    },
+    {
+      "source_section": "types",
+      "source_id": "reconciliation-loop",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "reconciler",
+      "target_name": "Reconciler"
+    },
+    {
+      "source_section": "types",
+      "source_id": "role-mapping-strategy",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "conduit",
+      "target_name": "Conduit"
+    },
+    {
+      "source_section": "types",
+      "source_id": "transform-signature",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "conduit",
+      "target_name": "Conduit"
+    },
+    {
+      "source_section": "types",
+      "source_id": "trust-score",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "xil",
+      "target_name": "XIL (External Intelligence Layer)"
+    },
+    {
+      "source_section": "types",
+      "source_id": "two-paths-self-extension",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "pipeline_wrp",
+      "target_name": "WorkRequest Pipeline (WRP)"
+    },
+    {
+      "source_section": "types",
+      "source_id": "two-paths-self-extension",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "reconciler",
+      "target_name": "Reconciler"
+    },
+    {
+      "source_section": "types",
+      "source_id": "typed-workflow-graph",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "conduit",
+      "target_name": "Conduit"
+    },
+    {
+      "source_section": "types",
+      "source_id": "typespec-contract-surface",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "conduit",
+      "target_name": "Conduit"
+    },
+    {
+      "source_section": "types",
+      "source_id": "typespec-contract-surface",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "conduit_gateway",
+      "target_name": "Conduit Gateway"
+    },
+    {
+      "source_section": "types",
+      "source_id": "work-request-vs-execution",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "conduit",
+      "target_name": "Conduit"
+    },
+    {
+      "source_section": "types",
+      "source_id": "xil-admission-gates",
+      "relation_type": "actors",
+      "target_section": "actors",
+      "target_id": "xil",
+      "target_name": "XIL (External Intelligence Layer)"
+    }
+  ]
+}

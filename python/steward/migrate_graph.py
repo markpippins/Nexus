@@ -2,15 +2,26 @@
 """
 Knowledge Graph Migration — File → PostgreSQL (JSONB + pgvector)
 
-Reads nexus/graph/nexus-knowledge-graph.json and inserts its contents
-into the knowledge.graph_entities, knowledge.graph_edges, and knowledge.graph_cross_references tables.
+Reads nexus/graph/nexus-knowledge-graph.json and upserts its contents into
+knowledge.graph_entities, knowledge.graph_edges, and
+knowledge.graph_cross_references.
 
 The Knowledge Steward role has exclusive write access to these tables.
 All other agents read-only.
 
+T24 hardening (architect breakdown b6a7d551):
+  * Lossless idempotent backfill — upsert, never DELETE; skip a run when the
+    file_checksum is unchanged (stops the 08-08 duplicate-version bug).
+  * Per-edge provenance — source_migration_id, resolution, unresolved_reason.
+  * Preserve unresolved edges (target_section NULL → FK-skipped) instead of
+    deleting them (issue #33 regression).
+  * extract_relations rewritten for the v2.4.1 work_requests/plans structure.
+  * No session_replication_role='replica' FK bypass — real FKs guard the write.
+
 Usage:
     python3 migrate_graph.py --file ../../graph/nexus-knowledge-graph.json
     python3 migrate_graph.py --file ../../graph/nexus-knowledge-graph.json --dry-run
+    python3 migrate_graph.py --file ../../graph/nexus-knowledge-graph.json --force  # re-run past the checksum skip
     python3 migrate_graph.py --list  # show migration history
 """
 
@@ -19,6 +30,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from typing import Any
@@ -26,9 +38,11 @@ from typing import Any
 log = logging.getLogger("knowledge_steward")
 
 # ── Connection (configurable via env vars) ────────────────────────────
+# Default points at the LIVE nexus database (the old default `.../graph` DB
+# did not exist — a silent dry-run trap). Override with NEXUS_DB_DSN.
 DB_DSN = os.getenv(
     "NEXUS_DB_DSN",
-    "postgresql://nexus:nexus@localhost:5432/graph",
+    "postgresql://pguser:pgpass@localhost:5432/nexus",
 )
 
 
@@ -51,7 +65,8 @@ def compute_checksum(data: dict) -> str:
 
 def extract_description(item: dict) -> str:
     """Best-effort extraction of descriptive text for embedding."""
-    for key in ("description", "statement", "rationale", "goal"):
+    for key in ("description", "statement", "rationale", "goal",
+                "problem_statement", "desired_outcome"):
         val = item.get(key)
         if val and isinstance(val, str) and len(val) > 10:
             return val
@@ -60,7 +75,12 @@ def extract_description(item: dict) -> str:
     rationale = item.get("rationale", "")
     if desc and rationale:
         return f"{desc} {rationale}"
-    return desc or ""
+    # For work requests, combine problem statement + desired outcome
+    ps = item.get("problem_statement", "")
+    do = item.get("desired_outcome", "")
+    if ps and do:
+        return f"{ps} {do}"
+    return ps or desc or ""
 
 
 def extract_entity_type(item: dict) -> str:
@@ -72,11 +92,52 @@ def extract_entity_type(item: dict) -> str:
     return ""
 
 
-def extract_relations(item: dict) -> list[tuple[str, str, str, str | None]]:
+def _extract_plan_numbers(text: str) -> list[str]:
+    """Pull plan-number tokens (4-digit, e.g. 0164 / 1023) out of a dependency
+    string. Handles both plain numbers and JSON-encoded lists like
+    `"[\"0164\"]"`; free-text notes yield no tokens and are ignored."""
+    nums = re.findall(r"\b\d{4}\b", text)
+    seen: set[str] = set()
+    out: list[str] = []
+    for n in nums:
+        if n not in seen:
+            seen.add(n)
+            out.append(n)
+    return out
+
+
+def extract_relations(section: str, item: dict) -> list[tuple[str, str, str]]:
+    """Extract (relation_type, target_section, target_id) triples.
+
+    v2.4.1 structure (work_requests / plans):
+      work_requests: 'plan'        → implements   plans
+                     'derived_from'→ derived_from plans
+      plans:         'dependencies'→ depends_on   plans (plan-number tokens)
+    Legacy v2.4.0 fields (types/actors) are kept for .bak recovery.
     """
-    Extract (relation_type, target_section, target_id, target_name) tuples.
-    Handles list fields like 'produces', 'consumes', 'governed_by', 'references'.
-    """
+    rels: list[tuple[str, str, str]] = []
+
+    if section == "work_requests":
+        plan = item.get("plan")
+        if plan:
+            rels.append(("implements", "plans", str(plan)))
+        for p in (item.get("derived_from") or []):
+            if isinstance(p, str) and p:
+                rels.append(("derived_from", "plans", p))
+        return rels
+
+    if section == "plans":
+        for dep in (item.get("dependencies") or []):
+            if not isinstance(dep, str):
+                continue
+            dep = dep.strip()
+            if not dep or dep == "[]":
+                continue
+            for tok in _extract_plan_numbers(dep):
+                rels.append(("depends_on", "plans", tok))
+        return rels
+
+    # ── Legacy sections (types/actors/…) — .bak recovery path ────────
     relation_fields = {
         "produces": ("actors", "runtime"),
         "consumes": ("actors", "work_product"),
@@ -86,30 +147,27 @@ def extract_relations(item: dict) -> list[tuple[str, str, str, str | None]]:
         "variants": ("types", "variant"),
         "actors": ("actors", "runtime"),  # types reference actors
     }
-
-    relations: list[tuple[str, str, str, str | None]] = []
     for field, (target_section, _) in relation_fields.items():
         values = item.get(field)
         if isinstance(values, list):
             for v in values:
                 if isinstance(v, str):
-                    relations.append((field, target_section, v, None))
+                    rels.append((field, target_section, v))
         elif isinstance(values, str):
-            relations.append((field, target_section, values, None))
+            rels.append((field, target_section, values))
 
-    # Handle source_transcripts → harvest section
     transcripts = item.get("source_transcripts")
     if isinstance(transcripts, list):
         for t in transcripts:
             if isinstance(t, str):
-                relations.append(("sourced_from", "harvests", t, None))
+                rels.append(("sourced_from", "harvests", t))
 
-    return relations
+    return rels
 
 
 def parse_cross_references(cross_refs: dict) -> list[dict]:
     """Parse the cross_references section into uniform records.
-    
+
     Handles three formats found in the JSON:
     - Flat string: {"map_name": "target_id"} — most common
     - List of strings: {"map_name": ["id1", "id2"]}
@@ -118,7 +176,6 @@ def parse_cross_references(cross_refs: dict) -> list[dict]:
     records: list[dict] = []
     for map_name, entries in cross_refs.items():
         if isinstance(entries, str):
-            # Flat string cross-ref: "map_name" → "target_id"
             records.append({
                 "map_name": map_name,
                 "source_section": None,
@@ -129,7 +186,6 @@ def parse_cross_references(cross_refs: dict) -> list[dict]:
         elif isinstance(entries, list):
             for entry in entries:
                 if isinstance(entry, str):
-                    # Simple string cross-ref: "CIRS-001"
                     records.append({
                         "map_name": map_name,
                         "source_section": None,
@@ -148,7 +204,36 @@ def parse_cross_references(cross_refs: dict) -> list[dict]:
     return records
 
 
-def migrate(kg_path: str, dry_run: bool = False) -> int:
+def resolve_edges(raw_edges: list[dict], entity_keys: set[tuple]) -> list[dict]:
+    """Dedupe + resolve edge endpoints against the entity key set.
+
+    Resolved edges keep their target section. Unresolved edges are preserved
+    losslessly (issue #33 regression): the dangling target_id is retained, the
+    target_section is NULLed so the composite FK is skipped (MATCH SIMPLE), and
+    resolution='unresolved' + unresolved_reason record why. Never deletes.
+    """
+    seen: set[tuple] = set()
+    out: list[dict] = []
+    for raw in raw_edges:
+        key = (
+            raw["source_section"], raw["source_id"], raw["relation_type"],
+            raw["target_section"], raw["target_id"],
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        e = dict(raw)
+        if (e["target_section"], e["target_id"]) in entity_keys:
+            e["resolution"] = "resolved"
+        else:
+            e["resolution"] = "unresolved"
+            e["unresolved_reason"] = "target_not_found"
+            e["target_section"] = None  # FK-skip escape hatch
+        out.append(e)
+    return out
+
+
+def migrate(kg_path: str, dry_run: bool = False, force: bool = False) -> int:
     """Run the migration. Returns exit code."""
     # ── Read file ────────────────────────────────────────────────
     log.info("Reading %s ...", kg_path)
@@ -174,7 +259,7 @@ def migrate(kg_path: str, dry_run: bool = False) -> int:
     ]
 
     entities: list[dict] = []
-    edges: list[dict] = []
+    raw_edges: list[dict] = []
     cross_refs: list[dict] = []
 
     for section in ENTITY_SECTIONS:
@@ -190,7 +275,7 @@ def migrate(kg_path: str, dry_run: bool = False) -> int:
             entities.append({
                 "section": section,
                 "entity_id": entity_id,
-                "name": item.get("name", entity_id),
+                "name": item.get("name") or item.get("title") or entity_id,
                 "entity_type": extract_entity_type(item),
                 "status": item.get("status"),
                 "description": desc,
@@ -200,9 +285,8 @@ def migrate(kg_path: str, dry_run: bool = False) -> int:
                 "checksum": compute_checksum(item),
             })
 
-            # Extract edges from relationship fields
-            for rel_type, target_section, target_id, _ in extract_relations(item):
-                edges.append({
+            for rel_type, target_section, target_id in extract_relations(section, item):
+                raw_edges.append({
                     "source_section": section,
                     "source_id": entity_id,
                     "relation_type": rel_type,
@@ -214,7 +298,6 @@ def migrate(kg_path: str, dry_run: bool = False) -> int:
     rules = kg.get("rules", {})
     for rule_category, rule_items in rules.items():
         if isinstance(rule_items, dict):
-            # rule_families is a dict of dicts
             for family_name, family_data in rule_items.items():
                 if isinstance(family_data, dict):
                     family_id = f"{rule_category}.{family_name}"
@@ -284,20 +367,27 @@ def migrate(kg_path: str, dry_run: bool = False) -> int:
                 "checksum": compute_checksum(boundary),
             })
 
+    # ── Resolve edge endpoints (preserve unresolved, never delete) ──
+    entity_keys = {(e["section"], e["entity_id"]) for e in entities}
+    edges = resolve_edges(raw_edges, entity_keys)
+
     # ── Cross-references ────────────────────────────────────────
     cross_refs = parse_cross_references(kg.get("cross_references", {}))
 
+    resolved = sum(1 for e in edges if e["resolution"] == "resolved")
+    unresolved = len(edges) - resolved
+
     # ── Summary ──────────────────────────────────────────────────
     log.info(
-        "Prepared: %d entities, %d edges, %d cross-refs",
-        len(entities), len(edges), len(cross_refs),
+        "Prepared: %d entities, %d edges (%d resolved, %d unresolved), %d cross-refs",
+        len(entities), len(edges), resolved, unresolved, len(cross_refs),
     )
 
     if dry_run:
         log.info("Dry-run mode — no database changes")
         return 0
 
-    # ── Insert into PostgreSQL ───────────────────────────────────
+    # ── Upsert into PostgreSQL (lossless: never DELETE) ──────────
     conn = connect_db()
     if not conn:
         log.info("No database — data prepared but not inserted")
@@ -306,15 +396,35 @@ def migrate(kg_path: str, dry_run: bool = False) -> int:
     try:
         cur = conn.cursor()
 
-        # Disable FKs temporarily for clean migration
-        cur.execute("SET session_replication_role = 'replica';")
+        # Idempotency: skip a re-run of the exact same file (stops the
+        # duplicate-version 08-08 bug). `--force` bypasses this so a recovery
+        # backfill (e.g. edges zeroed by the 08-08 rebuild) can re-run.
+        if not force:
+            cur.execute(
+                "SELECT id FROM knowledge.graph_migrations "
+                "WHERE file_checksum = %s ORDER BY migrated_at DESC LIMIT 1",
+                (file_checksum,),
+            )
+            if cur.fetchone():
+                log.info(
+                    "File checksum unchanged since last migration — skipping "
+                    "(idempotent); use --force to re-run"
+                )
+                conn.rollback()
+                return 0
 
-        # Clear existing data for this source file
-        cur.execute("DELETE FROM knowledge.graph_cross_references")
-        cur.execute("DELETE FROM knowledge.graph_edges")
-        cur.execute("DELETE FROM knowledge.graph_entities")
+        # Record the migration first (rolled back if the data insert fails).
+        cur.execute(
+            """INSERT INTO knowledge.graph_migrations
+                   (source_file, file_checksum, entity_count, edge_count, cross_ref_count, version)
+               VALUES (%s, %s, %s, %s, %s, %s)
+               RETURNING id""",
+            (os.path.basename(kg_path), file_checksum,
+             len(entities), len(edges), len(cross_refs), version),
+        )
+        migration_id = cur.fetchone()[0]
 
-        # Insert entities
+        # Upsert entities (no FK bypass)
         INSERT_ENTITY = """
             INSERT INTO knowledge.graph_entities
                 (section, entity_id, name, entity_type, status, description, properties, source_file, checksum)
@@ -336,18 +446,21 @@ def migrate(kg_path: str, dry_run: bool = False) -> int:
                 json.dumps(e["properties"]), e["source_file"], e["checksum"],
             ))
 
-        # Insert edges
+        # Insert edges with provenance
         INSERT_EDGE = """
             INSERT INTO knowledge.graph_edges
-                (source_section, source_id, relation_type, target_section, target_id)
-            VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT DO NOTHING
+                (source_section, source_id, relation_type, target_section, target_id,
+                 source_migration_id, resolution, unresolved_reason)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (source_section, source_id, relation_type, target_section, target_id)
+            DO NOTHING
         """
         for edge in edges:
             cur.execute(INSERT_EDGE, (
                 edge["source_section"], edge["source_id"],
                 edge["relation_type"],
                 edge["target_section"], edge["target_id"],
+                migration_id, edge["resolution"], edge.get("unresolved_reason"),
             ))
 
         # Insert cross-references
@@ -363,23 +476,12 @@ def migrate(kg_path: str, dry_run: bool = False) -> int:
                 xr["target_section"], xr["target_id"],
             ))
 
-        # Record migration
-        cur.execute("""
-            INSERT INTO knowledge.graph_migrations
-                (source_file, file_checksum, entity_count, edge_count, cross_ref_count, version)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (
-            os.path.basename(kg_path), file_checksum,
-            len(entities), len(edges), len(cross_refs), version,
-        ))
-
-        # Re-enable FKs
-        cur.execute("SET session_replication_role = 'origin';")
-
         conn.commit()
         log.info(
-            "Migration complete: %d entities, %d edges, %d cross-refs (version %s)",
-            len(entities), len(edges), len(cross_refs), version,
+            "Migration complete: %d entities, %d edges (%d resolved, %d unresolved), "
+            "%d cross-refs (version %s, migration %s)",
+            len(entities), len(edges), resolved, unresolved,
+            len(cross_refs), version, migration_id,
         )
         return 0
 
@@ -422,6 +524,7 @@ def main():
     )
     parser.add_argument("--file", help="Path to nexus-knowledge-graph.json")
     parser.add_argument("--dry-run", action="store_true", help="Parse only, no DB write")
+    parser.add_argument("--force", action="store_true", help="Re-run even if the file checksum is unchanged")
     parser.add_argument("--list", action="store_true", help="Show migration history")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose logging")
     args = parser.parse_args()
@@ -439,7 +542,7 @@ def main():
     if not args.file:
         parser.error("--file is required (or use --list)")
 
-    sys.exit(migrate(args.file, dry_run=args.dry_run))
+    sys.exit(migrate(args.file, dry_run=args.dry_run, force=args.force))
 
 
 if __name__ == "__main__":
