@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { Pool } from 'pg';
 import { createRoutes } from './routes';
+import { runMigrations } from './migrate';
 import { initRedis, closeRedis } from './services/block-segmentation-redis.service';
 
 // ── PostgreSQL Connection ──────────────────────────────────────────
@@ -49,24 +50,37 @@ try {
   console.warn('[redis] block-segmentation init failed (non-fatal):', err.message);
 }
 
-// ── Start ─────────────────────────────────────────────────────────
-const server = app.listen(PORT, () => {
-  console.log(`nebula-srv listening on http://localhost:${PORT}`);
-});
+// ── Migrations + Start ─────────────────────────────────────────────
+let server: ReturnType<typeof app.listen> | undefined;
 
-// Handle listen-time errors (e.g. EADDRINUSE) cleanly so a port conflict
-// produces a one-line log line + non-zero exit instead of an unhandled
-// 'error' event that crashes the process with a stack trace. This also
-// lets systemd's Restart=on-failure behave predictably: a taken port is
-// a fatal-but-clean condition, not a crash.
-server.on('error', (err: NodeJS.ErrnoException) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`nebula-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
-  } else {
-    console.error('nebula-srv: listen error:', err.message);
+async function start() {
+  try {
+    await runMigrations(pool);
+  } catch (err: any) {
+    console.error('nebula-srv: migration failure — refusing to start:', err.message);
+    process.exit(1);
+    return;
   }
-  process.exit(1);
-});
+  server = app.listen(PORT, () => {
+    console.log(`nebula-srv listening on http://localhost:${PORT}`);
+  });
+
+  // Handle listen-time errors (e.g. EADDRINUSE) cleanly so a port conflict
+  // produces a one-line log line + non-zero exit instead of an unhandled
+  // 'error' event that crashes the process with a stack trace. This also
+  // lets systemd's Restart=on-failure behave predictably: a taken port is
+  // a fatal-but-clean condition, not a crash.
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`nebula-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    } else {
+      console.error('nebula-srv: listen error:', err.message);
+    }
+    process.exit(1);
+  });
+}
+
+start();
 
 // ── Process-level safety net ─────────────────────────────────────
 // Prevent unhandled errors from crashing the process.
@@ -111,12 +125,12 @@ process.on('SIGTERM', async () => {
   console.log('[server] SIGTERM received, shutting down...');
   await closeRedis();
   await pool.end();
-  server.close(() => process.exit(0));
+  server?.close(() => process.exit(0));
 });
 
 process.on('SIGINT', async () => {
   console.log('[server] SIGINT received, shutting down...');
   await closeRedis();
   await pool.end();
-  server.close(() => process.exit(0));
+  server?.close(() => process.exit(0));
 });
