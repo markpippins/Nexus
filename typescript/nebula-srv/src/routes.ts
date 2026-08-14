@@ -39,7 +39,7 @@ function hasPlanRef(planRef: any): boolean {
 
 /**
  * Create a cross-reference from a harvest_candidate to a conduit plan
- * with rel_type='spawns_plan'. Uses WHERE NOT EXISTS for idempotency
+ * with rel_type='ag:spawns_plan'. Uses WHERE NOT EXISTS for idempotency
  * (cross_references has no unique constraint on the composite key).
  *
  * Must be called inside an active transaction (uses the provided client).
@@ -55,14 +55,14 @@ async function createSpawnsPlanCrossRef(
   const planRefStr = String(planRef).trim();
   const { rows: [xref] } = await client.query(
     `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
-     SELECT 'harvest_candidate', $1, 'plan', $2, 'spawns_plan', $3
+     SELECT 'harvest_candidate', $1, 'plan', $2, 'ag:spawns_plan', $3
      WHERE NOT EXISTS (
        SELECT 1 FROM nebula.cross_references_history
        WHERE source_type = 'harvest_candidate'
          AND source_id = $1
          AND target_type = 'plan'
          AND target_id = $2
-         AND rel_type = 'spawns_plan'
+         AND rel_type = 'ag:spawns_plan'
          AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
      )
      ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
@@ -1257,19 +1257,10 @@ export function createRoutes(pool: Pool): Router {
           const planResult = await planResponse.json() as any;
           if (planResult.created && planResult.planNumber) {
             planNumber = planResult.planNumber;
-            // Create cross-reference: requirement → plan (matches existing pattern — let DB defaults handle id/created_at)
+            // Requirement → plan linkage is column-based (requirements.conduit_plan_id)
+            // per T22 Step 5.4 ruling — no parallel compiles_to edge.
             await pool.query(
-              `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
-               SELECT 'requirement', $1, 'plan', $2, 'compiles_to', '{}'::jsonb
-               WHERE NOT EXISTS (
-                 SELECT 1 FROM nebula.cross_references_history
-                 WHERE source_type = 'requirement' AND source_id = $1
-                   AND target_type = 'plan' AND target_id = $2 AND rel_type = 'compiles_to'
-                   AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
-               )
-               ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
-                 WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
-               DO NOTHING`,
+              `UPDATE requirements SET conduit_plan_id = $2 WHERE id = $1`,
               [id, planNumber]
             );
           }
@@ -1874,7 +1865,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.implementation_plans p
            JOIN nebula.cross_references cr ON cr.target_type = 'plan'
                AND cr.target_id = p.plan_number
-               AND cr.rel_type = 'spawns_plan'
+               AND cr.rel_type = 'ag:spawns_plan'
            JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
                AND cr.source_type = 'harvest_candidate'
            WHERE hc.system_id = $1
@@ -1887,7 +1878,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.implementation_plans p
            JOIN nebula.cross_references cr ON cr.target_type = 'plan'
                AND cr.target_id = p.plan_number
-               AND cr.rel_type = 'spawns_plan'
+               AND cr.rel_type = 'ag:spawns_plan'
            JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
                AND cr.source_type = 'harvest_candidate'
            WHERE hc.system_id = $1`,
@@ -1923,7 +1914,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.implementation_plans p
            JOIN nebula.cross_references cr ON cr.target_type = 'plan'
                AND cr.target_id = p.plan_number
-               AND cr.rel_type = 'spawns_plan'
+               AND cr.rel_type = 'ag:spawns_plan'
            JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
                AND cr.source_type = 'harvest_candidate'
            WHERE hc.subsystem_id = $1
@@ -1936,7 +1927,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.implementation_plans p
            JOIN nebula.cross_references cr ON cr.target_type = 'plan'
                AND cr.target_id = p.plan_number
-               AND cr.rel_type = 'spawns_plan'
+               AND cr.rel_type = 'ag:spawns_plan'
            JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
                AND cr.source_type = 'harvest_candidate'
            WHERE hc.subsystem_id = $1`,
@@ -1972,7 +1963,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.implementation_plans p
            JOIN nebula.cross_references cr ON cr.target_type = 'plan'
                AND cr.target_id = p.plan_number
-               AND cr.rel_type = 'spawns_plan'
+               AND cr.rel_type = 'ag:spawns_plan'
            JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
                AND cr.source_type = 'harvest_candidate'
            WHERE hc.feature_id = $1
@@ -1985,7 +1976,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.implementation_plans p
            JOIN nebula.cross_references cr ON cr.target_type = 'plan'
                AND cr.target_id = p.plan_number
-               AND cr.rel_type = 'spawns_plan'
+               AND cr.rel_type = 'ag:spawns_plan'
            JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
                AND cr.source_type = 'harvest_candidate'
            WHERE hc.feature_id = $1`,
@@ -3002,7 +2993,7 @@ export function createRoutes(pool: Pool): Router {
            WHERE cr.source_type = 'harvest_candidate'
              AND cr.target_type = 'plan'
              AND cr.target_id = $1
-             AND cr.rel_type = 'spawns_plan'
+             AND cr.rel_type = 'ag:spawns_plan'
            ORDER BY cr.created_at DESC
            LIMIT $2 OFFSET $3`,
           [planRef, pageSize, offset]
@@ -3015,7 +3006,7 @@ export function createRoutes(pool: Pool): Router {
            WHERE cr.source_type = 'harvest_candidate'
              AND cr.target_type = 'plan'
              AND cr.target_id = $1
-             AND cr.rel_type = 'spawns_plan'`,
+             AND cr.rel_type = 'ag:spawns_plan'`,
           [planRef]
         ),
       ]);
@@ -4140,7 +4131,7 @@ export function createRoutes(pool: Pool): Router {
       }
 
       // Plan integration: when a planRef is provided, create a cross-reference
-      // linking this harvest_candidate to a conduit plan with rel_type='spawns_plan'.
+      // linking this harvest_candidate to a conduit plan with rel_type='ag:spawns_plan'.
       await createSpawnsPlanCrossRef(client, row.id, planRef, {
         candidateTitle: row.title,
         harvestId: row.harvest_id,
@@ -4215,10 +4206,11 @@ export function createRoutes(pool: Pool): Router {
         await client.query('ROLLBACK');
         return res.status(400).json({ error: `status, if provided, must be one of: ${Array.from(STATUS_CANONICAL).join(', ')}` });
       }
+      const planRefStr = hasPlanRef(planRef) ? String(planRef).trim() : null;
       const { rows: [requirement] } = await client.query(
-        `INSERT INTO requirements (system_id, subsystem_id, feature_id, title, description, status, priority, start_date, completion_date, parent_id, req_type, acceptance_criteria, candidate_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
-        [systemId, subsystemId, featureId, reqTitle, reqDescription, normalizedStatus, priority, null, null, parentId, reqType, acceptanceCriteria ? JSON.stringify(acceptanceCriteria) : null, candidate.id]
+        `INSERT INTO requirements (system_id, subsystem_id, feature_id, title, description, status, priority, start_date, completion_date, parent_id, req_type, acceptance_criteria, candidate_id, conduit_plan_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+        [systemId, subsystemId, featureId, reqTitle, reqDescription, normalizedStatus, priority, null, null, parentId, reqType, acceptanceCriteria ? JSON.stringify(acceptanceCriteria) : null, candidate.id, planRefStr]
       );
 
       // 5. Create cross-reference: candidate → plan (if planRef provided)
@@ -4230,34 +4222,8 @@ export function createRoutes(pool: Pool): Router {
         linkedAt: new Date().toISOString(),
       });
 
-      // 5b. Create cross-reference: requirement → plan (if planRef provided)
-      let reqCrossRef: any = null;
-      if (hasPlanRef(planRef)) {
-        const planRefStr = String(planRef).trim();
-        const { rows: [rcr] } = await client.query(
-          `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
-           SELECT 'requirement', $1, 'plan', $2, 'req:spawns_plan', $3
-           WHERE NOT EXISTS (
-             SELECT 1 FROM nebula.cross_references_history
-             WHERE source_type = 'requirement'
-               AND source_id = $1
-               AND target_type = 'plan'
-               AND target_id = $2
-               AND rel_type = 'req:spawns_plan'
-               AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
-           )
-           ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
-             WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
-           DO NOTHING
-           RETURNING *`,
-          [requirement.id, planRefStr, JSON.stringify({
-            candidateId: candidate.id,
-            systemId,
-            linkedAt: new Date().toISOString(),
-          })]
-        );
-        reqCrossRef = rcr || null;
-      }
+      // Requirement → plan linkage is column-based (requirements.conduit_plan_id)
+      // per T22 Step 5.4 ruling — no parallel req:spawns_plan edge.
 
       await client.query('COMMIT');
 
@@ -4274,12 +4240,10 @@ export function createRoutes(pool: Pool): Router {
           reqType: requirement.req_type,
           acceptanceCriteria: requirement.acceptance_criteria,
           candidateId: requirement.candidate_id,
+          conduitPlanId: requirement.conduit_plan_id,
         },
         crossReference: crossRef
           ? { ...toEpochMs(crossRef, 'created_at'), sourceType: crossRef.source_type, sourceId: crossRef.source_id, targetType: crossRef.target_type, targetId: crossRef.target_id, relType: crossRef.rel_type }
-          : null,
-        reqCrossReference: reqCrossRef
-          ? { ...toEpochMs(reqCrossRef, 'created_at'), sourceType: reqCrossRef.source_type, sourceId: reqCrossRef.source_id, targetType: reqCrossRef.target_type, targetId: reqCrossRef.target_id, relType: reqCrossRef.rel_type }
           : null,
       });
     } catch (err: any) {
@@ -6306,7 +6270,7 @@ export function createRoutes(pool: Pool): Router {
                1 AS weight
         FROM nebula.cross_references
         WHERE source_type = 'harvest_candidate'
-          AND rel_type = 'spawns_plan'
+          AND rel_type = 'ag:spawns_plan'
       ) AS all_xrefs`;
 
       const [dataResult, countResult] = await Promise.all([

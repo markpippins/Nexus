@@ -1190,7 +1190,7 @@ export function registerTools(server: McpServer) {
     "wrp:depends_on", "wrp:implements", "wrp:tracked_by", "wrp:impacts_system", "wrp:supersedes",
     "ag:references_plan", "ag:same_thread_as", "ag:prompted_by", "ag:spawns_plan", "ag:evidences_candidate",
     "kv:sourced_from", "kv:informs", "kv:cross_schema", "kv:name_overlap", "kv:description_overlap",
-    "req:blocks", "req:depends_on",
+    "req:blocks", "req:depends_on", "spec:defines_req",
   ];
   const CROSSREF_TYPES_HINT = `Valid types: ${CROSSREF_TYPES.join(", ")}`;
 
