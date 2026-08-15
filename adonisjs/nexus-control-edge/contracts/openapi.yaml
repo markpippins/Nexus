@@ -5838,6 +5838,509 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /config/ai:
+    get:
+      operationId: get_config_ai
+      description: Get the full AI config snapshot (providers, harnesses, models, roles, bundles)
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/bundle:
+    post:
+      operationId: post_config_ai_bundle
+      description: Upsert a config bundle
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/bundle/{id}:
+    get:
+      operationId: get_config_ai_bundle_id
+      description: Get a config bundle by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_config_ai_bundle_id
+      description: Delete a config bundle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/bundles:
+    get:
+      operationId: get_config_ai_bundles
+      description: List all config bundles
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/bundles/{role}:
+    get:
+      operationId: get_config_ai_bundles_role
+      description: List config bundles for a role
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_config_ai_bundles_role
+      description: Bulk upsert config bundles for a role
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/harness:
+    post:
+      operationId: post_config_ai_harness
+      description: Upsert an AI harness
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/harness/{id}:
+    get:
+      operationId: get_config_ai_harness_id
+      description: Get an AI harness by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_config_ai_harness_id
+      description: Delete an AI harness
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/harnesses:
+    get:
+      operationId: get_config_ai_harnesses
+      description: List AI harnesses
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/import:
+    post:
+      operationId: post_config_ai_import
+      description: Import a full AI config snapshot
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/model:
+    post:
+      operationId: post_config_ai_model
+      description: Upsert an AI model
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/model/{id}:
+    get:
+      operationId: get_config_ai_model_id
+      description: Get an AI model by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_config_ai_model_id
+      description: Delete an AI model
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/models:
+    get:
+      operationId: get_config_ai_models
+      description: List AI models
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/provider:
+    post:
+      operationId: post_config_ai_provider
+      description: Upsert an AI provider
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/provider/{id}:
+    get:
+      operationId: get_config_ai_provider_id
+      description: Get an AI provider by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_config_ai_provider_id
+      description: Delete an AI provider
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/providers:
+    get:
+      operationId: get_config_ai_providers
+      description: List AI providers
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/resolve/{role}:
+    get:
+      operationId: get_config_ai_resolve_role
+      description: Resolve the effective AI config for a role
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/role:
+    post:
+      operationId: post_config_ai_role
+      description: Upsert an AI role config (with optional bundles)
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/role/{role}:
+    get:
+      operationId: get_config_ai_role_role
+      description: Get an AI role config by role name
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_config_ai_role_role
+      description: Delete an AI role config
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/roles:
+    get:
+      operationId: get_config_ai_roles
+      description: List AI role configs
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/seed-defaults:
+    post:
+      operationId: post_config_ai_seed_defaults
+      description: Seed default AI config (providers, harnesses)
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/test:
+    post:
+      operationId: post_config_ai_test
+      description: Test-invoke a verified model via its harness
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/tool-access:
+    get:
+      operationId: get_config_ai_tool_access
+      description: List role tool-access rules
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/tool-access/{id}:
+    patch:
+      operationId: patch_config_ai_tool_access_id
+      description: Update (allow/deny) a tool-access rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/tool-access/{role}:
+    get:
+      operationId: get_config_ai_tool_access_role
+      description: List tool-access rules for a role
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/validate:
+    get:
+      operationId: get_config_ai_validate
+      description: Validate the AI config for missing references
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/verify:
+    post:
+      operationId: post_config_ai_verify
+      description: Verify a model via a harness run
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/ai/verify/{sessionId}:
+    get:
+      operationId: get_config_ai_verify_sessionId
+      description: Poll a model verification session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /config/cron:
     get:
       operationId: get_config_cron
@@ -5914,6 +6417,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Health'
+  /health/history:
+    get:
+      operationId: get_health_history
+      description: Get health metric history
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /health/metrics:
+    get:
+      operationId: get_health_metrics
+      description: Get current system health metrics
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /health/simulate-load:
+    post:
+      operationId: post_health_simulate_load
+      description: Simulate load (no-op stub)
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /knowledge/cross-references:
     get:
       operationId: listKnowledgeCrossReferences
@@ -6043,6 +6585,119 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /logs:
+    get:
+      operationId: get_logs
+      description: Query system logs with filters
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_logs
+      description: Clear all system logs
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /logs/emit:
+    post:
+      operationId: post_logs_emit
+      description: Emit a system log entry
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /memory/check-since:
+    post:
+      operationId: post_memory_check_since
+      description: Check whether a role's memory changed since a timestamp
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /memory/procedure/{slug}:
+    get:
+      operationId: get_memory_procedure_slug
+      description: Get a procedure card by slug
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /memory/procedures/{role}:
+    get:
+      operationId: get_memory_procedures_role
+      description: List procedure cards linked to a role
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /memory/refresh:
+    post:
+      operationId: post_memory_refresh
+      description: Refresh memory counts
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /memory/role-updates:
+    get:
+      operationId: get_memory_role_updates
+      description: Get role memory checkpoints
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /procedure/{slug}:
     get:
       operationId: getProcedureCard
@@ -6081,6 +6736,110 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ProcedureIndexEntry'
+  /projections:
+    get:
+      operationId: get_projections
+      description: List projection configs
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_projections
+      description: Create a projection config
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /projections/drift:
+    get:
+      operationId: get_projections_drift
+      description: Compare on-disk projection shas against stored
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /projections/render-all:
+    post:
+      operationId: post_projections_render_all
+      description: Render all enabled projections
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /projections/{id}:
+    get:
+      operationId: get_projections_id
+      description: Get a projection config by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    put:
+      operationId: put_projections_id
+      description: Update a projection config
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /projections/{id}/render:
+    post:
+      operationId: post_projections_id_render
+      description: Render a single projection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /prompt/{role}/{slug}:
     get:
       operationId: getPromptCard
@@ -6105,10 +6864,35 @@ paths:
                 anyOf:
                   - $ref: '#/components/schemas/PromptCard'
                   - $ref: '#/components/schemas/ErrorResponse'
+  /prompts:
+    get:
+      operationId: get_prompts
+      description: List all prompt templates
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_prompts
+      description: Upsert a prompt template
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /prompts/{role}:
     get:
-      operationId: listRolePrompts
-      description: Return the role's cached prompt index (launch-time lookup).
+      operationId: get_prompts_role
+      description: List prompt templates for a role
       parameters:
         - name: role
           in: path
@@ -6121,9 +6905,31 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/PromptIndexEntry'
+                type: object
+                unevaluatedProperties: {}
+  /prompts/{role}/{slug}:
+    get:
+      operationId: get_prompts_role_slug
+      description: Get a prompt template by role and slug
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /refresh:
     post:
       operationId: refreshCaches
@@ -6136,6 +6942,225 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RefreshResult'
+  /roles:
+    get:
+      operationId: get_roles
+      description: List tackle roles
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_roles
+      description: Upsert a tackle role
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /roles/{id}:
+    get:
+      operationId: get_roles_id
+      description: Get a tackle role by id or name
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_roles_id
+      description: Delete a tackle role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /scheduler:
+    get:
+      operationId: get_scheduler
+      description: List agent scheduler entries
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_scheduler
+      description: Create a scheduler entry
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /scheduler/due:
+    get:
+      operationId: get_scheduler_due
+      description: List due scheduler entries with prompt bodies
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /scheduler/{id}:
+    get:
+      operationId: get_scheduler_id
+      description: Get a scheduler entry by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    patch:
+      operationId: patch_scheduler_id
+      description: Update a scheduler entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_scheduler_id
+      description: Delete a scheduler entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /sessions:
+    get:
+      operationId: get_sessions
+      description: List agent sessions
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /sessions/{sessionId}/kill:
+    post:
+      operationId: post_sessions_sessionId_kill
+      description: Kill a running agent session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /tasks:
+    get:
+      operationId: get_tackle_tasks
+      description: List tackle tasks
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_tackle_tasks
+      description: Upsert a tackle task
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /tasks/inspector/dispatch:
+    get:
+      operationId: get_tasks_inspector_dispatch
+      description: Get inspector task dispatch with prompt bodies
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /tasks/{role}:
     get:
       operationId: listRoleTasks
@@ -6155,6 +7180,41 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/TaskIndexEntry'
+  /tasks/{task_slug}:
+    get:
+      operationId: get_tasks_task_slug
+      description: Get a tackle task by slug
+      parameters:
+        - name: task_slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_tasks_task_slug
+      description: Delete a tackle task by slug
+      parameters:
+        - name: task_slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /terrain/cli-tools:
     get:
       operationId: listCliTools

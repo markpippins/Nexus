@@ -196,13 +196,23 @@ export default class ConduitController {
     }
   }
 
-  /** GET /config/failure-recovery */
+  /** GET /config/failure-recovery
+   *
+   * Wave 3.5 consolidation: this path was claimed by BOTH conduit-srv
+   * (reading conduit.circuit_breaker) and tackle-srv (reading
+   * tackle.circuit_breaker). The only REST consumers are the UIs
+   * (wind-ui/tackle-ui route /config/failure-recovery to tackle-srv), and
+   * conduit-mcp reads its breaker directly from the DB via its own
+   * getBreaker(). So the edge serves the TACKLE table (the UI contract).
+   */
   async getFailureRecovery({ response }: HttpContext) {
     try {
       const { rows } = await q(
         `SELECT max_retries_per_model, retry_delay_seconds, max_fallbacks,
                 push_back_to_pending, retry_after
-         FROM ${CONDUIT_SCHEMA}.circuit_breaker WHERE id = 1`
+         FROM tackle.circuit_breaker WHERE id = 1`,
+        [],
+        'tackle'
       )
       const breaker = rows[0]
       if (!breaker) {
@@ -238,7 +248,7 @@ export default class ConduitController {
       } = request.body() || {}
 
       await q(
-        `UPDATE ${CONDUIT_SCHEMA}.circuit_breaker SET
+        `UPDATE tackle.circuit_breaker SET
            max_retries_per_model = COALESCE($1, max_retries_per_model),
            retry_delay_seconds = COALESCE($2, retry_delay_seconds),
            max_fallbacks = COALESCE($3, max_fallbacks),
@@ -252,7 +262,8 @@ export default class ConduitController {
           max_fallbacks ?? null,
           push_back_to_pending !== undefined ? (push_back_to_pending ? 1 : 0) : null,
           circuit_breaker_retry_after ?? null,
-        ]
+        ],
+        'tackle'
       )
       return { saved: true }
     } catch (e: any) {

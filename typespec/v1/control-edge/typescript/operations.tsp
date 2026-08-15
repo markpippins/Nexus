@@ -56,11 +56,10 @@ namespace org.nexus.controledge {
   // ========================================================================
   // tackle-prompt-sync-srv (re-homed Wave 1.1)
   // ========================================================================
-
-  @route("/prompts/{role}")
-  @get
-  @doc("Return the role's cached prompt index (launch-time lookup).")
-  op listRolePrompts(@path role: string): PromptIndexEntry[];
+  // Wave 3.5 collision resolution: /prompts/{role} moved to the tackle-srv
+  // contract (get_prompts_role, PG-backed {count, prompts}); the prompt-sync
+  // Redis index route was retired in favor of it. The singular
+  // /prompt/{role}/{slug} card route remains on the prompt-sync port.
 
   @route("/prompt/{role}/{slug}")
   @get
@@ -2089,4 +2088,365 @@ namespace org.nexus.controledge {
   @delete
   @doc("Delete a wind event type")
   op delete_event_types_eventType(@path eventType: string): Record<unknown>;
+
+// ── tackle-srv (Wave 3.5) ───────────────────────────────────────────
+  @route("/config/ai")
+  @get
+  @doc("Get the full AI config snapshot (providers, harnesses, models, roles, bundles)")
+  op get_config_ai(): Record<unknown>;
+
+  @route("/config/ai/validate")
+  @get
+  @doc("Validate the AI config for missing references")
+  op get_config_ai_validate(): Record<unknown>;
+
+  @route("/config/ai/seed-defaults")
+  @post
+  @doc("Seed default AI config (providers, harnesses)")
+  op post_config_ai_seed_defaults(): Record<unknown>;
+
+  @route("/config/ai/import")
+  @post
+  @doc("Import a full AI config snapshot")
+  op post_config_ai_import(): Record<unknown>;
+
+  @route("/config/ai/providers")
+  @get
+  @doc("List AI providers")
+  op get_config_ai_providers(): Record<unknown>;
+
+  @route("/config/ai/provider/{id}")
+  @get
+  @doc("Get an AI provider by id")
+  op get_config_ai_provider_id(@path id: string): Record<unknown>;
+
+  @route("/config/ai/provider")
+  @post
+  @doc("Upsert an AI provider")
+  op post_config_ai_provider(): Record<unknown>;
+
+  @route("/config/ai/provider/{id}")
+  @delete
+  @doc("Delete an AI provider")
+  op delete_config_ai_provider_id(@path id: string): Record<unknown>;
+
+  @route("/config/ai/harnesses")
+  @get
+  @doc("List AI harnesses")
+  op get_config_ai_harnesses(): Record<unknown>;
+
+  @route("/config/ai/harness/{id}")
+  @get
+  @doc("Get an AI harness by id")
+  op get_config_ai_harness_id(@path id: string): Record<unknown>;
+
+  @route("/config/ai/harness")
+  @post
+  @doc("Upsert an AI harness")
+  op post_config_ai_harness(): Record<unknown>;
+
+  @route("/config/ai/harness/{id}")
+  @delete
+  @doc("Delete an AI harness")
+  op delete_config_ai_harness_id(@path id: string): Record<unknown>;
+
+  @route("/config/ai/models")
+  @get
+  @doc("List AI models")
+  op get_config_ai_models(): Record<unknown>;
+
+  @route("/config/ai/model/{id}")
+  @get
+  @doc("Get an AI model by id")
+  op get_config_ai_model_id(@path id: string): Record<unknown>;
+
+  @route("/config/ai/model")
+  @post
+  @doc("Upsert an AI model")
+  op post_config_ai_model(): Record<unknown>;
+
+  @route("/config/ai/model/{id}")
+  @delete
+  @doc("Delete an AI model")
+  op delete_config_ai_model_id(@path id: string): Record<unknown>;
+
+  @route("/config/ai/roles")
+  @get
+  @doc("List AI role configs")
+  op get_config_ai_roles(): Record<unknown>;
+
+  @route("/config/ai/role/{role}")
+  @get
+  @doc("Get an AI role config by role name")
+  op get_config_ai_role_role(@path role: string): Record<unknown>;
+
+  @route("/config/ai/role")
+  @post
+  @doc("Upsert an AI role config (with optional bundles)")
+  op post_config_ai_role(): Record<unknown>;
+
+  @route("/config/ai/role/{role}")
+  @delete
+  @doc("Delete an AI role config")
+  op delete_config_ai_role_role(@path role: string): Record<unknown>;
+
+  @route("/config/ai/bundles")
+  @get
+  @doc("List all config bundles")
+  op get_config_ai_bundles(): Record<unknown>;
+
+  @route("/config/ai/bundles/{role}")
+  @get
+  @doc("List config bundles for a role")
+  op get_config_ai_bundles_role(@path role: string): Record<unknown>;
+
+  @route("/config/ai/bundle/{id}")
+  @get
+  @doc("Get a config bundle by id")
+  op get_config_ai_bundle_id(@path id: string): Record<unknown>;
+
+  @route("/config/ai/bundle")
+  @post
+  @doc("Upsert a config bundle")
+  op post_config_ai_bundle(): Record<unknown>;
+
+  @route("/config/ai/bundle/{id}")
+  @delete
+  @doc("Delete a config bundle")
+  op delete_config_ai_bundle_id(@path id: string): Record<unknown>;
+
+  @route("/config/ai/bundles/{role}")
+  @post
+  @doc("Bulk upsert config bundles for a role")
+  op post_config_ai_bundles_role(@path role: string): Record<unknown>;
+
+  @route("/config/ai/resolve/{role}")
+  @get
+  @doc("Resolve the effective AI config for a role")
+  op get_config_ai_resolve_role(@path role: string): Record<unknown>;
+
+  @route("/config/ai/test")
+  @post
+  @doc("Test-invoke a verified model via its harness")
+  op post_config_ai_test(): Record<unknown>;
+
+  @route("/config/ai/verify")
+  @post
+  @doc("Verify a model via a harness run")
+  op post_config_ai_verify(): Record<unknown>;
+
+  @route("/config/ai/verify/{sessionId}")
+  @get
+  @doc("Poll a model verification session")
+  op get_config_ai_verify_sessionId(@path sessionId: string): Record<unknown>;
+
+  @route("/config/ai/tool-access")
+  @get
+  @doc("List role tool-access rules")
+  op get_config_ai_tool_access(): Record<unknown>;
+
+  @route("/config/ai/tool-access/{role}")
+  @get
+  @doc("List tool-access rules for a role")
+  op get_config_ai_tool_access_role(@path role: string): Record<unknown>;
+
+  @route("/config/ai/tool-access/{id}")
+  @patch
+  @doc("Update (allow/deny) a tool-access rule")
+  op patch_config_ai_tool_access_id(@path id: string): Record<unknown>;
+
+  @route("/sessions")
+  @get
+  @doc("List agent sessions")
+  op get_sessions(): Record<unknown>;
+
+  @route("/sessions/{sessionId}/kill")
+  @post
+  @doc("Kill a running agent session")
+  op post_sessions_sessionId_kill(@path sessionId: string): Record<unknown>;
+
+  @route("/roles")
+  @get
+  @doc("List tackle roles")
+  op get_roles(): Record<unknown>;
+
+  @route("/roles/{id}")
+  @get
+  @doc("Get a tackle role by id or name")
+  op get_roles_id(@path id: string): Record<unknown>;
+
+  @route("/roles")
+  @post
+  @doc("Upsert a tackle role")
+  op post_roles(): Record<unknown>;
+
+  @route("/roles/{id}")
+  @delete
+  @doc("Delete a tackle role")
+  op delete_roles_id(@path id: string): Record<unknown>;
+
+  @route("/scheduler")
+  @get
+  @doc("List agent scheduler entries")
+  op get_scheduler(): Record<unknown>;
+
+  @route("/scheduler/due")
+  @get
+  @doc("List due scheduler entries with prompt bodies")
+  op get_scheduler_due(): Record<unknown>;
+
+  @route("/scheduler/{id}")
+  @get
+  @doc("Get a scheduler entry by id")
+  op get_scheduler_id(@path id: string): Record<unknown>;
+
+  @route("/scheduler")
+  @post
+  @doc("Create a scheduler entry")
+  op post_scheduler(): Record<unknown>;
+
+  @route("/scheduler/{id}")
+  @patch
+  @doc("Update a scheduler entry")
+  op patch_scheduler_id(@path id: string): Record<unknown>;
+
+  @route("/scheduler/{id}")
+  @delete
+  @doc("Delete a scheduler entry")
+  op delete_scheduler_id(@path id: string): Record<unknown>;
+
+  @route("/logs")
+  @get
+  @doc("Query system logs with filters")
+  op get_logs(): Record<unknown>;
+
+  @route("/logs/emit")
+  @post
+  @doc("Emit a system log entry")
+  op post_logs_emit(): Record<unknown>;
+
+  @route("/logs")
+  @delete
+  @doc("Clear all system logs")
+  op delete_logs(): Record<unknown>;
+
+  @route("/health/history")
+  @get
+  @doc("Get health metric history")
+  op get_health_history(): Record<unknown>;
+
+  @route("/health/metrics")
+  @get
+  @doc("Get current system health metrics")
+  op get_health_metrics(): Record<unknown>;
+
+  @route("/health/simulate-load")
+  @post
+  @doc("Simulate load (no-op stub)")
+  op post_health_simulate_load(): Record<unknown>;
+
+  @route("/tasks/inspector/dispatch")
+  @get
+  @doc("Get inspector task dispatch with prompt bodies")
+  op get_tasks_inspector_dispatch(): Record<unknown>;
+
+  @route("/tasks")
+  @get
+  @doc("List tackle tasks")
+  op get_tackle_tasks(): Record<unknown>;
+
+  @route("/tasks/{task_slug}")
+  @get
+  @doc("Get a tackle task by slug")
+  op get_tasks_task_slug(@path task_slug: string): Record<unknown>;
+
+  @route("/tasks")
+  @post
+  @doc("Upsert a tackle task")
+  op post_tackle_tasks(): Record<unknown>;
+
+  @route("/tasks/{task_slug}")
+  @delete
+  @doc("Delete a tackle task by slug")
+  op delete_tasks_task_slug(@path task_slug: string): Record<unknown>;
+
+  @route("/prompts")
+  @get
+  @doc("List all prompt templates")
+  op get_prompts(): Record<unknown>;
+
+  @route("/prompts")
+  @post
+  @doc("Upsert a prompt template")
+  op post_prompts(): Record<unknown>;
+
+  @route("/prompts/{role}")
+  @get
+  @doc("List prompt templates for a role")
+  op get_prompts_role(@path role: string): Record<unknown>;
+
+  @route("/prompts/{role}/{slug}")
+  @get
+  @doc("Get a prompt template by role and slug")
+  op get_prompts_role_slug(@path role: string, @path slug: string): Record<unknown>;
+
+  @route("/memory/procedures/{role}")
+  @get
+  @doc("List procedure cards linked to a role")
+  op get_memory_procedures_role(@path role: string): Record<unknown>;
+
+  @route("/memory/procedure/{slug}")
+  @get
+  @doc("Get a procedure card by slug")
+  op get_memory_procedure_slug(@path slug: string): Record<unknown>;
+
+  @route("/memory/check-since")
+  @post
+  @doc("Check whether a role's memory changed since a timestamp")
+  op post_memory_check_since(): Record<unknown>;
+
+  @route("/memory/refresh")
+  @post
+  @doc("Refresh memory counts")
+  op post_memory_refresh(): Record<unknown>;
+
+  @route("/memory/role-updates")
+  @get
+  @doc("Get role memory checkpoints")
+  op get_memory_role_updates(): Record<unknown>;
+
+  @route("/projections")
+  @get
+  @doc("List projection configs")
+  op get_projections(): Record<unknown>;
+
+  @route("/projections/drift")
+  @get
+  @doc("Compare on-disk projection shas against stored")
+  op get_projections_drift(): Record<unknown>;
+
+  @route("/projections/{id}")
+  @get
+  @doc("Get a projection config by id")
+  op get_projections_id(@path id: string): Record<unknown>;
+
+  @route("/projections")
+  @post
+  @doc("Create a projection config")
+  op post_projections(): Record<unknown>;
+
+  @route("/projections/{id}")
+  @put
+  @doc("Update a projection config")
+  op put_projections_id(@path id: string): Record<unknown>;
+
+  @route("/projections/{id}/render")
+  @post
+  @doc("Render a single projection")
+  op post_projections_id_render(@path id: string): Record<unknown>;
+
+  @route("/projections/render-all")
+  @post
+  @doc("Render all enabled projections")
+  op post_projections_render_all(): Record<unknown>;
 }

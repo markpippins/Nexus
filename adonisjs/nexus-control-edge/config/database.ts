@@ -58,6 +58,24 @@ const dbConfig = defineConfig({
       searchPath: ['conduit', 'vision', 'peb', 'tackle'],
       pool: { min: 2, max: 10 },
     },
+    // Re-homed tackle-srv SQL runs with search_path=tackle (the original
+    // pool carried `-c search_path=tackle`). Unqualified names like
+    // `sessions`, `roles`, `agent_scheduler`, `prompts`, `tasks`,
+    // `providers`, `models`, `harnesses`, `config_bundle`,
+    // `role_tool_access`, `system_logs`, `projection_configs` resolve
+    // exactly as they did upstream.
+    tackle: {
+      client: 'pg',
+      connection: {
+        host: env.get('PG_HOST'),
+        port: env.get('PG_PORT'),
+        user: env.get('PG_USER'),
+        password: env.get('PG_PASSWORD'),
+        database: env.get('PG_DB_NAME'),
+      },
+      searchPath: ['tackle', 'public'],
+      pool: { min: 2, max: 10 },
+    },
   },
 })
 
