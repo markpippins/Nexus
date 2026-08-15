@@ -1,0 +1,665 @@
+openapi: 3.1.0
+info:
+  title: Nexus Control Edge
+  version: 0.0.0
+tags: []
+paths:
+  /api/links:
+    get:
+      operationId: listLinks
+      description: List navigation links ordered by sort_order (throttler.links).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Link'
+    post:
+      operationId: createLink
+      description: Create a navigation link or separator.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Link'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkCreate'
+  /api/links/reorder:
+    patch:
+      operationId: reorderLinks
+      description: Transactionally reorder links; returns the updated list.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Link'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkReorder'
+  /api/links/{id}:
+    patch:
+      operationId: updateLink
+      description: Partially update a link.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Link'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkUpdate'
+    delete:
+      operationId: deleteLink
+      description: Delete a link.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+  /health:
+    get:
+      operationId: health
+      description: 'Edge health: status, service, db + redis connectivity.'
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /knowledge/cross-references:
+    get:
+      operationId: listKnowledgeCrossReferences
+      description: List knowledge-graph cross-references (filters; paging).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /knowledge/edges:
+    get:
+      operationId: listKnowledgeEdges
+      description: List knowledge-graph edges (filters; paging).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /knowledge/entities:
+    get:
+      operationId: listKnowledgeEntities
+      description: 'List knowledge-graph entities (filters: section, entity_type, status, search; paging).'
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /knowledge/entities/{section}/{entity_id}:
+    get:
+      operationId: getKnowledgeEntity
+      description: Get one knowledge-graph entity. 404 if missing.
+      parameters:
+        - name: section
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: entity_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /knowledge/entities/{section}/{entity_id}/relations:
+    get:
+      operationId: getKnowledgeEntityRelations
+      description: List inbound + outbound relations for an entity.
+      parameters:
+        - name: section
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: entity_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /knowledge/migrations:
+    get:
+      operationId: listKnowledgeMigrations
+      description: List graph migrations (most recent first).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /knowledge/summary:
+    get:
+      operationId: getKnowledgeSummary
+      description: Aggregate counts across the knowledge graph.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /procedure/{slug}:
+    get:
+      operationId: getProcedureCard
+      description: Return the full cached procedure card. 404 if missing.
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/ProcedureCard'
+                  - $ref: '#/components/schemas/ErrorResponse'
+  /procedures/{role}:
+    get:
+      operationId: listRoleProcedures
+      description: Return the role's cached procedure index.
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProcedureIndexEntry'
+  /prompt/{role}/{slug}:
+    get:
+      operationId: getPromptCard
+      description: Return the full cached prompt card (latest version). 404 if missing.
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/PromptCard'
+                  - $ref: '#/components/schemas/ErrorResponse'
+  /prompts/{role}:
+    get:
+      operationId: listRolePrompts
+      description: Return the role's cached prompt index (launch-time lookup).
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PromptIndexEntry'
+  /refresh:
+    post:
+      operationId: refreshCaches
+      description: Trigger a full PG→Redis sync for both caches (idempotent; also runs on Redis ready).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshResult'
+  /tasks/{role}:
+    get:
+      operationId: listRoleTasks
+      description: Return the role's cached active task index.
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskIndexEntry'
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+      description: Generic error response.
+    Health:
+      type: object
+      required:
+        - status
+        - service
+        - db
+        - redis
+        - timestamp
+      properties:
+        status:
+          type: string
+          description: Literal "ok" / "error".
+        service:
+          type: string
+          description: '"nexus-control-edge".'
+        db:
+          type: string
+          description: '"up" / error message.'
+        redis:
+          type: string
+          description: '"up" / error message.'
+        timestamp:
+          type: string
+          description: ISO timestamp.
+      description: GET /health response.
+    Link:
+      type: object
+      required:
+        - id
+        - address
+        - imagename
+        - text
+        - type
+        - sortOrder
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        address:
+          type: string
+        imagename:
+          type: string
+        text:
+          anyOf:
+            - type: string
+            - type: 'null'
+        type:
+          type: string
+          enum:
+            - link
+            - separator
+        sortOrder:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      description: A navigation link / separator (throttler.links).
+    LinkCreate:
+      type: object
+      properties:
+        address:
+          type: string
+        imagename:
+          type: string
+        text:
+          anyOf:
+            - type: string
+            - type: 'null'
+        type:
+          type: string
+          enum:
+            - link
+            - separator
+        sortOrder:
+          type: integer
+          format: int32
+      description: POST /api/links body.
+    LinkReorder:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReorderItem'
+      description: PATCH /api/links/reorder body.
+    LinkUpdate:
+      type: object
+      properties:
+        address:
+          type: string
+        imagename:
+          type: string
+        text:
+          anyOf:
+            - type: string
+            - type: 'null'
+        type:
+          type: string
+          enum:
+            - link
+            - separator
+        sortOrder:
+          type: integer
+          format: int32
+      description: PATCH /api/links/{id} body (all optional — partial update).
+    MemorySyncResult:
+      type: object
+      required:
+        - procedures
+        - roleIndices
+        - timestamp
+      properties:
+        procedures:
+          type: integer
+          format: int32
+        roleIndices:
+          type: integer
+          format: int32
+        timestamp:
+          type: string
+      description: Memory-cache sync result.
+    Ok:
+      type: object
+      required:
+        - ok
+      properties:
+        ok:
+          type: boolean
+      description: DELETE /api/links/{id} response.
+    ProcedureCard:
+      type: object
+      required:
+        - slug
+        - title
+        - summary
+        - body_md
+        - tags
+        - triggers
+        - mcp_tools
+        - roles
+        - updated_at
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        body_md:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        triggers:
+          type: array
+          items:
+            type: string
+        mcp_tools:
+          type: array
+          items:
+            type: string
+        roles:
+          type: array
+          items:
+            type: string
+        updated_at:
+          type: string
+      description: Full procedure card (mem:proc:{slug}).
+    ProcedureIndexEntry:
+      type: object
+      required:
+        - slug
+        - summary
+        - tags
+      properties:
+        slug:
+          type: string
+        summary:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+      description: A procedure index entry (cached per role).
+    PromptCard:
+      type: object
+      required:
+        - id
+        - role
+        - slug
+        - version
+        - title
+        - body_md
+        - parameter_schema
+        - tags
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+        slug:
+          type: string
+        version:
+          type: integer
+          format: int32
+        title:
+          type: string
+        body_md:
+          type: string
+        parameter_schema:
+          type: object
+          unevaluatedProperties: {}
+        tags:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+      description: Full prompt card (prompt:proc:{role}::{slug}).
+    PromptIndexEntry:
+      type: object
+      required:
+        - slug
+        - title
+        - version
+        - tags
+        - updated_at
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        version:
+          type: integer
+          format: int32
+        tags:
+          type: array
+          items:
+            type: string
+        updated_at:
+          type: string
+      description: A prompt index entry (cached per role, no body_md).
+    PromptSyncResult:
+      type: object
+      required:
+        - prompts
+        - rolePromptIndices
+        - tasks
+        - roleTaskIndices
+        - timestamp
+      properties:
+        prompts:
+          type: integer
+          format: int32
+        rolePromptIndices:
+          type: integer
+          format: int32
+        tasks:
+          type: integer
+          format: int32
+        roleTaskIndices:
+          type: integer
+          format: int32
+        timestamp:
+          type: string
+      description: Prompt-cache sync result.
+    RefreshResult:
+      type: object
+      required:
+        - prompts
+        - memory
+      properties:
+        prompts:
+          $ref: '#/components/schemas/PromptSyncResult'
+        memory:
+          $ref: '#/components/schemas/MemorySyncResult'
+      description: POST /refresh result — both caches.
+    ReorderItem:
+      type: object
+      required:
+        - id
+        - sortOrder
+      properties:
+        id:
+          type: string
+        sortOrder:
+          type: integer
+          format: int32
+      description: One reorder instruction.
+    TaskIndexEntry:
+      type: object
+      required:
+        - task_slug
+        - scope
+        - acceptance_criteria
+        - prompt_id
+        - prompt_slug
+        - updated_at
+      properties:
+        task_slug:
+          type: string
+        scope:
+          type: string
+        acceptance_criteria:
+          type: array
+          items:
+            type: string
+        prompt_id:
+          type: string
+        prompt_slug:
+          type: string
+        updated_at:
+          type: string
+      description: A task index entry (cached per role).

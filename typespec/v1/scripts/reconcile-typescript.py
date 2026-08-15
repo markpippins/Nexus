@@ -72,6 +72,12 @@ MANIFEST = [
     # extraction regexes run: express (default), adonisjs, or moleculer.
     {"name": "adonisjs", "type": "rest", "src_root": "adonisjs/broker-gateway-proxy", "framework": "adonisjs"},
     {"name": "moleculer", "type": "rest", "src_root": "moleculer/search", "framework": "moleculer"},
+    # Worker-tier broker (Wave 0.3) — same Moleculer alias extraction.
+    {"name": "nexus-broker", "type": "rest", "src_root": "moleculer/nexus-broker", "framework": "moleculer"},
+    # Consolidated control-plane edge (Wave 0.2) — AdonisJS route extraction.
+    {"name": "control-edge", "type": "rest", "src_root": "adonisjs/nexus-control-edge", "framework": "adonisjs"},
+    # Consolidated data-plane edge (Wave 0.2) — AdonisJS route extraction.
+    {"name": "data-edge", "type": "rest", "src_root": "adonisjs/nexus-data-edge", "framework": "adonisjs"},
     # MCP tool servers (smallest -> largest)
     {"name": "service-broker-mcp", "type": "mcp"},
     {"name": "knowledge-mcp", "type": "mcp"},
@@ -152,6 +158,11 @@ def ts_routes(entry: dict, src_root: str) -> set[str]:
                 continue
             with open(os.path.join(root, fn), encoding="utf-8", errors="replace") as f:
                 texts.append(f.read())
+    # Drop full-line comments so commented-out route groups (e.g. stub
+    # groups that land with a later migration wave) are not extracted as
+    # declared surface.
+    texts = ["\n".join(ln for ln in t.splitlines() if not ln.lstrip().startswith("//")) for t in texts]
+
     # Router mount prefixes (e.g. `app.use('/api', ...)`).
     mount_prefixes: set[str] = set()
     for text in texts:
