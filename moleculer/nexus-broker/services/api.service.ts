@@ -26,11 +26,19 @@ export default class ApiService extends Service {
           {
             path: "/api",
 
-            whitelist: ["api.*", "worker.*", "solir.*"],
+            whitelist: ["api.*", "worker.**", "solir.*"],
 
             aliases: {
               "GET /health": "api.health",
               "GET /workers": "worker.list",
+              "GET /workers/execution": "worker.execution.health",
+              "GET /workers/pty": "worker.pty.list",
+              "POST /workers/pty": "worker.pty.spawn",
+              "DELETE /workers/pty/:id": "worker.pty.kill",
+              "GET /workers/harness": "worker.harness.health",
+              "POST /workers/harness/run": "worker.harness.run",
+              "POST /workers/harness/resolve-context": "worker.harness.resolveContext",
+              "GET /workers/harness/sessions": "worker.harness.sessions",
               "GET /solir/status": "solir.status",
               "POST /solir/snapshot": "solir.snapshot",
             },

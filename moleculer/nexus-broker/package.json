@@ -5,17 +5,21 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "moleculer-runner --hot --repl services/**/*.service.ts",
-    "start": "moleculer-runner dist/services",
+    "start": "moleculer-runner --mask \"**/*.js\" dist/services",
     "build": "tsc",
     "cli": "moleculer connect NATS",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "dotenv": "^16.4.0",
+    "ioredis": "^5.11.1",
     "moleculer": "^0.14.34",
     "moleculer-web": "^0.10.7",
     "mongodb": "^6.8.0",
-    "pg": "^8.13.1"
+    "node-pty": "^1.1.0",
+    "pg": "^8.13.1",
+    "uuid": "^14.0.1",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
