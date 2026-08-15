@@ -673,7 +673,7 @@ export default class NebulaMetaController {
         threadResult, requirementResult, agendaResult, candidateResult,
         harvestResult, oqResult, intentResult, assessmentResult,
         observationResult, agentRecordResult, specificationResult, planResult,
-        userResult,
+        userResult, forumResult, commentResult,
       ] = await Promise.all([
         q(
           `SELECT id, title, text AS body, 'thread' AS result_type FROM assembly.posts
@@ -742,9 +742,19 @@ export default class NebulaMetaController {
            WHERE alias ILIKE $1 ESCAPE '\\' OR email ILIKE $1 ESCAPE '\\' LIMIT $2`,
           [pattern, limit]
         ),
+        // Wave 3.2: assembly-srv merged forum-by-name + comment search into the
+        // nebula search surface (assembly.search_forums / search_comments procs).
+        q(
+          `SELECT * FROM assembly.search_forums($1, $2)`,
+          [qText, limit]
+        ),
+        q(
+          `SELECT * FROM assembly.search_comments($1, $2)`,
+          [qText, limit]
+        ),
       ])
 
-      const results = [
+      let results = [
         ...threadResult.rows,
         ...requirementResult.rows,
         ...agendaResult.rows,
@@ -773,6 +783,31 @@ export default class NebulaMetaController {
           href: `/${routePath}/${r.id}`,
         }
       })
+
+      // Wave 3.2: assembly-srv merged forum-by-name + comment search (assembly
+      // procs) into the nebula search surface. Appended AFTER the primary map
+      // so their dedicated hrefs survive (the primary map rewrites hrefs from
+      // result_type).
+      const assemblyLocal = [
+        ...forumResult.rows.map((r: any) => ({
+          type: 'forum',
+          id: r.id,
+          title: r.name || '',
+          description: (r.description || '').slice(0, 200),
+          status: null,
+          href: `/forums/${r.slug}`,
+        })),
+        ...commentResult.rows.map((r: any) => ({
+          type: 'post',
+          id: r.id,
+          title: r.thread_title || '',
+          description: (r.body || '').slice(0, 200),
+          status: null,
+          href: `/forums/${r.forum_slug}/${r.thread_id}`,
+        })),
+      ]
+      results.push(...assemblyLocal)
+      results = results.slice(0, 100)
 
       return response.json({ query: qText, results, total: results.length })
     } catch (err: any) {
@@ -815,9 +850,10 @@ export default class NebulaMetaController {
       postsResult, requirementsResult, agendasResult, candidatesResult,
       harvestsResult, oqResult, intentsResult, assessmentsResult,
       observationsResult, agentRecordsResult, specificationsResult, plansResult,
-      usersResult, toDoThreadsResult,
+      usersResult, toDoThreadsResult, forumsResult,
     ] = await Promise.all([
       q('SELECT COUNT(*)::int AS total FROM assembly.posts'),
+      q("SELECT COUNT(*)::int AS total FROM assembly.forums WHERE expiration_dt = 'infinity'::timestamptz OR expiration_dt > now()"),
       q('SELECT COUNT(*)::int AS total FROM nebula.requirements'),
       q('SELECT COUNT(*)::int AS total FROM nebula.agendas'),
       q('SELECT COUNT(*)::int AS total FROM nebula.harvest_candidates'),
@@ -847,6 +883,8 @@ export default class NebulaMetaController {
       plans: plansResult.rows[0].total,
       users: usersResult.rows[0].total,
       toDoThreads: toDoThreadsResult.rows[0].total,
+      forums: forumsResult.rows[0].total,
+      posts: postsResult.rows[0].total,
     }
   }
 

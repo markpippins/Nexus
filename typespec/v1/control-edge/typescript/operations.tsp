@@ -1480,4 +1480,203 @@ namespace org.nexus.controledge {
   @patch
   @doc("Deprecated — returns 410.")
   op patch_api_external_ids(@path id: string): Record<unknown>;
+  @route("/api/forums")
+  @get
+  @doc("List forums.")
+  op get_api_forums(): Record<unknown>;
+
+  @route("/api/forums/{slug}/threads")
+  @get
+  @doc("List threads in a forum by slug.")
+  op get_api_forums_slug_threads(@path slug: string): Record<unknown>;
+
+  @route("/api/forums/{slug}/threads")
+  @post
+  @doc("Create a thread in a forum by slug.")
+  op post_api_forums_slug_threads(@path slug: string): Record<unknown>;
+
+  @route("/api/forums/by-id/{forumId}/threads")
+  @post
+  @doc("Create a thread in a forum by UUID.")
+  op post_api_forums_by_id_threads(@path forumId: string): Record<unknown>;
+
+  @route("/api/forums/by-id/{forumId}/threads")
+  @get
+  @doc("List threads in a forum by UUID.")
+  op get_api_forums_by_id_threads(@path forumId: string): Record<unknown>;
+
+  @route("/api/forums/threads/{threadId}")
+  @get
+  @doc("Get a thread with its comment tree.")
+  op get_api_forums_threads(@path threadId: string): Record<unknown>;
+
+  @route("/api/forums/threads/{threadId}/comments")
+  @post
+  @doc("Add a comment to a thread.")
+  op post_api_forums_threads_comments(@path threadId: string): Record<unknown>;
+
+  @route("/api/forums/by-slug/{slug}")
+  @get
+  @doc("Get a forum by slug.")
+  op get_api_forums_by_slug(@path slug: string): Record<unknown>;
+
+  @route("/api/forums/by-id/{id}")
+  @get
+  @doc("Get a forum by UUID.")
+  op get_api_forums_by_id(@path id: string): Record<unknown>;
+
+  @route("/api/forums")
+  @post
+  @doc("Create a forum.")
+  op post_api_forums(): Record<unknown>;
+
+  @route("/api/forums/{id}")
+  @put
+  @doc("Update a forum.")
+  op put_api_forums(@path id: string): Record<unknown>;
+
+  @route("/api/forums/{id}")
+  @delete
+  @doc("Soft-delete a forum.")
+  op delete_api_forums(@path id: string): Record<unknown>;
+
+  @route("/api/forums/reorder")
+  @put
+  @doc("Reorder forums.")
+  op put_api_forums_reorder(): Record<unknown>;
+
+  @route("/api/forums/move-thread")
+  @post
+  @doc("Move a thread between forums.")
+  op post_api_forums_move_thread(): Record<unknown>;
+
+  @route("/api/forums/threads/{threadId}")
+  @delete
+  @doc("Soft-delete a thread.")
+  op delete_api_forums_threads(@path threadId: string): Record<unknown>;
+
+  @route("/api/forums/search/by-name")
+  @get
+  @doc("Search forums by name.")
+  op get_api_forums_search_by_name(): Record<unknown>;
+
+  @route("/api/forums/search/by-thread-title")
+  @get
+  @doc("Search threads by title.")
+  op get_api_forums_search_by_thread_title(): Record<unknown>;
+
+  @route("/api/forums/comments/{id}")
+  @get
+  @doc("Get a single comment.")
+  op get_api_forums_comments(@path id: string): Record<unknown>;
+
+  @route("/api/forums/comments/{id}")
+  @delete
+  @doc("Soft-delete a comment.")
+  op delete_api_forums_comments(@path id: string): Record<unknown>;
+
+  @route("/api/feed")
+  @get
+  @doc("List feed posts.")
+  op get_api_feed(): Record<unknown>;
+
+  @route("/api/feed")
+  @post
+  @doc("Create a feed post.")
+  op post_api_feed(): Record<unknown>;
+
+  @route("/api/feed/{id}")
+  @delete
+  @doc("Soft-delete a feed post.")
+  op delete_api_feed(@path id: string): Record<unknown>;
+
+  @route("/api/users")
+  @get
+  @doc("List users.")
+  op get_api_users(): Record<unknown>;
+
+  @route("/api/users/{id}")
+  @get
+  @doc("Get a user.")
+  op get_api_users_id(@path id: string): Record<unknown>;
+
+  @route("/api/users/by-alias/{userAlias}")
+  @get
+  @doc("Get a user by alias.")
+  op get_api_users_by_alias(@path userAlias: string): Record<unknown>;
+
+  @route("/api/users")
+  @post
+  @doc("Create a user.")
+  op post_api_users(): Record<unknown>;
+
+  @route("/api/bridges/forum-agenda")
+  @post
+  @doc("Link a forum to an agenda.")
+  op post_api_bridges_forum_agenda(): Record<unknown>;
+
+  @route("/api/bridges/forum-agenda")
+  @delete
+  @doc("Unlink a forum from an agenda.")
+  op delete_api_bridges_forum_agenda(): Record<unknown>;
+
+  @route("/api/bridges/forums-by-agenda/{agendaId}")
+  @get
+  @doc("List forums linked to an agenda.")
+  op get_api_bridges_forums_by_agenda(@path agendaId: string): Record<unknown>;
+
+  @route("/api/bridges/agendas-by-forum/{forumId}")
+  @get
+  @doc("List agendas linked to a forum.")
+  op get_api_bridges_agendas_by_forum(@path forumId: string): Record<unknown>;
+
+  @route("/api/bridges/post-artifact")
+  @post
+  @doc("Link a post to an artifact.")
+  op post_api_bridges_post_artifact(): Record<unknown>;
+
+  @route("/api/bridges/post-artifact")
+  @delete
+  @doc("Unlink a post from an artifact.")
+  op delete_api_bridges_post_artifact(): Record<unknown>;
+
+  @route("/api/bridges/artifact-threads/{type}/{id}")
+  @get
+  @doc("List threads linked to an artifact.")
+  op get_api_bridges_artifact_threads(@path type: string, @path id: string): Record<unknown>;
+
+  @route("/api/bridges/artifact-refs/{postId}")
+  @get
+  @doc("List artifact refs for a post.")
+  op get_api_bridges_artifact_refs(@path postId: string): Record<unknown>;
+
+  @route("/api/bridges/supporting-refs")
+  @post
+  @doc("Add a supporting ref.")
+  op post_api_bridges_supporting_refs(): Record<unknown>;
+
+  @route("/api/bridges/supporting-refs/post/{postId}")
+  @get
+  @doc("List supporting refs for a post.")
+  op get_api_bridges_supporting_refs_post(@path postId: string): Record<unknown>;
+
+  @route("/api/bridges/supporting-refs/comment/{commentId}")
+  @get
+  @doc("List supporting refs for a comment.")
+  op get_api_bridges_supporting_refs_comment(@path commentId: string): Record<unknown>;
+
+  @route("/api/duality/watches")
+  @post
+  @doc("Create or reactivate a session watch.")
+  op post_api_duality_watches(): Record<unknown>;
+
+  @route("/api/duality/watches/active")
+  @get
+  @doc("Find the most recent active watch for a role/forum.")
+  op get_api_duality_watches_active(): Record<unknown>;
+
+  @route("/api/duality/watches/{threadId}")
+  @get
+  @doc("List active watches for a thread.")
+  op get_api_duality_watches_thread(@path threadId: string): Record<unknown>;
 }

@@ -89,6 +89,62 @@ router.group(() => {
   router.post('/api/drift_finding/:id/resolve', [() => import('#controllers/semantics_controller'), 'resolveDriftFinding'])
 })
 
+// ── assembly-srv (re-homed Wave 3.2) — genuine assembly domain ───────
+// Ported from nexus/typescript/assembly-srv/src/routes/{forums,feed,users,
+// bridges,duality}.js. The 13 camelCase proxy routers (agent-records,
+// harvests, plans, requirements, agendas, candidates, conversations,
+// intents, assessments, observations, specifications, work-requests,
+// open-questions) are NOT re-registered — their paths are already served
+// by the nebula-srv surface above (same path, canonical contract).
+// Static-literal routes are registered before their :param variants.
+router.group(() => {
+  // forums
+  router.get('/api/forums', [() => import('#controllers/assembly_forum_controller'), 'listForums'])
+  router.get('/api/forums/by-slug/:slug', [() => import('#controllers/assembly_forum_controller'), 'getForumBySlug'])
+  router.get('/api/forums/by-id/:id', [() => import('#controllers/assembly_forum_controller'), 'getForumById'])
+  router.post('/api/forums/by-id/:forumId/threads', [() => import('#controllers/assembly_forum_controller'), 'createThreadByForumId'])
+  router.get('/api/forums/by-id/:forumId/threads', [() => import('#controllers/assembly_forum_controller'), 'listThreadsByForumId'])
+  router.get('/api/forums/threads/:threadId', [() => import('#controllers/assembly_forum_controller'), 'getThread'])
+  router.post('/api/forums/threads/:threadId/comments', [() => import('#controllers/assembly_forum_controller'), 'addComment'])
+  router.delete('/api/forums/threads/:threadId', [() => import('#controllers/assembly_forum_controller'), 'deleteThread'])
+  router.get('/api/forums/search/by-name', [() => import('#controllers/assembly_forum_controller'), 'searchForumsByName'])
+  router.get('/api/forums/search/by-thread-title', [() => import('#controllers/assembly_forum_controller'), 'searchThreadsByTitle'])
+  router.get('/api/forums/comments/:id', [() => import('#controllers/assembly_forum_controller'), 'getComment'])
+  router.delete('/api/forums/comments/:id', [() => import('#controllers/assembly_forum_controller'), 'deleteComment'])
+  router.post('/api/forums/move-thread', [() => import('#controllers/assembly_forum_controller'), 'moveThread'])
+  router.put('/api/forums/reorder', [() => import('#controllers/assembly_forum_controller'), 'reorderForums'])
+  router.get('/api/forums/:slug/threads', [() => import('#controllers/assembly_forum_controller'), 'listThreadsBySlug'])
+  router.post('/api/forums/:slug/threads', [() => import('#controllers/assembly_forum_controller'), 'createThreadBySlug'])
+  router.post('/api/forums', [() => import('#controllers/assembly_forum_controller'), 'createForum'])
+  router.put('/api/forums/:id', [() => import('#controllers/assembly_forum_controller'), 'updateForum'])
+  router.delete('/api/forums/:id', [() => import('#controllers/assembly_forum_controller'), 'deleteForum'])
+  // feed
+  router.get('/api/feed', [() => import('#controllers/assembly_forum_controller'), 'listFeed'])
+  router.post('/api/feed', [() => import('#controllers/assembly_forum_controller'), 'createFeedPost'])
+  router.delete('/api/feed/:id', [() => import('#controllers/assembly_forum_controller'), 'deleteFeedPost'])
+  // users
+  router.get('/api/users', [() => import('#controllers/assembly_forum_controller'), 'listUsers'])
+  router.get('/api/users/by-alias/:userAlias', [() => import('#controllers/assembly_forum_controller'), 'getUserByAlias'])
+  router.get('/api/users/:id', [() => import('#controllers/assembly_forum_controller'), 'getUser'])
+  router.post('/api/users', [() => import('#controllers/assembly_forum_controller'), 'createUser'])
+  // bridges
+  router.post('/api/bridges/forum-agenda', [() => import('#controllers/assembly_bridge_controller'), 'linkForumAgenda'])
+  router.delete('/api/bridges/forum-agenda', [() => import('#controllers/assembly_bridge_controller'), 'unlinkForumAgenda'])
+  router.get('/api/bridges/forums-by-agenda/:agendaId', [() => import('#controllers/assembly_bridge_controller'), 'forumsByAgenda'])
+  router.get('/api/bridges/agendas-by-forum/:forumId', [() => import('#controllers/assembly_bridge_controller'), 'agendasByForum'])
+  router.post('/api/bridges/post-artifact', [() => import('#controllers/assembly_bridge_controller'), 'linkPostArtifact'])
+  router.delete('/api/bridges/post-artifact', [() => import('#controllers/assembly_bridge_controller'), 'unlinkPostArtifact'])
+  router.get('/api/bridges/artifact-threads/:type/:id', [() => import('#controllers/assembly_bridge_controller'), 'artifactThreads'])
+  router.get('/api/bridges/artifact-refs/:postId', [() => import('#controllers/assembly_bridge_controller'), 'artifactRefs'])
+  router.post('/api/bridges/supporting-refs', [() => import('#controllers/assembly_bridge_controller'), 'addSupportingRef'])
+  router.get('/api/bridges/supporting-refs/post/:postId', [() => import('#controllers/assembly_bridge_controller'), 'supportingRefsByPost'])
+  router.get('/api/bridges/supporting-refs/comment/:commentId', [() => import('#controllers/assembly_bridge_controller'), 'supportingRefsByComment'])
+  // duality
+  router.post('/api/duality/watches', [() => import('#controllers/assembly_bridge_controller'), 'createWatch'])
+  router.get('/api/duality/watches/active', [() => import('#controllers/assembly_bridge_controller'), 'activeWatch'])
+  router.get('/api/duality/watches/:threadId', [() => import('#controllers/assembly_bridge_controller'), 'threadWatches'])
+})
+
 // ── voyager-srv (re-homed Wave 2.4) ───────────────────────────────────
 // Registered BEFORE the semantics generic :table wildcards so the literal
 // /api/entities, /api/spans, /api/scan-epochs routes win the match.

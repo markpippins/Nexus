@@ -447,6 +447,182 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /api/bridges/agendas-by-forum/{forumId}:
+    get:
+      operationId: get_api_bridges_agendas_by_forum
+      description: List agendas linked to a forum.
+      parameters:
+        - name: forumId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/bridges/artifact-refs/{postId}:
+    get:
+      operationId: get_api_bridges_artifact_refs
+      description: List artifact refs for a post.
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/bridges/artifact-threads/{type}/{id}:
+    get:
+      operationId: get_api_bridges_artifact_threads
+      description: List threads linked to an artifact.
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/bridges/forum-agenda:
+    post:
+      operationId: post_api_bridges_forum_agenda
+      description: Link a forum to an agenda.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_bridges_forum_agenda
+      description: Unlink a forum from an agenda.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/bridges/forums-by-agenda/{agendaId}:
+    get:
+      operationId: get_api_bridges_forums_by_agenda
+      description: List forums linked to an agenda.
+      parameters:
+        - name: agendaId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/bridges/post-artifact:
+    post:
+      operationId: post_api_bridges_post_artifact
+      description: Link a post to an artifact.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_bridges_post_artifact
+      description: Unlink a post from an artifact.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/bridges/supporting-refs:
+    post:
+      operationId: post_api_bridges_supporting_refs
+      description: Add a supporting ref.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/bridges/supporting-refs/comment/{commentId}:
+    get:
+      operationId: get_api_bridges_supporting_refs_comment
+      description: List supporting refs for a comment.
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/bridges/supporting-refs/post/{postId}:
+    get:
+      operationId: get_api_bridges_supporting_refs_post
+      description: List supporting refs for a post.
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/candidates:
     get:
       operationId: get_api_candidates
@@ -1028,6 +1204,50 @@ paths:
             schema:
               type: object
               unevaluatedProperties: {}
+  /api/duality/watches:
+    post:
+      operationId: post_api_duality_watches
+      description: Create or reactivate a session watch.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/duality/watches/active:
+    get:
+      operationId: get_api_duality_watches_active
+      description: Find the most recent active watch for a role/forum.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/duality/watches/{threadId}:
+    get:
+      operationId: get_api_duality_watches_thread
+      description: List active watches for a thread.
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/entities:
     get:
       operationId: listVoyagerEntities
@@ -1528,6 +1748,355 @@ paths:
       description: List work requests for a feature.
       parameters:
         - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/feed:
+    get:
+      operationId: get_api_feed
+      description: List feed posts.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_feed
+      description: Create a feed post.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/feed/{id}:
+    delete:
+      operationId: delete_api_feed
+      description: Soft-delete a feed post.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/forums:
+    get:
+      operationId: get_api_forums
+      description: List forums.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_forums
+      description: Create a forum.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/forums/by-id/{forumId}/threads:
+    post:
+      operationId: post_api_forums_by_id_threads
+      description: Create a thread in a forum by UUID.
+      parameters:
+        - name: forumId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    get:
+      operationId: get_api_forums_by_id_threads
+      description: List threads in a forum by UUID.
+      parameters:
+        - name: forumId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/forums/by-id/{id}:
+    get:
+      operationId: get_api_forums_by_id
+      description: Get a forum by UUID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/forums/by-slug/{slug}:
+    get:
+      operationId: get_api_forums_by_slug
+      description: Get a forum by slug.
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/forums/comments/{id}:
+    get:
+      operationId: get_api_forums_comments
+      description: Get a single comment.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_forums_comments
+      description: Soft-delete a comment.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/forums/move-thread:
+    post:
+      operationId: post_api_forums_move_thread
+      description: Move a thread between forums.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/forums/reorder:
+    put:
+      operationId: put_api_forums_reorder
+      description: Reorder forums.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/forums/search/by-name:
+    get:
+      operationId: get_api_forums_search_by_name
+      description: Search forums by name.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/forums/search/by-thread-title:
+    get:
+      operationId: get_api_forums_search_by_thread_title
+      description: Search threads by title.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/forums/threads/{threadId}:
+    get:
+      operationId: get_api_forums_threads
+      description: Get a thread with its comment tree.
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_forums_threads
+      description: Soft-delete a thread.
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/forums/threads/{threadId}/comments:
+    post:
+      operationId: post_api_forums_threads_comments
+      description: Add a comment to a thread.
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/forums/{id}:
+    put:
+      operationId: put_api_forums
+      description: Update a forum.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_forums
+      description: Soft-delete a forum.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/forums/{slug}/threads:
+    get:
+      operationId: get_api_forums_slug_threads
+      description: List threads in a forum by slug.
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_forums_slug_threads
+      description: Create a thread in a forum by slug.
+      parameters:
+        - name: slug
           in: path
           required: true
           schema:
@@ -4006,6 +4575,67 @@ paths:
     get:
       operationId: getTopologySignal
       description: Get a single topology signal.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/users:
+    get:
+      operationId: get_api_users
+      description: List users.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_users
+      description: Create a user.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/users/by-alias/{userAlias}:
+    get:
+      operationId: get_api_users_by_alias
+      description: Get a user by alias.
+      parameters:
+        - name: userAlias
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/users/{id}:
+    get:
+      operationId: get_api_users_id
+      description: Get a user.
       parameters:
         - name: id
           in: path
