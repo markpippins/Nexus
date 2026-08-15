@@ -66,11 +66,6 @@ namespace org.nexus.controledge {
   @doc("Return the full cached prompt card (latest version). 404 if missing.")
   op getPromptCard(@path role: string, @path slug: string): PromptCard | ErrorResponse;
 
-  @route("/tasks/{role}")
-  @get
-  @doc("Return the role's cached active task index.")
-  op listRoleTasks(@path role: string): TaskIndexEntry[];
-
   @route("/refresh")
   @post
   @doc("Trigger a full PG→Redis sync for both caches (idempotent; also runs on Redis ready).")

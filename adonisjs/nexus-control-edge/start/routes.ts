@@ -3,10 +3,13 @@
 | Control-plane edge — route table
 |--------------------------------------------------------------------------
 |
-| One AdonisJS process hosting the control-plane REST surfaces:
-| ui-tools, tools-aggregator, knowledge-srv, semantics-srv, terrain-srv,
-| voyager-srv, tackle-srv, tackle-prompt-sync-srv, role-memory-srv
-| (per binding ruling D-2026-08-14-002).
+| One AdonisJS process — the single HTTP edge of the consolidated runtime
+| (per binding ruling D-2026-08-14-002; data-edge deleted per R-A-2026-08-15-001).
+| Hosts the REST surfaces re-homed from the Express fleet: ui-tools,
+| tools-aggregator, knowledge-srv, semantics-srv, terrain-srv, voyager-srv,
+| tackle-srv, tackle-prompt-sync-srv, role-memory-srv, nebula-srv (3.1),
+| assembly-srv (3.2), conduit-srv (3.3), wind-srv (3.4, commit 556eff7),
+| kernel-srv (3.6), peb-srv (3.7), cascade-srv (3.8).
 |
 | Each domain registers its routes in a named group so the boot-time
 | conformance validator can diff the route table against the emitted

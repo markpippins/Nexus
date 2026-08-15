@@ -3,15 +3,15 @@
 Moleculer **worker-tier broker** for the consolidated nexus runtime
 (project: "re-home `typescript/*-srv` onto AdonisJS + Moleculer + Redis + MongoDB").
 
-Per binding ruling `D-2026-08-14-002` (two HTTP edges + Moleculer worker tier),
+Per binding ruling `D-2026-08-14-002` (one HTTP edge + Moleculer worker tier),
 this broker hosts the process-spawning services re-homed from the Express fleet:
 
 - `harness-srv` (Wave 4)
 - `pty-srv` (Wave 4)
 - `execution-srv` (Wave 4)
 
-Plus any internal actions the two AdonisJS edges (`nexus-control-edge`,
-`nexus-data-edge`) call via the bus.
+Plus any internal actions the AdonisJS edge (`nexus-control-edge`, :8082)
+calls via the bus.
 
 ## Topology
 

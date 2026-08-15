@@ -3,8 +3,10 @@
 Consolidated **control-plane edge** for the nexus monolith cutover
 (project: "re-home `typescript/*-srv` onto AdonisJS + Moleculer + Redis + MongoDB").
 
-One AdonisJS process hosting the control-plane REST surfaces per binding
-ruling `D-2026-08-14-002`:
+One AdonisJS process — the **single HTTP edge** of the consolidated runtime
+per binding ruling `D-2026-08-14-002` (the data-edge was deleted by architect
+ruling R-A-2026-08-15-001; wind-srv re-homed here in commit `556eff7`). It
+hosts the REST surfaces re-homed from the Express fleet:
 
 - ui-tools
 - tools-aggregator (Wave 2)
@@ -15,6 +17,13 @@ ruling `D-2026-08-14-002`:
 - tackle-srv (Wave 3)
 - tackle-prompt-sync-srv (Wave 1)
 - role-memory-srv (Wave 1)
+- conduit-srv (Wave 3.3)
+- wind-srv (Wave 3.4)
+- kernel-srv (Wave 3.6)
+- peb-srv (Wave 3.7)
+- cascade-srv (Wave 3.8)
+- nebula-srv (Wave 3.1)
+- assembly-srv (Wave 3.2)
 
 ## Conventions
 

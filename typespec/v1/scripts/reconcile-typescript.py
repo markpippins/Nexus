@@ -76,8 +76,6 @@ MANIFEST = [
     {"name": "nexus-broker", "type": "rest", "src_root": "moleculer/nexus-broker", "framework": "moleculer"},
     # Consolidated control-plane edge (Wave 0.2) — AdonisJS route extraction.
     {"name": "control-edge", "type": "rest", "src_root": "adonisjs/nexus-control-edge", "framework": "adonisjs"},
-    # Consolidated data-plane edge (Wave 0.2) — AdonisJS route extraction.
-    {"name": "data-edge", "type": "rest", "src_root": "adonisjs/nexus-data-edge", "framework": "adonisjs"},
     # MCP tool servers (smallest -> largest)
     {"name": "service-broker-mcp", "type": "mcp"},
     {"name": "knowledge-mcp", "type": "mcp"},
