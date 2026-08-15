@@ -7026,7 +7026,7 @@ paths:
   /config/failure-recovery:
     get:
       operationId: get_config_failure_recovery
-      description: Failure recovery config.
+      description: Failure recovery config (tackle breaker table).
       parameters: []
       responses:
         '200':
@@ -7038,7 +7038,32 @@ paths:
                 unevaluatedProperties: {}
     post:
       operationId: post_config_failure_recovery
-      description: Save failure recovery config.
+      description: Save failure recovery config (tackle breaker table).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/failure-recovery/conduit:
+    get:
+      operationId: get_config_failure_recovery_conduit
+      description: Conduit breaker table (R2-3 — distinct path; never merged with tackle).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_config_failure_recovery_conduit
+      description: Save conduit breaker table (R2-3).
       parameters: []
       responses:
         '200':

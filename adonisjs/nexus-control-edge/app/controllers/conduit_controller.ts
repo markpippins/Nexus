@@ -271,6 +271,81 @@ export default class ConduitController {
     }
   }
 
+  /** GET /config/failure-recovery/conduit — the CONDUIT breaker table.
+   * R2-3 (architect ruling R-A-2026-08-15-001): the shared
+   * /config/failure-recovery serves the tackle table (UIs consume it);
+   * this distinct path exposes conduit.circuit_breaker for operability.
+   * The two tables are never merged. */
+  async getConduitFailureRecovery({ response }: HttpContext) {
+    try {
+      const { rows } = await q(
+        `SELECT max_retries_per_model, retry_delay_seconds, max_fallbacks,
+                push_back_to_pending, retry_after, tripped, paused
+         FROM conduit.circuit_breaker WHERE id = 1`,
+        [],
+        'conduit'
+      )
+      const breaker = rows[0]
+      if (!breaker) {
+        return {
+          max_retries_per_model: 3,
+          retry_delay_seconds: 120,
+          max_fallbacks: 3,
+          push_back_to_pending: true,
+          circuit_breaker_retry_after: 1800,
+          tripped: 0,
+          paused: 0,
+        }
+      }
+      return {
+        max_retries_per_model: breaker.max_retries_per_model ?? 3,
+        retry_delay_seconds: breaker.retry_delay_seconds ?? 120,
+        max_fallbacks: breaker.max_fallbacks ?? 3,
+        push_back_to_pending: breaker.push_back_to_pending === 1 || breaker.push_back_to_pending === null,
+        circuit_breaker_retry_after: breaker.retry_after ?? 1800,
+        tripped: breaker.tripped ?? 0,
+        paused: breaker.paused ?? 0,
+      }
+    } catch (e: any) {
+      return response.status(500).json({ error: e.message })
+    }
+  }
+
+  /** POST /config/failure-recovery/conduit */
+  async saveConduitFailureRecovery({ request, response }: HttpContext) {
+    try {
+      const {
+        max_retries_per_model,
+        retry_delay_seconds,
+        max_fallbacks,
+        push_back_to_pending,
+        circuit_breaker_retry_after,
+      } = request.body() || {}
+
+      await q(
+        `UPDATE conduit.circuit_breaker SET
+           max_retries_per_model = COALESCE($1, max_retries_per_model),
+           retry_delay_seconds = COALESCE($2, retry_delay_seconds),
+           max_fallbacks = COALESCE($3, max_fallbacks),
+           push_back_to_pending = COALESCE($4, push_back_to_pending),
+           retry_after = COALESCE($5, retry_after),
+           updated_at = NOW()
+         WHERE id = 1`,
+        [
+          max_retries_per_model ?? null,
+          retry_delay_seconds ?? null,
+          max_fallbacks ?? null,
+          push_back_to_pending !== undefined ? (push_back_to_pending ? 1 : 0) : null,
+          circuit_breaker_retry_after ?? null,
+        ],
+        'conduit'
+      )
+      return { saved: true }
+    } catch (e: any) {
+      return response.status(500).json({ error: e.message })
+    }
+  }
+
   // ── GOVERNANCE ────────────────────────────────────────────────────
 
   /** POST /governance/replay */

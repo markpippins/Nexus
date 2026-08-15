@@ -1710,13 +1710,23 @@ namespace org.nexus.controledge {
 
   @route("/config/failure-recovery")
   @get
-  @doc("Failure recovery config.")
+  @doc("Failure recovery config (tackle breaker table).")
   op get_config_failure_recovery(): Record<unknown>;
 
   @route("/config/failure-recovery")
   @post
-  @doc("Save failure recovery config.")
+  @doc("Save failure recovery config (tackle breaker table).")
   op post_config_failure_recovery(): Record<unknown>;
+
+  @route("/config/failure-recovery/conduit")
+  @get
+  @doc("Conduit breaker table (R2-3 — distinct path; never merged with tackle).")
+  op get_config_failure_recovery_conduit(): Record<unknown>;
+
+  @route("/config/failure-recovery/conduit")
+  @post
+  @doc("Save conduit breaker table (R2-3).")
+  op post_config_failure_recovery_conduit(): Record<unknown>;
 
   @route("/log/{sessionId}")
   @get

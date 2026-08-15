@@ -57,8 +57,15 @@ export default defineConfig({
         name: 'unit',
         timeout: 10000,
       },
+      {
+        files: ['tests/functional/**/*.spec.ts'],
+        name: 'functional',
+        timeout: 30000,
+      },
     ],
-    forceExit: false,
+    // forceExit: the edge's kernel pg LISTEN client + reconnect timer keep
+    // the event loop alive after tests; force-exit for CI-runnable npm test.
+    forceExit: true,
   },
 
   /*
