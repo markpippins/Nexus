@@ -55,7 +55,7 @@ def main():
         sys.exit(0)
 
     # Validate role
-    valid_roles = {"architect", "engineer", "planner", "reviewer", "analyst", "inspector", "critic"}
+    valid_roles = {"architect", "engineer", "engineer-ii", "planner", "reviewer", "analyst", "inspector", "critic"}
     if args.role not in valid_roles:
         print(f"ERROR: role must be one of: {', '.join(sorted(valid_roles))}", file=sys.stderr)
         sys.exit(2)
