@@ -14,7 +14,8 @@ const __dirname = path.dirname(__filename);
 
 const PIPELINE_DIR =
   process.env.PIPELINE_DIR ||
-  path.resolve(__dirname, "../../../../../nexus/.conduit-data");
+  // .conduit-data deleted 2026-08-09; mirror is the posterity home
+  path.resolve(__dirname, "../../../../../nexus/audit/CONDUIT_DATA");
 
 router.get("/:sessionId", async (req, res) => {
   const { sessionId } = req.params;

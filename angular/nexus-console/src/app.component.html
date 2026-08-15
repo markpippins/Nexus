@@ -4,10 +4,8 @@
   <!-- Left Nav Toolbar (always visible — stays up when iframes are shown) -->
   <app-nav-toolbar
     [viewMode]="currentViewMode()"
-    [theme]="currentTheme()"
     [collapsed]="isNavCollapsed()"
     (viewModeChange)="currentViewMode.set($event)"
-    (themeChange)="setTheme($event)"
     (collapseToggled)="onNavCollapseToggle()"
   ></app-nav-toolbar>
 

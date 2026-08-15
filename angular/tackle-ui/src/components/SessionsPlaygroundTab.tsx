@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Play,
   Skull,
@@ -14,6 +14,8 @@ import {
   BarChart2,
   Layers
 } from 'lucide-react';
+import { showToast } from '../components/Toast';
+import { showConfirm } from '../components/ConfirmDialog';
 import { SessionLedger, SystemRole, AIModel } from '../types';
 
 interface SessionsPlaygroundTabProps {
@@ -35,7 +37,20 @@ export const SessionsPlaygroundTab: React.FC<SessionsPlaygroundTabProps> = ({
 
   // Sandbox state
   const [testRole, setTestRole] = useState<string>(roles[0]?.name || 'operator');
-  const [testModelId, setTestModelId] = useState<string>(models[0]?.id || 'mod-gemini-3.6-flash');
+  // Only verified models are testable (the backend refuses unverified models
+  // with a 400) — default the selector to the first verified model.
+  const selectableModels = models.filter(m => m.verified);
+  const [testModelId, setTestModelId] = useState<string>(models.find(m => m.verified)?.id || '');
+
+  // Models load async (App.tsx fetches on mount), so the initializer above
+  // usually sees an empty list. Auto-select the first verified model once the
+  // list arrives and nothing is selected yet.
+  useEffect(() => {
+    if (!testModelId) {
+      const firstVerified = models.find(m => m.verified);
+      if (firstVerified) setTestModelId(firstVerified.id);
+    }
+  }, [models, testModelId]);
   const [promptText, setPromptText] = useState<string>(
     'Analyze the current Tackle inference configuration and output an optimized execution plan for low latency streaming.'
   );
@@ -135,7 +150,10 @@ export const SessionsPlaygroundTab: React.FC<SessionsPlaygroundTabProps> = ({
                     onChange={e => setTestModelId(e.target.value)}
                     className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 font-mono text-[var(--text-primary)]"
                   >
-                    {models.map(m => (
+                    {selectableModels.length === 0 && (
+                      <option value="">(No verified models — verify a model first)</option>
+                    )}
+                    {selectableModels.map(m => (
                       <option key={m.id} value={m.id}>
                         {m.name}
                       </option>
@@ -327,11 +345,11 @@ export const SessionsPlaygroundTab: React.FC<SessionsPlaygroundTabProps> = ({
                   {sess.status === 'running' && (
                     <button
                       onClick={async () => {
-                        if (confirm(`Send SIGKILL to session '${sess.id}'?`)) {
+                        if (await showConfirm(`Send SIGKILL to session '${sess.id}'?`)) {
                           try {
                             await onKillSession(sess.id);
                           } catch (err) {
-                            alert(`Error killing session: ${err instanceof Error ? err.message : String(err)}`);
+                            showToast(`Error killing session: ${err instanceof Error ? err.message : String(err)}`);
                           }
                         }
                       }}

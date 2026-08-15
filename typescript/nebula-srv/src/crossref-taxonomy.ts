@@ -36,6 +36,9 @@ export enum CrossReferenceType {
   /* Requirement domain */
   REQ_BLOCKS     = "req:blocks",
   REQ_DEPENDS_ON = "req:depends_on",
+
+  /* Specification domain */
+  SPEC_DEFINES_REQ = "spec:defines_req",
 }
 
 /* ── All valid string values ─────────────────────────────────────── */
@@ -83,6 +86,7 @@ const TYPE_CONSTRAINTS: Record<string, TypeConstraint> = {
   [CrossReferenceType.KV_DESCRIPTION_OVERLAP]: { sourceType: "knowledge_entity", targetType: "knowledge_entity" },
   [CrossReferenceType.REQ_BLOCKS]:     { sourceType: "requirement", targetType: "requirement" },
   [CrossReferenceType.REQ_DEPENDS_ON]: { sourceType: "requirement", targetType: "requirement" },
+  [CrossReferenceType.SPEC_DEFINES_REQ]: { sourceType: "specification", targetType: "requirement" },
 };
 
 /**

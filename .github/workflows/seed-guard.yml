@@ -1,0 +1,73 @@
+name: Seed Drift Guard
+
+# Runs the full wr-conf-006 suite (AC1-AC5) in CI:
+#
+#   1. Bootstrap — reconstruct tackle.memory + tackle.role_memory in a
+#      throwaway Postgres from the committed typescript/tackle-seeds/
+#      seed-manifest.json (a full-content snapshot of the canonical DB emitted
+#      by bin/regenerate_memory_seed.py). No production database is touched;
+#      bin/bootstrap_seed_manifest.py refuses a schema that looks like the
+#      live DB.
+#   2. Guard — render seedMemoryProcedures() from source with real JS
+#      semantics (node) and compare it against the bootstrapped tables:
+#        AC1  render integrity + shadow execution + dist artifact
+#        AC2  per-card byte-identity vs the bootstrapped (canonical) tables
+#        AC3  per-card role sets
+#        AC4  escape conventions (static)
+#        AC5  manifest guard: scratch-schema seed vs committed manifest,
+#             manifest content self-consistency, bootstrap round-trip
+#
+# So seed drift (hand-edits, stale regenerations) is caught automatically on
+# every push/PR, with the live-compare tests getting real table coverage in
+# CI too.
+
+on:
+  push:
+    branches: [main, master, feature/*, dev]
+  pull_request:
+    branches: [main, master, feature/*]
+  workflow_dispatch:
+  schedule:
+    # Daily 6 AM UTC — catches drift even without code pushes (e.g. a
+    # manual DB edit that wasn't regenerated into the seed + manifest).
+    - cron: '0 6 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  seed-manifest-guard:
+    name: "wr-conf-006 full suite: seed vs bootstrapped schema + manifest"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: nexus
+          POSTGRES_USER: pguser
+          POSTGRES_PASSWORD: pgpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pguser -d nexus"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install test deps
+        run: python3 -m pip install --quiet pytest psycopg2-binary
+      - name: Bootstrap tackle schema from committed manifest
+        run: make seed-guard-bootstrap
+        shell: bash
+      - name: Full seed guard suite (AC1-AC5 vs bootstrapped tables + manifest)
+        run: make seed-guard-test
+        shell: bash

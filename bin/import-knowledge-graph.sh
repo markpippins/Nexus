@@ -15,13 +15,12 @@
 #        ▼
 #   knowledge.graph_entity_embeddings   (nomic-embed-text 768-dim, ivfflat index)
 #
-# WHY the extra cleanup steps exist:
-#   migrate_graph.py DELETEs all entities/edges/xrefs then re-INSERTs with
-#   fresh gen_random_uuid() ids. Because nothing FKs to knowledge.graph_entities:
-#     - old canonical_asset rows (kind 'knowledge_entity') become unreferenced
-#     - old graph_entity_embeddings rows point at deleted entity uuids
-#   Without cleanup the asset count inflates and embeddings accumulate orphans
-#   on every import. This wrapper keeps the invariant:
+# WHY the extra cleanup steps exist (T24):
+#   migrate_graph.py now UPSERTs entities (ON CONFLICT (section, entity_id) DO
+#   UPDATE) and inserts edges with ON CONFLICT DO NOTHING — it never DELETEs
+#   and preserves entity ids/asset_ids. Steps 2–3 below are therefore
+#   defensive no-ops that clean up pre-existing orphans from the old
+#   destructive delete-and-reinsert era, and keep the invariant:
 #       active knowledge_entity assets == graph_entities rows == embeddings rows
 #
 # Usage:
@@ -41,7 +40,8 @@ MIGRATE_SCRIPT="${NEXUS_ROOT}/python/steward/migrate_graph.py"
 V083_SQL="${NEXUS_ROOT}/sql/V083__graph_entities_asset_id_backfill.sql"
 EMBED_SCRIPT="${NEXUS_ROOT}/bin/embed-knowledge-graph.sh"
 DEFAULT_FILE="${NEXUS_ROOT}/graph/nexus-knowledge-graph.json"
-# migrate_graph.py defaults to a WRONG DSN (nexus/nexus@/graph) — always override:
+# migrate_graph.py default DSN is now fixed to pguser/pgpass@localhost:5432/nexus;
+# keep the explicit override for deterministic pinning across shells:
 export NEXUS_DB_DSN="${NEXUS_DB_DSN:-postgresql://pguser:pgpass@localhost:5432/nexus}"
 PSQL=(docker exec -i pgvector_db psql -U pguser -d nexus -t -A -q)
 
@@ -87,7 +87,7 @@ say "  embed:  $([ ${SKIP_EMBED} == 1 ] && echo skipped || echo 'yes (after back
 before=$("${PSQL[@]}" -c "SELECT (SELECT count(*) FROM knowledge.graph_entities) || ' entities / ' || (SELECT count(*) FROM knowledge.graph_entity_embeddings) || ' emb / ' || (SELECT count(*) FROM semantics.canonical_asset WHERE asset_kind='knowledge_entity' AND expired_at IS NULL) || ' knowledge_assets'")
 say "BEFORE: ${before}"
 
-# ── 1. import (delete + reinsert from JSON) ────────────────────────────────
+# ── 1. import (lossless idempotent upsert from JSON) ───────────────────────
 MIGRATE_ARGS=(--file "${FILE}")
 if [[ "${DRY}" == "1" ]]; then
   MIGRATE_ARGS+=(--dry-run)
@@ -100,7 +100,7 @@ if [[ "${DRY}" == "1" ]]; then
   exit 0
 fi
 
-# ── 2. expire stale knowledge_entity canonical assets ─────────────────────
+# ── 2. expire stale knowledge_entity canonical assets (defensive no-op) ────
 say "step 2/4: expire stale knowledge_entity canonical assets (no longer referenced)"
 "${PSQL[@]}" -c "
 UPDATE semantics.canonical_asset ca
@@ -111,7 +111,7 @@ WHERE ca.asset_kind = 'knowledge_entity'
     SELECT 1 FROM knowledge.graph_entities ge WHERE ge.asset_id = ca.id
   );"
 
-# ── 3. purge orphan embeddings + V083 asset_id backfill ───────────────────
+# ── 3. purge orphan embeddings (defensive no-op) + V083 asset_id backfill ──
 say "step 3/4: purge orphan embeddings + run V083 asset_id backfill"
 "${PSQL[@]}" -c "
 DELETE FROM knowledge.graph_entity_embeddings

@@ -234,7 +234,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
-        role: { type: "string", description: "Role name: planner, builder, reviewer, critic, analyst, architect, inspector, engineer, rover" },
+        role: { type: "string", description: "Role name: planner, builder, reviewer, critic, analyst, architect, inspector, engineer, engineer-ii, devops, topologist, rover" },
       },
       required: ["role"],
     },
@@ -246,7 +246,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
       type: "object",
       properties: {
         id: { type: "string", description: "Role config ID (e.g. 'rc-builder')" },
-        role: { type: "string", description: "Role name: planner, builder, reviewer, critic, analyst, architect, inspector, engineer, rover" },
+        role: { type: "string", description: "Role name: planner, builder, reviewer, critic, analyst, architect, inspector, engineer, engineer-ii, devops, topologist, rover" },
         provider_id: { type: "string", description: "Provider ID for the primary model" },
         harness_id: { type: "string", description: "Harness ID for the primary model" },
         model_id: { type: "string", description: "Primary model ID" },
@@ -292,7 +292,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
         provider_id: { type: "string", description: "Optional provider ID override" },
         harness_id: { type: "string", description: "Optional harness ID override" },
         priority: { type: "number", description: "Priority (0 = primary)" },
-        invocation_mode: { type: "string", description: "CLI | HTTP | SDK | MCP", enum: ["CLI", "HTTP", "SDK", "MCP"] },
+        invocation_mode: { type: "string", description: "CLI | HTTP | SDK | MCP | INTERACTIVE", enum: ["CLI", "HTTP", "SDK", "MCP", "INTERACTIVE"] },
         command: { type: "string", description: "CLI command override" },
         endpoint_url: { type: "string", description: "HTTP endpoint override" },
         timeout_ms: { type: "number", description: "Timeout in milliseconds" },
@@ -742,7 +742,7 @@ export function registerToolHandlers(): Record<string, Function> {
       }
       await api.upsertConfigBundle({
         ...args,
-        invocation_mode: (args.invocation_mode || "CLI") as "CLI" | "HTTP" | "SDK" | "MCP",
+        invocation_mode: (args.invocation_mode || "CLI") as "CLI" | "HTTP" | "SDK" | "MCP" | "INTERACTIVE",
       });
       return { saved: true, id: args.id };
     },

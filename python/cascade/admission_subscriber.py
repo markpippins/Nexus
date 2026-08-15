@@ -181,6 +181,23 @@ def emit_wr_validated(wr_uuid: str) -> str:
 #  execution.requests mirror
 # ═══════════════════════════════════════════════════════════════════════
 
+def _derive_entity_key(dco_json: str | None, wr_id: str) -> str | None:
+    """Derive the deterministic WR entity_key at birth (T26 Item B).
+
+    Mirrors ``nexus_core.wrp.identity`` (SHA256 over sorted
+    {domain,intent,actor,scope} for the canonical ``execute workrequest:{wr_id}``
+    document) so the key equals the one ``db_adapter.add_work_request`` and
+    ``tackle.vision_bridge`` stamp at creation. Returns None when derivation
+    cannot produce a key (identity-unknown) — the WR write path stays fail-safe.
+    """
+    try:
+        from nexus_core.wrp.identity import ccnf_input_from_dco_json, derive_entity_key
+        return derive_entity_key(ccnf_input_from_dco_json(dco_json or "", wr_id))
+    except ValueError:
+        _log("no entity_key for wr=%s (intent not emittable)", wr_id)
+        return None
+
+
 def ensure_nebula_work_request(
     pg_conn: Any,
     wr_uuid: str,
@@ -196,8 +213,13 @@ def ensure_nebula_work_request(
     nebula side before mirroring. Keyed by legacy_id = vision wr_id (the
     convention used by add_work_request in db_adapter.py) OR by the WR
     uuid itself. Idempotent: re-runs reuse the existing row.
+
+    T26 Item B: the entity_key is derived at birth and persisted, and an
+    already-active row with the same entity_key is reused (idempotent
+    emission) instead of inserting a duplicate.
     """
     now = datetime.datetime.utcnow().isoformat() + "Z"
+    entity_key = _derive_entity_key(dco_json, wr_id)
     with pg_conn.cursor() as cur:
         cur.execute(
             "SELECT id FROM nebula.work_requests_history "
@@ -208,13 +230,26 @@ def ensure_nebula_work_request(
         if row:
             return str(row[0])
 
+        if entity_key:
+            cur.execute(
+                "SELECT id FROM nebula.work_requests_history "
+                "WHERE entity_key = %s "
+                "AND now() >= valid_from AND now() < valid_until LIMIT 1",
+                (entity_key,),
+            )
+            row = cur.fetchone()
+            if row:
+                _log("WR %s entity_key already active — reusing %s (idempotent emission)",
+                     wr_uuid[:8], str(row[0]))
+                return str(row[0])
+
         cur.execute(
             """INSERT INTO nebula.work_requests_history
                    (id, legacy_id, plan_id, title, business_status, dco_json,
-                    created_at, updated_at)
-               VALUES (%s::uuid, %s, %s, %s, 'DRAFT', %s, %s, %s)
+                    created_at, updated_at, entity_key)
+               VALUES (%s::uuid, %s, %s, %s, 'DRAFT', %s, %s, %s, %s)
                ON CONFLICT (id) DO NOTHING""",
-            (wr_uuid, wr_id, plan_id, title, dco_json, now, now),
+            (wr_uuid, wr_id, plan_id, title, dco_json, now, now, entity_key),
         )
         pg_conn.commit()
 
@@ -342,6 +377,7 @@ class AdmissionFailure(Exception):
 
 
 async def handle_work_request_created(
+    nc: Any,
     pg_conn: Any,
     event_envelope: dict[str, Any],
     event_id: str,
@@ -370,6 +406,19 @@ async def handle_work_request_created(
         # Transition failed transiently (conduit-mcp down/error). Do NOT mirror
         # — an execution.requests READY row for a WR still VALIDATED would be
         # inconsistent cross-domain state.
+        # D-T19 item 5: admission failure is observable on the canonical channel.
+        try:
+            from nats_publisher import build_failure_envelope
+            subject, env = build_failure_envelope(
+                "admission",
+                f"runtime_transition WR_VALIDATED failed for {wr_uuid}",
+                aggregate_id=wr_uuid,
+                correlation_id=wr_uuid,
+            )
+            await nc.publish(subject, json.dumps(env.to_dict()).encode())
+            await nc.flush()
+        except Exception as e:  # noqa: BLE001
+            _log("failed to emit admission.failed: %s", e)
         raise AdmissionFailure(
             f"runtime_transition WR_VALIDATED failed for {wr_uuid[:8]}"
         )
@@ -425,7 +474,7 @@ async def run_admission_subscriber() -> None:
                 return  # not an admission event; ignore silently
 
             try:
-                await handle_work_request_created(pg_conn, data, event_id)
+                await handle_work_request_created(nc, pg_conn, data, event_id)
             except Exception:  # noqa: BLE001
                 # Keep the event UNSEEN so redelivery / restart can retry it.
                 # Idempotency is guaranteed by the state machine (rejects a

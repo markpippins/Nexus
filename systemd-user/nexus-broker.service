@@ -1,0 +1,24 @@
+[Unit]
+# nexus-broker — Moleculer worker-tier broker of the consolidated runtime
+# (D-2026-08-14-002). Hosts api gateway + worker.harness/pty/execution + solir
+# on :4080. Remediates P0-2 (E3): previously ran as an ad-hoc foreground
+# process that died on machine restart.
+Description=Nexus Broker (Moleculer worker tier, port 4080)
+After=network.target postgresql.service redis.service mongodb.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/moleculer/nexus-broker
+Environment=NODE_ENV=production
+Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/node node_modules/.bin/moleculer-runner --mask "**/*.js" dist/services
+Restart=always
+RestartSec=5
+StandardOutput=append:/tmp/nexus-broker.log
+StandardError=append:/tmp/nexus-broker.log
+
+[Install]
+WantedBy=default.target

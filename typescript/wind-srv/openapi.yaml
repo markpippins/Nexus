@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: wind-srv — Wind Workflow Schema API
-  version: 1.0.57af7457
+  version: 1.0.7bdbe3b1
   description: 'REST API for the wind workflow schema: offices, titles, tasks, workflow graphs, runtime instances, tickets,
     and receipts.
 
@@ -156,6 +156,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: List event types
     post:
       tags:
       - event-types
@@ -185,6 +186,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Register a new event type
   /api/event-types/{eventType}:
     delete:
       tags:
@@ -215,6 +217,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Delete event type
       parameters:
       - name: eventType
         in: path
@@ -250,6 +253,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Get single event type
       parameters:
       - name: eventType
         in: path
@@ -286,6 +290,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: List events (with optional filters)
     post:
       tags:
       - events
@@ -315,6 +320,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Create event
   /api/events/{id}:
     get:
       tags:
@@ -345,6 +351,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Get single event
       parameters:
       - name: id
         in: path
@@ -381,6 +388,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Poll unconsumed events (FOR UPDATE SKIP LOCKED)
   /api/instances:
     get:
       tags:
@@ -657,6 +665,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: 'Run an instance to completion (loop: execute → advance → … until terminal).'
       parameters:
       - name: id
         in: path

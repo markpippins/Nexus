@@ -38,6 +38,7 @@ class LeaseSlot:
     load: float = 0.0  # 0.0 (idle) to 1.0 (fully loaded)
     preemptible: bool = True
     lease_count: int = 0  # total leases processed by this slot
+    executor: str = ""  # executor binding (set by consolidate_idle)
 
 
 @dataclass
@@ -164,6 +165,35 @@ class LeasePool:
         slot.active = False
         slot.load = 0.0
         return entry_id
+
+    # ── consolidation (nbk MergeIdleLeasesRule port) ───────────────
+
+    def consolidate_idle(self, target_executor: str = "executor-shared") -> int:
+        """Rebind idle lease slots to a shared executor.
+
+        Port of nbk's MergeIdleLeasesRule (rules.py) onto the canonical
+        lease pool: nbk consolidated idle/unexecuted leases under a single
+        executor to reduce fragmentation; here, every non-active slot is
+        tagged with the shared executor identity so schedulers can treat
+        idle capacity as one pool.
+
+        Args:
+            target_executor: The shared executor id to assign idle slots.
+
+        Returns:
+            Number of idle slots consolidated.
+
+        NOTE: ``LeaseSlot.executor`` is a marker field today — no scheduler
+        reads it yet. The port preserves the MergeIdleLeasesRule semantics
+        (idle capacity tagged as one shared pool); a scheduler is expected
+        to consume ``slot.executor`` when dispatching idle leases.
+        """
+        n = 0
+        for slot in self._slots.values():
+            if not slot.active:
+                slot.executor = target_executor
+                n += 1
+        return n
 
     # ── telemetry ──────────────────────────────────────────────────
 

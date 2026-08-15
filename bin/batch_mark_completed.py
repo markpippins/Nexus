@@ -44,7 +44,8 @@ log = logging.getLogger("batch_mark_completed")
 
 DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
 NEBULA_API = "http://localhost:3101/api"
-WORK_REQUESTS_DIR = Path("/home/codex/dev/nexus/.conduit-data/WORK_REQUESTS")
+# .conduit-data deleted 2026-08-09; mirror is the posterity home
+WORK_REQUESTS_DIR = Path("/home/codex/dev/nexus/audit/CONDUIT_DATA/WORK_REQUESTS")
 # Model config resolved via tackle-mcp (role: Rover)
 # See tackle/inference.py and config bundles at POST /config/ai/bundles/:role
 

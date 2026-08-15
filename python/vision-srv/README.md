@@ -640,7 +640,7 @@ All tables live in the `vision` PostgreSQL schema:
 |-------|---------|----------|
 | `work_requests_losm` | Core work requests (PlanningTask) | ✅ Full CRUD + DAG endpoints |
 | `artifacts` | Structured artifacts (plans, specs, etc.) | ✅ GET list + POST create |
-| `work_request_edges` | DAG edges between WRs | ⚠️ No direct REST API — edges are traversed implicitly by `/dag` endpoints |
+| `work_request_edges` | DAG edges between WRs | ⚠️ **Deprecated** — 0-row parallel store; WR lineage is column-based (`work_requests.plan_id`). See T22 Step 5.4 ruling. No direct REST API. |
 | `branches` | Alternative execution paths | ✅ GET list + POST create |
 | `branch_artifacts` | Artifacts scoped to branches | ❌ DB-only (no REST endpoint) |
 | `lifecycle_events` | State transition audit trail | ❌ DB-only (no REST endpoint) |

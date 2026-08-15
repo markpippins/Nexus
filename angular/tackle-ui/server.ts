@@ -42,7 +42,9 @@ import {
 // Initialize in-memory store
 let providersStore: Provider[] = [...INITIAL_PROVIDERS];
 let harnessesStore: Harness[] = [...INITIAL_HARNESSES];
-let modelsStore: AIModel[] = [...INITIAL_MODELS];
+// Mock-mode models are all treated as verified (they are the demo seed set
+// and the verified flag is not part of the mock payloads).
+let modelsStore: AIModel[] = INITIAL_MODELS.map(m => ({ ...m, verified: m.verified ?? true }));
 let systemRolesStore: SystemRole[] = [...INITIAL_SYSTEM_ROLES];
 let roleConfigsStore: RoleConfig[] = [...INITIAL_ROLE_CONFIGS];
 let bundlesStore: ConfigBundle[] = [...INITIAL_BUNDLES];
@@ -494,6 +496,28 @@ async function startServer() {
     });
   });
 
+  // Verify-model endpoint (mock parity) — all mock models are verified, so
+  // the run is skipped and the UI's alreadyVerified path is taken.
+  app.post('/config/ai/verify', (req: Request, res: Response) => {
+    const { model_id } = req.body || {};
+    const model = modelsStore.find(m => m.id === model_id);
+    res.json({
+      started: false,
+      alreadyVerified: true,
+      verified: true,
+      model_id,
+      message: model ? `Model ${model.name} is already verified in mock mode.` : 'Model is already verified in mock mode.',
+    });
+  });
+  app.get('/config/ai/verify/:sessionId', (req: Request, res: Response) => {
+    res.json({
+      sessionId: req.params.sessionId,
+      running: false,
+      exit_code: 0,
+      verified: true,
+    });
+  });
+
   // Test invocation endpoint
   app.post('/config/ai/test', async (req: Request, res: Response) => {
     const { model_id, test_prompt, role = 'operator' } = req.body;
@@ -806,7 +830,7 @@ async function startServer() {
       provider_id,
       harness_id,
       priority: typeof priority === 'number' ? priority : 1,
-      invocation_mode: invocation_mode || 'direct',
+      invocation_mode: invocation_mode || 'CLI',
       command,
       endpoint_url,
       timeout_ms: timeout_ms || 30000,

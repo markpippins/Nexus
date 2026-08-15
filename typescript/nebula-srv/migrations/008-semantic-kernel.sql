@@ -318,7 +318,9 @@ BEGIN
             'aggregate_type',   NEW.aggregate_type,
             'aggregate_id',     NEW.aggregate_id,
             'actor',            NEW.actor,
-            'timestamp',        NEW.timestamp::TEXT
+            'timestamp',        NEW.timestamp::TEXT,
+            'causation_id',     NEW.causation_id::TEXT,
+            'correlation_id',   NEW.correlation_id::TEXT
         )::TEXT
     );
 

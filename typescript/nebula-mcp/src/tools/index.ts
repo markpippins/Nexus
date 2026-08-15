@@ -1065,6 +1065,7 @@ export function registerTools(server: McpServer) {
       planRef: z.string().optional().describe("Conduit plan reference (e.g. '0136')"),
       level: z.number().optional().describe("Abstraction level 1-4 (default 1)"),
       visibilityScope: z.string().optional().describe("Visibility scope: builder, architect, planner, reviewer, all (default 'all')"),
+      model: z.string().optional().describe("AI model identifier (e.g. 'deepseek/deepseek-v4-pro')"),
     },
     async (args) => {
       const result = await NebulaClient.createAgentRecord({
@@ -1081,6 +1082,7 @@ export function registerTools(server: McpServer) {
         planRef: args.planRef,
         level: args.level,
         visibilityScope: args.visibilityScope,
+        model: args.model,
       });
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
@@ -1101,6 +1103,7 @@ export function registerTools(server: McpServer) {
       planRef: z.string().nullable().optional().describe("Conduit plan reference"),
       level: z.number().optional().describe("New abstraction level (1-4)"),
       visibilityScope: z.string().optional().describe("New visibility scope (builder, architect, planner, reviewer, all)"),
+      model: z.string().nullable().optional().describe("AI model identifier"),
     },
     async (args) => {
       const { id, ...body } = args;
@@ -1183,7 +1186,16 @@ export function registerTools(server: McpServer) {
   //  CROSS-REFERENCES
   // ════════════════════════════════════════════════════════════════
 
-  const CROSSREF_TYPES_HINT = "Valid types: wrp:depends_on, wrp:implements, wrp:tracked_by, wrp:impacts_system, wrp:supersedes, ag:references_plan, ag:same_thread_as, ag:prompted_by, ag:spawns_plan, kv:sourced_from, kv:informs, kv:cross_schema, kv:name_overlap, kv:description_overlap";
+  // Canonical enum lives in nebula-srv/src/crossref-taxonomy.ts (plan #0175).
+  // nebula-srv re-validates at the write boundary; this client-side list only
+  // fails fast with a clean MCP error and must stay in sync with the enum.
+  const CROSSREF_TYPES: readonly string[] = [
+    "wrp:depends_on", "wrp:implements", "wrp:tracked_by", "wrp:impacts_system", "wrp:supersedes",
+    "ag:references_plan", "ag:same_thread_as", "ag:prompted_by", "ag:spawns_plan", "ag:evidences_candidate",
+    "kv:sourced_from", "kv:informs", "kv:cross_schema", "kv:name_overlap", "kv:description_overlap",
+    "req:blocks", "req:depends_on", "spec:defines_req",
+  ];
+  const CROSSREF_TYPES_HINT = `Valid types: ${CROSSREF_TYPES.join(", ")}`;
 
   server.tool(
     "nebula_list_cross_references",
@@ -1231,6 +1243,12 @@ export function registerTools(server: McpServer) {
       metadata: z.any().optional().describe("Optional JSON metadata for the link"),
     },
     async (args) => {
+      if (!CROSSREF_TYPES.includes(args.relType)) {
+        return {
+          content: [{ type: "text" as const, text: `Invalid rel_type "${args.relType}". ${CROSSREF_TYPES_HINT}` }],
+          isError: true,
+        };
+      }
       const result = await NebulaClient.createCrossReference({
         sourceType: args.sourceType,
         sourceId: args.sourceId,
@@ -1712,6 +1730,64 @@ export function registerTools(server: McpServer) {
     },
     async (args) => {
       const result = await NebulaClient.releaseLease(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "role_lease_issue",
+    "Issue an ACTIVE role lease (RoleLeases, plan 1286): a bounded window + budget under which a role on a channel may consume work. Mandatory time limit. One ACTIVE lease per role at a time.",
+    {
+      role: z.string().describe("Role name (e.g. 'leased-builder', 'engineer')"),
+      channel: z.enum(["interactive","opencode","ollama","unknown"]).optional()
+        .describe("Harness channel (default: interactive)"),
+      model: z.string().optional().describe("Model identifier (e.g. 'freebuff/glm-5.2')"),
+      ttlSeconds: z.number().optional().describe("Window/lease length in seconds (default: 3600 — one hour)"),
+      budgetUnits: z.number().optional().describe("Max work units the role may consume under this lease"),
+      windowEnd: z.string().optional().describe("Explicit window end ISO timestamp (overrides ttlSeconds)"),
+    },
+    async (args) => {
+      const result = await NebulaClient.issueRoleLease(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "role_lease_renew",
+    "Renew an ACTIVE role lease (extend window/budget). Fails if expired or released. Renewal is an explicit decision, not automatic.",
+    {
+      id: z.string().describe("Role lease UUID"),
+      ttlSeconds: z.number().optional().describe("Extension in seconds (default: 3600)"),
+      budgetUnits: z.number().optional().describe("New budget ceiling"),
+    },
+    async (args) => {
+      const result = await NebulaClient.renewRoleLease(args.id, { ttlSeconds: args.ttlSeconds, budgetUnits: args.budgetUnits });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "role_lease_revoke",
+    "Revoke an ACTIVE role lease (voluntary release, e.g. dispenser empty or session ending). Unclaimed work returns to the pool.",
+    {
+      id: z.string().describe("Role lease UUID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.revokeRoleLease(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "role_lease_status",
+    "List role leases (optionally filtered by role/status) — for orientation: does my role have an active lease right now?",
+    {
+      role: z.string().optional().describe("Filter by role"),
+      status: z.string().optional().describe("Filter by status (ACTIVE/RELEASED/EXPIRED)"),
+      limit: z.number().optional().describe("Max rows (default: 50)"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listRoleLeases(args);
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
   );

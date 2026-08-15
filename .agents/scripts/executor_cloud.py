@@ -185,7 +185,8 @@ def run_worker(request_path):
         exit(2)
 
     working_path = os.path.abspath(req.get("path", "."))
-    artifacts_dir = os.path.join(working_path, "nexus", ".conduit-data", "WORK_REQUESTS", "artifacts", wr_id) if wr_id else None
+    # .conduit-data deleted 2026-08-09; mirror is the posterity home
+    artifacts_dir = os.path.join(working_path, "nexus", "audit", "CONDUIT_DATA", "WORK_REQUESTS", "artifacts", wr_id) if wr_id else None
 
     if artifacts_dir:
         os.makedirs(artifacts_dir, exist_ok=True)

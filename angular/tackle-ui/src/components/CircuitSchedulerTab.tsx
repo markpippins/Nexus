@@ -19,6 +19,7 @@ import {
   AlertCircle,
   X
 } from 'lucide-react';
+import { showToast } from '../components/Toast';
 import { FailureRecoveryConfig, AgentScheduleEntry, SystemRole, AIModel, TaskDefinition, PromptTemplate } from '../types';
 import { validateScheduleExpression } from '../utils/scheduleValidation';
 
@@ -65,7 +66,10 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
   const [schedModalOpen, setSchedModalOpen] = useState<boolean>(false);
   const [editingSched, setEditingSched] = useState<AgentScheduleEntry | null>(null);
   const [schedRole, setSchedRole] = useState<string>(roles[0]?.name || 'operator');
-  const [schedModelId, setSchedModelId] = useState<string>(models[0]?.id || '');
+  // Only verified models are selectable for scheduled runs — an unverified
+  // model would fail at dispatch with "model not found".
+  const selectableModels = models.filter(m => m.verified);
+  const [schedModelId, setSchedModelId] = useState<string>(selectableModels[0]?.id || '');
   const [schedType, setSchedType] = useState<'cron' | 'interval' | 'manual'>('cron');
   const [schedValue, setSchedValue] = useState<string>('0 */2 * * *');
   const [schedProjectDir, setSchedProjectDir] = useState<string>('/nexus/tackle');
@@ -113,7 +117,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
       setCircuitSavedSuccess(true);
       setTimeout(() => setCircuitSavedSuccess(false), 3000);
     } catch (e) {
-      alert('Error updating circuit breaker configuration');
+      showToast('Error updating circuit breaker configuration');
     } finally {
       setIsSavingCircuit(false);
     }
@@ -122,7 +126,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
   const openCreateSched = () => {
     setEditingSched(null);
     setSchedRole(roles[0]?.name || 'operator');
-    setSchedModelId(models[0]?.id || '');
+    setSchedModelId(selectableModels[0]?.id || '');
     setSchedType('cron');
     setSchedValue('0 */2 * * *');
     setSchedProjectDir('/nexus/tackle');
@@ -133,7 +137,9 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
   const openEditSched = (s: AgentScheduleEntry) => {
     setEditingSched(s);
     setSchedRole(s.role);
-    setSchedModelId(s.model_id || models[0]?.id || '');
+    // Keep the schedule's existing model if set (even when unverified it is
+    // shown as a flagged option); otherwise default to the first verified one.
+    setSchedModelId(s.model_id || selectableModels[0]?.id || '');
     setSchedType(s.schedule_type);
     setSchedValue(String(s.schedule_value ?? ''));
     setSchedProjectDir(s.project_dir || '/nexus/tackle');
@@ -162,7 +168,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
       });
       closeSchedModal();
     } catch (err) {
-      alert(`Error saving schedule: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error saving schedule: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -170,7 +176,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
     try {
       await onToggleSchedule(s.id, !s.enabled);
     } catch (err) {
-      alert(`Error toggling schedule: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error toggling schedule: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -178,7 +184,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
     try {
       await onDeleteSchedule(id);
     } catch (err) {
-      alert(`Error deleting schedule: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error deleting schedule: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -585,11 +591,27 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                   onChange={e => setSchedModelId(e.target.value)}
                   className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 font-mono text-[var(--text-primary)]"
                 >
-                  {models.map(m => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} ({m.model_identifier})
-                    </option>
-                  ))}
+                  {selectableModels.length === 0 && (
+                    <option value="">(No verified models — verify a model first)</option>
+                  )}
+                  {(() => {
+                    const currentSchedModel = models.find(m => m.id === schedModelId);
+                    const unverifiedCurrent = currentSchedModel && !currentSchedModel.verified;
+                    return (
+                      <>
+                        {unverifiedCurrent && (
+                          <option value={currentSchedModel.id}>
+                            {currentSchedModel.name} ({currentSchedModel.model_identifier}) — UNVERIFIED
+                          </option>
+                        )}
+                        {selectableModels.map(m => (
+                          <option key={m.id} value={m.id}>
+                            {m.name} ({m.model_identifier})
+                          </option>
+                        ))}
+                      </>
+                    );
+                  })()}
                 </select>
               </div>
 

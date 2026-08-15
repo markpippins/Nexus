@@ -39,7 +39,7 @@ function hasPlanRef(planRef: any): boolean {
 
 /**
  * Create a cross-reference from a harvest_candidate to a conduit plan
- * with rel_type='spawns_plan'. Uses WHERE NOT EXISTS for idempotency
+ * with rel_type='ag:spawns_plan'. Uses WHERE NOT EXISTS for idempotency
  * (cross_references has no unique constraint on the composite key).
  *
  * Must be called inside an active transaction (uses the provided client).
@@ -55,14 +55,14 @@ async function createSpawnsPlanCrossRef(
   const planRefStr = String(planRef).trim();
   const { rows: [xref] } = await client.query(
     `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
-     SELECT 'harvest_candidate', $1, 'plan', $2, 'spawns_plan', $3
+     SELECT 'harvest_candidate', $1, 'plan', $2, 'ag:spawns_plan', $3
      WHERE NOT EXISTS (
        SELECT 1 FROM nebula.cross_references_history
        WHERE source_type = 'harvest_candidate'
          AND source_id = $1
          AND target_type = 'plan'
          AND target_id = $2
-         AND rel_type = 'spawns_plan'
+         AND rel_type = 'ag:spawns_plan'
          AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
      )
      ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
@@ -1257,19 +1257,10 @@ export function createRoutes(pool: Pool): Router {
           const planResult = await planResponse.json() as any;
           if (planResult.created && planResult.planNumber) {
             planNumber = planResult.planNumber;
-            // Create cross-reference: requirement → plan (matches existing pattern — let DB defaults handle id/created_at)
+            // Requirement → plan linkage is column-based (requirements.conduit_plan_id)
+            // per T22 Step 5.4 ruling — no parallel compiles_to edge.
             await pool.query(
-              `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
-               SELECT 'requirement', $1, 'plan', $2, 'compiles_to', '{}'::jsonb
-               WHERE NOT EXISTS (
-                 SELECT 1 FROM nebula.cross_references_history
-                 WHERE source_type = 'requirement' AND source_id = $1
-                   AND target_type = 'plan' AND target_id = $2 AND rel_type = 'compiles_to'
-                   AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
-               )
-               ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
-                 WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
-               DO NOTHING`,
+              `UPDATE requirements SET conduit_plan_id = $2 WHERE id = $1`,
               [id, planNumber]
             );
           }
@@ -1874,7 +1865,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.implementation_plans p
            JOIN nebula.cross_references cr ON cr.target_type = 'plan'
                AND cr.target_id = p.plan_number
-               AND cr.rel_type = 'spawns_plan'
+               AND cr.rel_type = 'ag:spawns_plan'
            JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
                AND cr.source_type = 'harvest_candidate'
            WHERE hc.system_id = $1
@@ -1887,7 +1878,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.implementation_plans p
            JOIN nebula.cross_references cr ON cr.target_type = 'plan'
                AND cr.target_id = p.plan_number
-               AND cr.rel_type = 'spawns_plan'
+               AND cr.rel_type = 'ag:spawns_plan'
            JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
                AND cr.source_type = 'harvest_candidate'
            WHERE hc.system_id = $1`,
@@ -1923,7 +1914,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.implementation_plans p
            JOIN nebula.cross_references cr ON cr.target_type = 'plan'
                AND cr.target_id = p.plan_number
-               AND cr.rel_type = 'spawns_plan'
+               AND cr.rel_type = 'ag:spawns_plan'
            JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
                AND cr.source_type = 'harvest_candidate'
            WHERE hc.subsystem_id = $1
@@ -1936,7 +1927,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.implementation_plans p
            JOIN nebula.cross_references cr ON cr.target_type = 'plan'
                AND cr.target_id = p.plan_number
-               AND cr.rel_type = 'spawns_plan'
+               AND cr.rel_type = 'ag:spawns_plan'
            JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
                AND cr.source_type = 'harvest_candidate'
            WHERE hc.subsystem_id = $1`,
@@ -1972,7 +1963,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.implementation_plans p
            JOIN nebula.cross_references cr ON cr.target_type = 'plan'
                AND cr.target_id = p.plan_number
-               AND cr.rel_type = 'spawns_plan'
+               AND cr.rel_type = 'ag:spawns_plan'
            JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
                AND cr.source_type = 'harvest_candidate'
            WHERE hc.feature_id = $1
@@ -1985,7 +1976,7 @@ export function createRoutes(pool: Pool): Router {
            FROM nebula.implementation_plans p
            JOIN nebula.cross_references cr ON cr.target_type = 'plan'
                AND cr.target_id = p.plan_number
-               AND cr.rel_type = 'spawns_plan'
+               AND cr.rel_type = 'ag:spawns_plan'
            JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
                AND cr.source_type = 'harvest_candidate'
            WHERE hc.feature_id = $1`,
@@ -3002,7 +2993,7 @@ export function createRoutes(pool: Pool): Router {
            WHERE cr.source_type = 'harvest_candidate'
              AND cr.target_type = 'plan'
              AND cr.target_id = $1
-             AND cr.rel_type = 'spawns_plan'
+             AND cr.rel_type = 'ag:spawns_plan'
            ORDER BY cr.created_at DESC
            LIMIT $2 OFFSET $3`,
           [planRef, pageSize, offset]
@@ -3015,7 +3006,7 @@ export function createRoutes(pool: Pool): Router {
            WHERE cr.source_type = 'harvest_candidate'
              AND cr.target_type = 'plan'
              AND cr.target_id = $1
-             AND cr.rel_type = 'spawns_plan'`,
+             AND cr.rel_type = 'ag:spawns_plan'`,
           [planRef]
         ),
       ]);
@@ -4140,7 +4131,7 @@ export function createRoutes(pool: Pool): Router {
       }
 
       // Plan integration: when a planRef is provided, create a cross-reference
-      // linking this harvest_candidate to a conduit plan with rel_type='spawns_plan'.
+      // linking this harvest_candidate to a conduit plan with rel_type='ag:spawns_plan'.
       await createSpawnsPlanCrossRef(client, row.id, planRef, {
         candidateTitle: row.title,
         harvestId: row.harvest_id,
@@ -4215,10 +4206,11 @@ export function createRoutes(pool: Pool): Router {
         await client.query('ROLLBACK');
         return res.status(400).json({ error: `status, if provided, must be one of: ${Array.from(STATUS_CANONICAL).join(', ')}` });
       }
+      const planRefStr = hasPlanRef(planRef) ? String(planRef).trim() : null;
       const { rows: [requirement] } = await client.query(
-        `INSERT INTO requirements (system_id, subsystem_id, feature_id, title, description, status, priority, start_date, completion_date, parent_id, req_type, acceptance_criteria, candidate_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
-        [systemId, subsystemId, featureId, reqTitle, reqDescription, normalizedStatus, priority, null, null, parentId, reqType, acceptanceCriteria ? JSON.stringify(acceptanceCriteria) : null, candidate.id]
+        `INSERT INTO requirements (system_id, subsystem_id, feature_id, title, description, status, priority, start_date, completion_date, parent_id, req_type, acceptance_criteria, candidate_id, conduit_plan_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+        [systemId, subsystemId, featureId, reqTitle, reqDescription, normalizedStatus, priority, null, null, parentId, reqType, acceptanceCriteria ? JSON.stringify(acceptanceCriteria) : null, candidate.id, planRefStr]
       );
 
       // 5. Create cross-reference: candidate → plan (if planRef provided)
@@ -4230,34 +4222,8 @@ export function createRoutes(pool: Pool): Router {
         linkedAt: new Date().toISOString(),
       });
 
-      // 5b. Create cross-reference: requirement → plan (if planRef provided)
-      let reqCrossRef: any = null;
-      if (hasPlanRef(planRef)) {
-        const planRefStr = String(planRef).trim();
-        const { rows: [rcr] } = await client.query(
-          `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
-           SELECT 'requirement', $1, 'plan', $2, 'req:spawns_plan', $3
-           WHERE NOT EXISTS (
-             SELECT 1 FROM nebula.cross_references_history
-             WHERE source_type = 'requirement'
-               AND source_id = $1
-               AND target_type = 'plan'
-               AND target_id = $2
-               AND rel_type = 'req:spawns_plan'
-               AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
-           )
-           ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
-             WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
-           DO NOTHING
-           RETURNING *`,
-          [requirement.id, planRefStr, JSON.stringify({
-            candidateId: candidate.id,
-            systemId,
-            linkedAt: new Date().toISOString(),
-          })]
-        );
-        reqCrossRef = rcr || null;
-      }
+      // Requirement → plan linkage is column-based (requirements.conduit_plan_id)
+      // per T22 Step 5.4 ruling — no parallel req:spawns_plan edge.
 
       await client.query('COMMIT');
 
@@ -4274,12 +4240,10 @@ export function createRoutes(pool: Pool): Router {
           reqType: requirement.req_type,
           acceptanceCriteria: requirement.acceptance_criteria,
           candidateId: requirement.candidate_id,
+          conduitPlanId: requirement.conduit_plan_id,
         },
         crossReference: crossRef
           ? { ...toEpochMs(crossRef, 'created_at'), sourceType: crossRef.source_type, sourceId: crossRef.source_id, targetType: crossRef.target_type, targetId: crossRef.target_id, relType: crossRef.rel_type }
-          : null,
-        reqCrossReference: reqCrossRef
-          ? { ...toEpochMs(reqCrossRef, 'created_at'), sourceType: reqCrossRef.source_type, sourceId: reqCrossRef.source_id, targetType: reqCrossRef.target_type, targetId: reqCrossRef.target_id, relType: reqCrossRef.rel_type }
           : null,
       });
     } catch (err: any) {
@@ -4843,7 +4807,7 @@ export function createRoutes(pool: Pool): Router {
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
-          `SELECT id, record_type, role, title, source_path, tags, system_id, subsystem_id, feature_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
+          `SELECT id, record_type, role, model, title, source_path, tags, system_id, subsystem_id, feature_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
            FROM nebula.agent_records ${where}
            ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
           [...vals, pageSize, offset]
@@ -4927,7 +4891,7 @@ export function createRoutes(pool: Pool): Router {
       const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
 
       const { rows } = await pool.query(
-        `SELECT id, record_type, role, title, source_path, tags, system_id, subsystem_id, feature_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
+        `SELECT id, record_type, role, model, title, source_path, tags, system_id, subsystem_id, feature_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
          FROM nebula.agent_records ${where}
          ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
         [...vals, maxLimit, offset]
@@ -4946,10 +4910,59 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // ── Assembly decisions-forum mirror (T27) ─────────────────────────
+  // On-create hook: when a `decision` record is written, deterministically
+  // mirror it into the Assembly `decisions` forum (admin-facing projection).
+  // Fire-and-forget: a mirror failure never fails the record write.
+  const ASSEMBLY_URL = process.env.ASSEMBLY_URL || 'http://localhost:3107';
+  const DECISIONS_FORUM_ID = '703bc0f9-faf4-4c94-a52d-8f0d4024a89b';
+
+  let assemblyUserMapCache: Record<string, string> | null = null;
+  async function getAssemblyUserMap(): Promise<Record<string, string>> {
+    if (assemblyUserMapCache) return assemblyUserMapCache;
+    const resp = await fetch(`${ASSEMBLY_URL}/api/users`);
+    if (!resp.ok) throw new Error(`assembly /api/users -> HTTP ${resp.status}`);
+    const users = (await resp.json()) as any[];
+    const map: Record<string, string> = {};
+    for (const u of users) {
+      if (u && u.name) map[String(u.name).toLowerCase()] = u.id;
+    }
+    assemblyUserMapCache = map;
+    return map;
+  }
+
+  async function mirrorDecisionToForum(record: any): Promise<void> {
+    try {
+      const users = await getAssemblyUserMap();
+      const userId = users[String(record.role || '').toLowerCase()];
+      if (!userId) {
+        console.warn(`[decisions-mirror] no assembly user for role '${record.role}' — skipping ${record.id}`);
+        return;
+      }
+      const resp = await fetch(`${ASSEMBLY_URL}/api/forums/by-id/${DECISIONS_FORUM_ID}/threads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: record.title,
+          body: record.content,
+          postedById: userId,
+          source_url: `nebula://agent-record/${record.id}`,
+          role: record.role,
+          model: record.model || null,
+        }),
+      });
+      if (!resp.ok) {
+        console.warn(`[decisions-mirror] forum post HTTP ${resp.status} for ${record.id}`);
+      }
+    } catch (err: any) {
+      console.warn(`[decisions-mirror] error for ${record.id}: ${err?.message || err}`);
+    }
+  }
+
   // POST /api/agent-records — create a new agent record (canonical write path)
   router.post('/agent-records', async (req: Request, res: Response) => {
     try {
-      const { recordType, role, title, content, sourcePath, metadata, tags, systemId, subsystemId, featureId, planRef, level, visibilityScope } = req.body;
+      const { recordType, role, title, content, sourcePath, metadata, tags, systemId, subsystemId, featureId, planRef, level, visibilityScope, model } = req.body;
 
       const validTypes = ['report', 'analysis', 'assessment', 'inspection', 'prompt', 'response', 'engineering_log', 'architecture_note', 'decision'];
       if (!recordType || !validTypes.includes(recordType)) {
@@ -4961,16 +4974,21 @@ export function createRoutes(pool: Pool): Router {
       }
 
       const { rows: [row] } = await pool.query(
-        `INSERT INTO nebula.agent_records (record_type, role, title, content, source_path, metadata, tags, system_id, subsystem_id, feature_id, plan_ref, level, visibility_scope)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+        `INSERT INTO nebula.agent_records (record_type, role, title, content, source_path, metadata, tags, system_id, subsystem_id, feature_id, plan_ref, level, visibility_scope, model)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
         [
           recordType, role || '', title || '', content || '',
           sourcePath || null, metadata || {}, tags || [],
           systemId || null, subsystemId || null, featureId || null, planRef || null,
-          level ?? 1, visibilityScope || 'all',
+          level ?? 1, visibilityScope || 'all', model || null,
         ]
       );
       res.status(201).json(row);
+
+      // T27: deterministically mirror decision records into the decisions forum.
+      if (recordType === 'decision') {
+        mirrorDecisionToForum(row).catch((e: any) => console.warn('[decisions-mirror]', e?.message || e));
+      }
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -4980,7 +4998,7 @@ export function createRoutes(pool: Pool): Router {
   router.patch('/agent-records/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { title, content, metadata, tags, systemId, subsystemId, featureId, planRef, level, visibilityScope } = req.body;
+      const { title, content, metadata, tags, systemId, subsystemId, featureId, planRef, level, visibilityScope, model } = req.body;
       if (level !== undefined && (level < 1 || level > 4)) {
         return res.status(400).json({ error: 'level must be between 1 and 4' });
       }
@@ -4997,6 +5015,7 @@ export function createRoutes(pool: Pool): Router {
       if (planRef !== undefined) { sets.push(`plan_ref = $${i++}`); vals.push(planRef); }
       if (level !== undefined) { sets.push(`level = $${i++}`); vals.push(level); }
       if (visibilityScope !== undefined) { sets.push(`visibility_scope = $${i++}`); vals.push(visibilityScope); }
+      if (model !== undefined) { sets.push(`model = $${i++}`); vals.push(model); }
       if (sets.length === 0) return res.json({ ok: true });
       vals.push(id);
       const { rows: [row] } = await pool.query(
@@ -6306,7 +6325,7 @@ export function createRoutes(pool: Pool): Router {
                1 AS weight
         FROM nebula.cross_references
         WHERE source_type = 'harvest_candidate'
-          AND rel_type = 'spawns_plan'
+          AND rel_type = 'ag:spawns_plan'
       ) AS all_xrefs`;
 
       const [dataResult, countResult] = await Promise.all([
@@ -6807,6 +6826,280 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // ─────────────────────────────────────────────────────────────────────
+  //  ROLE LEASES (RoleLeases / plan 1286) — session-level leases in tackle
+  //  schema: a bounded window + budget under which a role on a channel may
+  //  consume work. Mirrors execution.leases (per-request) at role scope.
+  // ─────────────────────────────────────────────────────────────────────
+
+  // POST /api/role-leases/issue — issue an ACTIVE role lease
+  router.post('/role-leases/issue', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { role, channel, model, ttlSeconds, budgetUnits, windowEnd } = req.body;
+
+      if (!role) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: 'role is required' });
+        return;
+      }
+
+      // One ACTIVE lease per role at a time (mirrors execution lease rule)
+      const { rows: existing } = await client.query(
+        "SELECT id FROM tackle.role_leases WHERE role = $1 AND status = 'ACTIVE'",
+        [role]
+      );
+      if (existing.length > 0) {
+        await client.query('ROLLBACK');
+        res.status(409).json({ error: 'Active role lease already exists', existingLeaseId: existing[0].id });
+        return;
+      }
+
+      // window_end explicit OR ttl from now (mandatory time limit per design)
+      const ttl = ttlSeconds ?? 3600;
+      const windowEndTs = windowEnd
+        ? new Date(windowEnd)
+        : new Date(Date.now() + ttl * 1000);
+      if (windowEndTs.getTime() <= Date.now()) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: 'windowEnd/ttlSeconds must be in the future' });
+        return;
+      }
+
+      const { rows: [lease] } = await client.query(
+        `INSERT INTO tackle.role_leases
+           (role, channel, model, window_end, budget_units, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $4) RETURNING *`,
+        [role, channel || 'interactive', model || null, windowEndTs, budgetUnits ?? null]
+      );
+      await client.query('COMMIT');
+      res.status(201).json(lease);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/role-leases/:id/renew — renew an ACTIVE lease (window + budget)
+  router.post('/role-leases/:id/renew', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { id } = req.params;
+      const { ttlSeconds, budgetUnits } = req.body;
+
+      const { rows: [lease] } = await client.query(
+        'SELECT * FROM tackle.role_leases WHERE id = $1', [id]
+      );
+      if (!lease) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Role lease not found' }); return; }
+      if (lease.status !== 'ACTIVE') {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: `Cannot renew role lease in status '${lease.status}' (must be ACTIVE)` });
+        return;
+      }
+      if (new Date(lease.expires_at) < new Date()) {
+        await client.query("UPDATE tackle.role_leases SET status = 'EXPIRED' WHERE id = $1", [id]);
+        await client.query('COMMIT');
+        res.status(400).json({ error: 'Role lease has already expired' });
+        return;
+      }
+
+      const ttl = ttlSeconds ?? 3600;
+      const { rows: [updated] } = await client.query(
+        `UPDATE tackle.role_leases
+         SET window_end = GREATEST(window_end, NOW() + ($1 || ' seconds')::interval),
+             expires_at = NOW() + ($1 || ' seconds')::interval,
+             budget_units = COALESCE($2, budget_units),
+             updated_at = NOW()
+         WHERE id = $3 AND status = 'ACTIVE' RETURNING *`,
+        [ttl, budgetUnits ?? null, id]
+      );
+      await client.query('COMMIT');
+      res.json(updated);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/role-leases/:id/revoke — release an ACTIVE role lease
+  router.post('/role-leases/:id/revoke', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { id } = req.params;
+      const { rows: [lease] } = await client.query(
+        'SELECT * FROM tackle.role_leases WHERE id = $1', [id]
+      );
+      if (!lease) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Role lease not found' }); return; }
+      if (lease.status !== 'ACTIVE') {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: `Cannot revoke role lease in status '${lease.status}' (must be ACTIVE)` });
+        return;
+      }
+      const { rows: [updated] } = await client.query(
+        "UPDATE tackle.role_leases SET status = 'RELEASED', released_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *",
+        [id]
+      );
+      await client.query('COMMIT');
+      res.json(updated);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // GET /api/role-leases — list role leases (filters: role, status)
+  router.get('/role-leases', async (req: Request, res: Response) => {
+    try {
+      const { role, status, limit } = req.query as Record<string, string | undefined>;
+      const conds: string[] = [];
+      const vals: any[] = [];
+      if (role) { vals.push(role); conds.push(`role = $${vals.length}`); }
+      if (status) { vals.push(status); conds.push(`status = $${vals.length}`); }
+      const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+      const { rows } = await pool.query(
+        `SELECT * FROM tackle.role_leases ${where} ORDER BY created_at DESC LIMIT $${vals.length + 1}`,
+        [...vals, Number(limit) || 50]
+      );
+      res.json({ items: rows });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/cascade/subscriber-status — live liveness check for the
+  // cascade interactive-turn subscriber (the daemon that turns duality
+  // comments into agent turns). The subscriber tags its PG connection with
+  // application_name='cascade-interactive-turn'; when the daemon dies its
+  // socket closes and the backend disappears from pg_stat_activity. The
+  // duality-ui TopBar polls this so users know BEFORE sending whether a
+  // response is even possible.
+  router.get('/cascade/subscriber-status', async (_req: Request, res: Response) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT application_name, state, backend_start, pid
+         FROM pg_stat_activity
+         WHERE application_name = 'cascade-interactive-turn'
+           AND datname = current_database()
+         LIMIT 1`
+      );
+      const row = rows[0] || null;
+      // NOTE: backend_start is the server backend's start time; for a
+      // LISTEN connection the backend is spawned at connect, so it is a
+      // close approximation of when the subscriber connected.
+      res.json({
+        up: !!row,
+        state: row?.state ?? null,
+        backendSince: row?.backend_start
+          ? new Date(row.backend_start).toISOString()
+          : null,
+        backendPid: row?.pid ?? null,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/role-leases/stale — ACTIVE leases past window/budget (for sweep)
+  router.get('/role-leases/stale', async (_req: Request, res: Response) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT * FROM tackle.role_leases
+         WHERE status = 'ACTIVE'
+           AND (expires_at < NOW()
+             OR (budget_units IS NOT NULL AND consumed_units >= budget_units))
+         ORDER BY expires_at ASC`
+      );
+      res.json({ items: rows });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/role-leases/consume — increment consumed_units (all channels)
+  //
+  // Unified accounting: execution_worker, harness-srv, and interactive
+  // Freebuff all hit this one endpoint for lease consumption. When the
+  // budget is exhausted, the endpoint auto-revokes the lease and emits
+  // a type:lease-exhausted agent record so the operator is notified.
+  router.post('/role-leases/consume', async (req: Request, res: Response) => {
+    try {
+      const { role } = req.body;
+      if (!role) return res.status(400).json({ error: 'role is required' });
+      const { rows } = await pool.query(
+        `UPDATE tackle.role_leases
+         SET consumed_units = consumed_units + 1, updated_at = NOW()
+         WHERE role = $1 AND status = 'ACTIVE'
+         RETURNING id, consumed_units, budget_units, window_end, channel, model`,
+        [role]
+      );
+      if (rows.length === 0) {
+        return res.status(404).json({ error: `No ACTIVE lease for role '${role}'` });
+      }
+      const lease = rows[0];
+      const exhausted = lease.budget_units !== null && lease.consumed_units >= lease.budget_units;
+
+      if (exhausted) {
+        // Auto-revoke — budget consumed, no more work under this lease.
+        // G2 (binding, D-2026-08-14-001): dedup the exhaustion notification.
+        // Only the call that performs the ACTIVE → RELEASED transition emits
+        // the type:lease-exhausted agent record. Concurrent/duplicate consume
+        // calls that find the lease already RELEASED fall through silently,
+        // collapsing the wr-conf-002 spam (4+ records in ~40s) to a single
+        // record per (role, lease) exhaustion episode.
+        const revoked = await pool.query(
+          `UPDATE tackle.role_leases SET status = 'RELEASED', updated_at = NOW()
+           WHERE id = $1 AND status = 'ACTIVE' RETURNING id`,
+          [lease.id]
+        );
+        if (revoked.rows.length > 0) {
+          // Emit exhaustion record (fire-and-forget — don't block the response)
+          const exhaustId = randomUUID();
+          const now = new Date().toISOString();
+          pool.query(
+            `INSERT INTO nebula.agent_records_history (id, record_type, role, title, content, tags, created_at, recorded_on_dt, model)
+             VALUES ($1::uuid, 'report', $2, $3, $4, $5, $6, $6, $7)`,
+            [
+              exhaustId,
+              'architect',
+              `Role-lease exhausted: ${role} (${lease.consumed_units}/${lease.budget_units})`,
+              `## Role lease exhausted
+
+- **Role:** ${role}
+- **Channel:** ${lease.channel || 'unknown'}
+- **Model:** ${lease.model || 'unknown'}
+- **Consumed:** ${lease.consumed_units}/${lease.budget_units}
+- **Window end:** ${lease.window_end}
+- **Lease ID:** ${lease.id}
+
+The lease has been auto-revoked. Issue a new lease to resume work.`,
+              ['type:lease-exhausted', 'to:architect', 'to:engineer', `role:${role}`],
+              now,
+              lease.model || null
+            ]
+          ).catch(() => { /* best-effort — don't fail the response */ });
+        }
+      }
+
+      res.json({
+        ok: true,
+        consumed: lease.consumed_units,
+        budget: lease.budget_units,
+        exhausted,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // POST /api/execution/attempts — submit an attempt (create + set outcome)
   router.post('/execution/attempts', async (req: Request, res: Response) => {
     const client = await pool.connect();
@@ -6972,19 +7265,20 @@ export function createRoutes(pool: Pool): Router {
       let i = 1;
       if (requirementId) { clauses.push(`requirement_id = $${i++}`); vals.push(requirementId); }
       if (candidateId) { clauses.push(`candidate_id = $${i++}`); vals.push(candidateId); }
-      // Entity-scoped filter (e.g. specification-detail / work-request-detail views)
-      // joins through nebula.open_question_entities, which holds current-valid
-      // (entity_type, entity_id) → open_question_id links. Both params must be
-      // present; otherwise the filter is ignored to match prior behavior.
+      // Entity-scoped filtering now uses the canonical direct foreign-key
+      // columns. The retired junction table only ever contained candidate and
+      // requirement links in live data; reject unsupported legacy entity types
+      // rather than silently returning an unscoped result.
       if (entityType && entityId) {
-        clauses.push(`EXISTS (
-          SELECT 1 FROM nebula.open_question_entities oqe
-          WHERE oqe.open_question_id = oq.id
-            AND oqe.entity_type = $${i++}
-            AND oqe.entity_id = $${i++}
-            AND oqe.valid_until > now()
-        )`);
-        vals.push(entityType, entityId);
+        if (entityType !== 'candidate' && entityType !== 'requirement') {
+          return res.status(400).json({ error: 'entityType must be candidate or requirement' });
+        }
+        if (typeof entityId !== 'string' || !isUuid(entityId)) {
+          return res.status(400).json({ error: 'entityId must be a UUID' });
+        }
+        const directColumn = entityType === 'candidate' ? 'candidate_id' : 'requirement_id';
+        clauses.push(`oq.${directColumn} = $${i++}`);
+        vals.push(entityId);
       }
       if (status) { clauses.push(`status = $${i++}`); vals.push(status); }
       else { clauses.push(`status = 'OPEN'`); }
@@ -7071,6 +7365,18 @@ export function createRoutes(pool: Pool): Router {
       if ((entityType && !entityId) || (!entityType && entityId)) {
         return res.status(400).json({ error: 'Both entityType and entityId are required' });
       }
+      if (entityType && !['candidate', 'requirement'].includes(entityType)) {
+        return res.status(400).json({ error: 'entityType must be candidate or requirement' });
+      }
+      if (entityId && !isUuid(entityId)) {
+        return res.status(400).json({ error: 'entityId must be a UUID' });
+      }
+      if (requirementId && !isUuid(requirementId)) {
+        return res.status(400).json({ error: 'requirementId must be a UUID' });
+      }
+      if (candidateId && !isUuid(candidateId)) {
+        return res.status(400).json({ error: 'candidateId must be a UUID' });
+      }
 
       // Normalize legacy IDs
       let linkEntityType = entityType || null;
@@ -7097,14 +7403,6 @@ export function createRoutes(pool: Pool): Router {
             createdBy || null,
           ]
         );
-
-        if (linkEntityType && linkEntityId && isUuid(linkEntityId)) {
-          await client.query(
-            `INSERT INTO nebula.open_question_entities (open_question_id, entity_type, entity_id)
-             VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-            [result.rows[0].id, linkEntityType, linkEntityId]
-          );
-        }
 
         await client.query('COMMIT');
         res.status(201).json({ id: result.rows[0].id });
@@ -7499,21 +7797,19 @@ export function createRoutes(pool: Pool): Router {
                 link.entity_type, link.entity_id, link.entity_title
          FROM nebula.open_questions oq
          LEFT JOIN LATERAL (
-           SELECT
-             qe.entity_type, qe.entity_id,
-             CASE
-               WHEN qe.entity_type = 'requirement' THEN (SELECT title FROM nebula.requirements WHERE id = qe.entity_id)
-               WHEN qe.entity_type = 'candidate' THEN (SELECT title FROM nebula.harvest_candidates WHERE id = qe.entity_id)
-               WHEN qe.entity_type = 'harvest' THEN (SELECT source_filename FROM nebula.harvests WHERE id = qe.entity_id)
-               WHEN qe.entity_type IN ('report', 'agent_record') THEN (SELECT title FROM nebula.agent_records WHERE id = qe.entity_id)
-               WHEN qe.entity_type = 'specification' THEN ('Rev #' || (SELECT revision_number::text FROM nebula.specifications WHERE id = qe.entity_id))
-               WHEN qe.entity_type = 'agenda' THEN (SELECT title FROM nebula.agendas WHERE id = qe.entity_id)
-               WHEN qe.entity_type = 'work_request' THEN (SELECT title FROM nebula.work_requests WHERE id = qe.entity_id)
-               ELSE qe.entity_id::text
-             END AS entity_title
-           FROM nebula.open_question_entities qe
-           WHERE qe.open_question_id = oq.id AND qe.valid_until > now()
-           ORDER BY qe.entity_type
+           SELECT entity_type, entity_id, entity_title
+           FROM (
+             SELECT 'candidate'::text AS entity_type,
+                    oq.candidate_id AS entity_id,
+                    (SELECT title FROM nebula.harvest_candidates WHERE id = oq.candidate_id) AS entity_title
+             WHERE oq.candidate_id IS NOT NULL
+             UNION ALL
+             SELECT 'requirement'::text AS entity_type,
+                    oq.requirement_id AS entity_id,
+                    (SELECT title FROM nebula.requirements WHERE id = oq.requirement_id) AS entity_title
+             WHERE oq.requirement_id IS NOT NULL
+           ) direct_link
+           ORDER BY entity_type
            LIMIT 1
          ) link ON true
          WHERE oq.id = $1`,

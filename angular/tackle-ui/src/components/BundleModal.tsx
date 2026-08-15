@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Zap, X, Code } from 'lucide-react';
+import { showToast } from '../components/Toast';
 import { ConfigBundle, AIModel, Provider, Harness, SystemRole } from '../types';
 
 interface BundleModalProps {
@@ -48,7 +49,7 @@ export const BundleModal: React.FC<BundleModalProps> = ({
   );
   const [formPriority, setFormPriority] = useState<number>(initial?.priority || 1);
   const [formMode, setFormMode] = useState<ConfigBundle['invocation_mode']>(
-    initial?.invocation_mode || 'stream'
+    initial?.invocation_mode || 'CLI'
   );
   const [formTimeout, setFormTimeout] = useState<number>(initial?.timeout_ms || 30000);
   const [formValidFrom, setFormValidFrom] = useState<string>(
@@ -67,6 +68,18 @@ export const BundleModal: React.FC<BundleModalProps> = ({
         ? '{}'
         : '{\n  "environment": "production"\n}'
   );
+
+  // Verified-model gate: only verified models are offered in the dropdown.
+  // When editing a bundle that still points at an unverified model, the
+  // current model is kept as a flagged option so the form never silently
+  // retargets it — and the bundle is forced inactive until the model is
+  // verified (mirrors the server-side gate in upsertConfigBundle).
+  const selectableModels = models.filter(m => m.verified);
+  const currentModel = models.find(m => m.id === formModelId);
+  const currentModelUnverified = !!currentModel && !currentModel.verified;
+  const currentModelMissing =
+    !!formModelId && !currentModel && !selectableModels.some(m => m.id === formModelId);
+  const effectiveIsActive = currentModelUnverified ? false : formIsActive;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,14 +104,14 @@ export const BundleModal: React.FC<BundleModalProps> = ({
         timeout_ms: formTimeout,
         valid_from: formValidFrom ? new Date(formValidFrom).toISOString() : undefined,
         valid_to: formValidTo ? new Date(formValidTo).toISOString() : undefined,
-        is_active: formIsActive,
+        is_active: effectiveIsActive,
         command: formCommand || undefined,
         endpoint_url: formEndpoint || undefined,
         metadata: parsedMeta
       });
       onClose();
     } catch (err) {
-      alert(`Error saving bundle: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error saving bundle: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsSaving(false);
     }
@@ -159,12 +172,28 @@ export const BundleModal: React.FC<BundleModalProps> = ({
                 onChange={e => setFormModelId(e.target.value)}
                 className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-color)]"
               >
-                {models.map(m => (
+                {selectableModels.length === 0 && !currentModelUnverified && !currentModelMissing && (
+                  <option value="">(No verified models — verify a model first)</option>
+                )}
+                {currentModelUnverified && (
+                  <option value={currentModel.id}>
+                    {currentModel.name} ({currentModel.model_identifier}) — UNVERIFIED
+                  </option>
+                )}
+                {currentModelMissing && (
+                  <option value={formModelId}>{formModelId} — MISSING (deleted)</option>
+                )}
+                {selectableModels.map(m => (
                   <option key={m.id} value={m.id}>
                     {m.name} ({m.model_identifier})
                   </option>
                 ))}
               </select>
+              {currentModelUnverified && (
+                <p className="text-[10px] text-amber-400 mt-1 font-mono">
+                  ⚠ Model is unverified — this bundle will be saved INACTIVE until the model is verified.
+                </p>
+              )}
             </div>
 
             {/* Priority */}
@@ -224,11 +253,18 @@ export const BundleModal: React.FC<BundleModalProps> = ({
                 onChange={e => setFormMode(e.target.value as ConfigBundle['invocation_mode'])}
                 className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-color)]"
               >
-                <option value="stream">stream (Real-time SSE Chunking)</option>
-                <option value="direct">direct (Single Round-Trip JSON)</option>
-                <option value="fallback">fallback (Secondary Circuit Breaker Standby)</option>
-                <option value="batch">batch (Asynchronous Queued Queue)</option>
+                <option value="CLI">CLI (opencode / codex harness launch)</option>
+                <option value="HTTP">HTTP (direct endpoint round-trip)</option>
+                <option value="SDK">SDK (provider SDK client)</option>
+                <option value="MCP">MCP (model-context-protocol tool)</option>
+                <option value="INTERACTIVE">INTERACTIVE (Freebuff-hosted — not harness-launchable)</option>
               </select>
+              {formMode === 'INTERACTIVE' && (
+                <p className="text-[10px] text-amber-400 mt-1 font-mono">
+                  ⚠ INTERACTIVE roles are dispatched in Freebuff (harn-freebuff) and are refused by
+                  harness-srv — use this only for interactive-channel bundles.
+                </p>
+              )}
             </div>
 
             {/* Timeout MS */}
@@ -271,13 +307,19 @@ export const BundleModal: React.FC<BundleModalProps> = ({
             <input
               type="checkbox"
               id="bundleActiveCheck"
-              checked={formIsActive}
+              checked={effectiveIsActive}
+              disabled={currentModelUnverified}
               onChange={e => setFormIsActive(e.target.checked)}
-              className="rounded border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--accent-color)] focus:ring-0"
+              className="rounded border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--accent-color)] focus:ring-0 disabled:opacity-40"
             />
             <label htmlFor="bundleActiveCheck" className="text-sm text-[var(--text-primary)] font-semibold cursor-pointer">
               Bundle Active in Resolver Queue
             </label>
+            {currentModelUnverified && (
+              <span className="text-[10px] font-mono text-amber-400">
+                (locked — unverified model)
+              </span>
+            )}
           </div>
 
           {/* Metadata JSON */}

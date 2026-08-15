@@ -161,7 +161,7 @@ const server = http.createServer(async (req, res) => {
             for (const entry of await fs.readdir(targetPath)) {
                 try {
                     const entryPath = path.join(targetPath, entry);
-                    // lstat (not stat) so dangling symlinks don't throw ENOENT and vanish from edit-ui.
+                    // lstat (not stat) so dangling symlinks don't throw ENOENT and vanish from monaco-judge.
                     const entryStats = await fs.lstat(entryPath);
                     const relPath = path.relative(FS_ROOT_DIR, entryPath);
                     let type: 'directory' | 'file' | 'symlink' = 'file';

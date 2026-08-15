@@ -21,6 +21,7 @@ import {
   ChevronRight,
   ExternalLink
 } from 'lucide-react';
+import { showConfirm } from '../components/ConfirmDialog';
 import { SystemLogEntry } from '../types';
 
 export const SystemLogsTab: React.FC = () => {
@@ -92,7 +93,7 @@ export const SystemLogsTab: React.FC = () => {
 
   // Handle Clear Logs
   const handleClearLogs = async () => {
-    if (!window.confirm('Are you sure you want to clear the system log buffer?')) return;
+    if (!(await showConfirm('Are you sure you want to clear the system log buffer?'))) return;
     try {
       const res = await fetch('/logs', { method: 'DELETE' });
       if (res.ok) {

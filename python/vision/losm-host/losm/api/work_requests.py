@@ -7,8 +7,15 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from losm_store.models import PlanningTask, WorkStatus, LifecycleEvent as LifecycleEventModel
-from losm_store.repository import create_work_request, get_work_request, list_work_requests
+from losm_store.repository import (
+    create_work_request,
+    get_work_request,
+    list_work_requests,
+    update_work_request,
+)
 from losm_store.session import SessionLocal, get_db
+
+from nexus_core.wrp.identity import ccnf_input_from_intent_string, emit_identity
 
 from losm_ir.transition import validate_transition, TransitionError
 from losm_shell.lifecycle.orchestrator import PipelineCoordinator
@@ -55,6 +62,19 @@ class WorkRequestResponse(BaseModel):
         )
 
 
+def _stamp_entity_key(db, wr):
+    """Derive the CCNF content identity at WR birth and persist it on the
+    WR record (context). The canonical WR shape is always emittable (the
+    action is the controlled verb ``execute``), so the write path never
+    null-defaults — every WR born here carries its entity_key.
+    """
+    entity_key, _, _ = emit_identity(
+        ccnf_input_from_intent_string(wr.intent, wr.wr_id))
+    context = dict(wr.context_data or {})
+    context["entity_key"] = entity_key
+    return update_work_request(db, wr.wr_id, context_data=context)
+
+
 @router.post("/", response_model=WorkRequestResponse, status_code=status.HTTP_201_CREATED)
 def create_wr(payload: WorkRequestCreate, db: Session = Depends(get_db)):
     wr = create_work_request(
@@ -62,9 +82,10 @@ def create_wr(payload: WorkRequestCreate, db: Session = Depends(get_db)):
         intent=payload.intent,
         constraints=payload.constraints,
         priority=payload.priority,
-        context_data=payload.context,
+        context_data=dict(payload.context or {}),
     )
-    return WorkRequestResponse.from_orm_with_metadata(wr)
+    updated = _stamp_entity_key(db, wr)
+    return WorkRequestResponse.from_orm_with_metadata(updated or wr)
 
 
 @router.get("/{wr_id}", response_model=WorkRequestResponse)

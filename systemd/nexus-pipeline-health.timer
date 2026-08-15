@@ -1,0 +1,15 @@
+[Unit]
+Description=Pipeline Health Sweep timer — runs every 30 minutes
+Documentation=https://github.com/codex/nexus/wiki/pipeline-health-sweep
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Timer]
+OnCalendar=*:0/30
+OnBootSec=5min
+OnUnitActiveSec=30min
+Persistent=true
+RandomizedDelaySec=30s
+
+[Install]
+WantedBy=timers.target

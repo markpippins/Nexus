@@ -5,7 +5,7 @@
  *  1. Seed a system + harvest + unlinked candidate
  *  2. PATCH /api/harvest-candidates/:id with systemId + planRef
  *  3. GET /api/cross-references?sourceType=harvest_candidate&sourceId=<candidateId>
- *     → verify the cross-reference exists with rel_type='spawns_plan'
+ *     → verify the cross-reference exists with rel_type='ag:spawns_plan'
  *  4. Verify the reverse lookup: GET /api/plans/:planRef/candidates returns the candidate
  *  5. Also test the spawn-plan endpoint: unlink first, then POST spawn-plan
  *  6. Clean up
@@ -133,7 +133,7 @@ async function main() {
     `/api/cross-references?sourceType=harvest_candidate&sourceId=${candidateId}`
   );
   assert(xrefBefore.status === 200, "GET cross-references succeeds");
-  const beforeCount = Array.isArray(xrefBefore.body) ? xrefBefore.body.length : 0;
+  const beforeCount = Array.isArray(xrefBefore.body?.items) ? xrefBefore.body.items.length : 0;
   assert(beforeCount === 0, `No cross-references before linking (count: ${beforeCount})`);
 
   // 6. PATCH candidate with systemId + planRef
@@ -151,7 +151,7 @@ async function main() {
     `/api/cross-references?sourceType=harvest_candidate&sourceId=${candidateId}`
   );
   assert(xrefAfter.status === 200, "GET cross-references succeeds");
-  const xrefs: any[] = Array.isArray(xrefAfter.body) ? xrefAfter.body : [];
+  const xrefs: any[] = Array.isArray(xrefAfter.body?.items) ? xrefAfter.body.items : [];
   assert(xrefs.length >= 1, `Cross-reference exists (count: ${xrefs.length})`);
 
   const planXref = xrefs.find(
@@ -160,9 +160,9 @@ async function main() {
       x.source_id === candidateId &&
       x.target_type === "plan" &&
       x.target_id === PLAN_REF_PATCH &&
-      x.rel_type === "spawns_plan"
+      x.rel_type === "ag:spawns_plan"
   );
-  assert(!!planXref, "Cross-reference has correct fields (source=harvest_candidate, target=plan, rel=spawns_plan)");
+  assert(!!planXref, "Cross-reference has correct fields (source=harvest_candidate, target=plan, rel=ag:spawns_plan)");
   console.log(`   crossRefId: ${planXref.id}`);
   console.log(`   rel_type: ${planXref.rel_type}`);
   console.log(`   target_id: ${planXref.target_id}`);
@@ -172,8 +172,8 @@ async function main() {
   const revLookup = await httpGet(`/api/plans/${PLAN_REF_PATCH}/candidates`);
   assert(revLookup.status === 200, "GET plan candidates succeeds");
   assert(revLookup.body.planRef === PLAN_REF_PATCH, "Response includes correct planRef");
-  assert(revLookup.body.count >= 1, `At least 1 candidate returned (count: ${revLookup.body.count})`);
-  const foundCandidate = (revLookup.body.candidates || []).find((c: any) => c.id === candidateId);
+  assert(revLookup.body.total >= 1, `At least 1 candidate returned (count: ${revLookup.body.total})`);
+  const foundCandidate = (revLookup.body.items || []).find((c: any) => c.id === candidateId);
   assert(!!foundCandidate, "Our candidate appears in the reverse lookup results");
   console.log(`   found: id=${foundCandidate.id}, title="${foundCandidate.title}"`);
 
@@ -185,11 +185,11 @@ async function main() {
   const xrefAfterDup = await httpGet(
     `/api/cross-references?sourceType=harvest_candidate&sourceId=${candidateId}`
   );
-  const planXrefs = (Array.isArray(xrefAfterDup.body) ? xrefAfterDup.body : []).filter(
+  const planXrefs = (Array.isArray(xrefAfterDup.body?.items) ? xrefAfterDup.body.items : []).filter(
     (x: any) =>
       x.target_type === "plan" &&
       x.target_id === PLAN_REF_PATCH &&
-      x.rel_type === "spawns_plan"
+      x.rel_type === "ag:spawns_plan"
   );
   assert(planXrefs.length === 1, `No duplicate cross-reference created (count: ${planXrefs.length})`);
 
@@ -212,8 +212,8 @@ async function main() {
   const xrefBoth = await httpGet(
     `/api/cross-references?sourceType=harvest_candidate&sourceId=${candidateId}`
   );
-  const bothPlanXrefs = (Array.isArray(xrefBoth.body) ? xrefBoth.body : []).filter(
-    (x: any) => x.target_type === "plan" && x.rel_type === "spawns_plan"
+  const bothPlanXrefs = (Array.isArray(xrefBoth.body?.items) ? xrefBoth.body.items : []).filter(
+    (x: any) => x.target_type === "plan" && x.rel_type === "ag:spawns_plan"
   );
   assert(bothPlanXrefs.length === 2, `Both plan cross-references exist (count: ${bothPlanXrefs.length})`);
   const hasFirst = bothPlanXrefs.some((x: any) => x.target_id === PLAN_REF_PATCH);
@@ -225,8 +225,8 @@ async function main() {
   console.log(`12. Verifying reverse lookup for plan ${PLAN_REF_SECOND}...`);
   const revLookup2 = await httpGet(`/api/plans/${PLAN_REF_SECOND}/candidates`);
   assert(revLookup2.status === 200, "GET second plan candidates succeeds");
-  assert(revLookup2.body.count >= 1, "Second plan has candidates");
-  const foundInSecond = (revLookup2.body.candidates || []).find((c: any) => c.id === candidateId);
+  assert(revLookup2.body.total >= 1, "Second plan has candidates");
+  const foundInSecond = (revLookup2.body.items || []).find((c: any) => c.id === candidateId);
   assert(!!foundInSecond, "Our candidate appears in the second plan's lookup");
 
   // ════════════════════════════════════════════════════════════
@@ -272,11 +272,11 @@ async function main() {
   const xrefSpawn = await httpGet(
     `/api/cross-references?sourceType=harvest_candidate&sourceId=${freshCandidateId}`
   );
-  const spawnXref = (Array.isArray(xrefSpawn.body) ? xrefSpawn.body : []).find(
+  const spawnXref = (Array.isArray(xrefSpawn.body?.items) ? xrefSpawn.body.items : []).find(
     (x: any) =>
       x.target_type === "plan" &&
       x.target_id === PLAN_REF_SPAWN &&
-      x.rel_type === "spawns_plan"
+      x.rel_type === "ag:spawns_plan"
   );
   assert(!!spawnXref, "spawn-plan cross-reference exists in cross-references API");
   console.log(`   crossRefId: ${spawnXref.id}`);
@@ -285,14 +285,14 @@ async function main() {
   console.log(`16. Verifying reverse lookup for plan ${PLAN_REF_SPAWN}...`);
   const revLookupSpawn = await httpGet(`/api/plans/${PLAN_REF_SPAWN}/candidates`);
   assert(revLookupSpawn.status === 200, "GET spawn plan candidates succeeds");
-  const foundInSpawn = (revLookupSpawn.body.candidates || []).find((c: any) => c.id === freshCandidateId);
+  const foundInSpawn = (revLookupSpawn.body.items || []).find((c: any) => c.id === freshCandidateId);
   assert(!!foundInSpawn, "Spawn candidate appears in plan reverse lookup");
 
   // 17. Verify requirement was created correctly
   console.log("17. Verifying the created requirement...");
   const reqRes = await httpGet(`/api/requirements?systemId=${systemId}&subsystemId=${subsystemId}`);
   assert(reqRes.status === 200, "GET requirements succeeds");
-  const reqs: any[] = Array.isArray(reqRes.body) ? reqRes.body : [];
+  const reqs: any[] = Array.isArray(reqRes.body?.items) ? reqRes.body.items : [];
   const ourReq = reqs.find((r: any) => r.id === spawnRes.body.requirement.id);
   assert(!!ourReq, "Our requirement exists in the requirements list");
   assert(ourReq.title === "SpawnPlan Test Candidate", "Requirement title matches candidate title");

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "heartbeat-client": "file:../heartbeat-client",
+    "tackle-seeds": "file:../tackle-seeds",
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "ioredis": "^5.11.1",

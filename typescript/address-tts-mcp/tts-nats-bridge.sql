@@ -1,47 +1,29 @@
 -- ═══════════════════════════════════════════════════════════════════════
---  Migration — Address TTS NATS Bridge
+--  Migration — Address TTS NATS Bridge  (RETIRED — D-T19-1)
 --
---  Bridges conduit.work_request_events onto the kernel_transition_committed
---  NOTIFY channel so kernel_subscriber publishes them to NATS.
---  The Address TTS service (and any other NATS subscriber) consumes from NATS.
+--  This file previously bridged conduit.work_request_events onto the
+--  'kernel_transition_committed' NOTIFY channel via
+--  conduit.notify_work_request_event() so kernel_subscriber published them
+--  to NATS.
 --
---  Depends on: conduit.work_request_events table (migration 016)
---  Owned by:   address-tts subsystem (not conduit)
+--  RETIRED by D-T19-1 (Architect decision): kernel.transition_event →
+--  kernel.trg_notify_transition → NATS nexus.kernel.v1.transition.* is the
+--  single canonical envelope source for WorkRequest events. The legacy path
+--  here notified the SAME channel WITHOUT correlation_id / causation_id, so
+--  kernel_subscriber self-correlated a redundant ghost envelope (WR_*)
+--  beside the correct work_request.* envelope.
+--
+--  This file is kept as a historical artifact and now performs a DROP-only
+--  teardown so re-running it cannot resurrect the retired bridge. The
+--  canonical teardown lives in nexus/sql/V097__retire_legacy_conduit_notify.sql.
+--
+--  Owned by:   address-tts subsystem (not conduit) — now superseded by kernel.
 -- ═══════════════════════════════════════════════════════════════════════
 
 BEGIN;
 
--- Bridge: notify kernel_subscriber on new work request events.
--- Merges core envelope keys with the full event payload so kernel_subscriber
--- can publish a CanonicalEnvelope to NATS, and downstream subscribers (TTS,
--- monitoring, etc.) can extract event data directly.
-CREATE OR REPLACE FUNCTION conduit.notify_work_request_event()
-RETURNS TRIGGER AS $$
-BEGIN
-    PERFORM pg_notify('kernel_transition_committed', (
-        jsonb_build_object(
-            'event_id', NEW.event_id,
-            'event_type', NEW.event_type,
-            'timestamp', NEW.occurred_at,
-            'aggregate_type', 'work_request',
-            'aggregate_id', NEW.work_request_id,
-            'actor', NEW.actor_id,
-            'work_request_id', NEW.work_request_id
-        ) || NEW.payload
-    )::text);
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
 DROP TRIGGER IF EXISTS trg_notify_wr_event ON conduit.work_request_events;
-CREATE TRIGGER trg_notify_wr_event
-    AFTER INSERT ON conduit.work_request_events
-    FOR EACH ROW EXECUTE FUNCTION conduit.notify_work_request_event();
 
-COMMENT ON FUNCTION conduit.notify_work_request_event() IS
-    'Bridges conduit.work_request_events onto the kernel_transition_committed
-     NOTIFY channel so kernel_subscriber publishes them to NATS.
-     Owned by address-tts, not conduit.';
+DROP FUNCTION IF EXISTS conduit.notify_work_request_event();
 
 COMMIT;

@@ -33,9 +33,19 @@ export interface AIModel {
   harness_id: string;
   provider_id?: string;
   model_identifier: string; // e.g. gemini-3.6-flash, gpt-4o, claude-3-7-sonnet
+  /** true when the model has been exercised through a harness successfully — only verified models may be selected in dropdowns or enter the resolver queue. */
+  verified?: boolean;
   created_at?: string;
   updated_at?: string;
 }
+
+/**
+ * How the model is invoked once a config_bundle resolves — the DB
+ * constraint on tackle.config_bundle.invocation_mode (also consumed by
+ * tackle-mcp and harness-srv). INTERACTIVE = Freebuff-hosted role; the
+ * other four are harness-launchable (CLI spawns opencode/codex).
+ */
+export type InvocationMode = 'CLI' | 'HTTP' | 'SDK' | 'MCP' | 'INTERACTIVE';
 
 export interface ConfigBundle {
   id: string;
@@ -45,7 +55,7 @@ export interface ConfigBundle {
   provider_id?: string;
   harness_id?: string;
   priority: number; // lower number = higher priority
-  invocation_mode: 'direct' | 'stream' | 'batch' | 'fallback';
+  invocation_mode: InvocationMode;
   command?: string;
   endpoint_url?: string;
   timeout_ms?: number;

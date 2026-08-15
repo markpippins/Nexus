@@ -16,6 +16,8 @@ import {
   ShieldCheck,
   Package
 } from 'lucide-react';
+import { showToast } from '../components/Toast';
+import { showConfirm } from '../components/ConfirmDialog';
 import { Provider, Harness, AIModel, SystemRole, ConfigBundle } from '../types';
 import { BundleModal } from './BundleModal';
 
@@ -24,6 +26,7 @@ interface AIRegistryTabProps {
   harnesses: Harness[];
   models: AIModel[];
   roles: SystemRole[];
+  bundles?: ConfigBundle[];
   onSaveProvider: (prov: Partial<Provider>) => Promise<void>;
   onDeleteProvider: (id: string) => Promise<void>;
   onSaveHarness: (harn: Partial<Harness>) => Promise<void>;
@@ -31,6 +34,9 @@ interface AIRegistryTabProps {
   onSaveModel: (mod: Partial<AIModel>) => Promise<void>;
   onDeleteModel: (id: string) => Promise<void>;
   onSaveBundle: (bundle: Partial<ConfigBundle>) => Promise<void>;
+  onVerifyModel: (modelId: string, prompt?: string) => Promise<any>;
+  onVerifyStatus: (sessionId: string) => Promise<any>;
+  onRefresh: () => Promise<void>;
 }
 
 export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
@@ -38,13 +44,17 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
   harnesses,
   models,
   roles,
+  bundles,
   onSaveProvider,
   onDeleteProvider,
   onSaveHarness,
   onDeleteHarness,
   onSaveModel,
   onDeleteModel,
-  onSaveBundle
+  onSaveBundle,
+  onVerifyModel,
+  onVerifyStatus,
+  onRefresh
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'providers' | 'harnesses' | 'models'>('models');
   const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
@@ -54,6 +64,70 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
   const [bundlePrefill, setBundlePrefill] = useState<Partial<ConfigBundle> | null>(null);
   // Bumped on every open so the modal remounts with fresh form state.
   const [bundleModalKey, setBundleModalKey] = useState<number>(0);
+
+  // ── Models toolbar state ──────────────────────────────────────────
+  const [modelSearch, setModelSearch] = useState('');
+  const [modelSort, setModelSort] = useState<'name' | 'provider' | 'verified' | 'date'>('name');
+  const [modelSortAsc, setModelSortAsc] = useState(true);
+  const [modelFilterProvider, setModelFilterProvider] = useState<string>('all');
+  const [modelFilterHarness, setModelFilterHarness] = useState<string>('all');
+  const [modelFilterVerified, setModelFilterVerified] = useState<'all' | 'verified' | 'unverified'>('all');
+  const [modelFilterAssigned, setModelFilterAssigned] = useState<'all' | 'assigned' | 'unassigned'>('all');
+
+  // Verify-model state — one verification at a time; outcome keyed by model id
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const [verifyOutcome, setVerifyOutcome] = useState<Record<string, { ok: boolean; message: string }>>({});
+
+  // ── Verify Model flow ──────────────────────────────────────────────
+  // Runs a real inference through the harness (POST /config/ai/verify),
+  // polls the session status until it settles, then refreshes so the badge
+  // flips to VERIFIED and the model's bundles re-arm server-side.
+  const verifyModel = async (m: AIModel) => {
+    if (verifyingId) return;
+    if (!(await showConfirm(
+      `Run a verification inference against "${m.name}" (${m.model_identifier})?\n\n` +
+      `On success the model becomes VERIFIED and every config bundle referencing it is re-armed (active).`
+    ))) return;
+
+    setVerifyingId(m.id);
+    setVerifyOutcome(prev => { const n = { ...prev }; delete n[m.id]; return n; });
+    try {
+      const started = await onVerifyModel(m.id);
+      if (started?.alreadyVerified) {
+        setVerifyOutcome(prev => ({ ...prev, [m.id]: { ok: true, message: 'Already verified' } }));
+        return;
+      }
+
+      const sessionId: string | undefined = started?.sessionId;
+      if (!sessionId) throw new Error('No verify session returned');
+
+      const deadline = Date.now() + 180_000;
+      let status: any = null;
+      do {
+        await new Promise(r => setTimeout(r, 1500));
+        status = await onVerifyStatus(sessionId);
+      } while (status?.running && Date.now() < deadline);
+
+      if (!status) {
+        setVerifyOutcome(prev => ({ ...prev, [m.id]: { ok: false, message: 'Could not read verify status' } }));
+      } else if (status.running) {
+        setVerifyOutcome(prev => ({ ...prev, [m.id]: { ok: false, message: 'Verification timed out after 180s — check the session log' } }));
+      } else {
+        const ok = status.exit_code === 0;
+        setVerifyOutcome(prev => ({ ...prev, [m.id]: {
+          ok,
+          message: ok
+            ? 'Verified — model is now selectable and its bundles are re-armed'
+            : `Failed (exit ${status.exit_code ?? '?'}) — see the session log for details`
+        } }));
+      }
+    } catch (err: any) {
+      setVerifyOutcome(prev => ({ ...prev, [m.id]: { ok: false, message: `Verify failed: ${err instanceof Error ? err.message : String(err)}` } }));
+    } finally {
+      setVerifyingId(null);
+      try { await onRefresh(); } catch { /* refresh is best-effort */ }
+    }
+  };
 
   // Modals state
   const [provModalOpen, setProvModalOpen] = useState<boolean>(false);
@@ -124,7 +198,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
       });
       setProvModalOpen(false);
     } catch (err) {
-      alert(`Error saving provider: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error saving provider: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -168,7 +242,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
       });
       setHarnModalOpen(false);
     } catch (err) {
-      alert(`Error saving harness: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error saving harness: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -204,7 +278,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
       });
       setModModalOpen(false);
     } catch (err) {
-      alert(`Error saving model: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error saving model: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -247,6 +321,45 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
   };
 
   const defaultBundleRole = roles.find(r => r.name === 'engineer')?.name || roles[0]?.name || '';
+
+  // ── Derived: filtered + sorted models ──────────────────────────────
+  const uniqueProviderIds = [...new Set(models.map(m => m.provider_id).filter(Boolean))];
+  const uniqueHarnessIds = [...new Set(models.map(m => m.harness_id).filter(Boolean))];
+  const assignedModelIds = new Set((bundles || []).map(b => b.model_id).filter(Boolean));
+
+  const filteredModels = models
+    .filter(m => {
+      // Text search
+      if (modelSearch) {
+        const q = modelSearch.toLowerCase();
+        const providerObj = providers.find(p => p.id === m.provider_id);
+        const harnessObj = harnesses.find(h => h.id === m.harness_id);
+        const haystack = [m.name, m.id, m.model_identifier, providerObj?.name || '', harnessObj?.name || ''].join(' ').toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      // Provider filter
+      if (modelFilterProvider !== 'all' && m.provider_id !== modelFilterProvider) return false;
+      // Harness filter
+      if (modelFilterHarness !== 'all' && m.harness_id !== modelFilterHarness) return false;
+      // Verified filter
+      if (modelFilterVerified === 'verified' && !m.verified) return false;
+      if (modelFilterVerified === 'unverified' && m.verified) return false;
+      // Assigned filter
+      if (modelFilterAssigned === 'assigned' && !assignedModelIds.has(m.id)) return false;
+      if (modelFilterAssigned === 'unassigned' && assignedModelIds.has(m.id)) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      let cmp = 0;
+      if (modelSort === 'name') cmp = a.name.localeCompare(b.name);
+      else if (modelSort === 'provider') {
+        const pa = providers.find(p => p.id === a.provider_id)?.name || '';
+        const pb = providers.find(p => p.id === b.provider_id)?.name || '';
+        cmp = pa.localeCompare(pb) || a.name.localeCompare(b.name);
+      } else if (modelSort === 'verified') cmp = (a.verified ? 0 : 1) - (b.verified ? 0 : 1);
+      else if (modelSort === 'date') cmp = new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+      return modelSortAsc ? cmp : -cmp;
+    });
 
   return (
     <div className="space-y-6">
@@ -321,8 +434,112 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
 
       {/* 1. MODELS VIEW */}
       {activeSubTab === 'models' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {models.map(m => {
+        <>
+          {/* Toolbar: search + sort + filters */}
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[200px]">
+              <input
+                type="text"
+                value={modelSearch}
+                onChange={e => setModelSearch(e.target.value)}
+                placeholder="Search models by name, ID, provider…"
+                className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg pl-8 pr-3 py-1.5 font-mono text-[var(--text-primary)] text-xs placeholder:text-[var(--text-muted)]"
+              />
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              {modelSearch && (
+                <button onClick={() => setModelSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              )}
+            </div>
+
+            {/* Sort */}
+            <select
+              value={`${modelSort}-${modelSortAsc}`}
+              onChange={e => {
+                const [s, d] = e.target.value.split('-');
+                setModelSort(s as any);
+                setModelSortAsc(d === 'true');
+              }}
+              className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-2 py-1.5 text-xs font-mono text-[var(--text-primary)] cursor-pointer"
+            >
+              <option value="name-true">Name A→Z</option>
+              <option value="name-false">Name Z→A</option>
+              <option value="provider-true">Provider A→Z</option>
+              <option value="provider-false">Provider Z→A</option>
+              <option value="verified-false">Verified first</option>
+              <option value="verified-true">Unverified first</option>
+              <option value="date-false">Newest first</option>
+              <option value="date-true">Oldest first</option>
+            </select>
+
+            {/* Provider filter */}
+            <select
+              value={modelFilterProvider}
+              onChange={e => setModelFilterProvider(e.target.value)}
+              className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-2 py-1.5 text-xs font-mono text-[var(--text-primary)] cursor-pointer"
+            >
+              <option value="all">All providers</option>
+              {uniqueProviderIds.map(pid => {
+                const p = providers.find(pr => pr.id === pid);
+                return <option key={pid} value={pid}>{p?.name || pid}</option>;
+              })}
+            </select>
+
+            {/* Harness filter */}
+            <select
+              value={modelFilterHarness}
+              onChange={e => setModelFilterHarness(e.target.value)}
+              className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-2 py-1.5 text-xs font-mono text-[var(--text-primary)] cursor-pointer"
+            >
+              <option value="all">All harnesses</option>
+              {uniqueHarnessIds.map(hid => {
+                const h = harnesses.find(hr => hr.id === hid);
+                return <option key={hid} value={hid}>{h?.name || hid}</option>;
+              })}
+            </select>
+
+            {/* Verified filter */}
+            <select
+              value={modelFilterVerified}
+              onChange={e => setModelFilterVerified(e.target.value as any)}
+              className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-2 py-1.5 text-xs font-mono text-[var(--text-primary)] cursor-pointer"
+            >
+              <option value="all">All status</option>
+              <option value="verified">Verified</option>
+              <option value="unverified">Unverified</option>
+            </select>
+
+            {/* Assigned filter */}
+            <select
+              value={modelFilterAssigned}
+              onChange={e => setModelFilterAssigned(e.target.value as any)}
+              className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-2 py-1.5 text-xs font-mono text-[var(--text-primary)] cursor-pointer"
+            >
+              <option value="all">All assignment</option>
+              <option value="assigned">Assigned</option>
+              <option value="unassigned">Unassigned</option>
+            </select>
+
+            {/* Count badge */}
+            <span className="text-[10px] font-mono text-[var(--text-muted)]">
+              {filteredModels.length} of {models.length}
+            </span>
+
+            {/* Reset filters */}
+            {(modelSearch || modelFilterProvider !== 'all' || modelFilterHarness !== 'all' || modelFilterVerified !== 'all' || modelFilterAssigned !== 'all') && (
+              <button
+                onClick={() => { setModelSearch(''); setModelFilterProvider('all'); setModelFilterHarness('all'); setModelFilterVerified('all'); setModelFilterAssigned('all'); }}
+                className="px-2 py-1 rounded text-[10px] font-bold text-[var(--accent-color)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] cursor-pointer"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredModels.map(m => {
             const harnessObj = harnesses.find(h => h.id === m.harness_id);
             const providerObj = providers.find(p => p.id === (m.provider_id || harnessObj?.id));
 
@@ -337,6 +554,23 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                       <h4 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-2">
                         <Cpu className="w-4 h-4 text-[var(--accent-color)]" />
                         <span>{m.name}</span>
+                        <span
+                          title={m.verified
+                            ? 'Verified — exercised successfully through a harness; selectable in dropdowns and eligible for the resolver queue'
+                            : 'Unverified — not exercised through a harness; hidden from model dropdowns and bundles referencing it are forced inactive'}
+                          className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold uppercase border inline-flex items-center gap-1 ${
+                            m.verified
+                              ? 'bg-emerald-950/50 text-emerald-300 border-emerald-800/40'
+                              : 'bg-amber-950/50 text-amber-300 border-amber-800/40'
+                          }`}
+                        >
+                          {m.verified ? (
+                            <CheckCircle className="w-3 h-3" />
+                          ) : (
+                            <XCircle className="w-3 h-3" />
+                          )}
+                          {m.verified ? 'VERIFIED' : 'UNVERIFIED'}
+                        </span>
                       </h4>
                       <span className="font-mono text-[11px] text-[var(--text-secondary)] block mt-0.5">
                         ID: {m.id}
@@ -353,11 +587,11 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                       </button>
                       <button
                         onClick={async () => {
-                          if (confirm(`Delete model '${m.name}'?`)) {
+                          if (await showConfirm(`Delete model '${m.name}'?`)) {
                             try {
                               await onDeleteModel(m.id);
                             } catch (err) {
-                              alert(`Error deleting model: ${err instanceof Error ? err.message : String(err)}`);
+                              showToast(`Error deleting model: ${err instanceof Error ? err.message : String(err)}`);
                             }
                           }
                         }}
@@ -392,14 +626,61 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                   </div>
                 </div>
 
-                <button
-                  onClick={() => openBundleModalForModel(m)}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--accent-color)] hover:text-[var(--accent-color)] transition cursor-pointer"
-                  title="Create a config bundle from this model and assign it to a role"
-                >
-                  <Package className="w-3.5 h-3.5 text-[var(--accent-color)]" />
-                  <span>Add to Role</span>
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => verifyModel(m)}
+                    disabled={!!verifyingId || m.verified}
+                    title={
+                      m.verified
+                        ? 'Verified — exercised through a harness; bundles referencing it are active'
+                        : 'Run a real inference test — on success the model becomes VERIFIED and its bundles are re-armed'
+                    }
+                    className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold border transition ${
+                      m.verified
+                        ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50 cursor-default'
+                        : verifyingId === m.id
+                          ? 'bg-[var(--bg-tertiary)] border-[var(--accent-color)] text-[var(--accent-color)] cursor-wait'
+                          : 'bg-amber-950/30 border-amber-800/50 text-amber-300 hover:border-amber-500/70 hover:text-amber-200 cursor-pointer'
+                    }`}
+                  >
+                    {m.verified ? (
+                      <CheckCircle className="w-3.5 h-3.5" />
+                    ) : verifyingId === m.id ? (
+                      <ShieldCheck className="w-3.5 h-3.5 animate-pulse" />
+                    ) : (
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                    )}
+                    <span>
+                      {m.verified ? 'Verified' : verifyingId === m.id ? 'Verifying…' : 'Verify Model'}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => openBundleModalForModel(m)}
+                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--accent-color)] hover:text-[var(--accent-color)] transition cursor-pointer"
+                    title="Create a config bundle from this model and assign it to a role"
+                  >
+                    <Package className="w-3.5 h-3.5 text-[var(--accent-color)]" />
+                    <span>Add to Role</span>
+                  </button>
+                </div>
+
+                {verifyOutcome[m.id] && (
+                  <div
+                    className={`flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-mono ${
+                      verifyOutcome[m.id].ok
+                        ? 'bg-emerald-950/30 border-emerald-800/40 text-emerald-300'
+                        : 'bg-rose-950/30 border-rose-800/40 text-rose-300'
+                    }`}
+                  >
+                    {verifyOutcome[m.id].ok ? (
+                      <CheckCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                    ) : (
+                      <XCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                    )}
+                    <span>{verifyOutcome[m.id].message}</span>
+                  </div>
+                )}
 
                 <div className="pt-2 border-t border-[var(--border-subtle)] text-[10px] font-mono text-[var(--text-muted)] flex justify-between">
                   <span>Registered</span>
@@ -408,7 +689,8 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
               </div>
             );
           })}
-        </div>
+          </div>
+        </>
       )}
 
       {/* 2. PROVIDERS VIEW */}
@@ -444,11 +726,11 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                       </button>
                       <button
                         onClick={async () => {
-                          if (confirm(`Delete provider '${p.name}'?`)) {
+                          if (await showConfirm(`Delete provider '${p.name}'?`)) {
                             try {
                               await onDeleteProvider(p.id);
                             } catch (err) {
-                              alert(`Error deleting provider: ${err instanceof Error ? err.message : String(err)}`);
+                              showToast(`Error deleting provider: ${err instanceof Error ? err.message : String(err)}`);
                             }
                           }
                         }}
@@ -557,11 +839,11 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                       </button>
                       <button
                         onClick={async () => {
-                          if (confirm(`Delete harness '${h.name}'?`)) {
+                          if (await showConfirm(`Delete harness '${h.name}'?`)) {
                             try {
                               await onDeleteHarness(h.id);
                             } catch (err) {
-                              alert(`Error deleting harness: ${err instanceof Error ? err.message : String(err)}`);
+                              showToast(`Error deleting harness: ${err instanceof Error ? err.message : String(err)}`);
                             }
                           }
                         }}

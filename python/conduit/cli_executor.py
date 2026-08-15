@@ -29,6 +29,43 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from db_adapter import DBAdapter
 
 
+def _emit_vision_receipt(wr_id: str, result: str, summary: str, executor: str) -> None:
+    """Best-effort: emit a LOSM ExecutionReceipt into vision.receipts.
+
+    Mirrors agent_chat.py's guarded receipt emission — the vision.receipts
+    insert triggers trg_receipt_governance, which writes a governance event
+    into peb.governance_events so THIS execution channel leaves a trace in
+    the governance ledger (previously only the interactive channel did).
+
+    Deliberately best-effort: import failures (losm_ir/tackle unavailable)
+    or server errors are logged, never fatal — cli_executor must keep
+    working standalone.
+
+    NOTE: the default executor_id "cli-executor" is not in
+    DEFAULT_KNOWN_EXECUTORS, so issue_receipt's pass-through whitelist maps
+    the governance event's agent_role to "builder"; the real identity is
+    preserved in metadata.losm_executor_id. That fallback is intentional.
+    """
+    try:
+        from tackle.vision_bridge import issue_receipt
+        from losm_ir.execution_receipt import ExecutionReceipt
+
+        from datetime import datetime, timezone
+        receipt = ExecutionReceipt(
+            work_request_id=wr_id,
+            executor_id=executor,
+            timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            result=result,  # SUCCESS / FAILED / PARTIAL
+            lineage_parent=summary,
+        )
+        issue_receipt(receipt, plan_id=wr_id, session_id=f"cli-{executor}")
+    except ImportError:
+        # losm_ir or tackle not available — skip (standalone mode)
+        pass
+    except Exception as e:
+        print(f"[cli-executor] vision receipt emission failed: {e}", file=sys.stderr)
+
+
 def list_pending_requests(db: DBAdapter) -> None:
     """List requests that are READY (can be claimed by an executor)."""
     with db._get_connection() as conn:
@@ -103,6 +140,14 @@ def claim_and_execute(db: DBAdapter, request_id: str, executor_id: str = "cli-ex
         )
         print(f"Execution receipt issued: {receipt['id']}")
 
+        # Step 6b: Emit LOSM vision receipt (governance event via trigger)
+        _emit_vision_receipt(
+            wr_id=request_id,
+            result="SUCCESS",
+            summary=f"CLI executor completed request {request_id[:8]}...",
+            executor=executor_id,
+        )
+
         # Step 7: Release lease
         db.release_lease(lease_id)
         print("Lease released.")
@@ -120,6 +165,13 @@ def claim_and_execute(db: DBAdapter, request_id: str, executor_id: str = "cli-ex
 
     except Exception as e:
         print(f"\nERROR during execution: {e}")
+        # Best-effort: record the failure in the governance ledger too
+        _emit_vision_receipt(
+            wr_id=request_id,
+            result="FAILED",
+            summary=f"CLI executor failed request {request_id[:8]}...: {e}",
+            executor=executor_id,
+        )
         # Try to release lease on error
         try:
             db.release_lease(lease_id)

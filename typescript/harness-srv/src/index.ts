@@ -14,8 +14,9 @@
  */
 
 import express from "express";
-import { resolveContext, emitEvent, pool, redis } from "./db";
-import { execFile } from "child_process";
+import { resolveContext, resolveRoleModel, emitEvent, pool, redis, checkConfigAdmission, incrementConsumedUnits, emitGovernanceReceipt } from "./db";
+import { ADMISSION_OUTCOME } from "./admission";
+import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import { writeFile, readFile, unlink, mkdir, appendFile } from "fs/promises";
 import { join } from "path";
@@ -28,6 +29,126 @@ app.use(express.json());
 const PORT = parseInt(process.env.HARNESS_PORT || "3420");
 const WORK_DIR = process.env.HARNESS_WORK_DIR || "/home/codex/dev";
 const PROMPT_DIR = join(WORK_DIR, ".harness", "prompts");
+
+// ── Runaway watchdog (T16 guardrail, 1285 remediation slice 2) ───
+const RUNAWAY_THRESHOLD_MS = 15 * 60 * 1000; // 15 min
+const WATCHDOG_INTERVAL_MS = 60_000; // check every 60s
+
+interface TrackedSession {
+  jobId: string;
+  role: string;
+  model: string | undefined;
+  startedAt: number;
+  promptFile: string;
+  wind_task_id?: string; // for governance BLOCK receipt on watchdog kill
+  pid?: number; // child process PID (set by executeOpencode for direct SIGTERM)
+}
+
+const activeSessions = new Map<string, TrackedSession>();
+
+function startWatchdog(): void {
+  setInterval(async () => {
+    const now = Date.now();
+    for (const [jobId, session] of activeSessions) {
+      const elapsed = now - session.startedAt;
+      if (elapsed < RUNAWAY_THRESHOLD_MS) continue;
+
+      // Check for durable output since launch
+      let hasOutput = false;
+      try {
+        const nebulaUrl = process.env.NEBULA_URL || "http://localhost:3101";
+        const since = new Date(session.startedAt).toISOString();
+        const resp = await fetch(
+          `${nebulaUrl}/api/agent-records?role=${encodeURIComponent(session.role)}&createdAfter=${since}&limit=1`
+        );
+        const data = await resp.json() as any;
+        hasOutput = (data?.items?.length || 0) > 0;
+      } catch {
+        // Can't reach nebula — assume worst case, don't kill
+        continue;
+      }
+
+      if (hasOutput) continue; // agent is producing output, not runaway
+
+      // ── Runaway detected — kill + unload ──────────────────────
+      await log("warn", `runaway detected: job=${jobId} role=${session.role} elapsed=${Math.round(elapsed/1000)}s — killing`);
+
+      // Kill the child process directly by PID (set by executeOpencode spawn)
+      if (session.pid) {
+        try {
+          process.kill(session.pid, 'SIGTERM');
+          await log("info", `runaway kill: SIGTERM sent to pid=${session.pid} job=${jobId.slice(0, 8)}`);
+        } catch {
+          // Process already dead — that's fine
+        }
+      }
+
+      // Unload Ollama model if one was in use
+      if (session.model) {
+        try {
+          const ollamaUrl = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
+          await fetch(`${ollamaUrl}/api/generate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model: session.model, keep_alive: 0 }),
+          });
+        } catch {
+          // best-effort unload
+        }
+      }
+
+      // Emit runaway detection record
+      const exhaustId = uuidv4();
+      const isoNow = new Date().toISOString();
+      try {
+        await pool.query(
+          `INSERT INTO nebula.agent_records_history (id, record_type, role, title, content, tags, created_at, recorded_on_dt)
+           VALUES ($1::uuid, 'report', 'architect', $2, $3, $4, $5, $5)`,
+          [
+            exhaustId,
+            `Runaway agent killed: ${session.role} (job ${jobId.slice(0, 8)})`,
+            `## Runaway agent detected + killed
+
+- **Job:** ${jobId}
+- **Role:** ${session.role}
+- **Model:** ${session.model || 'unknown'}
+- **Elapsed:** ${Math.round(elapsed / 1000)}s
+- **Threshold:** ${RUNAWAY_THRESHOLD_MS / 1000}s
+
+No agent records were produced since launch. The process was killed and the model unloaded.`,
+            ['type:runaway-detected', 'to:architect', 'to:engineer', 'to:engineer-ii', 'to:devops', 'to:topologist', `role:${session.role}`],
+            isoNow
+          ]
+        );
+      } catch {
+        // best-effort record
+      }
+
+      // Governance BLOCK receipt — the killed run is an abnormal
+      // completion; BLOCK is the always-valid override receipt type
+      // (watchdog is whitelisted as a receipt-issuing executor in
+      // tackle.vision_bridge._PASS_THROUGH_EXECUTORS).
+      if (session.wind_task_id) {
+        emitGovernanceReceipt({
+          planId: session.wind_task_id,
+          type: "BLOCK",
+          agentRole: "watchdog",
+          sessionId: jobId,
+          summary: `runaway watchdog kill: ${session.role} (job ${jobId.slice(0, 8)})`,
+          metadata: {
+            stage: "watchdog_kill",
+            role: session.role,
+            model: session.model || "unknown",
+            elapsed_ms: elapsed,
+          },
+        });
+      }
+
+      activeSessions.delete(jobId);
+    }
+  }, WATCHDOG_INTERVAL_MS);
+  log("info", `watchdog started (threshold=${RUNAWAY_THRESHOLD_MS}ms, interval=${WATCHDOG_INTERVAL_MS}ms)`);
+}
 
 // ── File logging (nexus/logs/harness-srv.log) ─────────────────────
 const LOG_DIR = process.env.NEXUS_LOG_DIR || "/home/codex/dev/nexus/logs";
@@ -86,6 +207,7 @@ app.post("/run", async (req, res) => {
       agent,
       timeout_ms = 300_000,
     } = req.body;
+    const resolveOnly = req.body.resolve_only === true;
 
     if (!wind_task_id) {
       return res.status(400).json({ error: "wind_task_id is required" });
@@ -93,6 +215,66 @@ app.post("/run", async (req, res) => {
 
     // 1. Resolve context
     const resolved = await resolveContext(wind_task_id, contextOverrides);
+
+    // ── Interactive-hosted guard (Freebuff roles, plan 1286 follow-up) ─
+    // Roles whose config_bundle resolves to invocation_mode=INTERACTIVE
+    // (harness harn-freebuff) run INSIDE Freebuff — they are never
+    // launched by harness-srv. Refuse before any spawn happens.
+    if (resolved.model?.invocation_mode === "INTERACTIVE") {
+      await log(
+        "warn",
+        `run job=${jobId} role=${resolved.role} — INTERACTIVE-hosted role (Freebuff); refusing harness launch`
+      );
+      return res.status(400).json({
+        job_id: jobId,
+        error: `role ${resolved.role} is INTERACTIVE-hosted (Freebuff) — cannot be launched via harness-srv; run it in the Freebuff interactive session instead`,
+      });
+    }
+
+    // ── Admission gate (T20 two-tier): config validity, uniform across paths ──
+    const configAdmission = await checkConfigAdmission(resolved.role);
+    if (!configAdmission.valid) {
+      await log(
+        "warn",
+        `run job=${jobId} role=${resolved.role} — admission denied: ${configAdmission.outcome}`
+      );
+      await emitEvent({
+        event_type: "admission.denied",
+        source: "harness-srv.run",
+        aggregate_type: "harness_job",
+        aggregate_id: jobId,
+        payload: {
+          wind_task_id,
+          role: resolved.role,
+          outcome: ADMISSION_OUTCOME.ADMISSION_DENIED,
+          reason: configAdmission.outcome,
+        },
+        actor_type: "system",
+      });
+      // BLOCK is the always-valid terminal receipt and a valid first receipt
+      // for a fresh plan_id — durable "admission denied" audit trail.
+      await emitGovernanceReceipt({
+        planId: wind_task_id,
+        type: "BLOCK",
+        agentRole: resolved.role,
+        sessionId: jobId,
+        summary: `harness-srv ${jobId.slice(0, 8)}: admission denied (${configAdmission.outcome})`,
+        metadata: {
+          stage: "admission_denied",
+          wind_task_id,
+          outcome: ADMISSION_OUTCOME.ADMISSION_DENIED,
+          reason: configAdmission.outcome,
+        },
+      });
+      return res.status(403).json({
+        job_id: jobId,
+        error: configAdmission.message,
+        admission: {
+          outcome: ADMISSION_OUTCOME.ADMISSION_DENIED,
+          reason: configAdmission.outcome,
+        },
+      });
+    }
 
     // 2. Merge overrides
     const effectiveHarnessId = harness_id || resolved.harness_id;
@@ -120,6 +302,25 @@ app.post("/run", async (req, res) => {
       actor_type: "system",
     });
 
+    // Governance PLAN_CREATE — bootstrap the receipt lifecycle for the
+    // wind_task_id (fresh plan id → PLAN_CREATE is the only valid first
+    // receipt). Skipped for resolve_only dry-runs: no work unit runs.
+    if (!resolveOnly) {
+      await emitGovernanceReceipt({
+        planId: wind_task_id,
+        type: "PLAN_CREATE",
+        agentRole: resolved.role,
+        sessionId: jobId,
+        summary: `harness-srv ${jobId.slice(0, 8)}: run started (${resolved.task.task_slug})`,
+        metadata: {
+          stage: "run_start",
+          wind_task_id,
+          task_slug: resolved.task.task_slug,
+          harness_id: effectiveHarnessId,
+        },
+      });
+    }
+
     // 4. Append outcome instruction to prompt and write to temp file
     const outcomeInstruction = buildOutcomeInstruction(resolved.outcomes || []);
     const fullPrompt = resolved.prompt + "\n\n" + outcomeInstruction;
@@ -132,8 +333,6 @@ app.post("/run", async (req, res) => {
     let stdout = "";
     let stderr = "";
 
-    const resolveOnly = req.body.resolve_only === true;
-
     if (resolveOnly) {
       // Skip execution — return resolved context only
       stdout = JSON.stringify({
@@ -143,6 +342,16 @@ app.post("/run", async (req, res) => {
         procedure_cards: resolved.prompt.match(/^- \*\*/gm)?.length || 0,
       });
     } else {
+      // ── Register session for runaway watchdog ──────────────────
+      activeSessions.set(jobId, {
+        jobId,
+        role: resolved.role,
+        model: effectiveModel,
+        startedAt: startTime,
+        promptFile,
+        wind_task_id,
+      });
+
       try {
         const result = await executeHarness({
           harness_id: effectiveHarnessId,
@@ -151,6 +360,7 @@ app.post("/run", async (req, res) => {
           agent: effectiveAgent,
           role: resolved.role,
           model: effectiveModel,
+          model_identifier: resolved.model?.model_identifier,
           timeout_ms,
         });
         stdout = result.stdout;
@@ -160,6 +370,8 @@ app.post("/run", async (req, res) => {
         exitCode = execError.exitCode || 1;
         stdout = execError.stdout || "";
         stderr = execError.stderr || execError.message;
+      } finally {
+        activeSessions.delete(jobId);
       }
     }
 
@@ -190,6 +402,40 @@ app.post("/run", async (req, res) => {
       exitCode === 0 ? "info" : "warn",
       `run job=${jobId} role=${resolved.role} exit=${exitCode} duration_ms=${Date.now() - startTime} model=${effectiveModel ?? "(harness default)"}`
     );
+
+    // 6b. Governance completion receipts — IMPLEMENTATION then
+    // REVIEW_PASS (exit 0) / REVIEW_REJECT (exit != 0), walked in the
+    // order validateReceipt requires. Best-effort + sequential so the
+    // chain lands in peb.governance_events like every other channel.
+    if (!resolveOnly) {
+      const durationMs = Date.now() - startTime;
+      const completedMetadata = {
+        stage: "run_complete",
+        wind_task_id,
+        task_slug: resolved.task.task_slug,
+        harness_id: effectiveHarnessId,
+        exit_code: exitCode,
+        duration_ms: durationMs,
+        stdout_preview: stdout.slice(0, 300),
+        stderr_preview: stderr.slice(0, 300),
+      };
+      await emitGovernanceReceipt({
+        planId: wind_task_id,
+        type: "IMPLEMENTATION",
+        agentRole: resolved.role,
+        sessionId: jobId,
+        summary: `harness-srv ${jobId.slice(0, 8)}: implementation ${exitCode === 0 ? "ok" : "failed"} (${resolved.task.task_slug})`,
+        metadata: completedMetadata,
+      });
+      await emitGovernanceReceipt({
+        planId: wind_task_id,
+        type: exitCode === 0 ? "REVIEW_PASS" : "REVIEW_REJECT",
+        agentRole: resolved.role,
+        sessionId: jobId,
+        summary: `harness-srv ${jobId.slice(0, 8)}: ${exitCode === 0 ? "completed" : "failed"} exit=${exitCode} (${resolved.task.task_slug})`,
+        metadata: completedMetadata,
+      });
+    }
 
     // 7. Parse outcome from agent output
     const parsedOutcome = parseOutcome(stdout, resolved.outcomes || []);
@@ -266,6 +512,227 @@ app.post("/resolve-context", async (req, res) => {
   }
 });
 
+// ── POST /run-direct ────────────────────────────────────────────────
+
+/**
+ * Run an agent with raw context — no wind task resolution required.
+ *
+ * For interactive conversation turns (Duality/Plurality) where the
+ * subscriber already assembled the full prompt from Assembly thread
+ * context. Bypasses wind.task lookup entirely.
+ *
+ * Body:
+ *   role: string           — agent role (maps to tackle config_bundle)
+ *   prompt: string         — full prompt text (already assembled)
+ *   model?: string         — model override (from tackle config_bundle)
+ *   work_dir?: string      — working directory override
+ *   agent?: string         — agent name override (for opencode)
+ *   timeout_ms?: number    — execution timeout (default: 300000 = 5 min)
+ *   channel?: string       — invocation channel (default: "duality")
+ *
+ * Returns:
+ *   { job_id, role, exit_code, stdout, stderr, duration_ms, prompt_preview }
+ */
+app.post("/run-direct", async (req, res) => {
+  const jobId = uuidv4();
+  const startTime = Date.now();
+
+  try {
+    const {
+      role,
+      prompt,
+      model: modelOverride,
+      work_dir,
+      agent,
+      timeout_ms = 600_000,
+      channel = "duality",
+    } = req.body;
+
+    if (!role) {
+      return res.status(400).json({ error: "role is required" });
+    }
+    if (!prompt) {
+      return res.status(400).json({ error: "prompt is required" });
+    }
+
+    // ── Admission gate (T20 two-tier): config validity, uniform across paths ──
+    const configAdmission = await checkConfigAdmission(role);
+    if (!configAdmission.valid) {
+      await log(
+        "warn",
+        `run-direct job=${jobId} role=${role} — admission denied: ${configAdmission.outcome}`
+      );
+      await emitEvent({
+        event_type: "admission.denied",
+        source: `harness-srv.run-direct.${channel}`,
+        aggregate_type: "harness_job",
+        aggregate_id: jobId,
+        payload: {
+          role,
+          channel,
+          outcome: ADMISSION_OUTCOME.ADMISSION_DENIED,
+          reason: configAdmission.outcome,
+        },
+        actor_type: "system",
+      });
+      return res.status(403).json({
+        job_id: jobId,
+        error: configAdmission.message,
+        admission: {
+          outcome: ADMISSION_OUTCOME.ADMISSION_DENIED,
+          reason: configAdmission.outcome,
+        },
+      });
+    }
+
+    // ── Resolve the role's model/harness config from tackle ──────
+    // Reuse resolveRoleModel — the same resolver as the /run workflow path —
+    // so both paths agree on the SAME primary bundle, model wire id, and
+    // harness. (Previously this ran its own SQL with `ORDER BY priority DESC`,
+    // which inverted the primary-bundle selection vs resolveRoleModel's
+    // ascending priority sort — picking the fallback model instead of the
+    // primary. One role reference must resolve deterministically, T20.)
+    const modelConfig = await resolveRoleModel(role);
+
+    if (!modelConfig) {
+      await log("warn", `run-direct job=${jobId} role=${role} — no active config_bundle found`);
+      return res.status(400).json({
+        job_id: jobId,
+        error: `No active config_bundle found for role ${role}`,
+      });
+    }
+
+    const harnessId = modelConfig.harness_id;
+    // Explicit modelOverride values are passed through as-is: callers must
+    // supply an opencode-formatted id (e.g. `opencode/big-pickle`). Otherwise
+    // the canonical opencode_model_id from resolveRoleModel is used.
+    const effectiveModel = modelOverride || modelConfig.opencode_model_id;
+    const invocationMode = modelConfig.invocation_mode;
+
+    // ── Interactive-hosted guard ─────────────────────────────────
+    // invocation_mode is a column on tackle.config_bundle (not on
+    // harnesses.invocation_semantics). It's set when a role is
+    // configured to run inside Freebuff rather than via harness-srv.
+    if (invocationMode === "INTERACTIVE") {
+      await log("warn", `run-direct job=${jobId} role=${role} — INTERACTIVE-hosted; refusing harness launch`);
+      return res.status(400).json({
+        job_id: jobId,
+        error: `role ${role} is INTERACTIVE-hosted (Freebuff) — use freebuff backend instead`,
+      });
+    }
+
+    const effectiveWorkDir = work_dir || WORK_DIR;
+    const effectiveAgent = agent || role;
+
+    await log("info", `run-direct job=${jobId} role=${role} model=${effectiveModel ?? "(harness default)"} channel=${channel}`);
+
+    // 1. Emit harness.started event
+    const startedEventId = await emitEvent({
+      event_type: "harness.started",
+      source: `harness-srv.run-direct.${channel}`,
+      aggregate_type: "harness_job",
+      aggregate_id: jobId,
+      payload: { role, channel, prompt_length: prompt.length },
+      actor_type: "system",
+    });
+
+    // 2. Write prompt to temp file
+    await mkdir(PROMPT_DIR, { recursive: true });
+    const promptFile = join(PROMPT_DIR, `${jobId}.md`);
+    await writeFile(promptFile, prompt, "utf-8");
+
+    // 3. Register for watchdog
+    activeSessions.set(jobId, {
+      jobId,
+      role,
+      model: effectiveModel,
+      startedAt: startTime,
+      promptFile,
+    });
+
+    // 4. Execute via harness
+    let exitCode = 0;
+    let stdout = "";
+    let stderr = "";
+
+    try {
+      const result = await executeHarness({
+        harness_id: harnessId,
+        prompt_file: promptFile,
+        work_dir: effectiveWorkDir,
+        agent: effectiveAgent,
+        role,
+        model: effectiveModel,
+        model_identifier: modelConfig.model_identifier,
+        timeout_ms,
+      });
+      stdout = result.stdout;
+      stderr = result.stderr;
+      exitCode = result.exitCode;
+    } catch (execError: any) {
+      exitCode = execError.exitCode || 1;
+      stdout = execError.stdout || "";
+      stderr = execError.stderr || execError.message;
+    } finally {
+      activeSessions.delete(jobId);
+    }
+
+    await unlink(promptFile).catch(() => {});
+
+    // 5. Emit harness.completed event
+    await emitEvent({
+      event_type: exitCode === 0 ? "harness.completed" : "harness.failed",
+      source: `harness-srv.run-direct.${channel}`,
+      aggregate_type: "harness_job",
+      aggregate_id: jobId,
+      payload: {
+        role,
+        channel,
+        exit_code: exitCode,
+        duration_ms: Date.now() - startTime,
+        stdout_preview: stdout.slice(0, 500),
+        stderr_preview: stderr.slice(0, 500),
+      },
+      actor_type: "system",
+      causation_id: startedEventId,
+      caused_by_event_type: "harness.started",
+    });
+
+    await log(
+      exitCode === 0 ? "info" : "warn",
+      `run-direct job=${jobId} role=${role} exit=${exitCode} duration_ms=${Date.now() - startTime}`
+    );
+
+    res.json({
+      job_id: jobId,
+      role,
+      exit_code: exitCode,
+      stdout,
+      stderr,
+      duration_ms: Date.now() - startTime,
+      prompt_preview: prompt.slice(0, 300) + (prompt.length > 300 ? "..." : ""),
+      harness_id: harnessId,
+      model: effectiveModel || null,
+      events: { started: startedEventId },
+    });
+  } catch (error: any) {
+    await emitEvent({
+      event_type: "harness.error",
+      source: "harness-srv.run-direct",
+      aggregate_type: "harness_job",
+      aggregate_id: jobId,
+      payload: { error: error.message },
+      actor_type: "system",
+    }).catch(() => {});
+
+    res.status(500).json({
+      job_id: jobId,
+      error: error.message,
+      duration_ms: Date.now() - startTime,
+    });
+  }
+});
+
 // ── GET /health ─────────────────────────────────────────────────────
 
 app.get("/health", async (_req, res) => {
@@ -278,6 +745,18 @@ app.get("/health", async (_req, res) => {
   }
 });
 
+// ── GET /sessions — active session list (runaway watchdog visibility)
+app.get("/sessions", (_req, res) => {
+  const sessions = Array.from(activeSessions.values()).map((s) => ({
+    jobId: s.jobId,
+    role: s.role,
+    model: s.model || null,
+    startedAt: new Date(s.startedAt).toISOString(),
+    elapsedSeconds: Math.round((Date.now() - s.startedAt) / 1000),
+  }));
+  res.json({ sessions, count: sessions.length });
+});
+
 // ── Harness execution ───────────────────────────────────────────────
 
 interface HarnessExecParams {
@@ -287,6 +766,7 @@ interface HarnessExecParams {
   agent: string;
   role: string;
   model?: string; // opencode --model value (from tackle config_bundle)
+  model_identifier?: string; // bare model_identifier (for binary=ollama)
   timeout_ms: number;
 }
 
@@ -323,9 +803,17 @@ async function executeHarness(params: HarnessExecParams): Promise<HarnessExecRes
   // config_bundle) is honored on both paths — opencode via --model, and
   // ollama via the model_identifier passed to the generate API.
   if (binary === "ollama") {
-    return executeOllama(promptContent, role, params.model, timeout_ms);
+    // Ollama's /api/generate expects the bare model_identifier (e.g.
+    // `qwen2.5-coder`), not the opencode-qualified wire id
+    // (`ollama/qwen2.5-coder`) — feeding the latter 404s.
+    return executeOllama(
+      promptContent,
+      role,
+      params.model_identifier ?? params.model,
+      timeout_ms
+    );
   } else if (binary === "opencode") {
-    return executeOpencode(params);
+    return executeOpencode(params, promptContent);
   } else {
     throw new Error(`Harness ${harness_id} binary '${binary}' not yet supported`);
   }
@@ -373,6 +861,8 @@ async function executeOllama(
     }
 
     const data = await resp.json() as any;
+    // ── consumed_units tracking (RoleLeases plan 1286) ──────────
+    incrementConsumedUnits(role).catch(() => {});
     return {
       exitCode: 0,
       stdout: data.response || "",
@@ -390,48 +880,115 @@ async function executeOllama(
  * Execute via opencode CLI (full tool access, requires GPU for reasonable speed).
  * When a model was resolved from tackle config_bundle it is passed via --model,
  * so external-provider changes made in tackle-ui take effect on harness runs.
+ *
+ * Uses child_process.spawn (not execFile) so the T16 runaway watchdog can
+ * directly SIGTERM the child process by PID instead of pattern-matching pkill.
  */
-async function executeOpencode(params: HarnessExecParams): Promise<HarnessExecResult> {
+async function executeOpencode(
+  params: HarnessExecParams,
+  promptContent: string
+): Promise<HarnessExecResult> {
   const { prompt_file, work_dir, agent, role, model, timeout_ms } = params;
   const opencodeBin = process.env.OPENCODE_BIN || "opencode";
+  // Extract jobId from prompt filename (${jobId}.md) for watchdog PID tracking
+  const jobId = prompt_file.split("/").pop()?.replace(".md", "") || "";
 
+  // NOTE (opencode 1.18.x): `opencode run [message..]` requires the prompt as
+  // a message. We pipe the prompt via stdin instead of passing it as a
+  // positional arg: opencode's resolveRunInput() uses piped stdin when the
+  // positional message is empty, and piping avoids argv-length limits (E2BIG)
+  // for large Assembly-thread prompts.
+  //
+  // `--file` is deliberately NOT passed: (a) the prompt file only contains the
+  // same text we already deliver as the message, so attaching it adds nothing;
+  // and (b) empirically, passing `--file` breaks model resolution for custom
+  // config providers (`Model not found: <provider>/<model>`) — with --file,
+  // opencode 1.18.16 resolves the model against a provider registry that has
+  // not yet loaded config providers. The prompt file stays on disk for jobId/
+  // watchdog bookkeeping (prompt_file.split("/").pop() below).
   const cmdArgs = [
     "run",
     "--agent", agent,
     ...(model ? ["--model", model] : []),
     "--dir", work_dir,
     "--format", "json",
-    "--file", prompt_file,
     "--dangerously-skip-permissions",
-    "",
   ];
 
-  await log("info", `opencode exec agent=${agent} model=${model ?? "(unset)"} file=${prompt_file} dir=${work_dir} bin=${opencodeBin}`);
+  await log("info", `opencode exec agent=${agent} model=${model ?? "(unset)"} file=${prompt_file} dir=${work_dir} bin=${opencodeBin} prompt_chars=${promptContent.length}`);
 
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      opencodeBin,
-      cmdArgs,
-      {
-        cwd: work_dir,
-        timeout: timeout_ms,
-        maxBuffer: 10 * 1024 * 1024,
-        env: {
-          ...process.env,
-          HARNESS_ROLE: role,
-          HARNESS_JOB_ID: prompt_file.split("/").pop()?.replace(".md", "") || "",
-        },
+  return new Promise((resolve) => {
+    const child = spawn(opencodeBin, cmdArgs, {
+      cwd: work_dir,
+      env: {
+        ...process.env,
+        HARNESS_ROLE: role,
+        HARNESS_JOB_ID: prompt_file.split("/").pop()?.replace(".md", "") || "",
+      },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    // Pipe the prompt as the run message (opencode reads non-TTY stdin as the
+    // message via resolveRunInput). Ignore EPIPE — the child may exit early.
+    if (child.stdin) {
+      child.stdin.on("error", () => { /* child may have exited early */ });
+      child.stdin.write(promptContent);
+      child.stdin.end();
+    }
+
+    // Register PID for runaway watchdog (direct SIGTERM instead of pkill -f)
+    if (jobId) {
+      const session = activeSessions.get(jobId);
+      if (session) {
+        session.pid = child.pid;
+        log("info", `opencode pid=${child.pid} registered for watchdog (job=${jobId.slice(0, 8)})`);
       }
-    );
+    }
 
-    return { exitCode: 0, stdout, stderr };
-  } catch (error: any) {
-    return {
-      exitCode: error.code || 1,
-      stdout: error.stdout || "",
-      stderr: error.stderr || error.message,
-    };
-  }
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    child.stdout?.on('data', (data: Buffer) => { stdout += data.toString(); });
+    child.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+      // Give it 5s to exit gracefully, then force-kill
+      setTimeout(() => {
+        try { child.kill('SIGKILL'); } catch { /* already dead */ }
+      }, 5000);
+    }, timeout_ms);
+
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      let exitCode = code ?? 1;
+      let stderrOut = stderr;
+      if (timedOut) {
+        // A signal-killed child reports code=null, which otherwise surfaces
+        // as a misleading '(no stderr; exit 1)'. Mirror the ollama path's
+        // exitCode 124 + message so callers know this was a timeout, and
+        // keep the partial stdout for the caller to surface.
+        exitCode = 124;
+        stderrOut = `opencode timeout after ${timeout_ms}ms — partial output below`;
+      } else if (code === null) {
+        // Killed by a signal outside the timeout (e.g. the 15-min runaway
+        // watchdog or an external kill) — report it honestly too instead of
+        // the generic exit 1.
+        exitCode = 137;
+        stderrOut = 'opencode killed by signal (watchdog or external kill) — partial output below';
+      }
+      if (exitCode === 0) {
+        incrementConsumedUnits(role).catch(() => {});
+      }
+      resolve({ exitCode, stdout, stderr: stderrOut });
+    });
+
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      resolve({ exitCode: 1, stdout, stderr: err.message });
+    });
+  });
 }
 
 // ── Outcome helpers ─────────────────────────────────────────────────
@@ -510,6 +1067,7 @@ const server = app.listen(PORT, () => {
   console.log(`[harness-srv] work dir: ${WORK_DIR}`);
   console.log(`[harness-srv] prompt dir: ${PROMPT_DIR}`);
   log("info", `listening on port ${PORT} (work dir: ${WORK_DIR}, log: ${LOG_FILE})`);
+  startWatchdog();
 });
 
 server.on('error', (err: NodeJS.ErrnoException) => {

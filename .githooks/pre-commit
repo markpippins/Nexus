@@ -16,4 +16,65 @@ if ! "$PYTHON" "$REPO_ROOT/tools/arl_linter.py" "$REPO_ROOT"; then
 fi
 
 echo "[CIR-ARL] PASS — No CIR v2 violations detected"
+
+# ---------------------------------------------------------------------------
+# Seed-drift gate — keep the procedure-card seed honest against the live DB.
+#
+# bin/regenerate_memory_seed.py --verify re-renders typescript/tackle-seeds/
+# from the live tackle.memory table (the DB is canonical), rebuilds the
+# package dist, and shadow-compares every card byte-for-byte. If the seed had
+# drifted, the generator rewrites the worktree copy to match live — so we
+# block the commit here and ask for a re-stage (otherwise the stale staged
+# version would be committed while the worktree held the fresh copy).
+#
+# Scoped to seed-relevant staged paths so unrelated commits stay fast
+# (mirrors the pre-push hook's range-aware style). The always-on CI guard for
+# the committed state is wr-conf-006 (test_conformance_seed_guard.py). If the
+# DB or node is unavailable we skip with a warning rather than block every
+# commit — the guard is a safety net, not a hard environment requirement.
+# ---------------------------------------------------------------------------
+SEED_WATCH_RE='^(typescript/tackle-seeds/|bin/regenerate_memory_seed\.py|typescript/tackle-srv/src/db\.ts|typescript/tackle-mcp/src/db\.ts|\.githooks/pre-commit)'
+
+if git diff --cached --name-only | grep -qE "$SEED_WATCH_RE"; then
+  if ! command -v node >/dev/null 2>&1; then
+    echo "[seed-guard] skipping (node not available — seed cannot be rendered)"
+  elif ! "$PYTHON" -c '
+import os, sys
+
+try:
+    import psycopg2
+    psycopg2.connect(
+        os.environ.get("CONDUIT_PG_DSN",
+                        "postgresql://pguser:pgpass@localhost:5432/nexus"),
+        connect_timeout=3,
+    )
+except Exception:
+    sys.exit(1)
+' >/dev/null 2>&1; then
+    echo "[seed-guard] skipping (live DB unreachable — run \"python3 bin/regenerate_memory_seed.py --verify\" manually when the DB is up)"
+  else
+    echo "[seed-guard] seed-relevant files staged — verifying seed against live DB"
+    if ! "$PYTHON" "$REPO_ROOT/bin/regenerate_memory_seed.py" --verify; then
+      echo ""
+      echo "[seed-guard] COMMIT BLOCKED — the seed could not be verified/regenerated (see output above)."
+      echo "[seed-guard] Fix: run  python3 bin/regenerate_memory_seed.py --verify  and investigate the failure."
+      echo "[seed-guard] (DB and node must be reachable; use --no-verify only if the drift is intentional)"
+      exit 1
+    fi
+    # The generator writes the seed from the live DB; if that rewrote the
+    # working tree, the index still holds the stale version. Block until the
+    # fresh seed is staged.
+    if ! git diff --quiet -- typescript/tackle-seeds/; then
+      echo ""
+      echo "[seed-guard] COMMIT BLOCKED — the seed was regenerated from the live DB (it had drifted)."
+      echo "[seed-guard] The fresh copy is in your worktree but NOT staged."
+      echo "[seed-guard] Fix:  git add typescript/tackle-seeds/  then commit again."
+      exit 1
+    fi
+    echo "[seed-guard] PASS — seed matches live DB"
+  fi
+else
+  echo "[seed-guard] no seed-relevant files staged — skipping"
+fi
+
 exit 0

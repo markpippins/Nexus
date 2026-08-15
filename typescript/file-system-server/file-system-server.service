@@ -1,5 +1,5 @@
 [Unit]
-Description=File System Server — filesystem operations (edit-ui)
+Description=File System Server — filesystem operations (monaco-judge)
 Documentation=https://github.com/nexus/typescript/file-system-server
 After=network.target
 

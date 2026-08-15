@@ -185,7 +185,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedDetailItem = signal<FileSystemNode | null>(null);
   connectionStatus = signal<ConnectionStatus>('disconnected');
   refreshPanes = signal(0);
-  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'edit-ui' | 'wind-ui' | 'nebula-cp' | 'semantics-ui' | 'throttler-ui' | 'barbie' | 'monaco-judge' | 'conduit-legacy-ui' | 'data-explorer'>('file-explorer');  // Default to file explorer
+  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'wind-ui' | 'nebula-cp' | 'semantics-ui' | 'throttler-ui' | 'barbie' | 'monaco-judge' | 'conduit-legacy-ui' | 'data-explorer'>('file-explorer');  // Default to file explorer
   meshViewMode = signal<'console' | 'graph'>('console');  // Sub-mode when in service-mesh
   graphBackgroundColor = signal('#000510');  // Graph background color
   graphSubView = signal<'canvas' | 'creator'>('canvas');  // Sub-view when in graph mode (canvas vs creator)
@@ -207,7 +207,6 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     'cascade-ui': 'http://localhost:4203',
     'execution-ui': 'http://localhost:4205',
     'vision-ui': 'http://localhost:4208',
-    'edit-ui': 'http://localhost:4223',
     'wind-ui': 'http://localhost:4209',
     'nebula-cp': 'http://localhost:4014',
     'semantics-ui': 'http://localhost:4213',
@@ -230,7 +229,6 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.currentViewMode() === 'cascade-ui' ||
     this.currentViewMode() === 'execution-ui' ||
     this.currentViewMode() === 'vision-ui' ||
-    this.currentViewMode() === 'edit-ui' ||
     this.currentViewMode() === 'wind-ui' ||
     this.currentViewMode() === 'nebula-cp' ||
     this.currentViewMode() === 'semantics-ui' ||
@@ -263,7 +261,6 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     'data-explorer',
     'duality',
     'plurality',
-    'edit-ui',
     'monaco-judge',
     'assembly',
   ]);
@@ -1921,6 +1918,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onMeshViewModeChange(mode: 'console' | 'graph'): void {
     this.meshViewMode.set(mode);
+    // The object inspector lives in the left sidebar in graph mode, so the
+    // right details pane is not needed there — hide it when entering the view.
+    if (mode === 'graph') {
+      this.uiPreferencesService.setDetailPaneOpen(false);
+    }
   }
 
   onGraphSubViewChange(view: 'canvas' | 'creator'): void {

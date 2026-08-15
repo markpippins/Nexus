@@ -10,6 +10,8 @@ import {
   BookOpen,
   Layers
 } from 'lucide-react';
+import { showToast } from '../components/Toast';
+import { showConfirm } from '../components/ConfirmDialog';
 import { TaskDefinition, PromptTemplate, SystemRole } from '../types';
 
 interface TasksTabProps {
@@ -79,16 +81,16 @@ export const TasksTab: React.FC<TasksTabProps> = ({
       });
       setTaskModalOpen(false);
     } catch (err) {
-      alert(`Error saving task: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error saving task: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
   const handleDelete = async (task: TaskDefinition) => {
-    if (!confirm(`Delete task "${task.task_slug}"? Scheduled jobs attached to it will fall back to the role's default persona.`)) return;
+    if (!(await showConfirm(`Delete task "${task.task_slug}"? Scheduled jobs attached to it will fall back to the role's default persona.`))) return;
     try {
       await onDeleteTask(task);
     } catch (err) {
-      alert(`Error deleting task: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error deleting task: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 

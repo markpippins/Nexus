@@ -2,7 +2,6 @@ import { Component, ChangeDetectionStrategy, input, output, ViewEncapsulation } 
 import { CommonModule } from '@angular/common';
 import { ViewMode } from '../bottom-bar/bottom-bar.component.js';
 import { OrbComponent } from '../orb/orb.component.js';
-import { Theme } from '../services/ui-preferences.service.js';
 
 export interface NavItem {
   key: ViewMode;
@@ -159,12 +158,6 @@ export const NAV_ITEMS: NavItemOrSeparator[] = [
 
   // ── Code & editing ────────────────────────────────────────────
   {
-    type: 'item', key: 'edit-ui',
-    label: 'Code Editor',
-    title: 'Code Editor',
-    iconPath: 'M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125',
-  },
-  {
     type: 'item', key: 'monaco-judge',
     label: 'Monaco Judge',
     title: 'Monaco Judge',
@@ -194,12 +187,8 @@ export const NAV_ITEMS: NavItemOrSeparator[] = [
 export class NavToolbarComponent {
   /** Current view mode to highlight the active button */
   viewMode = input<ViewMode>('file-explorer');
-  /** Current theme for the toggle button icon */
-  theme = input<Theme>('theme-steel');
   /** Emitted when the user clicks a navigation button */
   viewModeChange = output<ViewMode>();
-  /** Emitted when the user clicks the theme toggle */
-  themeChange = output<Theme>();
 
   /** Whether the nav toolbar is collapsed */
   collapsed = input(false);
@@ -207,14 +196,6 @@ export class NavToolbarComponent {
   collapseToggled = output<void>();
 
   readonly navItems = NAV_ITEMS;
-  readonly THEME_CYCLE: Theme[] = ['theme-steel', 'theme-light', 'theme-dark'];
-
-  toggleTheme(): void {
-    const current = this.theme();
-    const idx = this.THEME_CYCLE.indexOf(current);
-    const next = this.THEME_CYCLE[(idx + 1) % this.THEME_CYCLE.length];
-    this.themeChange.emit(next);
-  }
 
   onCollapseToggle(): void {
     this.collapseToggled.emit();

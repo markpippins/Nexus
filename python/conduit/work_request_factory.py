@@ -95,7 +95,7 @@ def _build_files_affected(plan: Dict[str, Any]) -> List[ProducedFile]:
 def _build_safety_constraints() -> List[str]:
     constraints = [
         "Do not delete or overwrite historical plan artifacts",
-        "Do not modify .conduit-data/ directory structure",
+        "Do not modify nexus/audit/CONDUIT_DATA/ (mirror of the deleted .conduit-data)",
         "Preserve existing receipt and audit records",
         "Follow existing project conventions when editing code",
     ]

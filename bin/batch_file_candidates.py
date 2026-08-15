@@ -30,10 +30,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from tackle.inference import call_llm
 from event_emitter import emit_candidate_discovered
 from nebula_utils import unwrap_systems_response
+from detect_truncated_transcripts import truncated_filenames
 
 log = logging.getLogger("batch_file_candidates")
 
 PROJECT_ROOT = Path("/home/codex/dev")
+CHATS_DIR = PROJECT_ROOT / "chats"
 DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
 NEBULA_API = "http://localhost:3101/api"
 # Model config resolved via tackle-mcp (role: Rover)
@@ -209,13 +211,34 @@ def summarize_docklang(docklang: dict) -> str:
     return "\n".join(parts)
 
 
-def get_unfiled_harvests(limit: int = None, skip_unchanged: bool = False) -> tuple[list[dict], list[str]]:
+def get_truncated_filenames() -> set[str]:
+    """Return the set of truncated source transcript filenames (best-effort).
+
+    Reuses the same first-turn detection as the running-reference report
+    (detect_truncated_transcripts.py).  Fail-open: if detection is unavailable
+    (missing dir, bad import, etc.), return an empty set so candidate
+    generation is never blocked by a detection outage.
+    """
+    try:
+        return truncated_filenames(str(CHATS_DIR))
+    except Exception as e:
+        log.warning("Truncated-source detection unavailable (%s); guard disabled", e)
+        return set()
+
+
+def get_unfiled_harvests(limit: int = None, skip_unchanged: bool = False,
+                         skip_truncated: bool = True) -> tuple[list[dict], list[str]]:
     """Query harvests with docklang that have no existing candidates.
     Uses direct SQL exclusion (NOT IN subquery) — immune to API limits.
     
     If skip_unchanged=True, also excludes harvests whose same-filename
     predecessor at the same file_size already has candidates (re-ingestion
-    of unchanged content). Returns (harvests, skipped_filenames).
+    of unchanged content).
+
+    If skip_truncated=True (default), excludes harvests whose source transcript
+    starts mid-conversation (first turn is an assistant/model reply) — those
+    sources have broken provenance and must not seed candidates.
+    Returns (harvests, skipped_filenames).
     """
     sql = """
     SELECT h.id, h.source_filename, h.file_size
@@ -245,6 +268,23 @@ def get_unfiled_harvests(limit: int = None, skip_unchanged: bool = False) -> tup
                     except ValueError:
                         pass
                 harvests.append(h)
+
+    # Truncated-source guard: skip harvests whose source transcript's first
+    # turn is an assistant/model turn (mid-conversation capture = broken
+    # provenance). Applied before reharvest/dedup so truncated sources never
+    # seed candidates regardless of size or duplication state.
+    truncated_skipped = []
+    if skip_truncated:
+        truncated_set = get_truncated_filenames()
+        if truncated_set:
+            remaining = []
+            for h in harvests:
+                if h["filename"] in truncated_set:
+                    log.info("  Skip (truncated): %s", h["filename"])
+                    truncated_skipped.append(h["filename"])
+                else:
+                    remaining.append(h)
+            harvests = remaining
 
     # Also query total for logging
     rc2, out2 = psql("SELECT COUNT(*) FROM nebula.harvests WHERE docklang IS NOT NULL;")
@@ -316,13 +356,15 @@ def get_unfiled_harvests(limit: int = None, skip_unchanged: bool = False) -> tup
             harvests = remaining
 
     log.info("Unfiled: %d / %d harvests (direct SQL exclusion)", len(harvests), total)
+    if truncated_skipped:
+        log.info("Skipped (truncated source): %d", len(truncated_skipped))
     if skipped:
         log.info("Skipped (unchanged/smaller): %d", len(skipped))
     if reharvested:
         log.info("Reharvest (larger version): %d", len(reharvested))
     if dedup_skipped:
         log.info("Skipped (pre-inference dedup): %d", len(dedup_skipped))
-    all_skipped = skipped + dedup_skipped
+    all_skipped = truncated_skipped + skipped + dedup_skipped
     if limit:
         harvests = harvests[:limit]
     return harvests, all_skipped
@@ -451,6 +493,11 @@ def main():
                         help="Publish harvests to Assembly forum after creating candidates")
     parser.add_argument("--skip-unchanged", action="store_true", default=False,
                         help="Skip harvests whose same-filename predecessor at same file_size already has candidates")
+    parser.add_argument("--skip-truncated", dest="skip_truncated", action="store_true",
+                        default=True,
+                        help="Skip harvests whose source transcript is truncated (default: on)")
+    parser.add_argument("--no-skip-truncated", dest="skip_truncated", action="store_false",
+                        help="Disable the truncated-source guard")
     args = parser.parse_args()
     
     log.info("=" * 60)
@@ -462,7 +509,8 @@ def main():
         return 1
     hierarchy_text = build_hierarchy_text(systems)
     
-    harvests, skipped = get_unfiled_harvests(args.limit, args.skip_unchanged)
+    harvests, skipped = get_unfiled_harvests(args.limit, args.skip_unchanged,
+                                             args.skip_truncated)
     if not harvests:
         log.info("No unfiled harvests.")
         return 0

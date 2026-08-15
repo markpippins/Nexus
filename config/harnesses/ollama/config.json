@@ -1,0 +1,37 @@
+{
+  "integrations": {
+    "claude": {
+      "models": [
+        "qwen2.5-coder:latest"
+      ]
+    },
+    "codex": {
+      "models": [
+        "qwen3:4b"
+      ]
+    },
+    "hermes": {
+      "models": [
+        "gemini-3-flash-preview"
+      ],
+      "onboarded": true
+    },
+    "openclaw": {
+      "models": [
+        "gemini-3-flash-preview",
+        "nemotron-3-nano:4b"
+      ]
+    },
+    "opencode": {
+      "models": [
+        "deepseek-v4-pro:cloud",
+        "qwen3:4b",
+        "qwen3.5:latest",
+        "nemotron-3-nano:4b",
+        "qwen2.5-coder:latest",
+        "llama3:8b"
+      ]
+    }
+  },
+  "last_selection": "hermes"
+}

@@ -1,0 +1,32 @@
+{
+  "name": "nexus-broker",
+  "version": "0.1.0",
+  "description": "Moleculer worker-tier broker for the consolidated nexus runtime (D-2026-08-14-002)",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "moleculer-runner --hot --repl \"services/**/*.{service,worker}.ts\"",
+    "start": "moleculer-runner --mask \"**/*.js\" dist/services",
+    "build": "tsc",
+    "cli": "moleculer connect NATS",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"tests/**/*.test.js\""
+  },
+  "dependencies": {
+    "dotenv": "^16.4.0",
+    "ioredis": "^5.11.1",
+    "moleculer": "^0.14.34",
+    "moleculer-web": "^0.10.7",
+    "mongodb": "^6.8.0",
+    "node-pty": "^1.1.0",
+    "pg": "^8.13.1",
+    "uuid": "^14.0.1",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.21.0",
+    "moleculer-repl": "^0.7.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

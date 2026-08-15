@@ -16,6 +16,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NEXUS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SYSTEMD_USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 
+# ── Source centralized .env (service target configuration) ─────────────
+# This exports <UNIT>_TARGET variables for all services.
+# See .env.example for the full list of variables.
+if [ -f "${NEXUS_ROOT}/.env" ]; then
+    set -a  # Automatically export all variables
+    source "${NEXUS_ROOT}/.env"
+    set +a
+    echo "Sourced ${NEXUS_ROOT}/.env"
+else
+    echo "WARNING: ${NEXUS_ROOT}/.env not found — using defaults"
+fi
+
 # ── Ordered service list ───────────────────────────────────────────────
 # Infrastructure first, then databases, then backends, then MCPs
 ALL_SERVICES=(
@@ -29,7 +41,7 @@ ALL_SERVICES=(
     "quarkus-broker-gateway.service"  # port 8091 — service broker gateway (Quarkus)
     "helidon-user-access-service.service"  # port 9093 — user access control (Helidon MP)
     "terrain.service"          # port 8084 — topology registry
-    "file-system-server.service"        # port 4042 — file system operations (edit-ui)
+    "file-system-server.service"        # port 4042 — file system operations (monaco-judge)
     "secure-file-system-server.service" # port 4040 — secure file system operations (service-broker)
     "ui-event-bus.service"     # port 3200 — cross-app UI event bus (SSE)
     "peb-kernel.service"       # port 8080 — engineering brain
@@ -72,6 +84,7 @@ ALL_SERVICES=(
     "cpf-api.service"          # port 3108 — CPF funnel data API
     "atlas.service"            # port 8090 — graph views persistence
     "execution-srv.service"    # port 3110 — execution observability REST API
+    "harness-srv.service"      # port 3420 — generic execution harness (Tackle role context + Wind task context)
     "mcp-bridge.service"       # ports 3131-3134 — generic stdio-to-SSE bridge (knowledge/vision/peb/terrain MCPs)
     "tools-aggregator.service" # port 3210 — unified MCP tool-discovery aggregator
     "slash-command-mcp.service" # port 3220 — Phase-2 DSL MCP (command_lookup/execute/completions → aggregator)
@@ -83,6 +96,10 @@ ALL_SERVICES=(
     "semantics-srv.service"      # port 3160 — semantics REST API (semantics.* schema — type-level legend)
     "semantics-mcp.service"      # port 3161 — semantics MCP (→ semantics-srv)
     "apidocs-srv.service"        # port 3180 — API docs index (Swagger UI + ReDoc over all *-srv specs)
+
+    # Consolidated runtime (re-homed fleet — P0-2 remediation)
+    "nexus-control-edge.service" # port 8082 — single AdonisJS HTTP edge (all REST servers re-homed)
+    "nexus-broker.service"       # port 4080 — Moleculer worker tier (harness/pty/execution/solir)
 
     # API servers (non-UI services)
     "wind-srv.service"         # port 3300 — Wind IDE workflow API
@@ -150,10 +167,13 @@ SERVICE_PORTS=(
 ["cpf-api.service"]="3108"
     ["atlas.service"]="8090"
     ["execution-srv.service"]="3110"
+    ["harness-srv.service"]="3420"
     ["mcp-bridge.service"]="3131"     # one of ports 3131-3134 — any bridge target's /health works
     ["tools-aggregator.service"]="3210"
     ["slash-command-mcp.service"]="3220"
     ["service-broker-mcp.service"]="3112"
+    ["nexus-control-edge.service"]="8082"
+    ["nexus-broker.service"]="4080"
     ["wind-srv.service"]="3300"
     ["mildred-dam-api.service"]="3140"
     ["voyager-srv.service"]="3114"
@@ -217,6 +237,16 @@ ON_DEMAND_SERVICES=(
     "terrain-mcp.service"
 )
 
+# Services whose canonical units live at SYSTEM level, not user level.
+# file-system-server + secure-file-system-server were ratified as system-level
+# canonical (decision 793cf1f6); their user-level units were disabled to stop
+# the EADDRINUSE thrash loop against the system-level :4040/:4042 instances.
+# Status/start/stop must operate on the system manager for these.
+SYSTEM_SCOPE_SERVICES=(
+    "file-system-server.service"
+    "secure-file-system-server.service"
+)
+
 # ── Helpers ─────────────────────────────────────────────────────────────
 
 # Check if a service is in an array
@@ -256,21 +286,30 @@ _http_healthy() {
     curl -s --max-time 2 "http://localhost:${port}${path}" >/dev/null 2>&1
 }
 
-# Get systemd SubState for a service
+# Get systemd SubState for a service (system manager for SYSTEM_SCOPE_SERVICES)
 _substate() {
-    systemctl --user show -p SubState --value "$1" 2>/dev/null || echo "-"
+    if _in_array "$1" "${SYSTEM_SCOPE_SERVICES[@]}"; then
+        systemctl show -p SubState --value "$1" 2>/dev/null || echo "-"
+    else
+        systemctl --user show -p SubState --value "$1" 2>/dev/null || echo "-"
+    fi
 }
 
-# Get systemd ActiveState for a service
+# Get systemd ActiveState for a service (system manager for SYSTEM_SCOPE_SERVICES)
 _is_active() {
-    systemctl --user is-active --quiet "$1" 2>/dev/null
+    if _in_array "$1" "${SYSTEM_SCOPE_SERVICES[@]}"; then
+        systemctl is-active --quiet "$1" 2>/dev/null
+    else
+        systemctl --user is-active --quiet "$1" 2>/dev/null
+    fi
 }
 
 # ── Commands ────────────────────────────────────────────────────────────
 
 cmd_start_all() {
     echo "=== Starting Nexus Services ==="
-    systemctl --user daemon-reload
+    systemctl --user daemon-reload 2>/dev/null || true
+    systemctl daemon-reload 2>/dev/null || true
     for svc in "${ALL_SERVICES[@]}"; do
         echo -n "  $svc ... "
         if _is_active "$svc"; then
@@ -288,7 +327,11 @@ cmd_start_all() {
                 echo "already running"
             fi
         else
-            systemctl --user start "$svc" 2>&1 | tail -1 || echo "FAILED"
+            if _in_array "$svc" "${SYSTEM_SCOPE_SERVICES[@]}"; then
+                systemctl start "$svc" 2>&1 | tail -1 || echo "FAILED"
+            else
+                systemctl --user start "$svc" 2>&1 | tail -1 || echo "FAILED"
+            fi
             sleep 0.5
         fi
     done
@@ -430,7 +473,11 @@ cmd_stop_all() {
     for svc in "${ALL_SERVICES[@]}"; do
         echo -n "  $svc ... "
         if _is_active "$svc"; then
-            systemctl --user stop "$svc" 2>&1 | tail -1 || echo "FAILED"
+            if _in_array "$svc" "${SYSTEM_SCOPE_SERVICES[@]}"; then
+                systemctl stop "$svc" 2>&1 | tail -1 || echo "FAILED"
+            else
+                systemctl --user stop "$svc" 2>&1 | tail -1 || echo "FAILED"
+            fi
         else
             echo "not running"
         fi
@@ -465,7 +512,11 @@ cmd_enable_all() {
             continue
         fi
         echo -n "  $svc ... "
-        systemctl --user enable "$svc" 2>&1 | tail -1 || echo "FAILED"
+        if _in_array "$svc" "${SYSTEM_SCOPE_SERVICES[@]}"; then
+            systemctl enable "$svc" 2>&1 | tail -1 || echo "FAILED"
+        else
+            systemctl --user enable "$svc" 2>&1 | tail -1 || echo "FAILED"
+        fi
     done
 }
 

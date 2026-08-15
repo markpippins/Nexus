@@ -4,12 +4,15 @@ Deduplication Gate for the front-half pipeline.
 
 Checks harvest candidates against four sources before promotion:
 1. implementation_plans — work that was planned in the new system
-2. work_request_history — work that was planned in the old system
+2. work_requests — work that was planned (canonical, via nebula.work_requests VIEW)
 3. intent_records — work captured as intent
 4. git history — work that was actually committed
 
 Usage:
     python3 dedup_gate.py [--dry-run] [--verbose] [--threshold 0.8]
+
+Note: The legacy nebula.work_request_history table was dropped in 2026-08-11;
+all 1,880 rows were migrated into nebula.work_requests_history (canonical).
 """
 
 import json
@@ -72,18 +75,18 @@ def check_implementation_plans(cur, title: str, threshold: float = 0.8) -> dict 
 
 
 def check_work_request_history(cur, title: str, threshold: float = 0.8) -> dict | None:
-    """Check if title matches a historical work request."""
+    """Check if title matches an existing work request (via canonical VIEW)."""
     cur.execute("""
-        SELECT id, plan_number, title,
+        SELECT id, plan_id, title,
                similarity(title, %s) as score
-        FROM nebula.work_request_history
+        FROM nebula.work_requests
         WHERE similarity(title, %s) > %s
         ORDER BY score DESC
         LIMIT 1
     """, (title, title, threshold))
     row = cur.fetchone()
     if row:
-        return {"source": "work_request_history", "id": row[0], "title": row[2], "score": float(row[3])}
+        return {"source": "work_requests", "id": str(row[0]), "title": row[2], "score": float(row[3])}
     return None
 
 
@@ -131,7 +134,7 @@ def classify_candidate(cur, title: str, threshold: float = 0.8) -> DedupResult:
     # Check in priority order: implementation_plans > work_requests > intent_records > git
     for check_fn, source_name in [
         (lambda: check_implementation_plans(cur, title, threshold), "implementation_plan"),
-        (lambda: check_work_request_history(cur, title, threshold), "work_request_history"),
+        (lambda: check_work_request_history(cur, title, threshold), "work_requests"),
         (lambda: check_intent_records(cur, title, threshold), "intent_record"),
         (lambda: check_git_history(title), "git"),
     ]:

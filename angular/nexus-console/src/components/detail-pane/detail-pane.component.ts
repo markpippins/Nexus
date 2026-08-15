@@ -6,13 +6,12 @@ import { RssFeedComponent } from '../rss-feed/rss-feed.component.js';
 import { WebviewService } from '../../services/webview.service.js';
 import { UiPreferencesService } from '../../services/ui-preferences.service.js';
 import { ServiceMeshService } from '../../services/service-mesh.service.js';
-import { ObjectInspectorComponent } from '../object-inspector/object-inspector.component.js';
 import { ComponentPreviewComponent } from '../component-preview/component-preview.component.js';
 
 @Component({
   selector: 'app-detail-pane',
   templateUrl: './detail-pane.component.html',
-  imports: [CommonModule, RssFeedComponent, ObjectInspectorComponent, ComponentPreviewComponent],
+  imports: [CommonModule, RssFeedComponent, ComponentPreviewComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DetailPaneComponent implements OnDestroy {

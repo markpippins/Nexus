@@ -374,6 +374,7 @@ instancesRouter.post('/:id/advance', async (req, res, next) => {
  *   4. Repeat until no PENDING tickets or instance is COMPLETED
  *   5. Return the full execution log
  */
+// Run an instance to completion (loop: execute → advance → … until terminal).
 instancesRouter.post('/:id/run', async (req, res, next) => {
   try {
     const { max_steps = 10, timeout_ms = 120_000 } = req.body;

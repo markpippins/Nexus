@@ -102,7 +102,8 @@ def run():
         check(f"kernel.{tbl} has trigger {trig}",
               result is not None and int(result) > 0)
 
-    print("\n--- Vision Receipt Triggers ---")
+    print("\n--- Governance Receipt Triggers (execution, not vision) ---")
+    # D-T19-2c (V099): governance projection moved vision.receipts → execution.receipts.
     for view, fn in [
         ("receipts", "receipt_governance_trigger"),
     ]:
@@ -111,12 +112,25 @@ def run():
             JOIN pg_class c ON t.tgrelid = c.oid
             JOIN pg_namespace n ON c.relnamespace = n.oid
             JOIN pg_proc p ON t.tgfoid = p.oid
-            WHERE n.nspname = 'vision'
+            WHERE n.nspname = 'execution'
               AND c.relname = '{view}'
               AND p.proname = '{fn}';
         """)
-        check(f"vision.{view} has trigger {fn}",
+        check(f"execution.{view} has trigger {fn}",
               result is not None and int(result) > 0)
+
+    # Negative assertion: vision.receipts must NOT carry the retired governance trigger.
+    result = query("""
+        SELECT COUNT(*) FROM pg_trigger t
+        JOIN pg_class c ON t.tgrelid = c.oid
+        JOIN pg_namespace n ON c.relnamespace = n.oid
+        JOIN pg_proc p ON t.tgfoid = p.oid
+        WHERE n.nspname = 'vision'
+          AND c.relname = 'receipts'
+          AND p.proname = 'receipt_governance_trigger';
+    """)
+    check("vision.receipts does NOT have trigger receipt_governance_trigger",
+          result is not None and int(result) == 0)
 
     print("\n--- Open Question Trigger ---")
     result = query("""
@@ -205,10 +219,14 @@ def run():
           result is not None and int(result) > 0)
 
     print("\n--- Cascade Publish Log ---")
-    result = query("SELECT COUNT(*) FROM cascade.nats_publish_log;")
-    check("cascade.nats_publish_log has rows",
-          result is not None and int(result) > 0,
-          f"0 rows — cascade subscribers may not be running" if result == "0" else "")
+    result = query("SELECT to_regclass('cascade.nats_publish_log');")
+    if result is None:
+        check("cascade.nats_publish_log retirement query", False,
+              "catalog query failed")
+    else:
+        check("cascade.nats_publish_log retired",
+              result in ("", "\\N"),
+              f"unexpected live table: {result}" if result not in ("", "\\N") else "")
 
     print("\n--- C-1: execution.receipts CHECK includes CCNF_EXECUTION ---")
     result = query("""

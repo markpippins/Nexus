@@ -8,6 +8,8 @@
 
 import { Pool } from "pg";
 import Redis from "ioredis";
+import { opencodeModelId, opencodeProviderFromConfig } from "./model";
+import { decideConfigAdmission, type ConfigAdmission } from "./admission";
 
 const pool = new Pool({
   host: process.env.PG_HOST || "localhost",
@@ -88,6 +90,8 @@ export interface ResolvedModelConfig {
   harness_id: string;
   harness_name: string;
   invocation_semantics: Record<string, any>;
+  /** config_bundle invocation_mode: CLI | HTTP | SDK | MCP | INTERACTIVE */
+  invocation_mode: string;
   fallback_models: ResolvedFallbackModel[];
   /** opencode --model value computed from model_identifier */
   opencode_model_id: string;
@@ -106,28 +110,6 @@ export interface ResolvedFallbackModel {
 }
 
 /**
- * Map a tackle provider + model_identifier to the opencode --model value.
- *
- * opencode config keys its provider models by the wire model ID, and the
- * wire `model` field is the map key verbatim — so the opencode model ID is
- * `<opencode-provider>/<wire-id>`:
- *   - Nvidia:    identifier already namespaced (nvidia/x, z-ai/x) → nvidia/nvidia/x
- *   - DeepSeek:  identifier already namespaced (deepseek-ai/x)     → deepseek-ai/deepseek-ai/x
- *   - OpenCode:  bare identifier (big-pickle)                      → opencode/big-pickle
- *   - OpenCode Go: bare identifier (gemini-3.5-flash)              → opencode-go/gemini-3.5-flash
- *   - Ollama:    bare identifier (qwen2.5-coder)                   → ollama/qwen2.5-coder
- *   - OpenRouter: bare identifier (gpt-oss-120b)                   → openrouter/gpt-oss-120b
- */
-const OPENCODE_PROVIDER_BY_TACKLE: Record<string, string> = {
-  "prov-1783906359513": "nvidia", // Nvidia
-  "prov-1782144397043": "openrouter", // OpenRouter
-  "prov-opencode-go": "opencode-go",
-  "prov-opencode": "opencode",
-  "prov-ollama": "ollama",
-  "prov-deepseek": "deepseek-ai",
-};
-
-/**
  * Provider preference rank for fallback ordering — matches the operating
  * ladder: Nvidia first, then free OpenRouter, then free OpenCode Go,
  * then OpenCode (big-pickle), then Ollama (local, last resort), and the
@@ -141,20 +123,6 @@ const PROVIDER_RANK: Record<string, number> = {
   "prov-ollama": 4, // Ollama
   "prov-deepseek": 5, // DeepSeek (key currently invalid)
 };
-
-export function opencodeModelId(providerId: string, modelIdentifier: string): string {
-  const slash = modelIdentifier.indexOf("/");
-  if (slash > 0) {
-    // Already namespaced (nvidia/x, z-ai/x, deepseek-ai/x) — the opencode
-    // provider name is the first segment of the wire id, and the model key
-    // is the full wire id: nvidia/nvidia/x, z-ai/z-ai/x, deepseek-ai/deepseek-ai/x.
-    return modelIdentifier.slice(0, slash) + "/" + modelIdentifier;
-  }
-  // Bare identifier — map the tackle provider to its opencode provider.
-  const opencodeProvider = OPENCODE_PROVIDER_BY_TACKLE[providerId];
-  if (!opencodeProvider) return modelIdentifier; // unknown provider — pass through
-  return `${opencodeProvider}/${modelIdentifier}`;
-}
 
 // ── Resolution functions ────────────────────────────────────────────
 
@@ -263,6 +231,7 @@ export async function resolveRoleModel(role: string): Promise<ResolvedModelConfi
             p.name AS provider_name,
             COALESCE(p.type, '') AS provider_type,
             p.api_key,
+            p.config_json AS provider_config_json,
             COALESCE(cb.endpoint_url, p.endpoint_url) AS endpoint_url,
             COALESCE(h.id, '') AS harness_id,
             COALESCE(h.name, '') AS harness_name,
@@ -274,6 +243,8 @@ export async function resolveRoleModel(role: string): Promise<ResolvedModelConfi
      LEFT JOIN tackle.providers p  ON COALESCE(cb.provider_id, m.provider_id) = p.id
      LEFT JOIN tackle.harnesses h  ON COALESCE(cb.harness_id, m.harness_id) = h.id
      WHERE cb.role = $1 AND cb.is_active = 1
+       AND (cb.valid_from IS NULL OR cb.valid_from <= NOW())
+       AND (cb.valid_to IS NULL OR cb.valid_to > NOW())
      ORDER BY cb.priority ASC`,
     [role]
   );
@@ -315,9 +286,34 @@ export async function resolveRoleModel(role: string): Promise<ResolvedModelConfi
     harness_id: primary.harness_id ?? "",
     harness_name: primary.harness_name ?? "",
     invocation_semantics: parseJson(primary.invocation_semantics),
+    invocation_mode: primary.invocation_mode ?? "",
     fallback_models: fallbacks,
-    opencode_model_id: opencodeModelId(primary.provider_id ?? "", primary.model_identifier),
+    opencode_model_id: opencodeModelId(
+      primary.provider_id ?? "",
+      primary.model_identifier,
+      opencodeProviderFromConfig(primary.provider_config_json)
+    ),
   };
+}
+
+/**
+ * Check whether a role is admissible via its config_bundle validity.
+ *
+ * Distinguishes three denial reasons (T20 admission gate):
+ *   - NO_CONFIG           — no config_bundle rows for the role
+ *   - ROLE_REVOKED        — bundles exist but all is_active=0
+ *   - CONFIG_INVALIDATED  — active bundles but none within valid_from/valid_to
+ */
+export async function checkConfigAdmission(role: string): Promise<ConfigAdmission> {
+  const result = await pool.query(
+    `SELECT is_active,
+            (valid_from IS NOT NULL AND valid_from > NOW()) AS not_yet_valid,
+            (valid_to IS NOT NULL AND valid_to <= NOW()) AS expired
+     FROM tackle.config_bundle
+     WHERE role = $1`,
+    [role]
+  );
+  return decideConfigAdmission(result.rows as any[]);
 }
 
 /**
@@ -453,3 +449,76 @@ export async function emitEvent(params: {
 }
 
 export { pool, redis };
+
+// ── Role-lease guard (RoleLeases plan 1286, slice 3) ─────────────────
+
+export interface RoleLeaseStatus {
+  id: string;
+  role: string;
+  channel: string;
+  status: string;
+  window_end: string;
+  budget_units: number | null;
+  consumed_units: number;
+  expired: boolean;
+  exhausted: boolean;
+}
+
+/**
+ * Check whether a role has an active lease in tackle.role_leases.
+ *
+ * Returns null when no ACTIVE lease exists (role has not been leased).
+ * Returns the lease with computed `expired` (past window_end) and
+ * `exhausted` (budget consumed) flags so callers can decide whether
+ * to proceed, warn, or reject.
+ */
+export async function checkRoleLease(role: string): Promise<RoleLeaseStatus | null> {
+  const result = await pool.query(
+    `SELECT id, role, channel, status,
+            window_end, budget_units, consumed_units,
+            NOW() > window_end AS expired,
+            (budget_units IS NOT NULL AND consumed_units >= budget_units) AS exhausted
+     FROM tackle.role_leases
+     WHERE role = $1 AND status = 'ACTIVE'
+     LIMIT 1`,
+    [role]
+  );
+  if (result.rows.length === 0) return null;
+  return result.rows[0] as RoleLeaseStatus;
+}
+
+/**
+ * Increment consumed_units on the active role lease via the canonical
+ * POST /api/role-leases/consume endpoint (nebula-srv).
+ *
+ * Unified accounting: all three execution channels (execution_worker,
+ * harness-srv, interactive) hit the same endpoint, so lease accounting
+ * is a single canonical event rather than three copies of the same SQL.
+ *
+ * Idempotent — no-op when no ACTIVE lease exists for the role.
+ */
+export async function incrementConsumedUnits(role: string): Promise<void> {
+  const nebulaUrl = process.env.NEBULA_URL || "http://localhost:3101";
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5_000);
+  try {
+    await fetch(`${nebulaUrl}/api/role-leases/consume`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ── Governance receipts (vision.receipts → peb.governance_events) ──
+// The harness/Wind channel was the last unverified execution channel for
+// governance events (it only wrote cascade.events). The receipt payload
+// builder + best-effort emitter live in the side-effect-free
+// ./governance module so unit tests can load them without constructing
+// db/redis clients; index.ts imports emitGovernanceReceipt via this
+// re-export.
+export { buildGovernanceReceiptPayload, emitGovernanceReceipt } from "./governance";
+export type { GovernanceReceiptParams } from "./governance";

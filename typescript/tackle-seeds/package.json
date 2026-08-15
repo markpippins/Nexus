@@ -1,0 +1,18 @@
+{
+  "name": "tackle-seeds",
+  "version": "1.0.0",
+  "description": "Canonical seed SQL for the tackle procedure-card registry (tackle.memory / tackle.role_memory). Single source of truth shared by tackle-srv and tackle-mcp; the seed body is generated from the live DB by nexus/bin/regenerate_memory_seed.py — do not hand-edit the template literal.",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "prebuild": "rm -rf dist",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0"
+  }
+}

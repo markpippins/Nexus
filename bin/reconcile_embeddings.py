@@ -48,7 +48,8 @@ from embed_util import (
 
 log = logging.getLogger("reconcile_embeddings")
 
-WORK_REQUESTS_DIR = Path("/home/codex/dev/nexus/.conduit-data/WORK_REQUESTS")
+# .conduit-data deleted 2026-08-09; mirror is the posterity home
+WORK_REQUESTS_DIR = Path("/home/codex/dev/nexus/audit/CONDUIT_DATA/WORK_REQUESTS")
 
 LOG_DIR = Path("/home/codex/dev/nexus/logs")
 LOG_DIR.mkdir(parents=True, exist_ok=True)

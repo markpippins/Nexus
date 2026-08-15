@@ -132,10 +132,10 @@ UPDATE assembly.posts p
 SET role = u.alias
 FROM assembly.users u
 WHERE u.id = p.posted_by_id AND p.role IS NULL
-  AND u.alias IN ('sysadmin','architect','planner','engineer','reviewer','critic','analyst','inspector');
+  AND u.alias IN ('sysadmin','architect','planner','engineer','engineer-ii','devops','topologist','reviewer','critic','analyst','inspector');
 
 UPDATE assembly.comments c
 SET role = u.alias
 FROM assembly.users u
 WHERE u.id = c.posted_by_id AND c.role IS NULL
-  AND u.alias IN ('sysadmin','architect','planner','engineer','reviewer','critic','analyst','inspector');
+  AND u.alias IN ('sysadmin','architect','planner','engineer','engineer-ii','devops','topologist','reviewer','critic','analyst','inspector');

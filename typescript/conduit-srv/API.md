@@ -5,7 +5,7 @@
 
 REST surface of the conduit pipeline orchestrator: workflows, tickets, tokens, config (cron, failure-recovery), governance (replay, events), vision, and session log. The MCP tool surface is served separately (Streamable HTTP JSON-RPC on the same port).
 
-**18 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**20 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -27,6 +27,8 @@ REST surface of the conduit pipeline orchestrator: workflows, tickets, tokens, c
 | POST | `/vision/work-requests` | POST /vision/work-requests — create or upsert a work request |
 | GET | `/vision/work-requests/:id` | GET /vision/work-requests/:id — get a single work request |
 | GET | `/workflows` |  |
+| GET | `/wr/:id/projection-drift` |  |
+| GET | `/wr/drift-scan` |  |
 
 ## Regeneration
 

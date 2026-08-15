@@ -410,3 +410,66 @@ class WRPProjectionBuilder:
             acceptance_criteria=acceptance_criteria,
             dependencies=dependencies,
         )
+
+
+# ── 10. Conformance: IR/kernel-path opcode extraction ─────────────────
+#
+# The IR/kernel path encodes opcodes as WRP state transitions in
+# WRPProjection.state_history. Each entry's receipt_type and to_state
+# form one (receipt, state) opcode pair. extract_ir_opcodes() lifts this
+# sequence into the same structural shape as the MEEP path's
+# extract_meep_opcodes() so the two paths can be compared by the
+# conformance oracle without coupling to either path's internals.
+#
+# Design invariants:
+# - Pure function, deterministic, no IO.
+# - Same projection → same opcode list every call (I3).
+# - Only applied receipts contribute (skipped transitions are excluded so
+#   the equivalence oracle compares the effectual opcode sequence).
+
+
+def extract_ir_opcodes(projection: WRPProjection) -> list[dict]:
+    """Extract a deterministic opcode sequence from an IR/kernel projection.
+
+    The IR/kernel path encodes opcodes as WRP state-history entries. The
+    opcode sequence is the ordered list of ``(receipt_type, to_state)``
+    pairs that were *applied* (valid transitions only) — this matches the
+    MEEP path's extract_meep_opcodes() which lists emitted events only.
+
+    Determinism invariant: for the same WRPProjection, this function
+    always returns the same list (structural equality, no timestamps).
+
+    Args:
+        projection: The WRPProjection from WRPProjectionBuilder.reduce().
+
+    Returns:
+        Ordered list of ``{"receipt": str, "state": str}`` dicts — one
+        per *applied* state-history entry.
+    """
+    return [
+        {"receipt": event.receipt_type, "state": event.to_state}
+        for event in projection.state_history
+        if event.valid
+    ]
+
+
+def projection_schema_shape(projection: WRPProjection) -> dict:
+    """Return a stable schema-shape fingerprint for a WRPProjection.
+
+    The schema shape is the structural signature compared across the two
+    paths: it captures the field set, abstraction level, visibility
+    scope, chunk count, cross-reference count, and terminal state. Two
+    projections with the same schema shape are structurally equivalent.
+
+    Determinism invariant: same projection → same dict every call (I3).
+    """
+    return {
+        "fields": sorted(f for f in projection.__dataclass_fields__),
+        "wrp_state": projection.wrp_state,
+        "abstraction_level": projection.abstraction_level,
+        "visibility_scope": projection.visibility_scope,
+        "chunk_count": len(projection.chunks),
+        "cross_ref_count": len(projection.cross_references),
+        "partial": projection.partial,
+        "incomplete_start": projection.incomplete_start,
+    }

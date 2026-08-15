@@ -138,6 +138,11 @@ export class UiPreferencesService {
     this.preferences.update(p => ({ ...p, isDetailPaneOpen: !p.isDetailPaneOpen }));
   }
 
+  /** Set the details pane open/closed explicitly (not a toggle). */
+  setDetailPaneOpen(open: boolean): void {
+    this.preferences.update(p => ({ ...p, isDetailPaneOpen: open }));
+  }
+
   toggleSavedItems(): void {
     this.preferences.update(p => ({ ...p, isSavedItemsVisible: !p.isSavedItemsVisible }));
   }

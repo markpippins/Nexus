@@ -213,6 +213,29 @@ DEFAULT_TICKET_TTL_HOURS = 24  # tickets expire after 24h of inactivity
 DEFAULT_STALE_SECONDS = 3600 * 6  # claimed tickets become stale after 6h idle
 
 
+def derive_wr_entity_key(dco_json: str, wr_id: str) -> Optional[str]:
+    """Derive the deterministic WR entity_key at birth (T26 Item B).
+
+    Mirrors ``nexus_core.wrp.identity`` — the key is the SHA256 over the
+    sorted ``{domain, intent, actor, scope}`` fields of the canonical WR
+    ``execute workrequest:{wr_id}`` document, so it equals the key
+    ``tackle.vision_bridge`` / ``vision-srv`` stamp at creation and the key
+    ``ccnf_input_from_dco_json`` would re-derive on backfill. The DCO content
+    is provenance only (the entity identity is keyed on ``wr_id``); content
+    identity is tracked separately by ``content_hash`` (T08 three-way split).
+
+    Returns None when derivation cannot produce a key (identity-unknown).
+    The canonical shape never raises, but the guard keeps the WR write path
+    fail-safe against a malformed intent.
+    """
+    try:
+        from nexus_core.wrp.identity import ccnf_input_from_dco_json, derive_entity_key
+        return derive_entity_key(ccnf_input_from_dco_json(dco_json, wr_id))
+    except ValueError:
+        _log.warning("derive_wr_entity_key: no entity_key for wr=%s (intent not emittable)", wr_id)
+        return None
+
+
 class DBAdapter:
     def __init__(self, db_path: str = None, schema: str = None):
         dsn = os.environ.get("CONDUIT_PG_DSN")
@@ -764,25 +787,134 @@ class DBAdapter:
         metadata: Optional[Dict[str, Any]] = None,
         tokens_used: int = 0,
     ):
-        """Insert a receipt linked to exactly one Ticket (Invariant 2)."""
+        """Insert a receipt. D-T19-2(b): canonical surface is execution.receipts
+        (request-scoped, attempt_id NULL). Falls back to vision.receipts for
+        test/synthetic plans that have no execution.requests row and no
+        nebula.plans row."""
         _log.info("insert_receipt: plan=%s type=%s role=%s ticket=%s tokens=%d",
                   plan_id, receipt_type, agent_role, ticket_id, tokens_used)
         now = datetime.utcnow().isoformat() + "Z"
         receipt_id = f"rec-{plan_id}-{receipt_type}-{uuid.uuid4().hex[:8]}"
-        meta_json = json.dumps(metadata or {})
-        query = """
-            INSERT INTO vision.receipts (id, plan_id, type, agent_role, session_id,
-                ticket_id, summary, artifact_path, metadata_json, tokens_used, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT DO NOTHING
+
+        try:
+            request_id = self.resolve_request_for_receipt(plan_id)
+            if request_id is not None:
+                # Canonical: execution.receipts, request-scoped, no attempt.
+                # The legacy "rec-*" id is preserved in lineage_original_id so
+                # tickets.created_by_receipt and other legacy lookups keep working.
+                exec_meta = {
+                    **(metadata or {}),
+                    "session_id": session_id,
+                    "artifact_path": artifact_path,
+                    "ticket_id": ticket_id,
+                    "tokens_used": tokens_used,
+                }
+                with self._get_connection() as conn:
+                    conn.execute(
+                        """INSERT INTO execution.receipts
+                           (request_id, attempt_id, type, agent_role, summary, metadata,
+                            lineage_source, lineage_original_id, issued_at)
+                           VALUES (%s, NULL, %s, %s, %s, %s, 'conduit', %s, %s)
+                           ON CONFLICT (lineage_original_id) WHERE lineage_source = 'conduit' DO NOTHING""",
+                        (request_id, receipt_type, agent_role, summary,
+                         json.dumps(exec_meta), receipt_id, now),
+                    )
+                    conn.commit()
+            else:
+                # Test/synthetic plan (no execution.requests + no nebula.plans row).
+                # Preserve the legacy write surface — frozen read-only in D-T19-2(d).
+                meta_json = json.dumps(metadata or {})
+                query = """
+                    INSERT INTO vision.receipts (id, plan_id, type, agent_role, session_id,
+                        ticket_id, summary, artifact_path, metadata_json, tokens_used, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT DO NOTHING
+                """
+                with self._get_connection() as conn:
+                    conn.execute(query, (
+                        receipt_id, plan_id, receipt_type, agent_role, session_id,
+                        ticket_id, summary, artifact_path, meta_json, tokens_used, now,
+                    ))
+                    conn.commit()
+        except Exception as e:
+            _log.error("insert_receipt failed plan=%s type=%s: %s", plan_id, receipt_type, e)
+            self._emit_receipt_failure(plan_id, receipt_type, str(e))
+            raise
+        _log.debug("insert_receipt: created %s (request=%s)", receipt_id, request_id)
+
+    def _emit_receipt_failure(self, plan_id: str, receipt_type: str, error: str) -> None:
+        """D-T19 item 5: emit a canonical receipt-failure event.
+
+        V103 (D-T19-3) extended ``kernel.event_type`` with ``receipt.failed``,
+        so receipt failures land in the DB as their own event_type instead of
+        riding ``transition.rejected`` (which remains reserved for ticket
+        expiry). Consumers disambiguate on event_type alone — no payload
+        sniffing. Flows through trg_notify_transition onto the canonical NATS
+        channel (nexus.kernel.v1.transition.receipt.failed).
         """
+        try:
+            with self._get_connection() as conn:
+                self._record_kernel_transition(
+                    conn,
+                    aggregate_type="receipt",
+                    aggregate_id=plan_id or "",
+                    event_type="receipt.failed",
+                    actor="conduit-python",
+                    authority="system",
+                    payload={
+                        "failure_class": "receipt",
+                        "plan_id": plan_id,
+                        "receipt_type": receipt_type,
+                        "error": error[:2000],
+                    },
+                )
+                conn.commit()
+        except Exception:
+            _log.exception("_emit_receipt_failure: failed to record receipt failure")
+
+    def resolve_request_for_receipt(self, plan_id: str) -> Optional[str]:
+        """D-T19-2(b): resolve (or get-or-create) the execution.requests id for a plan.
+
+        Tiered per Architect decision:
+          1. reuse an existing execution.requests row (source_plan_id match);
+          2. get-or-create a legacy-provisioned request for a real plan
+             (exists in nebula.plans);
+          3. return None for test/synthetic plans (no nebula.plans row) —
+             the caller falls back to vision.receipts.
+
+        Idempotent + concurrent-safe via ON CONFLICT (business_key) RETURNING.
+        Returns the request uuid (str), or None."""
         with self._get_connection() as conn:
-            conn.execute(query, (
-                receipt_id, plan_id, receipt_type, agent_role, session_id,
-                ticket_id, summary, artifact_path, meta_json, tokens_used, now,
-            ))
+            existing = conn.execute(
+                "SELECT id FROM execution.requests WHERE source_plan_id = %s LIMIT 1",
+                (plan_id,),
+            ).dict_fetchone()
+            if existing:
+                return str(existing["id"])
+
+            plan = conn.execute(
+                "SELECT id, title, goal FROM nebula.plans WHERE id = %s LIMIT 1",
+                (plan_id,),
+            ).dict_fetchone()
+            if plan is None:
+                return None
+
+            business_key = f"legacy-plan-{plan_id}"
+            created = conn.execute(
+                """INSERT INTO execution.requests
+                   (business_key, title, objective, intent_type,
+                    source_plan_id, source_wr_id, status)
+                   VALUES (%s, %s, %s, 'legacy', %s, NULL, 'READY')
+                   ON CONFLICT (business_key) DO UPDATE
+                     SET business_key = EXCLUDED.business_key
+                   RETURNING id""",
+                (business_key,
+                 plan.get("title") or f"Legacy plan {plan_id}",
+                 plan.get("goal") or "",
+                 plan_id),
+            ).dict_fetchone()
             conn.commit()
-        _log.debug("insert_receipt: created %s", receipt_id)
+            return str(created["id"]) if created else None
 
     def add_work_request(self, wr_id: str, plan_id: str, dco_json: str, title: str = ''):
         """Insert a work request into nebula.work_requests.
@@ -796,6 +928,9 @@ class DBAdapter:
         import uuid
         _log.info("add_work_request: wr=%s plan=%s title=%s", wr_id, plan_id, title or '(empty)')
         now = datetime.utcnow().isoformat() + "Z"
+        # T26 Item B (T07 emission boundary): derive the entity_key at birth so
+        # the row carries content identity from creation, not retroactively.
+        entity_key = derive_wr_entity_key(dco_json, wr_id)
         with self._get_connection() as conn:
             # SCD-type-4 temporal upgrade: nebula.work_requests is a VIEW over
             # work_requests_history. INSERT ... ON CONFLICT through views is not
@@ -811,11 +946,30 @@ class DBAdapter:
             if existing:
                 _log.info("add_work_request: wr=%s already exists, skipping", wr_id)
             else:
+                # T26 Item B: idempotent emission dedup — when the derived key
+                # is already active (same entity re-emitted), reuse the existing
+                # row instead of inserting a duplicate. The 045 exclusion
+                # constraint backstops overlap at the DB level.
+                if entity_key:
+                    active = conn.execute(
+                        "SELECT 1 FROM nebula.work_requests_history "
+                        "WHERE entity_key = %s "
+                        "AND now() >= valid_from AND now() < valid_until LIMIT 1",
+                        (entity_key,),
+                    ).fetchone()
+                    if active:
+                        _log.info(
+                            "add_work_request: wr=%s entity_key already active, "
+                            "reusing row (idempotent emission)", wr_id)
+                        conn.commit()
+                        return
                 conn.execute(
                     "INSERT INTO nebula.work_requests_history "
-                    "(id, legacy_id, plan_id, title, business_status, dco_json, created_at, updated_at) "
-                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-                    (str(uuid.uuid4()), wr_id, plan_id, title, 'DRAFT', dco_json, now, now),
+                    "(id, legacy_id, plan_id, title, business_status, dco_json, "
+                    "created_at, updated_at, entity_key) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (str(uuid.uuid4()), wr_id, plan_id, title, 'DRAFT', dco_json,
+                     now, now, entity_key),
                 )
             conn.commit()
 

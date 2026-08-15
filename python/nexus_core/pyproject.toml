@@ -1,14 +1,4 @@
-[build-system]
-requires = ["setuptools>=64"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "nexus-core"
-version = "0.1.0"
-requires-python = ">=3.13"
-dependencies = []
-description = "Shared architectural primitives for the Nexus WorkRequest Pipeline"
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["nexus_core*"]
+[tool.pytest.ini_options]
+markers = [
+    "local_integration: tests that require local infrastructure (daemons, NATS, full DB schema)",
+]

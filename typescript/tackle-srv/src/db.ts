@@ -1,6 +1,7 @@
 import { Pool, PoolClient, types } from "pg";
 import { readFileSync } from "fs";
 import path from "path";
+import { seedMemoryProcedures } from "tackle-seeds";
 
 // ── Keep timestamps as ISO strings ─────────────────────────────────
 // pg parses TIMESTAMPTZ into Date objects by default. Override to keep
@@ -164,6 +165,7 @@ async function createSchema(
       harness_id       TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.harnesses(id) ON DELETE CASCADE,
       provider_id      TEXT REFERENCES ${TACKLE_SCHEMA}.providers(id),
       model_identifier TEXT NOT NULL,
+      verified         BOOLEAN NOT NULL DEFAULT false,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -177,7 +179,7 @@ async function createSchema(
       harness_id      TEXT REFERENCES ${TACKLE_SCHEMA}.harnesses(id),
       priority        INTEGER NOT NULL DEFAULT 0,
       invocation_mode TEXT NOT NULL DEFAULT 'CLI'
-                        CHECK(invocation_mode IN ('CLI', 'HTTP', 'SDK', 'MCP')),
+                        CHECK(invocation_mode IN ('CLI', 'HTTP', 'SDK', 'MCP', 'INTERACTIVE')),
       command         TEXT,
       endpoint_url    TEXT,
       timeout_ms      INTEGER,
@@ -296,6 +298,41 @@ async function createSchema(
   await exec(`
     CREATE INDEX IF NOT EXISTS idx_role_memory_expiration
       ON ${TACKLE_SCHEMA}.role_memory (role, expiration_dt DESC NULLS FIRST)
+  `);
+
+  // role_leases — session-level role leases (RoleLeases / plan 1286):
+  // a bounded window + budget under which a role on a given channel may
+  // consume work. Mirrors execution.leases (per-request) but scoped to a
+  // role/session. One ACTIVE lease per role at a time.
+  await exec(`
+    CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.role_leases (
+      id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      role            TEXT NOT NULL,
+      channel         TEXT NOT NULL DEFAULT 'interactive'
+                      CHECK (channel IN ('interactive','opencode','ollama','unknown')),
+      model           TEXT,
+      window_start    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      window_end      TIMESTAMPTZ NOT NULL,
+      budget_units    INTEGER,
+      consumed_units  INTEGER NOT NULL DEFAULT 0,
+      status          TEXT NOT NULL DEFAULT 'ACTIVE'
+                      CHECK (status IN ('ACTIVE','EXPIRED','RELEASED')),
+      acquired_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at      TIMESTAMPTZ NOT NULL,
+      released_at     TIMESTAMPTZ,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_role_leases_active_per_role
+      ON ${TACKLE_SCHEMA}.role_leases (role)
+      WHERE status = 'ACTIVE'
+  `);
+  await exec(`
+    CREATE INDEX IF NOT EXISTS idx_role_leases_status
+      ON ${TACKLE_SCHEMA}.role_leases (status, expires_at)
   `);
 
   // ── Add FK constraints to roles(name) (idempotent for existing tables) ──
@@ -875,6 +912,74 @@ Nexus follows a database-first architecture: canonical state lives in PostgreSQL
       console.log("[tackle-migrations] v14: Created tackle.projection_configs + seeded 6 projection families");
     },
   },
+  {
+    version: 15,
+    description: "Add tackle.models.verified (BOOLEAN NOT NULL DEFAULT false) — marks models that have actually been exercised through a harness (inference test passed) and may therefore enter the resolver queue. Bundles whose model is unverified are forced inactive (verified-model gate). The live DB already carries the column; this makes green-field bootstraps match and stamps the migration.",
+    up: async (exec) => {
+      await exec(`
+        ALTER TABLE ${TACKLE_SCHEMA}.models
+          ADD COLUMN IF NOT EXISTS verified BOOLEAN NOT NULL DEFAULT false
+      `);
+      console.log("[tackle-migrations] v15: Added tackle.models.verified");
+    },
+  },
+  {
+    version: 16,
+    description: "Verified-model gate trigger on tackle.config_bundle — BEFORE INSERT OR UPDATE forces is_active=0 whenever the referenced model is unverified (or missing). One DB-level rule covers every write path (REST upserts, import, seed-defaults, CLI, external tooling) so an unverified model can never silently enter the resolver queue through a bypassing code path.",
+    up: async (exec) => {
+      await exec(`
+        CREATE OR REPLACE FUNCTION ${TACKLE_SCHEMA}.config_bundle_verified_gate()
+        RETURNS trigger AS $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM ${TACKLE_SCHEMA}.models m
+            WHERE m.id = NEW.model_id AND m.verified IS TRUE
+          ) THEN
+            NEW.is_active := 0;
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+      `);
+      await exec(`
+        DROP TRIGGER IF EXISTS trg_config_bundle_verified_gate ON ${TACKLE_SCHEMA}.config_bundle
+      `);
+      await exec(`
+        CREATE TRIGGER trg_config_bundle_verified_gate
+        BEFORE INSERT OR UPDATE ON ${TACKLE_SCHEMA}.config_bundle
+        FOR EACH ROW EXECUTE FUNCTION ${TACKLE_SCHEMA}.config_bundle_verified_gate()
+      `);
+      console.log("[tackle-migrations] v16: config_bundle verified-model gate trigger installed");
+    },
+  },
+  {
+    version: 17,
+    description: "INTERACTIVE exemption in the verified-model gate — INTERACTIVE bundles (harn-freebuff, dispatched in Freebuff where the model is the human/CLI model, not an opencode provider reference) must stay active regardless of model verification. The gate exists to stop opencode spawning unresolvable model ids, which the INTERACTIVE channel never does.",
+    up: async (exec) => {
+      await exec(`
+        CREATE OR REPLACE FUNCTION ${TACKLE_SCHEMA}.config_bundle_verified_gate()
+        RETURNS trigger AS $$
+        BEGIN
+          -- INTERACTIVE bundles never spawn a harness with the model id —
+          -- the model is the human/CLI model driving Freebuff. The verified
+          -- gate (which exists to stop opencode spawning dead model ids)
+          -- does not apply to this channel.
+          IF NEW.invocation_mode = 'INTERACTIVE' THEN
+            RETURN NEW;
+          END IF;
+          IF NOT EXISTS (
+            SELECT 1 FROM ${TACKLE_SCHEMA}.models m
+            WHERE m.id = NEW.model_id AND m.verified IS TRUE
+          ) THEN
+            NEW.is_active := 0;
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+      `);
+      console.log("[tackle-migrations] v17: verified-model gate INTERACTIVE exemption installed");
+    },
+  },
 ];
 
 /**
@@ -929,6 +1034,9 @@ async function runMigrations(
 
 const DEFAULT_ROLES: { name: string; description: string }[] = [
   { name: "engineer", description: "Primary implementation agent — writes code, runs commands, integrates systems" },
+  { name: "engineer-ii", description: "Primary implementation agent — writes code, runs commands, integrates systems" },
+  { name: "devops", description: "Infrastructure operations and systems administration — system scripts, container setup/maintenance, migrations, sysadmin tasks; expansion of engineer with sysadmin concerns" },
+  { name: "topologist", description: "Interactive representative of the terrain subsystem — verifies local service docs match actual configuration; validates specs/plans/work requests against live capabilities; offers running alternatives for unavailable services" },
   { name: "architect", description: "System design authority — owns architecture decisions, cross-system contracts, and design lineage" },
   { name: "planner", description: "Work decomposition authority — creates and manages implementation plans, promotes proposals" },
   { name: "builder", description: "Implementation executor — picks up pending plans and implements them against acceptance criteria" },
@@ -937,6 +1045,7 @@ const DEFAULT_ROLES: { name: string; description: string }[] = [
   { name: "analyst", description: "Gap and triage analyst — identifies missing coverage, classifies incidents" },
   { name: "inspector", description: "Compliance auditor — verifies invariants, issues violation reports" },
   { name: "test", description: "Internal test harness role — used for test invoke sessions and ad-hoc agent runs" },
+  { name: "leased-builder", description: "Interactive-channel implementation executor — bounded role lease (RoleLeases, plan 1286): consumes from the READY pool under a window+budget lease, mirroring builder with a mandatory time limit" },
 ];
 
 async function seedDefaultRoles(
@@ -951,1175 +1060,6 @@ async function seedDefaultRoles(
       [r.name, r.description, now, now]
     );
   }
-}
-
-// ── Memory procedure seed function ─────────────────────────────────
-// Each procedure uses ON CONFLICT (slug) DO NOTHING, so re-running
-// is safe: existing procedures are left untouched, new ones are added.
-
-function seedMemoryProcedures(): string {
-  const SQL = `tackle`;
-  return `
-DO $$
-DECLARE
-    v_memory_id UUID;
-    v_role TEXT;
-    v_roles TEXT[];
-BEGIN
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 1. Pipeline Health Check
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'pipeline-health-check',
-        'Pipeline Health Check',
-        'Scan for blocked plans, flagged changes, and blocker reports before each turn.',
-        E'## Procedure\\n\\n'
-        'At the start of every conversational turn, before responding to the user:\\n\\n'
-        '1. **Check for blocked plans** \\u2014 Scan nexus/.conduit-data/IMPLEMENTATION_PLANS/blocked/ '
-        'for .md files. If any exist, the pipeline is jammed \\u2014 report the blocker prominently.\\n\\n'
-        '2. **Check for flagged changes** \\u2014 Scan nexus/.conduit-data/CHANGES/flagged/ '
-        'for .md files. If any exist, a change report failed review.\\n\\n'
-        '3. **Check for blocker reports** \\u2014 Scan nexus/.conduit-data/INSPECTIONS/blocker-reports/.\\n\\n'
-        '4. **Persistence** \\u2014 These checks are persistent. Report on every turn '
-        'until the directories are empty.\\n\\n'
-        '5. **Full change-detection** \\u2014 For completed plans and inspections, '
-        'load the pipeline-watch skill.',
-        ARRAY['turn-protocol', 'pipeline', 'blocker', 'health-check'],
-        ARRAY['start of turn', 'before responding', 'health check', 'pipeline check'],
-        ARRAY['pipeline-watch']
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder',
-                         'reviewer', 'critic', 'analyst', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 2. Bootstrap Self-Update (Activation)
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'bootstrap-self-update',
-        'Bootstrap Self-Update (Activation)',
-        'On activation: ensure audit directories, load procedure index, query inbox, present open items.',
-        E'## Procedure\\n\\n'
-        'On role activation (every session start):\\n\\n'
-        '1. **Load your procedure index:**\\n'
-        '   - Call \\\`memory_get_procedures("<your_role>")\` to get the full list of '
-        'procedure cards available for your role.\\n'
-        '   - This populates your runtime procedure index from Redis (backed by '
-        'tackle.memory and tackle.role_memory in PostgreSQL).\\n\\n'
-        '2. **Ensure projection target directories exist:**\\n'
-        '   mkdir -p nexus/audit/{PROMPTS,RESPONSES,PLANS/pending, ...}\\n'
-        '   These are on-demand projection targets, not the canonical store.\\n\\n'
-        '3. **Query your inbox:**\\n'
-        '   - Use nebula_list_agent_records and filter for tags containing '
-        '"to:<your_role>" and "status:open"\\n'
-        '   - If nebula-mcp is unreachable, surface as a blocking infrastructure issue\\n'
-        '   - Present any open items to the user before proceeding\\n\\n'
-        '4. **Query nebula projection config** to verify current role\\u2192folder '
-        'assignments.\\n\\n'
-        '5. **Present any new items** to the user before proceeding.',
-        ARRAY['turn-protocol', 'activation', 'bootstrap', 'inbox'],
-        ARRAY['activate', 'session start', 'boot', 'turn start'],
-        ARRAY['nebula_list_agent_records', 'nebula_create_agent_record']
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder',
-                         'reviewer', 'critic', 'analyst', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 3. Post-Turn Self-Update
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'post-turn-self-update',
-        'Post-Turn Self-Update',
-        'After every response: write agent record to DB, optionally trigger projection.',
-        E'## Procedure\\n\\n'
-        'After completing work on every conversational turn:\\n\\n'
-        '1. **Write to the database first** \\u2014 Use nebula_create_agent_record with '
-        'recordType (report|analysis|assessment|inspection|prompt|response|engineering_log|'
-        'architecture_note|decision), role, title, content, tags, '
-        'systemId, subsystemId, planRef, threadRef.\\n\\n'
-        '2. **Optionally trigger a projection** via nebula_render_projection '
-        'to regenerate the filesystem view.\\n\\n'
-        '3. **Do NOT write directly to audit directories** \\u2014 the filesystem '
-        'is a derived view. Direct writes will be overwritten.\\n\\n'
-        '4. **Respect folder boundaries** \\u2014 Do not write to folders assigned to other roles.',
-        ARRAY['turn-protocol', 'persistence', 'audit', 'post-turn'],
-        ARRAY['after response', 'turn end', 'post-turn', 'after completing'],
-        ARRAY['nebula_create_agent_record', 'nebula_render_projection']
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder',
-                         'reviewer', 'critic', 'analyst', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 4. Engineer Backlog Check (Nebula RMS)
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'engineer-backlog-check',
-        'Engineer Backlog Check (Nebula RMS)',
-        'Query nebula RMS backlog before starting work. Surface pending requirements.',
-        E'## Procedure\\n\\n'
-        'Run at session start AND at the start of every subsequent turn '
-        'before processing the user\\'s request.\\n\\n'
-        '1. **Call nebula_list_requirements** with no filter, filter client-side.\\n\\n'
-        '2. **Filter to backlog** \\u2014 keep requirements whose status is one of '
-        'Backlog, ToDo, InProgress, Active, or Blocked.\\n\\n'
-        '3. **Present before acting** \\u2014 show open count, IDs, titles, statuses, priorities.\\n\\n'
-        '4. **Propose, do not auto-claim** \\u2014 surface matching items but ask before '
-        'flipping status.\\n\\n'
-        '5. **Record genuinely new work** via nebula_create_requirement.\\n\\n'
-        '6. **Re-check before every turn** \\u2014 backlog state can shift.',
-        ARRAY['engineer', 'backlog', 'requirements', 'nebula-rms'],
-        ARRAY['start of turn', 'before working', 'backlog', 'requirement'],
-        ARRAY['nebula_list_requirements', 'nebula_create_requirement', 'nebula_update_requirement']
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        FOREACH v_role IN ARRAY ARRAY['engineer']::TEXT[] LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 5. Turn-Based Planning Check (Conduit)
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'turn-based-planning-check',
-        'Turn-Based Planning Check (Conduit)',
-        'Check for plans promoted to Planning status before each turn.',
-        E'## Procedure\\n\\n'
-        'At the start of every turn, before processing the user\\'s request:\\n\\n'
-        '1. **Query the pipeline state** \\u2014 Call query_pipeline_state (or GET /state).\\n\\n'
-        '2. **Inspect plans.planning** \\u2014 Look for plans with a PLANNING receipt.\\n\\n'
-        '3. **Present findings** \\u2014 Show title, goal summary of each plan. '
-        'Ask if user wants to discuss any.\\n\\n'
-        '4. **Follow the user\\'s lead** \\u2014 elucidate or defer.\\n\\n'
-        '5. **Do NOT auto-promote to Pending** \\u2014 user must explicitly confirm.',
-        ARRAY['turn-protocol', 'planning', 'conduit', 'elucidation'],
-        ARRAY['start of turn', 'planning check', 'promoted plan', 'plan pipeline'],
-        ARRAY['conduit-mcp_query_conduit_state', 'conduit-mcp_issue_receipt']
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder', 'reviewer'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 6. Prompt Capture (Audit Trail)
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'prompt-capture',
-        'Prompt Capture (Audit Trail)',
-        'Save every interactive prompt as the start of the audit trail.',
-        E'## Procedure\\n\\n'
-        '1. **Save every prompt** \\u2014 Use nebula_create_agent_record with '
-        'recordType: "prompt". The database is the canonical store.\\n\\n'
-        '2. **Link plans to prompts** \\u2014 When a prompt results in a plan, '
-        'pass the promptRef to create_plan or create_proposed_plan.\\n\\n'
-        '3. **Preserve continuity** \\u2014 The promptRef allows subsequent plans, '
-        'proposals, and responses to reference the originating intent.',
-        ARRAY['audit', 'prompt', 'capture', 'traceability'],
-        ARRAY['user prompt', 'new conversation', 'question', 'request'],
-        ARRAY['nebula_create_agent_record', 'conduit-mcp_create_plan',
-              'conduit-mcp_create_proposed_plan']
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder',
-                         'reviewer', 'critic', 'analyst', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 7. Inbox Query Procedure
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'inbox-query-procedure',
-        'Inbox Query (Role-Driven Messaging)',
-        'Query your role inbox for open messages before proceeding each turn.',
-        E'## Procedure\\n\\n'
-        'Before processing any request, query your role inbox:\\n\\n'
-        '1. **Call nebula_list_agent_records**, filter for tags containing '
-        '"to:<my_role>" and "status:open".\\n\\n'
-        '2. **Present findings** \\u2014 Surface open messages to the user before acting.\\n\\n'
-        '3. **Tag routing conventions:**\\n'
-        '   - to:{role}  \\u2014 intended recipient\\n'
-        '   - from:{role} \\u2014 sender\\n'
-        '   - status:{state} \\u2014 open, claimed, in_progress, resolved, archived\\n'
-        '   - type:{kind} \\u2014 incident, task, question, decision, finding, proposal, etc.\\n'
-        '   - thread:{id} \\u2014 thread membership\\n\\n'
-        '4. **Thread tracking** \\u2014 Conversations use shared threadRef UUID.\\n\\n'
-        '5. **Infrastructure failure** \\u2014 If nebula-mcp is unreachable, '
-        'surface as blocking. Do not silently proceed.',
-        ARRAY['messaging', 'inbox', 'routing', 'communication'],
-        ARRAY['start of turn', 'inbox', 'messages', 'agent communication'],
-        ARRAY['nebula_list_agent_records', 'nebula_create_agent_record',
-              'nebula_update_agent_record']
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder',
-                         'reviewer', 'critic', 'analyst', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 8. Thread Tracking
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'thread-tracking',
-        'Thread Tracking (Cross-Role Conversations)',
-        'Create and continue cross-role conversations via threadRef UUIDs.',
-        E'## Procedure\\n\\n'
-        '1. **First message** \\u2014 Author writes a record with new threadRef UUID '
-        'and tags ["to:recipient", "status:open", "type:kinds"].\\n\\n'
-        '2. **Response** \\u2014 Recipient writes with same threadRef, '
-        'tags ["to:author", "status:in_progress", ...].\\n\\n'
-        '3. **Continuation** \\u2014 Any role writes to the same thread with '
-        'updated status and appropriate to: tag.\\n\\n'
-        '4. **Querying** \\u2014 Filter for threadRef = "<uuid>" and order by created_at.\\n\\n'
-        '5. **Resolving** \\u2014 Update all messages in thread to status:resolved.',
-        ARRAY['messaging', 'thread', 'conversation', 'cross-role'],
-        ARRAY['conversation', 'thread', 'cross-role', 'respond to agent'],
-        ARRAY['nebula_list_agent_records', 'nebula_create_agent_record',
-              'nebula_update_agent_record']
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder',
-                         'reviewer', 'critic', 'analyst', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 9. Tag Routing Reference
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'tag-routing-reference',
-        'Tag Routing Convention Reference',
-        'Reference for valid agent message tags.',
-        E'## Tag Routing Reference\\n\\n'
-        'All tags are lower-kebab-case. Multiple tags form a conjunction.\\n\\n'
-        '### Prefix Tags\\n'
-        '| Tag | Purpose | Example |\\n'
-        '|-----|---------|---------|\\n'
-        '| to:{role} | Recipient | to:engineer |\\n'
-        '| from:{role} | Sender | from:architect |\\n'
-        '| status:{state} | Lifecycle | status:open |\\n'
-        '| type:{kind} | Semantic kind | type:decision |\\n'
-        '| thread:{id} | Thread membership | thread:a1b2c3 |\\n\\n'
-        '### Type values\\n'
-        'incident, task, question, decision, spec, finding, blocker, proposal, '
-        'warning, error, approval, rejection, disagreement, escalation, deferred',
-        ARRAY['messaging', 'reference', 'tags', 'routing'],
-        ARRAY['tag routing', 'message format', 'tag convention', 'what tags'],
-        ARRAY[]::TEXT[]
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder',
-                         'reviewer', 'critic', 'analyst', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 10. Rover Harvest Notification
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'rover-harvest-notification',
-        'Rover Harvest Notification',
-        'After harvests, create cross-refs and notify Architect + Analyst.',
-        E'## Procedure\\n\\n'
-        '1. Execute the harvest using Rover. Always use yourself as the '
-        'inference component \\u2014 do not delegate to Ollama unless told.\\n\\n'
-        '2. Persist harvest output via nebula_create_harvest.\\n\\n'
-        '3. Create cross-references linking harvest to knowledge entities.\\n\\n'
-        '4. Notify Architect and Analyst via nebula_create_agent_record.',
-        ARRAY['harvest', 'post-processing', 'notification', 'cross-reference'],
-        ARRAY['rover', 'harvest', 'chat transcript', 'nebula_create_harvest'],
-        ARRAY['nebula_create_harvest', 'nebula_create_cross_reference',
-              'knowledge_list_entities', 'nebula_create_agent_record']
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        FOREACH v_role IN ARRAY ARRAY['engineer']::TEXT[] LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 11. Terrain Registration
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'terrain-registration', 'Terrain Registration',
-        'Register services in terrain topology after building or deploying.',
-        E'## Procedure\\n\\n'
-        '1. Identify the service \\u2014 name, type, endpoint, health, deps.\\n'
-        '2. Call terrain-mcp to register.\\n'
-        '3. Verify via terrain_list_services.',
-        ARRAY['deployment', 'infrastructure', 'service-registry'],
-        ARRAY['deploy', 'build', 'set up', 'service'],
-        ARRAY['terrain_register_service', 'terrain_list_services']
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        FOREACH v_role IN ARRAY ARRAY['engineer']::TEXT[] LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 12. Planning Elucidation
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'planning-elucidation', 'Planning Elucidation Workflow',
-        'Elucidate a planning-plan before promoting to pending.',
-        E'## Procedure\\n\\n'
-        '1. Present the plan.\\n'
-        '2. Discuss scope (files affected).\\n'
-        '3. Refine acceptance criteria.\\n'
-        '4. Identify dependencies.\\n'
-        '5. Confirm with user.\\n'
-        '6. Persist metadata.\\n'
-        '7. Issue PLAN_CREATE receipt.',
-        ARRAY['planning', 'elucidation', 'promotion'],
-        ARRAY['discuss plan', 'promote plan', 'elucidate'],
-        ARRAY['conduit-mcp_update_plan', 'conduit-mcp_issue_receipt']
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        FOREACH v_role IN ARRAY ARRAY['planner']::TEXT[] LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 13. Proposal Capture
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'proposal-capture', 'Proposal Capture (Followup Preservation)',
-        'Persist followup suggestions as proposed plans.',
-        E'## Procedure\\n\\n'
-        '1. After suggest_followups, call create_proposed_plan for each.\\n'
-        '2. Use label as title, brief description as goal.\\n'
-        '3. Pass promptRef for audit trail.',
-        ARRAY['proposal', 'followup', 'preservation'],
-        ARRAY['suggest followup', 'after completing', 'propose'],
-        ARRAY['conduit-mcp_create_proposed_plan']
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['planner', 'engineer', 'architect'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 14. Nexus Boot Procedure
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'nexus-boot-procedure', 'Nexus Boot Procedure',
-        'Minimum startup read set before working in nexus/.',
-        E'## Procedure\\n\\n'
-        'Load: nexus/CLAUDE.md, pipeline-mode.json, and conduit state. '
-        '(OPERATING_MODEL.md and mode-router/SKILL.md are archived '
-        'historical references -- do not read as live authority.)',
-        ARRAY['bootstrap', 'startup', 'initialization'],
-        ARRAY['start session', 'activate', 'boot'],
-        ARRAY[]::TEXT[]
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'planner', 'architect', 'builder', 'reviewer'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 15. Plan Deletion & Ticket Cleanup
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'plan-deletion-cleanup', 'Plan Deletion & Ticket Cleanup',
-        'Soft-delete a plan, cancel tickets, notify UI.',
-        E'## Procedure\\n\\n'
-        '1. Call conduit-mcp_delete_plan.\\n'
-        '2. For stuck plans: conduit-mcp_hard_delete_plan.\\n'
-        '3. Idempotent on already-deleted plans.',
-        ARRAY['plan', 'deletion', 'cleanup', 'ticket'],
-        ARRAY['delete plan', 'remove plan', 'cancel plan'],
-        ARRAY['conduit-mcp_delete_plan', 'conduit-mcp_hard_delete_plan']
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['builder', 'engineer'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 16. Orphan Detection
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'orphan-detection', 'Orphan Detection',
-        'Check for DB/filesystem inconsistencies.',
-        E'## Procedure\\n\\n'
-        'Conduit /health endpoint has orphanScan: checks for deleted plans '
-        'with residual .md files, and .md files without DB rows.',
-        ARRAY['orphan', 'inconsistency', 'health'],
-        ARRAY['check health', 'orphan scan'],
-        ARRAY[]::TEXT[]
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'reviewer', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 17. Nebula-MCP Tool Reference
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'nebula-mcp-tools',
-        'Nebula-MCP Tool Reference',
-        'Complete catalog of nebula-mcp tools organized by domain.',
-        E'## Nebula-MCP Tool Reference\\n\\n'
-        'Full catalog of nebula-mcp tools, organized by domain. '
-        'Available over MCP transport (Stdio or SSE on port 3102).\\n\\n'
-        '### Hierarchy: Systems / Subsystems / Features\\n'
-        '| Tool | Purpose |\\n'
-        '|------|---------|\\n'
-        '| nebula_list_systems | List all systems with full nested hierarchy |\\n'
-        '| nebula_create_system | Create a new system |\\n'
-        '| nebula_update_system | Update system metadata |\\n'
-        '| nebula_delete_system | Delete a system and cascade |\\n'
-        '| nebula_create_subsystem | Create a subsystem |\\n'
-        '| nebula_update_subsystem | Update subsystem metadata |\\n'
-        '| nebula_delete_subsystem | Delete a subsystem and cascade |\\n'
-        '| nebula_move_subsystem | Move a subsystem to a different parent |\\n'
-        '| nebula_create_feature | Create a feature under a subsystem |\\n'
-        '| nebula_update_feature | Update feature metadata |\\n'
-        '| nebula_delete_feature | Delete a feature and cascade |\\n'
-        '| nebula_move_feature | Move a feature to a different subsystem |\\n\\n'
-        '### Requirements (Backlog / Kanban)\\n'
-        '| Tool | Purpose |\\n'
-        '|------|---------|\\n'
-        '| nebula_list_requirements | List requirements, filterable |\\n'
-        '| nebula_create_requirement | Create a new requirement |\\n'
-        '| nebula_update_requirement | Update requirement fields |\\n'
-        '| nebula_move_requirement | Move requirement to a new status |\\n'
-        '| nebula_delete_requirement | Delete a requirement |\\n'
-        '| nebula_batch_update_requirements | Batch-update status |\\n\\n'
-        '### Agent Records (Bitemporal Audit)\\n'
-        '| Tool | Purpose |\\n'
-        '|------|---------|\\n'
-        '| nebula_list_agent_records | List audit records, filterable |\\n'
-        '| nebula_get_agent_record | Get a single record with full content |\\n'
-        '| nebula_create_agent_record | Create a new record (canonical write path) |\\n'
-        '| nebula_update_agent_record | Update an existing record |\\n'
-        '| nebula_delete_agent_record | Delete a record |\\n\\n'
-        '### Harvest Pipeline\\n'
-        '| Tool | Purpose |\\n'
-        '|------|---------|\\n'
-        '| nebula_list_harvests | List harvest outputs |\\n'
-        '| nebula_get_harvest | Get a single harvest |\\n'
-        '| nebula_create_harvest | Record a new harvest |\\n'
-        '| nebula_delete_harvest | Delete a harvest |\\n\\n'
-        '### Other Domains\\n'
-        'See the full card for projections, cross-refs, sessions, etc.',
-        ARRAY['reference', 'nebula-mcp', 'tools', 'appendix'],
-        ARRAY['list tools', 'what tools', 'nebula-mcp', 'MCP reference'],
-        ARRAY[]::TEXT[]
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder',
-                         'reviewer', 'critic', 'analyst', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 18. Tackle-MCP Tool Reference
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'tackle-mcp-tools',
-        'Tackle-MCP Tool Reference',
-        'Complete catalog of tackle-mcp tools for AI config and memory management.',
-        E'## Tackle-MCP Tool Reference\\n\\n'
-        'Tackle-mcp (port 3400) manages the AI configuration registry '
-        'and Role Memory Procedure Registry.\\n\\n'
-        '### AI Configuration Registry\\n'
-        '| Tool | Purpose |\\n'
-        '|------|---------|\\n'
-        '| get_ai_config | Get full AI configuration snapshot |\\n'
-        '| validate_ai_config | Validate configuration |\\n'
-        '| seed_default_ai_config | Seed defaults |\\n'
-        '| import_ai_config | Replace entire configuration |\\n\\n'
-        '### Providers / Harnesses / Models\\n'
-        '| Tool | Purpose |\\n'
-        '|------|---------|\\n'
-        '| list_ai_providers | List all providers |\\n'
-        '| get_ai_provider(id) | Get a single provider |\\n'
-        '| upsert_ai_provider | Create or update |\\n'
-        '| delete_ai_provider(id) | Delete |\\n'
-        '| list_ai_harnesses | List all harnesses |\\n'
-        '| get_ai_harness(id) | Get a single harness |\\n'
-        '| upsert_ai_harness | Create or update |\\n'
-        '| delete_ai_harness(id) | Delete |\\n'
-        '| list_ai_models | List all models |\\n'
-        '| get_ai_model(id) | Get a single model |\\n'
-        '| upsert_ai_model | Create or update |\\n'
-        '| delete_ai_model(id) | Delete |\\n\\n'
-        '### Role Configs / Bundles / Memory\\n'
-        'See the full card for the complete reference.',
-        ARRAY['reference', 'tackle-mcp', 'tools', 'appendix'],
-        ARRAY['list tools', 'what tools', 'tackle-mcp', 'MCP reference'],
-        ARRAY[]::TEXT[]
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder',
-                         'reviewer', 'critic', 'analyst', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 19. Conduit-MCP Tool Reference
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'conduit-mcp-tools',
-        'Conduit-MCP Tool Reference',
-        'Complete catalog of conduit-mcp tools for plan lifecycle and pipeline management.',
-        E'## Conduit-MCP Tool Reference\\n\\n'
-        'Conduit-mcp (port 3100) manages the plan lifecycle, issues receipts, '
-        'and serves pipeline state.\\n\\n'
-        '### Plan Lifecycle\\n'
-        '| Tool | Purpose |\\n'
-        '|------|---------|\\n'
-        '| query_conduit_state | Return full pipeline state |\\n'
-        '| create_plan | Create a pending implementation plan |\\n'
-        '| create_proposed_plan | Create a lightweight proposed plan |\\n'
-        '| update_plan | Update plan metadata |\\n'
-        '| delete_plan | Soft-delete a plan |\\n'
-        '| hard_delete_plan | Permanently delete a stuck plan |\\n'
-        '| promote_plan | Promote proposed to planning |\\n'
-        '| revise_plan | Create a revision copy in planning |\\n'
-        '| unblock_plan | Move blocked to pending |\\n'
-        '| get_plan_receipts | Get receipt chain for a plan |\\n\\n'
-        '### Receipts & Agent Status\\n'
-        '| Tool | Purpose |\\n'
-        '|------|---------|\\n'
-        '| issue_receipt | Record a conduit event receipt |\\n'
-        '| report_builder_status | Report builder process status |\\n'
-        '| agent_heartbeat | Report agent liveness |\\n'
-        '| agent_finished | Report agent completed task |\\n\\n'
-        '### Queries\\n'
-        '| query_analytics | Query conduit analytics |\\n'
-        '| query_prompts | Search captured prompts |\\n'
-        '| query_nebula_backlog | Query Nebula RMS backlog |\\n'
-        '| query_nebula_systems | Query Nebula RMS hierarchy |',
-        ARRAY['reference', 'conduit-mcp', 'tools', 'appendix'],
-        ARRAY['list tools', 'what tools', 'conduit-mcp', 'MCP reference'],
-        ARRAY[]::TEXT[]
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder',
-                         'reviewer', 'critic', 'analyst', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 20. Knowledge Stratification (L1-L4)
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'knowledge-stratification',
-        'Knowledge Stratification (L1-L4)',
-        'Two-axis knowledge model: abstraction levels L1-L4 combined with visibility scopes.',
-        E'## Knowledge Stratification\\n\\n'
-        'Every document and chunk has two independent attributes: '
-        'Abstraction Level and Visibility Scope.\\n\\n'
-        '### Axis 1: Abstraction Level (L1-L4)\\n'
-        '| Level | Name | Description | Primary Consumers |\\n'
-        '|-------|------|-------------|-------------------|\\n'
-        '| L1 | Raw / operational | APIs, schemas, contracts, configs | Builder |\\n'
-        '| L2 | Structured / intermediate | Subsystem design, DAG semantics | Builder, Architect |\\n'
-        '| L3 | Planning / architectural | Rationale, trade-offs, philosophy | Architect, Inspector |\\n'
-        '| L4 | Meta / system reasoning | Cross-system doctrine, ontology | Architect (opt-in) |\\n\\n'
-        '### Axis 2: Visibility Scope\\n'
-        '| Scope | Effect |\\n'
-        '|-------|--------|\\n'
-        '| builder | Visible to builder only |\\n'
-        '| architect | Visible to architect only |\\n'
-        '| planner | Visible to planner only |\\n'
-        '| reviewer | Visible to reviewer only |\\n'
-        '| all | Visible to all roles |\\n\\n'
-        'See the full card for per-role query filters.',
-        ARRAY['reference', 'knowledge', 'stratification', 'levels'],
-        ARRAY['knowledge levels', 'L1 L2 L3 L4', 'stratification', 'visibility'],
-        ARRAY[]::TEXT[]
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder',
-                         'reviewer', 'critic', 'analyst', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 21. WorkRequest Pattern Participation
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'work-request-participation',
-        'WorkRequest Pattern Participation',
-        'How to participate in the WorkRequest pattern: capture, plan, emit, execute, recover.',
-        E'## WorkRequest Participation\\n\\n'
-        'Unless the user explicitly asks for a different workflow, '
-        'participate as follows:\\n\\n'
-        '### 1. Prompt & Intent Capture\\n'
-        'For non-trivial requests, preserve the request in prompt/planning records. '
-        'Query conduit-mcp state before creating new formats.\\n\\n'
-        '### 2. Implementation Plan Stacking\\n'
-        'For substantial tasks: create/update a plan, stack on existing state, '
-        'keep scope narrow, avoid duplicating active plans.\\n\\n'
-        '### 3. WorkRequest Emission\\n'
-        'Generate explicit WorkRequests when prompted or when workflow expects them. '
-        'Follow existing schemas, version rather than mutate.\\n\\n'
-        '### 4. Execution\\n'
-        'Execute only authorized work. Respect plan boundaries, blocked states, '
-        'dependency ordering.\\n\\n'
-        '### 5. Recovery\\n'
-        'On session restart: query conduit state and .agents/ artifacts first. '
-        'Assume partial completion. Prioritize durable state over conversation memory.',
-        ARRAY['governance', 'workrequest', 'participation', 'pattern'],
-        ARRAY['work request', 'how to work', 'participation pattern'],
-        ARRAY['conduit-mcp_query_conduit_state']
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder',
-                         'reviewer', 'critic', 'analyst', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 22. Day/Night Turn Boundary
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'day-night-boundary',
-        'Day/Night Turn Boundary',
-        'Day (evidence accumulation) vs Night (reconciliation between sessions).',
-        E'## Day/Night Turn Boundary\\n\\n'
-        '### Day (within a turn)\\n'
-        '- Evidence accumulation. Messages arrive, work is done, records written.\\n'
-        '- No full perceptual recalculation.\\n'
-        '- Each turn appends to the timeline without reconciling belief state.\\n\\n'
-        '### Night (between sessions / reflection)\\n'
-        '- Accumulated records reconciled. Stale threads resolved.\\n'
-        '- Divergences evaluated. Projections regenerated.\\n'
-        '- Belief state recomputed.\\n\\n'
-        'During Day, agents must not require full recalculation to respond. '
-        'The inbox query is the attention filter.',
-        ARRAY['operational-model', 'day-night', 'perceptual-cycle'],
-        ARRAY['day night', 'turn boundary', 'perceptual cycle', 'reconciliation'],
-        ARRAY[]::TEXT[]
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder',
-                         'reviewer', 'critic', 'analyst', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 23. Role Governance & Epistemic Constraints
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'role-governance',
-        'Role Governance & Epistemic Constraints',
-        'Roundtable of epistemic agents with competing claims. No single role dominates.',
-        E'## Role Governance\\n\\n'
-        'Roles form a roundtable of epistemic agents with competing claims.\\n\\n'
-        '### Invariants\\n'
-        'I1 \\u2014 No single layer dominates.\\n'
-        'I2 \\u2014 Origin gating: each role owns its binding output.\\n'
-        'I3 \\u2014 Divergence is signal, not noise.\\n'
-        'I4 \\u2014 Read-only provenance records.\\n\\n'
-        '### Binding Outputs\\n'
-        '- Architecture: type:decision (Architect)\\n'
-        '- Implementation: type:change (Builder/Engineer)\\n'
-        '- Review: type:approval / rejection (Reviewer)\\n'
-        '- Plans: type:proposal (Planner)\\n'
-        '- Triage: type:triage (Analyst)\\n'
-        '- Compliance: type:violation (Inspector)\\n\\n'
-        'A role may propose in any domain, but only the owning role closes.',
-        ARRAY['governance', 'role', 'epistemic', 'constraints'],
-        ARRAY['governance', 'role rules', 'epistemic', 'who decides'],
-        ARRAY[]::TEXT[]
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder',
-                         'reviewer', 'critic', 'analyst', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 24. Per-Role Outbox Table
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'per-role-outbox-table',
-        'Per-Role Outbox Table',
-        'Reference: what each role sends, to whom, and when.',
-        E'## Per-Role Outbox Table\\n\\n'
-        'See the full card for the complete routing table.\\n\\n'
-        '### Key entries per role:\\n'
-        '- **Planner**: plan proposals to Architect/Engineer, proposals to all\\n'
-        '- **Architect**: decisions to Engineer, reviews to Planner\\n'
-        '- **Engineer**: tasks to self, questions to Architect, blockers to Planner\\n'
-        '- **Builder**: changes to Reviewer, blockers to Planner\\n'
-        '- **Reviewer**: approval/rejection, issues to Engineer\\n'
-        '- **Analyst**: gaps to Planner, triage to Architect\\n'
-        '- **Critic**: warnings to Analyst\\n'
-        '- **Inspector**: errors/violations to Analyst/Planner\\n'
-        '- **Archivist**: history to all (read-only)',
-        ARRAY['reference', 'messaging', 'outbox', 'routing'],
-        ARRAY['outbox', 'who sends what', 'role messages'],
-        ARRAY[]::TEXT[]
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder',
-                         'reviewer', 'critic', 'analyst', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 25. Agent Config Frontmatter Template
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'agent-config-template',
-        'Agent Config Frontmatter Template',
-        'Frontmatter template for .opencode/agents/ role definition files.',
-        E'## Agent Config Role Definition\\n\\n'
-        'Each agent role .md file in .opencode/agents/ MUST include:\\n\\n'
-        '\`\`\`yaml\\n'
-        '---\\n'
-        'assumes_role: <role>\\n'
-        'message:\\n'
-        '  inbox_query:\\n'
-        '    - tags contain "to:<role>"\\n'
-        '    - tags contain "status:open"\\n'
-        '  record_types: [valid types]\\n'
-        '  auto_present: true\\n'
-        '  enrich_context: true\\n'
-        '---\\n'
-        '\`\`\`\\n\\n'
-        '### Fields\\n'
-        '- assumes_role: engineer|architect|planner|builder|reviewer|critic|analyst|inspector\\n'
-        '- inbox_query: tag filters for inbox\\n'
-        '- record_types: valid record types this role may write\\n'
-        '- auto_present: surface inbox on every turn\\n'
-        '- enrich_context: load linked data on boot\\n\\n'
-        'Valid record_type values: report, analysis, assessment, inspection, '
-        'prompt, response, engineering_log, architecture_note, decision',
-        ARRAY['reference', 'config', 'frontmatter', 'agent-definition'],
-        ARRAY['agent config', 'frontmatter', 'role definition'],
-        ARRAY[]::TEXT[]
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder',
-                         'reviewer', 'critic', 'analyst', 'inspector'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 26. Planner: Create & Manage Plans
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'planner-create-plan',
-        'Planner: Create & Manage Plans',
-        'How to create, update, and promote implementation plans (via nebula_create_plan), and route DB-change plans to the Engineer before a Builder starts.',
-        E'## Creating & Managing Plans\\n\\n'
-        '### Create a Plan (ready for implementation)\\n'
-        'Use \`nebula_create_plan\` (nebula-mcp) with title, project, goal, filesAffected, '
-        'acceptanceCriteria, and dependencies. conduit-mcp create_plan / create_proposed_plan '
-        'are REMOVED stubs (TOOL_NOT_FOUND) — do not call them. The plan lands in '
-        'nebula.implementation_plans (status pending) and conduit-mcp auto-bootstraps a '
-        'PLAN_CREATE receipt + builder ticket within ~30s.\\n\\n'
-        '### Proposed / Planning states\\n'
-        'There is no create_proposed_plan tool. Start ideas as a full plan via nebula_create_plan; '
-        'use \`conduit-mcp_revise_plan\` to create a revision copy for planning discussion. '
-        'Use \`conduit-mcp_update_plan\` / \`conduit-mcp_report_plan_metadata\` '
-        'to set filesAffected, acceptanceCriteria, dependencies.\\n\\n'
-        '### ⚠ DB-Change Routing (mandatory rule)\\n'
-        '**Plans that require database changes go to the DBA for the DB work BEFORE a '
-        'Builder starts implementation.** When creating or updating a plan whose goal, '
-        'filesAffected, or acceptance criteria involve schema changes, migrations, DDL, '
-        'seed/data backfills, or index changes:\\n'
-        '1. Write a nebula agent record tagged \`["to:dba", "type:db-change", "planRef:<N>", "status:open"]\` '
-        'describing exactly which database changes are required (tables, columns, '
-        'migrations, data). Use recordType report.\\n'
-        '2. Put the DB change as the FIRST acceptance criterion of the plan so the builder '
-        'knows the schema must exist before implementation.\\n'
-        '3. The DBA posts the proposed alterations to the Assembly Drafts forum '
-        '(slug \`draft\`) and applies them ONLY after admin approval. The Builder '
-        'must not start implementation until the DBA completes the DB change '
-        '(approval + application) and the plan is still pending/ready. If a builder '
-        'ticket is already open for a DB-change plan, escalate via \`type:escalation\` '
-        'to keep sequencing.\\n\\n'
-        '### Update Metadata\\n'
-        'Use \`conduit-mcp_update_plan\` or \`conduit-mcp_report_plan_metadata\` '
-        'to set filesAffected, acceptanceCriteria, dependencies.\\n\\n'
-        '### Revise a Plan\\n'
-        'Use \`conduit-mcp_revise_plan\` to create a revision copy (issues PLANNING on the new copy).\\n\\n'
-        '### Issue Receipts (state transitions)\\n'
-        'Use \`conduit-mcp_issue_receipt\` with plan_id, type (PLAN_CREATE|IMPLEMENTATION|'
-        'REVIEW_PASS|REVIEW_REJECT|BLOCK|PLANNING|HOLD|CANCELLED), and agent_role.\\n\\n'
-        '### Delete a Plan\\n'
-        'Use \`conduit-mcp_delete_plan\` for soft-delete (preserves audit trail). '
-        'Use \`conduit-mcp_hard_delete_plan\` (with title confirmation) for permanent removal.',
-        ARRAY['planner', 'plans', 'create', 'manage', 'workflow', 'db-change'],
-        ARRAY['create plan', 'new plan', 'propose plan', 'promote plan', 'delete plan',
-              'database change', 'schema change', 'migration'],
-        ARRAY['nebula_create_plan', 'conduit-mcp_update_plan',
-              'conduit-mcp_revise_plan', 'conduit-mcp_issue_receipt',
-              'conduit-mcp_delete_plan', 'conduit-mcp_hard_delete_plan']
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['planner', 'engineer'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 27. Implementation Plan Template
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'plan-template-format',
-        'Implementation Plan Template',
-        'Required sections for every implementation plan: Goal, Files, AC, Dependencies.',
-        E'## Implementation Plan Format\\n\\n'
-        'Every plan written to pending/ must include these sections:\\n\\n'
-        '\`\`\`markdown\\n'
-        '## Goal\\n'
-        '<what this plan achieves>\\n\\n'
-        '## Files Affected\\n'
-        '<absolute paths to every file that will be created or modified>\\n\\n'
-        '## Acceptance Criteria\\n'
-        '<how to verify the plan was implemented successfully \\u2014 '
-        'specific commands, outputs, or observable states>\\n\\n'
-        '## Dependencies\\n'
-        '<other plan names this one depends on, or "none">\\n'
-        '\`\`\`',
-        ARRAY['reference', 'template', 'plan-format'],
-        ARRAY['plan template', 'plan format', 'acceptance criteria', 'files affected'],
-        ARRAY[]::TEXT[]
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['planner', 'builder', 'engineer'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 28. Builder: Implementation Workflow
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'builder-workflow',
-        'Builder: Implementation Workflow',
-        'How the Builder picks up pending plans, implements them, and handles blockers.',
-        E'## Builder Workflow\\n\\n'
-        '### 1. Query Pipeline State\\n'
-        'Use \`conduit-mcp_query_conduit_state\` to find pending plans. '
-        'Check for blocked plans first \\u2014 if any exist, stop and alert.\\n\\n'
-        '### 2. Read Plan Details\\n'
-         'Use \`conduit-mcp_get_plan_receipts\` to review plan receipts '
-         'and confirm its lifecycle state. Read the .md file from filesystem '
-         'for the implementation spec (goal, files, AC, deps).\\n\\n'
-         '### 3. Implement\\n'
-         'Modify code according to the plan goal, files affected, and '
-         'acceptance criteria. Use \`conduit-mcp_agent_heartbeat\` to report '
-        'liveness.\\n\\n'
-        '### 4. Handle Blockers\\n'
-        'If implementation cannot proceed: \`conduit-mcp_issue_receipt\` '
-        'with type BLOCK. Report the issue to the user.\\n\\n'
-        '### 5. Report Completion\\n'
-        'Use \`conduit-mcp_agent_finished\` when the plan is implemented. '
-        'The pipeline manager handles receipt advancement automatically.\\n\\n'
-        '### Continuous Execution Rule\\n'
-        'The Builder works through all available plans without pausing. '
-        'Only stops on: true blocker, logical impossibility, or user interrupt. '
-        'Does NOT ask for approval between plans.',
-        ARRAY['builder', 'workflow', 'implementation', 'plans'],
-        ARRAY['builder workflow', 'implement plan', 'pending plans', 'blocker'],
-        ARRAY['conduit-mcp_query_conduit_state', 'conduit-mcp_get_plan_receipts',
-              'conduit-mcp_agent_heartbeat', 'conduit-mcp_issue_receipt',
-              'conduit-mcp_agent_finished']
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['builder', 'engineer'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 29. Verification Commands
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'verification-commands',
-        'Verification & Build Commands',
-        'Build, typecheck, and test commands for the nexus workspace.',
-        E'## Verification Commands\\n\\n'
-        '### MCP Server\\n'
-        '\`\`\`bash\\n'
-        'cd nexus/typescript/conduit-mcp && npx tsc --noEmit\\n'
-        'cd nexus/typescript/conduit-mcp && npx vitest run\\n'
-        '\`\`\`\\n\\n'
-        '### Backend (LOSM)\\n'
-        '\`\`\`bash\\n'
-        'cd nexus/python/ai/losm && source .venv/bin/activate && pytest\\n'
-        '\`\`\`\\n\\n'
-        '### UI (React)\\n'
-        '\`\`\`bash\\n'
-        'cd nexus-ui/nexus-plurality-ui && npx tsc --noEmit\\n'
-        'cd nexus-ui/nexus-plurality-ui && npm run build\\n'
-        '\`\`\`\\n\\n'
-        '### Conduit UI (Angular)\\n'
-        '\`\`\`bash\\n'
-        'cd nexus/angular/conduit-ui && npx ng build\\n'
-        '\`\`\`\\n\\n'
-        '### Chat Server\\n'
-        '\`\`\`bash\\n'
-        'cd nexus/python/conduit && python3 agent_chat.py\\n'
-        '\`\`\`',
-        ARRAY['reference', 'commands', 'build', 'test', 'verification'],
-        ARRAY['build', 'test', 'typecheck', 'verify', 'tsc', 'vitest', 'pytest'],
-        ARRAY[]::TEXT[]
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'builder'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    -- ════════════════════════════════════════════════════════════════
-    -- 30. MCP Server & Chat Configuration
-    -- ════════════════════════════════════════════════════════════════
-    v_memory_id := NULL;
-    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
-    VALUES (
-        'mcp-server-config',
-        'MCP Server & Chat Configuration',
-        'Conduit-mcp server, chat server, health check, and orphan scan details.',
-        E'## MCP Server Configuration\\n\\n'
-        '### Conduit-mcp (port 3100)\\n'
-        '- Pipeline orchestration: state machine, receipts, tickets\\n'
-        '- All plan creation/promotion/state queries go through MCP tools\\n'
-        '- Never write .md files directly to nexus/graph/IMPLEMENTATION_PLANS/\\n\\n'
-        '### Chat Server (port 3101)\\n'
-        '- Python: nexus/python/conduit/agent_chat.py\\n'
-        '- MCP server proxies /chat routes:\\n'
-        '  - GET /chat/config \\u2014 available agent roles\\n'
-        '  - POST /chat/send \\u2014 send message to an agent\\n'
-        '  - GET /chat/sessions \\u2014 active sessions\\n'
-        '- Supports @planner, @builder, @reviewer, @critic notation\\n'
-        '- Spawns opencode run --agent <role> as background process\\n'
-        '- Streams output via SSE: /chat/stream/<id>\\n\\n'
-        '### Health Check\\n'
-        '- GET /health returns server status, PID, pipeline state\\n'
-        '- OrphanScan section: detects soft-deleted plans with stale .md files, '
-        'and filesystem artifacts with no DB row',
-        ARRAY['reference', 'config', 'server', 'mcp', 'chat'],
-        ARRAY['mcp server', 'chat server', 'health check', 'port 3100', 'port 3101'],
-        ARRAY[]::TEXT[]
-    )
-    ON CONFLICT (slug) DO NOTHING
-    RETURNING id INTO v_memory_id;
-    IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['engineer', 'architect', 'planner', 'builder'];
-        FOREACH v_role IN ARRAY v_roles LOOP
-            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
-            VALUES (v_memory_id, v_role, NOW(), NULL);
-        END LOOP;
-    END IF;
-
-    RAISE NOTICE 'Memory procedures seeded.';
-END $$;`;
 }
 
 // ── AI Config CRUD ─────────────────────────────────────────────────
@@ -2139,6 +1079,7 @@ export interface AIHarnessRow {
 export interface AIModelRow {
   id: string; name: string; harness_id: string;
   provider_id: string | null; model_identifier: string;
+  verified: boolean;
   created_at: string; updated_at: string;
 }
 
@@ -2161,7 +1102,7 @@ export interface ConfigBundleRow {
   provider_id: string | null;
   harness_id: string | null;
   priority: number;
-  invocation_mode: "CLI" | "HTTP" | "SDK" | "MCP";
+  invocation_mode: "CLI" | "HTTP" | "SDK" | "MCP" | "INTERACTIVE";
   command: string | null;
   endpoint_url: string | null;
   timeout_ms: number | null;
@@ -2281,6 +1222,48 @@ export async function deleteAIModel(id: string): Promise<boolean> {
   return changes > 0;
 }
 
+// ── Verification ────────────────────────────────────────────────────
+// setModelVerified marks a model as verified after a successful harness
+// run; rearmBundlesForModel re-activates every config bundle referencing
+// the model (the verified-model gate trigger allows the flip now that the
+// model is verified).
+
+export async function setModelVerified(id: string, verified: boolean): Promise<void> {
+  await qRun(
+    "UPDATE models SET verified = @verified, updated_at = @updated_at WHERE id = @id",
+    { id, verified, updated_at: new Date().toISOString() }
+  );
+}
+
+export async function rearmBundlesForModel(modelId: string): Promise<number> {
+  return qRun(
+    "UPDATE config_bundle SET is_active = 1, updated_at = @updated_at WHERE model_id = @model_id AND is_active = 0",
+    { model_id: modelId, updated_at: new Date().toISOString() }
+  );
+}
+
+// ── Verified-model gate helpers ────────────────────────────────────
+// A model only becomes usable once it has been verified (an inference
+// test actually passed through a harness). Bundles referencing unverified
+// models are forced inactive on every write path so they can never enter
+// the resolver queue — the UI filters them from model dropdowns, and the
+// test-invoke endpoint refuses them outright.
+
+async function getVerifiedModelIds(ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await qAll(
+    "SELECT id FROM models WHERE id = ANY(@ids) AND verified IS TRUE",
+    { ids }
+  );
+  return new Set(rows.map((r) => r.id));
+}
+
+async function isModelVerified(id: string): Promise<boolean> {
+  if (!id) return false;
+  const row = await qOne("SELECT verified FROM models WHERE id = @id", { id });
+  return !!(row && row.verified);
+}
+
 // ── Role Configs (via config_bundle) ─────────────────────────────
 //
 // The `role_config` table was removed. Role assignments are now stored in
@@ -2319,14 +1302,19 @@ export async function upsertAIRoleConfig(
   rc: Partial<AIRoleConfigRow> & { id: string; role: string; provider_id: string; harness_id: string; model_id: string },
 ): Promise<void> {
   const now = new Date().toISOString();
+  // Verified-model gate: a primary role config over an unverified model is
+  // stored inactive so it never resolves.
+  const verified = await isModelVerified(rc.model_id);
+  const isActive = verified ? 1 : 0;
   await qRun(
     `INSERT INTO config_bundle (id, name, role, model_id, provider_id, harness_id, priority, invocation_mode, is_active, metadata, created_at, updated_at)
-     VALUES (@id, @name, @role, @model_id, @provider_id, @harness_id, 0, 'CLI', 1, '{}', @created_at, @updated_at)
+     VALUES (@id, @name, @role, @model_id, @provider_id, @harness_id, 0, 'CLI', @is_active, '{}', @created_at, @updated_at)
      ON CONFLICT (id) DO UPDATE SET
        name = EXCLUDED.name, role = EXCLUDED.role, model_id = EXCLUDED.model_id,
        provider_id = EXCLUDED.provider_id, harness_id = EXCLUDED.harness_id,
-       priority = 0, is_active = 1, updated_at = EXCLUDED.updated_at`,
+       priority = 0, is_active = EXCLUDED.is_active, updated_at = EXCLUDED.updated_at`,
     { ...rc, name: `Primary: ${rc.model_id} for ${rc.role}`,
+      is_active: isActive,
       extra_params: rc.extra_params ?? "{}",
       created_at: rc.created_at ?? now, updated_at: now }
   );
@@ -2358,6 +1346,19 @@ export async function upsertConfigBundle(
   b: Partial<ConfigBundleRow> & { id: string; name: string; role: string; model_id: string },
 ): Promise<void> {
   const now = new Date().toISOString();
+  // Verified-model gate: a bundle whose model has not been verified can never
+  // be active, regardless of what the caller requested. When the model IS
+  // verified, preserve the historic default (absent is_active → active).
+  // is_active is INTEGER in the schema; the route normalizes booleans to 1/0
+  // before calling, so 0 is the only "inactive" representation seen here.
+  const verified = await isModelVerified(b.model_id);
+  // INTERACTIVE bundles are dispatched in Freebuff — the model is the
+  // human/CLI model, not an opencode provider reference — so the verified
+  // gate (which exists to stop opencode spawning dead model ids) does not
+  // apply to this channel.
+  const isActive = b.invocation_mode === "INTERACTIVE"
+    ? (b.is_active === 0 ? 0 : 1)
+    : (verified ? (b.is_active === 0 ? 0 : 1) : 0);
   await qRun(
     `INSERT INTO config_bundle (id, name, role, model_id, provider_id, harness_id, priority, invocation_mode, command, endpoint_url, timeout_ms, valid_from, valid_to, is_active, metadata, created_at, updated_at)
      VALUES (@id, @name, @role, @model_id, @provider_id, @harness_id, @priority, @invocation_mode, @command, @endpoint_url, @timeout_ms, @valid_from, @valid_to, @is_active, @metadata, @created_at, @updated_at)
@@ -2380,7 +1381,7 @@ export async function upsertConfigBundle(
       timeout_ms: b.timeout_ms ?? null,
       valid_from: b.valid_from ?? null,
       valid_to: b.valid_to ?? null,
-      is_active: b.is_active ?? 1,
+      is_active: isActive,
       metadata: b.metadata ?? "{}",
       created_at: b.created_at ?? now,
       updated_at: now,
@@ -2397,7 +1398,7 @@ export async function upsertConfigBundles(
   role: string, bundles: {
     model_id: string; priority: number;
     provider_id?: string | null; harness_id?: string | null;
-    name?: string; invocation_mode?: "CLI" | "HTTP" | "SDK" | "MCP";
+    name?: string; invocation_mode?: "CLI" | "HTTP" | "SDK" | "MCP" | "INTERACTIVE";
     command?: string | null; endpoint_url?: string | null; timeout_ms?: number | null;
   }[],
 ): Promise<void> {
@@ -2405,6 +1406,11 @@ export async function upsertConfigBundles(
   const now = new Date().toISOString();
 
   console.log(`[upsertConfigBundles] Starting for role: ${role}, bundles: ${bundles.length}`);
+
+  // Verified-model gate: any bundle in the batch whose model is unverified is
+  // inserted inactive (this path previously hardcoded is_active=1, which would
+  // have re-activated unverified models on every role save).
+  const verifiedIds = await getVerifiedModelIds(bundles.map((b) => b.model_id));
 
   await withTransaction(async (client) => {
     const deleteResult = await tRun(client, "DELETE FROM config_bundle WHERE role = @role", { role });
@@ -2419,13 +1425,20 @@ export async function upsertConfigBundles(
             command, endpoint_url, timeout_ms, is_active, metadata, created_at, updated_at)
          VALUES
            (@id, @name, @role, @model_id, @provider_id, @harness_id, @priority, @invocation_mode,
-            @command, @endpoint_url, @timeout_ms, 1, '{}', @now, @now)`,
+            @command, @endpoint_url, @timeout_ms, @is_active, '{}', @now, @now)`,
         {
           id,
           name: b.name ?? `Bundle: ${b.model_id}`,
           role,
           model_id: b.model_id,
           priority: b.priority,
+          // INTERACTIVE bundles never spawn a harness — exemption from the
+          // verified gate (see trigger v17). Note: this batch path has no
+          // is_active channel in its input, so INTERACTIVE always lands
+          // active here (the single upsert can honor an explicit inactive).
+          is_active: b.invocation_mode === "INTERACTIVE"
+            ? 1
+            : (verifiedIds.has(b.model_id) ? 1 : 0),
           provider_id: b.provider_id ?? null,
           harness_id: b.harness_id ?? null,
           invocation_mode: b.invocation_mode ?? "CLI",
@@ -2934,6 +1947,8 @@ export interface AgentSchedulerRow {
   agent_config: string;
   schedule_type: string;
   schedule_value: number;
+  cron_expr: string | null;
+  event_criteria: string | null;
   project_dir: string;
   task_slug: string | null;
   enabled: number;
@@ -2989,13 +2004,14 @@ function toScheduleSeconds(v: unknown, dflt: number): number {
 export async function createSchedulerEntry(data: {
   role: string; model_id?: string; harness?: string;
   agent_config?: string; schedule_type?: string; schedule_value?: number | string;
+  cron_expr?: string; event_criteria?: string | object | null;
   project_dir?: string; task_slug?: string | null;
   enabled?: number | boolean | string;
 }): Promise<AgentSchedulerRow> {
   const now = new Date().toISOString();
   const row = await qOne(`
-    INSERT INTO agent_scheduler (role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, task_slug, enabled, metadata, created_at, updated_at)
-    VALUES (@role, @model_id, @harness, @agent_config, @schedule_type, @schedule_value, @project_dir, @task_slug, @enabled, '{}', @now, @now)
+    INSERT INTO agent_scheduler (role, model_id, harness, agent_config, schedule_type, schedule_value, cron_expr, event_criteria, project_dir, task_slug, enabled, metadata, created_at, updated_at)
+    VALUES (@role, @model_id, @harness, @agent_config, @schedule_type, @schedule_value, @cron_expr, @event_criteria, @project_dir, @task_slug, @enabled, '{}', @now, @now)
     RETURNING *
   `, {
     role: data.role,
@@ -3004,6 +2020,10 @@ export async function createSchedulerEntry(data: {
     agent_config: data.agent_config ?? "{}",
     schedule_type: data.schedule_type ?? "interval",
     schedule_value: toScheduleSeconds(data.schedule_value, 3600),
+    cron_expr: data.cron_expr ?? null,
+    event_criteria: data.event_criteria == null ? null
+      : typeof data.event_criteria === "string" ? data.event_criteria
+      : JSON.stringify(data.event_criteria),
     project_dir: data.project_dir ?? "/home/codex/dev",
     task_slug: data.task_slug ?? null,
     enabled: toEnabledInt(data.enabled, 1),
@@ -3015,6 +2035,7 @@ export async function createSchedulerEntry(data: {
 export async function updateSchedulerEntry(id: number, data: Partial<{
   role: string; model_id: string | null; harness: string;
   agent_config: string; schedule_type: string; schedule_value: number | string;
+  cron_expr: string | null; event_criteria: string | object | null;
   project_dir: string; enabled: number | boolean | string; last_run_at: string;
   last_run_status: string; metadata: string;
 }>): Promise<AgentSchedulerRow | undefined> {
@@ -3022,7 +2043,7 @@ export async function updateSchedulerEntry(id: number, data: Partial<{
   const sets: string[] = ["updated_at = @now"];
   const params: Record<string, any> = { id, now };
   const fields = ["role", "model_id", "harness", "agent_config", "schedule_type",
-    "schedule_value", "project_dir", "task_slug", "enabled", "last_run_at", "last_run_status", "metadata"];
+    "schedule_value", "cron_expr", "event_criteria", "project_dir", "task_slug", "enabled", "last_run_at", "last_run_status", "metadata"];
   for (const f of fields) {
     if ((data as any)[f] !== undefined) {
       sets.push(`${f} = @${f}`);
@@ -3030,6 +2051,10 @@ export async function updateSchedulerEntry(id: number, data: Partial<{
         ? toEnabledInt((data as any)[f], 1)
         : f === "schedule_value"
         ? toScheduleSeconds((data as any)[f], 3600)
+        : f === "event_criteria" && (data as any)[f] != null
+        ? typeof (data as any)[f] === "string"
+          ? (data as any)[f]
+          : JSON.stringify((data as any)[f])
         : (data as any)[f];
     }
   }
@@ -3088,6 +2113,10 @@ async function resolveSchedulerPrompt(
 }
 
 export async function getDueSchedulerEntries(): Promise<DueSchedulerEntry[]> {
+  // NOTE: the canonical evaluator is the Python runner
+  // (python/tackle/agent_scheduler_runner.py evaluate_tick — T15). This
+  // endpoint is a UI convenience mirror for the interval-based legacy
+  // evaluation; cron/event entries are matched + stamped by the runner only.
   const rows = await qAll(`
     SELECT * FROM agent_scheduler
     WHERE enabled = 1

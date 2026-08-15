@@ -5,13 +5,15 @@
 
 Merges Tackle role context (prompt + tool ACL + procedure cards) with Wind task context (inputs + acceptance criteria) and invokes an agent via the configured harness.
 
-**3 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**5 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` |  |
 | POST | `/resolve-context` |  |
 | POST | `/run` |  |
+| POST | `/run-direct` |  |
+| GET | `/sessions` | GET /sessions — active session list (runaway watchdog visibility) |
 
 ## Regeneration
 

@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """
-Ingest .conduit-data/WORK_REQUESTS/ JSON files into nebula.work_request_history.
+Ingest .conduit-data/WORK_REQUESTS/ JSON files into nebula.work_requests_history.
 
 Phase 1 of Plan 1265: Front-Half Pipeline Redesign.
 Captures 1880+ historical work requests from the old filesystem pipeline
 so the deduplication gate can recognize previously-planned work.
+
+Note: As of 2026-08-11, all 1,880 legacy work requests were migrated into
+nebula.work_requests_history (canonical SCD-type-4 table). The legacy table
+(nebula.work_request_history) was dropped. This script is retained for
+re-ingestion scenarios; its INSERT target should be updated to match the
+canonical schema before running.
 
 Usage:
     python3 ingest_conduit_data.py [--dry-run] [--verbose]
@@ -25,7 +31,8 @@ DB_CONFIG = {
     "password": "pgpass",
 }
 
-WR_DIR = os.path.join(os.path.dirname(__file__), "..", "..", ".conduit-data", "WORK_REQUESTS")
+# .conduit-data deleted 2026-08-09; mirror is the posterity home
+WR_DIR = os.path.join(os.path.dirname(__file__), "..", "audit", "CONDUIT_DATA", "WORK_REQUESTS")
 
 
 def load_work_requests(wr_dir: str) -> list[dict]:
@@ -92,7 +99,7 @@ def ingest(requests: list[dict], dry_run: bool = False, verbose: bool = False) -
     cur = conn.cursor()
 
     insert_sql = """
-        INSERT INTO nebula.work_request_history
+        INSERT INTO nebula.work_requests_history
             (id, plan_number, title, goal, status, domain, priority,
              created_at, updated_at, agent_id, model, session_id, raw_json)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)

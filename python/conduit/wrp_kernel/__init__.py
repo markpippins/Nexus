@@ -33,7 +33,13 @@ from nexus_core.wrp.states import (
 )
 
 # Conduit-specific implementations
-from .engine import KernelEngine, KernelState
+from .engine import (
+    KernelEngine,
+    KernelState,
+    DeltaStore,
+    kernel_state_fingerprint,
+    byte_identical_replay,
+)
 from .identity import IdentityEngine, Identity
 from .graph import GraphIndex, GraphEdge
 from .lineage import LineageEngine, LineageEvent
@@ -42,6 +48,7 @@ __all__ = [
     "KernelDelta", "KernelDeltaBatch",
     "KernelEngine", "KernelResult", "KernelError",
     "KernelState", "KernelSnapshot",
+    "DeltaStore", "kernel_state_fingerprint", "byte_identical_replay",
     "WRP_ADJACENCY_MATRIX", "RECEIPT_TO_WRP_STATE", "is_valid_transition",
     "IdentityEngine", "Identity",
     "GraphIndex", "GraphEdge",

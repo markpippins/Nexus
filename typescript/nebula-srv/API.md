@@ -5,7 +5,7 @@
 
 Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge graph, and cross-references.
 
-**216 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**223 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -37,6 +37,7 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | POST | `/api/audit/sync` | POST /api/audit/sync — scan filesystem and upsert all audit files |
 | GET | `/api/candidates` |  |
 | GET | `/api/candidates/:id` |  |
+| GET | `/api/cascade/subscriber-status` | cascade interactive-turn subscriber (the daemon that turns duality comments into agent turns). The subscriber tags its PG connection with application_name='cascade-interactive-turn'; when the daemon dies its socket closes and the backend disappears from pg_stat_activity. The duality-ui TopBar polls  |
 | GET | `/api/conduit/deleted-plans` | GET /api/conduit/deleted-plans — shortcut to find all soft-deleted plans |
 | GET | `/api/conduit/plans` | CONDUIT — plan history & point-in-time queries (conduit + vision schemas) Reads from nebula.plans, vision.receipts, vision.tickets via fully qualified table names (pool search_path=nebula). GET /api/conduit/plans — list all conduit plans, option to include soft-deleted Query params: includeDeleted ( |
 | GET | `/api/conduit/plans/:id/history` | GET /api/conduit/plans/:id/history — full lifecycle history for one plan Returns plan metadata (even if deleted), all receipts, all tickets, linked sessions, token usage |
@@ -164,6 +165,12 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | DELETE | `/api/requirements/:id/dependencies/:depId` | DELETE /api/requirements/:id/dependencies/:depId — remove a dependency link |
 | POST | `/api/requirements/:id/move` | SYSTEM FOLDERS POST /api/requirements/:id/move — kanban-friendly single-id status move (Plan 0131) |
 | PATCH | `/api/requirements/batch` | PATCH /api/requirements/batch — batch status update (BEFORE /:id!) |
+| GET | `/api/role-leases` | GET /api/role-leases — list role leases (filters: role, status) |
+| POST | `/api/role-leases/:id/renew` | POST /api/role-leases/:id/renew — renew an ACTIVE lease (window + budget) |
+| POST | `/api/role-leases/:id/revoke` | POST /api/role-leases/:id/revoke — release an ACTIVE role lease |
+| POST | `/api/role-leases/consume` | POST /api/role-leases/consume — increment consumed_units (all channels) Unified accounting: execution_worker, harness-srv, and interactive Freebuff all hit this one endpoint for lease consumption. When the budget is exhausted, the endpoint auto-revokes the lease and emits a type:lease-exhausted agen |
+| POST | `/api/role-leases/issue` | ROLE LEASES (RoleLeases / plan 1286) — session-level leases in tackle schema: a bounded window + budget under which a role on a channel may consume work. Mirrors execution.leases (per-request) at role scope. POST /api/role-leases/issue — issue an ACTIVE role lease |
+| GET | `/api/role-leases/stale` | GET /api/role-leases/stale — ACTIVE leases past window/budget (for sweep) |
 | GET | `/api/roles` | ROLES GET /api/roles — list all roles (governance roles with capabilities) |
 | GET | `/api/roles/:id` | GET /api/roles/:id — single role |
 | GET | `/api/search` | SEARCH (cross-entity full-text) GET /api/search?q=... |

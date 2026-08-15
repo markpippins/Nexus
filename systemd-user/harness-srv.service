@@ -1,0 +1,38 @@
+[Unit]
+# harness-srv — generic execution harness (Tackle role context + Wind task context)
+# on :3420. Previously managed outside the nexus start-script lifecycle;
+# tracked here so it joins the standard ALL_SERVICES registry.
+Description=Harness SRV — Generic execution harness (Tackle role context + Wind task context)
+After=network.target postgresql.service redis.service tackle-srv.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/typescript/harness-srv
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=HARNESS_PORT=3420
+Environment=HARNESS_WORK_DIR=/home/codex/dev
+Environment=NODE_ENV=production
+Environment=OPENCODE_BIN=/home/codex/.opencode/bin/opencode
+Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/home/codex/.opencode/bin:/usr/local/bin:/usr/bin:/bin
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/node dist/index.js
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart policy ─────────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# ── Logging ────────────────────────────────────────────────────────────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=harness-srv
+
+[Install]
+WantedBy=default.target

@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import fs from "fs";
+import path from "path";
 import { loadEnv } from "./env";
 import { initRedis, closeRedis } from "./memory";
 import { aiConfigRouter } from "./routes/ai-config";
@@ -69,6 +71,81 @@ app.get("/health", async (_req, res) => {
 });
 
 // ── Route mounting ────────────────────────────────────────────────
+
+// ── Session log SSE ────────────────────────────────────────────────
+// Stream nexus/logs/<sessionId>.log (test/verify invocations write there).
+// Mirrors tackle-mcp's /log/:sessionId so the UI proxy chain
+// (tackle-ui :4202 → tackle-srv :3410) can stream logs — previously the
+// route only existed on tackle-mcp and the UI's log polls 404'd.
+app.get("/log/:sessionId", (req, res) => {
+  const { sessionId } = req.params;
+  if (!/^[a-zA-Z0-9_-]+$/.test(sessionId)) {
+    res.status(400).json({ error: "Invalid session ID" });
+    return;
+  }
+
+  const projectRoot = process.env.PIPELINE_ROOT || "/home/codex/dev";
+  const logPath = path.join(projectRoot, "nexus", "logs", `${sessionId}.log`);
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "Access-Control-Allow-Origin": "*",
+  });
+
+  let lastSize = 0;
+  let resolved = false;
+
+  const sendLines = () => {
+    try {
+      if (!fs.existsSync(logPath)) return;
+      const stats = fs.statSync(logPath);
+      if (stats.size <= lastSize) return;
+
+      const fd = fs.openSync(logPath, "r");
+      const buf = Buffer.alloc(stats.size - lastSize);
+      fs.readSync(fd, buf, 0, buf.length, lastSize);
+      fs.closeSync(fd);
+      lastSize = stats.size;
+
+      const newContent = buf.toString("utf-8");
+      for (const line of newContent.split("\n")) {
+        if (line.length === 0) continue;
+        const event = JSON.stringify({
+          type: "session_log",
+          data: { sessionId, line, timestamp: new Date().toISOString() },
+        });
+        res.write(`data: ${event}\n\n`);
+      }
+    } catch {
+      /* file may disappear — stop polling */
+    }
+  };
+
+  const logExists = fs.existsSync(logPath);
+  res.write(
+    `data: ${JSON.stringify({
+      type: "session_log_meta",
+      data: { sessionId, logFileExists: logExists },
+    })}\n\n`,
+  );
+
+  const interval = setInterval(sendLines, 1000);
+  const timeout = setTimeout(() => {
+    res.write(
+      `data: ${JSON.stringify({ type: "session_log_end", data: { sessionId } })}\n\n`,
+    );
+    res.end();
+    clearInterval(interval);
+  }, 30000);
+
+  req.on("close", () => {
+    clearInterval(interval);
+    clearTimeout(timeout);
+    res.end();
+  });
+});
 
 app.use("/config/ai", aiConfigRouter);
 app.use("/sessions", sessionsRouter);

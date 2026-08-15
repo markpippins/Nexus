@@ -114,7 +114,7 @@ BEGIN
     )
     RETURNING id INTO v_memory_id;
 
-    FOREACH v_role IN ARRAY ARRAY['engineer']::TEXT[]
+    FOREACH v_role IN ARRAY ARRAY['engineer', 'engineer-ii', 'devops', 'topologist']::TEXT[]
     LOOP
         INSERT INTO tackle.role_memory (memory_id, role, as_of_dt, expiration_dt)
         VALUES (v_memory_id, v_role, NOW(), NULL);
@@ -142,7 +142,7 @@ BEGIN
     )
     RETURNING id INTO v_memory_id;
 
-    FOREACH v_role IN ARRAY ARRAY['engineer']::TEXT[]
+    FOREACH v_role IN ARRAY ARRAY['engineer', 'engineer-ii', 'devops', 'topologist']::TEXT[]
     LOOP
         INSERT INTO tackle.role_memory (memory_id, role, as_of_dt, expiration_dt)
         VALUES (v_memory_id, v_role, NOW(), NULL);
@@ -194,7 +194,7 @@ BEGIN
     )
     RETURNING id INTO v_memory_id;
 
-    FOREACH v_role IN ARRAY ARRAY['planner', 'engineer', 'architect']::TEXT[]
+    FOREACH v_role IN ARRAY ARRAY['planner', 'engineer', 'engineer-ii', 'devops', 'topologist', 'architect']::TEXT[]
     LOOP
         INSERT INTO tackle.role_memory (memory_id, role, as_of_dt, expiration_dt)
         VALUES (v_memory_id, v_role, NOW(), NULL);
@@ -220,7 +220,7 @@ BEGIN
     )
     RETURNING id INTO v_memory_id;
 
-    FOREACH v_role IN ARRAY ARRAY['engineer', 'planner', 'architect',
+    FOREACH v_role IN ARRAY ARRAY['engineer', 'engineer-ii', 'devops', 'topologist', 'planner', 'architect',
                                   'builder', 'reviewer']::TEXT[]
     LOOP
         INSERT INTO tackle.role_memory (memory_id, role, as_of_dt, expiration_dt)
@@ -251,7 +251,7 @@ BEGIN
     )
     RETURNING id INTO v_memory_id;
 
-    FOREACH v_role IN ARRAY ARRAY['builder', 'engineer']::TEXT[]
+    FOREACH v_role IN ARRAY ARRAY['builder', 'engineer', 'engineer-ii', 'devops', 'topologist']::TEXT[]
     LOOP
         INSERT INTO tackle.role_memory (memory_id, role, as_of_dt, expiration_dt)
         VALUES (v_memory_id, v_role, NOW(), NULL);
@@ -275,7 +275,7 @@ BEGIN
     )
     RETURNING id INTO v_memory_id;
 
-    FOREACH v_role IN ARRAY ARRAY['engineer', 'reviewer', 'inspector']::TEXT[]
+    FOREACH v_role IN ARRAY ARRAY['engineer', 'engineer-ii', 'devops', 'topologist', 'reviewer', 'inspector']::TEXT[]
     LOOP
         INSERT INTO tackle.role_memory (memory_id, role, as_of_dt, expiration_dt)
         VALUES (v_memory_id, v_role, NOW(), NULL);

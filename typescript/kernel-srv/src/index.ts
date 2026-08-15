@@ -9,12 +9,14 @@ import { startHeartbeat } from 'heartbeat-client';
 // Same convention as nebula-srv. We do NOT set search_path here so
 // every SQL in routes.ts is explicit (kernel.*) — kernel is co-equal
 // with nebula, not the default.
+// Env-configurable for the legacy Docker tier (docker/legacy-tier); defaults
+// preserve the original local behavior.
 const pool = new Pool({
-  host: 'localhost',
-  port: 5432,
-  user: 'pguser',
-  password: 'pgpass',
-  database: 'nexus',
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5432', 10),
+  user: process.env.DB_USER || 'pguser',
+  password: process.env.DB_PASS || 'pgpass',
+  database: process.env.DB_NAME || 'nexus',
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,

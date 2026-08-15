@@ -273,7 +273,19 @@ def run_ollama(req, system_base, prompt_body, session_log_path=None):
     if ollama is None:
         _log.error("run_ollama: ollama package not installed")
         raise RuntimeError("ollama package is not installed — cannot use ollama harness")
-    model = _resolve_model_name(req)
+    # The ollama harness talks to the local ollama server directly, which
+    # expects bare model names (e.g. "qwen2.5-coder:latest"). Prefer the DCO's
+    # explicit metadata.model verbatim (stripping an opencode-style
+    # "ollama/" provider prefix if present) — role-config resolution returns
+    # opencode-qualified IDs (e.g. "nvidia/z-ai/glm-5.2") that local ollama
+    # cannot serve. Fall back to that resolution only when no explicit model
+    # is set (finding 8b1a8623, option D).
+    explicit = (req.get("metadata") or {}).get("model", "")
+    if explicit:
+        model = explicit[len("ollama/") :] if explicit.startswith("ollama/") else explicit
+        _log.info("run_ollama: explicit model=%s → ollama model=%s", explicit, model)
+    else:
+        model = _resolve_model_name(req)
     _log.info("run_ollama: entry model=%s prompt_len=%d", model, len(prompt_body) if prompt_body else 0)
 
     # Retry loop: local models sometimes produce empty output on first attempt.
@@ -753,7 +765,9 @@ def _run_from_path(dco_path: str) -> int:
     session_log_path = None
     if session_id:
         session_log_path = os.path.join(
-            os.environ.get("CONDUIT_DATA_DIR", "/home/codex/dev/nexus/.conduit-data"),
+            os.environ.get("CONDUIT_DATA_DIR", os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                "audit", "CONDUIT_DATA")),
             "session_logs",
             f"{session_id}.log",
         )
@@ -771,14 +785,12 @@ def _run_from_path(dco_path: str) -> int:
             call_ccnf_conformance,
         )
 
-        _binary = os.environ.get(
-            "CCNF_CONFORMANCE_BIN",
-            os.path.join(os.path.dirname(__file__),
-                         "../../go/wrp/ccnf-ref/bin/ccnf-conformance"),
-        )
+        # T21 (D-T21-1): emission is delegated to nexus_core.wrp.compile — the
+        # bridge is a caller, not an emitter. No Go binary, no
+        # CCNF_CONFORMANCE_BIN.
         try:
             _ccnf_input = CCNFAdapter.from_work_request(req)
-            _ccnf_result = call_ccnf_conformance(_ccnf_input, _binary)
+            _ccnf_result = call_ccnf_conformance(_ccnf_input)
             _ccnf_cer_json = _ccnf_result.cer
             _ccnf_hash = _ccnf_result.hash
             _ccnf_started_at = int(time.time())
@@ -844,13 +856,13 @@ def _run_from_path(dco_path: str) -> int:
                     "id": f"rec-ccnf-{wr_id}-{int(time.time())}",
                     "type": "CCNF_EXECUTION",
                     "agent_role": "builder",
-                    "plan_id": plan_id if plan_id else wr_id,
+                    "plan_id": wr_id,
                     "summary": f"CCNF conformance: {_receipt.get('status', 'UNKNOWN')}",
                     "ccnf_hash": _receipt.get("ccnf_hash", ""),
                     "created_at": datetime.utcnow().isoformat() + "Z",
                     "metadata": _receipt,
                 }],
-                "affected_plans": [plan_id] if plan_id else [],
+                "affected_plans": [wr_id] if wr_id else [],
                 "invalidated_plans": [],
             }
 

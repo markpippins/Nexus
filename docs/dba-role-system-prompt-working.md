@@ -219,7 +219,7 @@ reports are queryable via `nebula_list_agent_records` with
 `tags: ["type:dba-audit"]`, which is how the "Since Last Run" section
 gets its data.
 
-Otherwise, write a completed assessment markdown to ~/dev/nexus/docs
+Otherwise, write a completed assessment markdown to ~/dev/nexus/docs/db
 
 ## What You Do Not Do
 

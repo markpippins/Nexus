@@ -223,6 +223,20 @@ This is the core traversal step. It:
 6. Creates tickets for downstream nodes
 7. If no downstream edges and node is terminal, marks instance COMPLETED
 
+### `POST /api/instances/:id/execute`
+**Execute** — run the harness for a ticket's task. Marks the ticket `IN_PROGRESS`, calls harness-srv, and records the outcome.
+
+```json
+{ "ticket_id": "uuid", "context": {} }
+```
+
+### `POST /api/instances/:id/run`
+**Run** an instance to completion — loops `execute → advance → execute → …` until no `PENDING` tickets remain or the instance is `COMPLETED`. Returns the full execution log.
+
+```json
+{ "max_steps": 10, "timeout_ms": 120000 }
+```
+
 ---
 
 ## Tickets
@@ -292,3 +306,58 @@ List all roles from `wind.v_roles` (view over `nebula.roles`).
 
 ### `GET /api/v-roles/:name`
 Get role by name.
+
+---
+
+## Events
+
+### `GET /api/events?event_type=&consumed=&limit=50`
+List events. Filter by `event_type` and consumption state (`consumed=false` → unconsumed, `consumed=true` → consumed); `limit` caps rows (default 50).
+
+### `GET /api/events/:id`
+Get single event by ID.
+
+### `POST /api/events`
+Create an event. Broadcasts to NATS for real-time subscribers.
+
+```json
+{ "event_type": "string", "subject": "string?", "payload": {}, "source": "string?" }
+```
+
+### `POST /api/events/poll`
+Poll unconsumed events (`FOR UPDATE SKIP LOCKED`) — claim up to `limit` (default 10, max 100) oldest unconsumed events atomically.
+
+```json
+{ "limit": 10 }
+```
+
+---
+
+## Event Types
+
+### `GET /api/event-types`
+List all event types (joins workflow name).
+
+### `GET /api/event-types/:eventType`
+Get single event type by name.
+
+### `POST /api/event-types`
+Register a new event type.
+
+```json
+{
+  "event_type": "string",
+  "description": "string?",
+  "schema": {},
+  "workflow_id": "uuid?",
+  "dedup_key_template": "string?",
+  "enabled": true
+}
+```
+
+### `DELETE /api/event-types/:eventType`
+Delete an event type by name.
+
+```json
+{ "deleted": "string" }
+```

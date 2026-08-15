@@ -31,6 +31,7 @@ from losm_ir.dag import (
     WorkRequestDAG,
     WorkRequestNode,
 )
+from losm_ir.executor_registry import DEFAULT_KNOWN_EXECUTORS
 from losm_ir.states import WorkStatus
 
 
@@ -447,21 +448,29 @@ def pass_structural_validate(dag: WorkRequestDAG) -> Tuple[List[StructuralValida
 #  Pass 5: EXECUTION COMPATIBILITY
 # ═════════════════════════════════════════════════════════════════════════════
 
-def pass_execution_compatibility(dag: WorkRequestDAG) -> Tuple[List[str], List[str]]:
+def pass_execution_compatibility(
+    dag: WorkRequestDAG,
+    known_executors: Optional[Set[str]] = None,
+) -> Tuple[List[str], List[str]]:
     """Pass 5 — Execution Compatibility.
 
     Verify all nodes have valid executor configuration:
       - Each node must have a known executor type or be a pure orchestration node
       - Orchestration nodes (status=COMPLETION) need no executor
       - Warn on nodes with incompatible status→executor mappings
+
+    Args:
+        dag: The compiled DAG.
+        known_executors: Optional override of the canonical executor set.
+            Defaults to ``DEFAULT_KNOWN_EXECUTORS`` (losm_ir.executor_registry),
+            which canonical callers may replace with the live tackle.roles set
+            for hydration (see wr-conf-009). Unknown executors only WARN —
+            LOSM validation stays advisory.
     """
     errors: List[str] = []
     warnings: List[str] = []
 
-    KNOWN_EXECUTORS = {
-        "planner", "builder", "reviewer", "analyst",
-        "critic", "inspector", "architect", "archivist",
-    }
+    known = set(DEFAULT_KNOWN_EXECUTORS) if known_executors is None else set(known_executors)
 
     for node in dag.nodes.values():
         executor = node.metadata.get("executor", "").lower()
@@ -474,7 +483,7 @@ def pass_execution_compatibility(dag: WorkRequestDAG) -> Tuple[List[str], List[s
         # Orchestration nodes (NEW, INTAKE, PLAN_*) need executors
         if not executor:
             errors.append(f"Node {node.wr_id} (status={status}) has no executor assigned")
-        elif executor not in KNOWN_EXECUTORS:
+        elif executor not in known:
             warnings.append(f"Node {node.wr_id}: unknown executor {executor!r}")
 
         # Check status sanity
@@ -555,6 +564,7 @@ def compile_dag(
     trace_id: Optional[str] = None,
     kernel_id: Optional[str] = None,
     stop_on_error: bool = False,
+    known_executors: Optional[Set[str]] = None,
 ) -> CompilationResult:
     """Run all 6 compilation passes in order.
 
@@ -564,6 +574,10 @@ def compile_dag(
         envelope: Optional EventEnvelope for routing context.
         tenant_id, trace_id, kernel_id: Top-level scoping.
         stop_on_error: If True, stop at the first pass that produces errors.
+        known_executors: Optional executor-set override for pass 5
+            (EXECUTION_COMPATIBILITY); defaults to
+            ``DEFAULT_KNOWN_EXECUTORS``. Canonical callers may pass the live
+            tackle.roles set to hydrate (see wr-conf-009).
 
     Returns:
         CompilationResult with the final DAG (or partial DAG on error).
@@ -635,7 +649,8 @@ def compile_dag(
 
     # ── Pass 5: Execution Compatibility ─────────────────────────────
     p5_start = time.monotonic()
-    compat_errors, p5_warnings = pass_execution_compatibility(dag)
+    compat_errors, p5_warnings = pass_execution_compatibility(
+        dag, known_executors=known_executors)
     p5_dur = (time.monotonic() - p5_start) * 1000
     all_errors.extend([f"[EXECUTION_COMPAT] {e}" for e in compat_errors])
     all_warnings.extend([f"[EXECUTION_COMPAT] {w}" for w in p5_warnings])

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { OverviewTab } from './components/OverviewTab';
-import { BundlesTab } from './components/BundlesTab';
 import { AIRegistryTab } from './components/AIRegistryTab';
 import { RolesTasksTab } from './components/RolesTasksTab';
 import { MemoryContextTab } from './components/MemoryContextTab';
@@ -12,6 +11,10 @@ import { SessionsPlaygroundTab } from './components/SessionsPlaygroundTab';
 import { SystemLogsTab } from './components/SystemLogsTab';
 import { SystemInsightsTab } from './components/SystemInsightsTab';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ToastContainer } from './components/Toast';
+import { ConfirmDialog } from './components/ConfirmDialog';
+import { showToast } from './components/Toast';
+import { showConfirm } from './components/ConfirmDialog';
 import {
   ThemeMode,
   Provider,
@@ -155,12 +158,12 @@ export default function App() {
 
   // Seed Defaults
   const handleSeedDefaults = async () => {
-    if (confirm('Reset and re-seed default tackle configurations?')) {
+    if (await showConfirm('Reset and re-seed default tackle configurations?')) {
       try {
         await fetch('/config/ai/seed-defaults', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: false }) });
         await fetchAllData();
       } catch (e) {
-        alert('Seed error');
+        showToast('Seed error');
       }
     }
   };
@@ -368,6 +371,39 @@ export default function App() {
     return await res.json();
   };
 
+  const handleVerifyModel = async (modelId: string, prompt?: string) => {
+    let res: Response;
+    try {
+      res = await fetch('/config/ai/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_id: modelId,
+          test_prompt: prompt
+        })
+      });
+    } catch (e) {
+      throw friendlyFetchError(e);
+    }
+    if (!res.ok) {
+      throw new Error(await extractErrorMessage(res));
+    }
+    return await res.json();
+  };
+
+  const handleVerifyStatus = async (sessionId: string) => {
+    let res: Response;
+    try {
+      res = await fetch(`/config/ai/verify/${sessionId}`);
+    } catch (e) {
+      throw friendlyFetchError(e);
+    }
+    if (!res.ok) {
+      throw new Error(await extractErrorMessage(res));
+    }
+    return await res.json();
+  };
+
   const activeSessionsCount = sessions.filter(s => s.status === 'running').length;
 
   if (loadingInitial) {
@@ -422,16 +458,6 @@ export default function App() {
                 onRunTest={handleRunTest}
                 onSeedDefaults={handleSeedDefaults}
                 onNavigateToTab={setCurrentTab}
-              />
-            )}
-
-            {currentTab === 'bundles' && (
-              <BundlesTab
-                bundles={bundles}
-                models={models}
-                providers={providers}
-                harnesses={harnesses}
-                roles={roles}
                 onSaveBundle={handleSaveBundle}
                 onDeleteBundle={handleDeleteBundle}
                 onReorderPriority={handleReorderPriority}
@@ -444,6 +470,7 @@ export default function App() {
                 harnesses={harnesses}
                 models={models}
                 roles={roles}
+                bundles={bundles}
                 onSaveProvider={handleSaveProvider}
                 onDeleteProvider={handleDeleteProvider}
                 onSaveHarness={handleSaveHarness}
@@ -451,6 +478,9 @@ export default function App() {
                 onSaveModel={handleSaveModel}
                 onDeleteModel={handleDeleteModel}
                 onSaveBundle={handleSaveBundle}
+                onVerifyModel={handleVerifyModel}
+                onVerifyStatus={handleVerifyStatus}
+                onRefresh={fetchAllData}
               />
             )}
 
@@ -535,6 +565,8 @@ export default function App() {
           </footer>
         </div>
       </div>
+      <ToastContainer />
+      <ConfirmDialog />
     </div>
   );
 }

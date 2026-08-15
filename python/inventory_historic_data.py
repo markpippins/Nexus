@@ -5,7 +5,7 @@ rebuilt knowledge graph (nexus/graph/nexus-knowledge-graph.json) and the
 canonical DB (nebula.implementation_plans, nebula.work_requests).
 
 Areas scanned:
-  1. nexus/.conduit-data            (live conduit data)
+  1. nexus/audit/CONDUIT_DATA       (mirror of deleted .conduit-data — historic conduit data)
   2. nexus/audit                    (audit archive incl. CONDUIT_DATA mirror, HISTORY, PLANS, IMPLEMENTATION_PLANS, ROVER, PROMPTS, ...)
   3. ./bak/nexus **RECORD dirs      (losm + html-importer RECORD folders)
 
@@ -27,7 +27,8 @@ from collections import Counter, defaultdict
 
 ROOT = "/home/codex/dev/nexus"
 KG_PATH = f"{ROOT}/graph/nexus-knowledge-graph.json"
-CONDUIT = f"{ROOT}/.conduit-data"
+# .conduit-data deleted 2026-08-09; mirror is the posterity home
+CONDUIT = f"{ROOT}/audit/CONDUIT_DATA"
 AUDIT = f"{ROOT}/audit"
 BAK = "/home/codex/dev/bak/nexus"
 
@@ -144,8 +145,8 @@ def main():
     out(f"DB plans: {len(db_plans)} | DB work_requests (legacy_id): {len(db_wr_ids)}")
     out()
 
-    # ── 1. .conduit-data ──────────────────────────────────────────────
-    out("## 1. nexus/.conduit-data")
+    # ── 1. audit/CONDUIT_DATA (mirror of deleted .conduit-data) ───────
+    out("## 1. nexus/audit/CONDUIT_DATA (mirror)")
     for sub, c in sorted(count_files(CONDUIT).items()):
         if sub == ".":
             out(f"  (top-level files) {dict(c)}")
@@ -180,13 +181,13 @@ def main():
 
     # ── 2. audit ──────────────────────────────────────────────────────
     out("## 2. nexus/audit")
-    skip_detail = {"CONDUIT_DATA"}  # exact mirror of .conduit-data
+    skip_detail = {"CONDUIT_DATA"}  # already inventoried above (section 1)
     for sub in sorted(os.listdir(AUDIT)):
         p = os.path.join(AUDIT, sub)
         if not os.path.isdir(p) or sub.startswith("."):
             continue
         n = sum(len(fs) for _, _, fs in os.walk(p))
-        note = " (mirror of .conduit-data)" if sub in skip_detail else ""
+        note = " (inventoried in section 1)" if sub in skip_detail else ""
         out(f"  {sub}/: {n} files{note}")
 
     # audit/PLANS + IMPLEMENTATION_PLANS — plan-numbered docs
@@ -299,7 +300,7 @@ def main():
         out(f"    incoming harvests: {len(harvests)} | incoming chats: {len(chats)}")
         out(f"    output: {sorted(os.listdir(f'{rover}/output'))}")
     prompts = [
-        (f"{CONDUIT}/PROMPTS", ".conduit-data/PROMPTS"),
+        (f"{CONDUIT}/PROMPTS", "audit/CONDUIT_DATA/PROMPTS"),
         (f"{AUDIT}/PROMPTS", "audit/PROMPTS"),
     ]
     for d, label in prompts:

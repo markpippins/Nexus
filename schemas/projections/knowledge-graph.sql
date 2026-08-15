@@ -26,17 +26,34 @@ CREATE TABLE IF NOT EXISTS knowledge.graph_entities (
 );
 
 -- ── Edge table: every relationship in the knowledge graph ────────────
+--
+-- Endpoint contract (T24 step 3):
+--   * Canonical entity key = `graph_entities.id` (UUID) or `asset_id`
+--     (100% backfilled by V083). The NATURAL key is `(section, entity_id)`
+--     — edges reference entities by that natural key, never by human-readable
+--     name or file path (issue #33 root cause).
+--   * `target_section` is NULLable so an UNRESOLVED edge can be preserved
+--     (lossless): its `target_id` still carries the dangling reference, the
+--     composite target FK is skipped (MATCH SIMPLE), and `resolution =
+--     'unresolved'` + `unresolved_reason` record why. A re-resolution pass
+--     can backfill the section without losing the edge.
+--   * `source_migration_id` records which `graph_migrations` run inserted
+--     the edge (per-edge provenance).
 CREATE TABLE IF NOT EXISTS knowledge.graph_edges (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source_section  TEXT NOT NULL,
     source_id       TEXT NOT NULL,
-    relation_type   TEXT NOT NULL,           -- 'produces', 'consumes', 'governed_by', 'references', 'depends_on', etc.
+    relation_type   TEXT NOT NULL,           -- 'implements', 'derived_from', 'depends_on', 'produces', 'consumes', 'governed_by', 'references', etc.
     target_section  TEXT,
     target_id       TEXT NOT NULL,
     properties      JSONB NOT NULL DEFAULT '{}',
+    source_migration_id UUID,               -- graph_migrations.id of the run that inserted this edge
+    resolution      TEXT NOT NULL DEFAULT 'resolved',   -- 'resolved' | 'unresolved'
+    unresolved_reason TEXT,                  -- e.g. 'target_not_found'
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    -- Quick lookup: all edges from/to an entity
+    -- Quick lookup: all edges from/to an entity (skipped when the matching
+    -- section is NULL, which is exactly the unresolved-edge escape hatch)
     FOREIGN KEY (source_section, source_id) REFERENCES knowledge.graph_entities(section, entity_id) ON DELETE CASCADE,
     FOREIGN KEY (target_section, target_id) REFERENCES knowledge.graph_entities(section, entity_id) ON DELETE CASCADE,
 

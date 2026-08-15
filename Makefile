@@ -3,7 +3,7 @@
         cir5-lint cir5-validate \
         cir-arl cir-verify install-hooks \
         test-db-setup test-db-reset test \
-        mesh-test \
+        mesh-test seed-guard-bootstrap seed-guard-test \
         apidocs-extract apidocs-gen apidocs-validate apidocs-regen \
         mcp-start mcp-stop mcp-restart mcp-status mcp-watch
 
@@ -166,6 +166,33 @@ mcp-watch:
 mesh-test:
 	@echo "[mesh-test] running mesh-register probe tests..."
 	@python3 -m pytest bin/tests/test_mesh_register_probe.py -v
+
+# ─── Seed drift guard (wr-conf-006) ─────────────────────────────────────────
+# Backed by nexus/.github/workflows/seed-guard.yml — same commands locally and
+# in CI.
+#
+#   make seed-guard-bootstrap  reconstruct the tackle schema in a throwaway DB
+#                              from the committed typescript/tackle-seeds/
+#                              seed-manifest.json (refuses a schema that looks
+#                              like the live DB)
+#   make seed-guard-test       run the FULL wr-conf-006 suite: renders
+#                              seedMemoryProcedures() from source (node),
+#                              executes it against shadow + scratch schemas,
+#                              and asserts card/role counts + per-card sha256 +
+#                              role sets match both the live tables (AC1-AC3)
+#                              and the committed manifest (AC5).
+#
+# Needs `node` and a reachable Postgres. For a schema-free DB, run
+# `make seed-guard-bootstrap` first (CI does this); against the live DB the
+# AC1-AC4 live-compare tests run directly.
+
+seed-guard-bootstrap:
+	@echo "[seed-guard] bootstrapping tackle schema from committed seed-manifest.json..."
+	@python3 bin/bootstrap_seed_manifest.py
+
+seed-guard-test:
+	@echo "[seed-guard] running wr-conf-006 full suite (AC1-AC5)..."
+	@python3 -m pytest python/nexus_core/wrp/tests/test_conformance_seed_guard.py -v
 
 # ─── API docs (tools/api-docs) ───────────────────────────────────────────────
 # Backed by nexus/.github/workflows/apidocs.yml — same commands locally and

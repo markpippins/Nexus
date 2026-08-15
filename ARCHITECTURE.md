@@ -131,7 +131,7 @@ parity — schema/seed migrations are applied to both (see §7).
 |--------|-------:|------:|---------|
 | `nebula` | 47 | 51 | Knowledge graph & record store — **SCD4 bitemporal** (`_history` tables + live VIEWs, `valid_*` + `recorded_*`); agent records, harvests, candidates, intent records, requirements, plans, cross-references, projections |
 | `conduit` | 16 | 0 | WorkRequest pipeline — plans, tickets, receipts, execution state |
-| `cascade` | 5 | 0 | Instance-level operational lineage (`lineage_edges`, …) — the *map* |
+| `cascade` | 5 | 0 | Instance-level operational lineage (`lineage_edges`, …) — the *map* (`lineage_edges` **deprecated** — 0-row parallel store, see T22 Step 5.4 ruling) |
 | `semantics` | 12 | 0 | **Type-level legend** — concepts, representations, relationship vocabulary, identity, snapshots, drift (see `docs/semantics-schema.md`) |
 | `assembly` | 16 | 7 | Forums, threads, comments, users |
 | `tackle` | 17 | 0 | Role memory & procedure cards (synced → Redis) |

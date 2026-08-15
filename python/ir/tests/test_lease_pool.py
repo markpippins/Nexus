@@ -152,6 +152,38 @@ class TestLeasePoolCapacity:
         assert t["max_active"] == 5
 
 
+# ── consolidation (nbk MergeIdleLeasesRule port) ────────────────────
+
+class TestLeasePoolConsolidation:
+    def test_consolidate_idle_tags_idle_slots(self):
+        pool = LeasePool()
+        pool.register(_make_lease("l1"))
+        pool.register(_make_lease("l2"))
+        pool.acquire("l1", _make_event())
+        n = pool.consolidate_idle(target_executor="executor-shared")
+        assert n == 1  # only l2 is idle
+        assert pool.get_slot("l2").executor == "executor-shared"
+        assert pool.get_slot("l1").executor == ""  # active untouched
+
+    def test_consolidate_all_idle(self):
+        pool = LeasePool()
+        pool.register(_make_lease("l1"))
+        pool.register(_make_lease("l2"))
+        n = pool.consolidate_idle()
+        assert n == 2
+        assert pool.get_slot("l1").executor == "executor-shared"
+
+    def test_consolidate_empty_pool(self):
+        pool = LeasePool()
+        assert pool.consolidate_idle() == 0
+
+    def test_consolidate_custom_target(self):
+        pool = LeasePool()
+        pool.register(_make_lease("l1"))
+        pool.consolidate_idle(target_executor="executor-bulk")
+        assert pool.get_slot("l1").executor == "executor-bulk"
+
+
 # ── preemption ──────────────────────────────────────────────────────
 
 class TestLeasePoolPreemption:

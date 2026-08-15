@@ -317,13 +317,13 @@ export const NebulaClient = {
     recordType: string; role?: string; title?: string; content?: string;
     sourcePath?: string; metadata?: any; tags?: string[];
     systemId?: string; subsystemId?: string; featureId?: string; planRef?: string;
-    level?: number; visibilityScope?: string;
+    level?: number; visibilityScope?: string; model?: string;
   }) => httpRequest("POST", "/api/agent-records", body),
   /** PATCH /api/agent-records/:id */
   updateAgentRecord: (id: string, body: {
     title?: string; content?: string; metadata?: any; tags?: string[];
     systemId?: string | null; subsystemId?: string | null; featureId?: string | null; planRef?: string | null;
-    level?: number; visibilityScope?: string;
+    level?: number; visibilityScope?: string; model?: string | null;
   }) => httpRequest("PATCH", `/api/agent-records/${encodeURIComponent(id)}`, body),
   /** DELETE /api/agent-records/:id */
   deleteAgentRecord: (id: string) => httpRequest("DELETE", `/api/agent-records/${encodeURIComponent(id)}`),
@@ -596,6 +596,26 @@ export const NebulaClient = {
     leaseId: string; status?: string; result?: any;
     error?: string; exitCode?: number;
   }) => httpRequest("POST", "/api/execution/attempts", body),
+
+  /** POST /api/role-leases/issue (RoleLeases, plan 1286) */
+  issueRoleLease: (body: {
+    role: string; channel?: string; model?: string;
+    ttlSeconds?: number; budgetUnits?: number; windowEnd?: string;
+  }) => httpRequest("POST", "/api/role-leases/issue", body),
+
+  /** POST /api/role-leases/:id/renew */
+  renewRoleLease: (id: string, body: { ttlSeconds?: number; budgetUnits?: number }) =>
+    httpRequest("POST", `/api/role-leases/${encodeURIComponent(id)}/renew`, body),
+
+  /** POST /api/role-leases/:id/revoke */
+  revokeRoleLease: (id: string) =>
+    httpRequest("POST", `/api/role-leases/${encodeURIComponent(id)}/revoke`),
+
+  /** GET /api/role-leases?role=&status=&limit= */
+  listRoleLeases: (params?: { role?: string; status?: string; limit?: number }) =>
+    httpRequest("GET", `/api/role-leases?${new URLSearchParams(
+      Object.entries(params || {}).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])
+    )}`),
 
   /** POST /api/execution/receipts */
   issueReceipt: (body: {

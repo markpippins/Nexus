@@ -16,6 +16,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from losm_ir.executor_registry import DEFAULT_KNOWN_EXECUTORS
+
 from pydantic import BaseModel, Field
 
 from losm_ir.dag import EdgeType, WorkRequestDAG, WorkRequestNode
@@ -203,6 +205,20 @@ class InvariantEngine:
       - check_fixed_point(new_invariant, registry) — fixed-point constraint
       - check_non_circular(invariant) — non-circular validation
     """
+
+    def __init__(self, known_executors: Optional[Set[str]] = None):
+        """Create an engine.
+
+        Args:
+            known_executors: Optional override of the canonical executor set
+                used by governance checks (G2 executor assignment). Defaults
+                to ``DEFAULT_KNOWN_EXECUTORS``; canonical callers may pass the
+                live tackle.roles set for hydration (see wr-conf-009).
+        """
+        self._known_executors = (
+            set(DEFAULT_KNOWN_EXECUTORS) if known_executors is None
+            else set(known_executors)
+        )
 
     def validate(
         self,
@@ -498,10 +514,7 @@ class InvariantEngine:
                 ))
 
         # G2: Executor assignment — all non-terminal nodes need executors
-        known_executors = {
-            "planner", "builder", "reviewer", "analyst",
-            "critic", "inspector", "architect", "archivist",
-        }
+        known_executors = self._known_executors
         for nid, node in dag.nodes.items():
             if node.status in ("COMPLETION", "COMPLETE", "FAILED", "BLOCKED"):
                 continue
