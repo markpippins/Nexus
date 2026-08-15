@@ -21,12 +21,12 @@
   },
   "private": true,
   "dependencies": {
-    "@angular/cdk": "^20.2.14",
-    "@angular/common": "^20.3.0",
-    "@angular/compiler": "^20.3.0",
-    "@angular/core": "^20.3.0",
-    "@angular/forms": "^20.3.0",
-    "@angular/platform-browser": "^20.3.0",
+    "@angular/cdk": "^20.3.27",
+    "@angular/common": "^20.3.27",
+    "@angular/compiler": "^20.3.27",
+    "@angular/core": "^20.3.27",
+    "@angular/forms": "^20.3.27",
+    "@angular/platform-browser": "^20.3.27",
     "monaco-editor": "^0.52.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
