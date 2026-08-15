@@ -38,7 +38,10 @@ TSP_DIR = os.path.join(REPO, "typespec", "v1")
 # Authoritative service manifest.  type: "rest" | "mcp".
 # ---------------------------------------------------------------------------
 MANIFEST = [
-    # REST services (smallest -> largest)
+    # REST services (smallest -> largest).
+    # `src_root` (optional) overrides where the service's source lives; default
+    # is `typescript/<name>/src`. Used by the consolidated-stack entries that
+    # live outside typescript/ (adonisjs/, moleculer/).
     {"name": "ui-event-bus", "type": "rest"},
     {"name": "harness-srv", "type": "rest"},
     {"name": "ui-tools", "type": "rest"},
@@ -61,6 +64,14 @@ MANIFEST = [
     # mcp-bridge is an MCP-over-SSE transport proxy: it exposes raw HTTP
     # routes (/sse, /messages, /health), not a static tool catalog.
     {"name": "mcp-bridge", "type": "rest"},
+    # ── Consolidated stack (Wave 0.1) ────────────────────────────────
+    # The consolidated runtime under test: AdonisJS HTTP edge and Moleculer
+    # service bus. Their contracts become the canonical surface as *-srv
+    # services are re-homed onto them. `src_root` points at the real source
+    # (they do not live under typescript/). `framework` gates which
+    # extraction regexes run: express (default), adonisjs, or moleculer.
+    {"name": "adonisjs", "type": "rest", "src_root": "adonisjs/broker-gateway-proxy", "framework": "adonisjs"},
+    {"name": "moleculer", "type": "rest", "src_root": "moleculer/search", "framework": "moleculer"},
     # MCP tool servers (smallest -> largest)
     {"name": "service-broker-mcp", "type": "mcp"},
     {"name": "knowledge-mcp", "type": "mcp"},
@@ -89,7 +100,23 @@ REGISTER_TOOL_RE = re.compile(r"registerTool\s*\(\s*['\"]([^'\"]+)['\"]")
 # Express router mount: `app.use('/api', createRoutes(pool))` — a mounted
 # router's routes are served under this prefix, which the reconciler must
 # prepend so `router.get('/links')` reconciles to `GET /api/links`.
-MOUNT_RE = re.compile(r"\.use\s*\(\s*['\"]([^'\"]+)['\"]")
+# Scoped to `app.use(...)` (the Express mount convention) so unrelated
+# `.use(...)` calls (e.g. `hash.use('scrypt')` in AdonisJS) don't pollute
+# the prefix set.
+MOUNT_RE = re.compile(r"\bapp\.use\s*\(\s*['\"]([^'\"]+)['\"]")
+# AdonisJS route file: `router.get('/health', [ProxyController, 'health'])`
+# and catch-alls `router.any('/*', ...)`. `any` maps to the `all` wildcard.
+ADONIS_ROUTE_RE = re.compile(
+    r"\brouter\.(get|post|put|patch|delete|any)\s*\(\s*['\"]([^'\"]+)['\"]"
+)
+# Moleculer-web aliases inside a routes block:
+#   path: "/api",
+#   aliases: { "POST /search/simple": "google-search.simpleSearch", ... }
+# The `path` is the mount prefix; each alias key is "METHOD /sub-path".
+MOLEQ_PATH_RE = re.compile(r"path:\s*['\"]([^'\"]+)['\"]")
+MOLEQ_ALIAS_RE = re.compile(
+    r"['\"](GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+([^'\"]+)['\"]\s*:"
+)
 
 TSP_ROUTE_RE = re.compile(r"@route\s*\(\s*\"([^\"]+)\"\s*\)")
 TSP_VERB_RE = re.compile(r"@(get|post|put|patch|delete|head|options)\b")
@@ -103,14 +130,23 @@ def norm_path(p: str) -> str:
     return p
 
 
-def ts_routes(service: str) -> set[str]:
+def src_root_for(entry: dict) -> str:
+    """Resolve the source root for a manifest entry."""
+    if "src_root" in entry:
+        return os.path.join(REPO, entry["src_root"])
+    return os.path.join(TS_DIR, entry["name"], "src")
+
+
+def ts_routes(entry: dict, src_root: str) -> set[str]:
     """Extract `METHOD /path` route strings from a REST service's source."""
     out: set[str] = set()
-    src_root = os.path.join(TS_DIR, service, "src")
     if not os.path.isdir(src_root):
         return out
     texts: list[str] = []
-    for root, _dirs, files in os.walk(src_root):
+    for root, dirs, files in os.walk(src_root):
+        # Skip vendored/build directories (node_modules, dist, build, .git) —
+        # they are not source and pollute route extraction.
+        dirs[:] = [d for d in dirs if d not in ("node_modules", "dist", "build", ".git")]
         for fn in files:
             if not fn.endswith((".ts", ".js")):
                 continue
@@ -121,25 +157,56 @@ def ts_routes(service: str) -> set[str]:
     for text in texts:
         for m in MOUNT_RE.finditer(text):
             mount_prefixes.add(m.group(1).rstrip("/"))
+    framework = entry.get("framework", "express")
     for text in texts:
-        for m in ROUTE_RE.finditer(text):
-            obj, verb, path = m.group(1), m.group(2), m.group(3)
-            p = norm_path(path)
-            # Routes declared on a mounted router (object other than
-            # `app`/`server`) inherit the service's mount prefix when exactly
-            # one prefix exists — `router.get('/links')` → `GET /api/links`.
-            if obj not in ("app", "server") and len(mount_prefixes) == 1:
-                p = norm_path(next(iter(mount_prefixes)) + path)
-            out.add(f"{verb.upper()} {p}")
-        for m in RAW_HTTP_RE.finditer(text):
-            out.add(f"{m.group(1).upper()} {norm_path(m.group(2))}")
-        # `.route('/x').get().post()` chains (method without path arg)
-        for cm in CHAIN_ROUTE_RE.finditer(text):
-            base = norm_path(cm.group(1))
-            # scan forward a short window for chained verbs
-            window = text[cm.end() : cm.end() + 200]
-            for vm in CHAIN_VERB_RE.finditer(window):
-                out.add(f"{vm.group(1).upper()} {base}")
+        if framework == "express":
+            # Express-style route declarations. Only treat objects that
+            # actually declare routes as route declarations: `app`, `server`,
+            # `router`, or a *Router instance (e.g. `semanticsRouter`). This
+            # keeps `env.get('APP_KEY')`, `hash.get(...)`, and other method
+            # calls from polluting the surface.
+            for m in ROUTE_RE.finditer(text):
+                obj, verb, path = m.group(1), m.group(2), m.group(3)
+                if not (obj in ("app", "server", "router") or obj.endswith("Router")):
+                    continue
+                p = norm_path(path)
+                # Routes declared on a mounted router (object other than
+                # `app`/`server`) inherit the service's mount prefix when
+                # exactly one prefix exists — `router.get('/links')` →
+                # `GET /api/links`.
+                if obj not in ("app", "server") and len(mount_prefixes) == 1:
+                    p = norm_path(next(iter(mount_prefixes)) + path)
+                out.add(f"{verb.upper()} {p}")
+            for m in RAW_HTTP_RE.finditer(text):
+                out.add(f"{m.group(1).upper()} {norm_path(m.group(2))}")
+            # `.route('/x').get().post()` chains (method without path arg)
+            for cm in CHAIN_ROUTE_RE.finditer(text):
+                base = norm_path(cm.group(1))
+                # scan forward a short window for chained verbs
+                window = text[cm.end() : cm.end() + 200]
+                for vm in CHAIN_VERB_RE.finditer(window):
+                    out.add(f"{vm.group(1).upper()} {base}")
+        elif framework == "adonisjs":
+            # AdonisJS: `router.get('/health', [Controller, 'method'])`.
+            # `any` (catch-all) maps to the `all` wildcard; `/*` is normalized
+            # to `/{path}` so it matches the TypeSpec catch-all convention.
+            for m in ADONIS_ROUTE_RE.finditer(text):
+                verb, path = m.group(1), m.group(2)
+                if verb == "any":
+                    verb = "all"
+                p = norm_path(path)
+                if p == "/*":
+                    p = "/{path}"
+                out.add(f"{verb.upper()} {p}")
+        elif framework == "moleculer":
+            # Moleculer-web: aliases under a routes block with a path prefix.
+            #   path: "/api"  +  aliases: { "POST /search/simple": ... }
+            #   → POST /api/search/simple
+            for pm in MOLEQ_PATH_RE.finditer(text):
+                prefix = pm.group(1).rstrip("/")
+                window = text[pm.end() : pm.end() + 4000]
+                for am in MOLEQ_ALIAS_RE.finditer(window):
+                    out.add(f"{am.group(1).upper()} {prefix}{norm_path(am.group(2))}")
     return out
 
 
@@ -149,7 +216,8 @@ def ts_tools(service: str) -> set[str]:
     src_root = os.path.join(TS_DIR, service, "src")
     if not os.path.isdir(src_root):
         return out
-    for root, _dirs, files in os.walk(src_root):
+    for root, dirs, files in os.walk(src_root):
+        dirs[:] = [d for d in dirs if d not in ("node_modules", "dist", "build", ".git")]
         for fn in files:
             if not fn.endswith((".ts", ".js")):
                 continue
@@ -215,14 +283,32 @@ def reconcile(entry: dict) -> dict:
     if not modeled:
         return result
     if kind == "rest":
-        src = ts_routes(name)
+        src = ts_routes(entry, src_root_for(entry))
         contract = tsp_rest_ops(name)
     else:
         src = ts_tools(name)
         contract = tsp_tool_ops(name)
-    result["missing"] = sorted(src - contract)
-    result["extra"] = sorted(contract - src)
-    result["covered"] = len(src - (src - contract))
+    # Wildcard-verb matching: a source `ALL /path` (Express app.all / AdonisJS
+    # router.any catch-all) is covered when the contract declares ANY verb on
+    # the same path — TypeSpec has no verb-neutral op. The matching contract
+    # entry is consumed (not reported EXTRA) by the wildcard.
+    src_effective = set(src)
+    contract_effective = set(contract)
+    for s in src:
+        verb, _, path = s.partition(" ")
+        if verb != "ALL":
+            continue
+        for c in contract:
+            if c.partition(" ")[2] == path:
+                src_effective.discard(s)
+                contract_effective.discard(c)
+                break
+    result["missing"] = sorted(src_effective - contract_effective)
+    result["extra"] = sorted(contract_effective - src_effective)
+    # Covered counts every declared source route that is NOT missing — including
+    # wildcard-verb routes consumed above (e.g. ALL /{path} covered by a
+    # concrete-verb contract op) — so adonisjs shows 2/2, not 1/2.
+    result["covered"] = len(src) - len(result["missing"])
     result["total"] = len(src)
     return result
 

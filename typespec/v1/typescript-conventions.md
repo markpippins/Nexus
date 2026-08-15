@@ -65,6 +65,23 @@ op <tool-name>(...): ...;
 `typespec/v1/<service>/typescript/` directory is reported as `UNMODELED` (not
 an error) until its contract exists.
 
+## Framework-specific extraction
+
+Most services are plain Express and the reconciler's default (`framework:
+"express"`) extraction applies. The consolidated-stack entries use explicit
+framework routing:
+
+- **`framework: "adonisjs"`** — routes are read from `router.<verb>('<path>')`
+  declarations. The AdonisJS catch-all `router.any('/*')` is modeled as a
+  single op with `@route("/{path}")` plus any concrete verb; the reconciler
+  treats the source `ALL /{path}` as covered by any verb on that path
+  (TypeSpec has no verb-neutral op).
+- **`framework: "moleculer"`** — routes are read from moleculer-web `routes`
+  blocks: the `path` prefix is concatenated with each `aliases` key's
+  `"METHOD /sub-path"` to form the full route.
+- Manifest entries may set `src_root` to point at source that lives outside
+  `typescript/<name>/src` (e.g. `adonisjs/broker-gateway-proxy`, `moleculer/search`).
+
 ## Verification
 
 ```bash
