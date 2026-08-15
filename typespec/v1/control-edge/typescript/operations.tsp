@@ -2593,4 +2593,50 @@ op get_peb_state_versions(key: string): Record<unknown>;
 op get_peb_state_diff(key: string): Record<unknown>;
 
 
+// ── cascade-srv (/cascade) ──
+@route("/cascade/events")
+@get
+op get_cascade_events(): Record<unknown>;
+
+@route("/cascade/events/{id}")
+@get
+op get_cascade_event(id: string): Record<unknown>;
+
+@route("/cascade/events/{id}/lineage")
+@get
+op get_cascade_event_lineage(id: string): Record<unknown>;
+
+@route("/cascade/events/{id}/children")
+@get
+op get_cascade_event_children(id: string): Record<unknown>;
+
+@route("/cascade/lineage")
+@get
+op get_cascade_lineage(): Record<unknown>;
+
+@route("/cascade/analytics")
+@get
+op get_cascade_analytics(): Record<unknown>;
+
+@route("/cascade/subscribers")
+@get
+op get_cascade_subscribers(): Record<unknown>;
+
+@route("/cascade/subscribers/{pattern}")
+@get
+op get_cascade_subscriber(pattern: string): Record<unknown>;
+
+@route("/cascade/subscribers/{pattern}")
+@patch
+op patch_cascade_subscriber(pattern: string): Record<unknown>;
+
+@route("/cascade/assessments")
+@get
+op get_cascade_assessments(): Record<unknown>;
+
+@route("/cascade/health")
+@get
+op get_cascade_health(): Record<unknown>;
+
+
 }

@@ -158,6 +158,21 @@ router.group(() => {
   router.get('/api/peb/state/:key/diff', [() => import('#controllers/peb_controller'), 'stateDiff'])
 })
 
+// ── cascade-srv: event cascade ────────────────────────────────────────
+router.group(() => {
+  router.get('/cascade/events', [() => import('#controllers/cascade_controller'), 'listEvents'])
+  router.get('/cascade/events/:id', [() => import('#controllers/cascade_controller'), 'getEvent'])
+  router.get('/cascade/events/:id/lineage', [() => import('#controllers/cascade_controller'), 'eventLineage'])
+  router.get('/cascade/events/:id/children', [() => import('#controllers/cascade_controller'), 'eventChildren'])
+  router.get('/cascade/lineage', [() => import('#controllers/cascade_controller'), 'lineage'])
+  router.get('/cascade/analytics', [() => import('#controllers/cascade_controller'), 'analytics'])
+  router.get('/cascade/subscribers', [() => import('#controllers/cascade_controller'), 'listSubscribers'])
+  router.get('/cascade/subscribers/:pattern', [() => import('#controllers/cascade_controller'), 'getSubscriber'])
+  router.patch('/cascade/subscribers/:pattern', [() => import('#controllers/cascade_controller'), 'updateSubscriber'])
+  router.get('/cascade/assessments', [() => import('#controllers/cascade_controller'), 'listAssessments'])
+  router.get('/cascade/health', [() => import('#controllers/cascade_controller'), 'health'])
+})
+
 // ── ui-tools: navigation links ────────────────────────────────────────
 router.group(() => {
   router.get('/api/links', [() => import('#controllers/links_controller'), 'index'])

@@ -6351,6 +6351,162 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /cascade/analytics:
+    get:
+      operationId: get_cascade_analytics
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /cascade/assessments:
+    get:
+      operationId: get_cascade_assessments
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /cascade/events:
+    get:
+      operationId: get_cascade_events
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /cascade/events/{id}:
+    get:
+      operationId: get_cascade_event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /cascade/events/{id}/children:
+    get:
+      operationId: get_cascade_event_children
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /cascade/events/{id}/lineage:
+    get:
+      operationId: get_cascade_event_lineage
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /cascade/health:
+    get:
+      operationId: get_cascade_health
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /cascade/lineage:
+    get:
+      operationId: get_cascade_lineage
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /cascade/subscribers:
+    get:
+      operationId: get_cascade_subscribers
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /cascade/subscribers/{pattern}:
+    get:
+      operationId: get_cascade_subscriber
+      parameters:
+        - name: pattern
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    patch:
+      operationId: patch_cascade_subscriber
+      parameters:
+        - name: pattern
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /config/ai:
     get:
       operationId: get_config_ai
