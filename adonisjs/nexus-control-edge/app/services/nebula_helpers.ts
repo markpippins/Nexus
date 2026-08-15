@@ -25,6 +25,11 @@ export function toKnex(sql: string, params: any[] = []): { sql: string; values: 
     values.push(params[idx])
     return '?'
   })
+  // No $n placeholders found — the SQL already uses knex ? placeholders,
+  // so forward the caller's bindings unchanged.
+  if (converted === sql) {
+    return { sql: converted, values: params }
+  }
   return { sql: converted, values }
 }
 

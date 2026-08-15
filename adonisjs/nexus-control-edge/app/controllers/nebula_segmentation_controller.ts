@@ -46,7 +46,7 @@ export default class NebulaSegmentationController {
   /** GET /api/conversations */
   async listConversations({ request, response }: HttpContext) {
     try {
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
+      const { offset, page, pageSize } = parsePagination(request.qs())
       const [dataResult, countResult] = await Promise.all([
         q(
           `SELECT cs.id, cs.conversation_id, cs.snapshot_index, cs.source_hash,

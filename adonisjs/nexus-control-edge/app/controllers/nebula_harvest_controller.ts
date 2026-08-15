@@ -34,7 +34,7 @@ export default class NebulaHarvestController {
       const visibilityScope = qs.visibilityScope as string | undefined
       const tag = qs.tag as string | undefined
       const sort = (qs.sort as string) || 'created_at'
-      const { offset, limit, page, pageSize } = parsePagination(qs)
+      const { page, pageSize } = parsePagination(qs)
 
       const validSorts = ['candidate_count', 'code_blocks', 'turns', 'block_density', 'collaboration', 'created_at', 'tag_frequency', 'keyword_hits']
       if (!validSorts.includes(sort)) {
@@ -481,7 +481,7 @@ export default class NebulaHarvestController {
     try {
       const qs = request.qs()
       const { harvestId, systemId, subsystemId, featureId } = qs
-      const { offset, limit, page, pageSize } = parsePagination(qs)
+      const { offset, page, pageSize } = parsePagination(qs)
 
       const clauses: string[] = []
       const vals: any[] = []
@@ -1476,7 +1476,7 @@ export default class NebulaHarvestController {
         ),
         q('SELECT COUNT(*)::int AS total FROM nebula.specs'),
       ])
-      response.json({ items: dataResult.rows.map((r) => this.specItem(r)), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset })
+      response.json({ items: dataResult.rows.map((r: any) => this.specItem(r)), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset })
     } catch (e: any) {
       const { status, body } = err(e)
       response.status(status).json(body)

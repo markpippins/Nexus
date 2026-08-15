@@ -1,6 +1,6 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
-import { q, qT, camelCaseRow, parsePagination, isUuid, toEpochMs } from '../services/nebula_helpers.js'
+import { q, qT, camelCaseRow, parsePagination, isUuid } from '../services/nebula_helpers.js'
 
 /**
  * nebula-srv (Wave 3.1) — meta domain.
@@ -438,7 +438,7 @@ export default class NebulaMetaController {
   /** GET /api/roles */
   async listRoles({ request, response }: HttpContext) {
     try {
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
+      const { offset, page, pageSize } = parsePagination(request.qs())
       const [dataResult, countResult] = await Promise.all([
         q('SELECT * FROM nebula.roles ORDER BY name ASC LIMIT $1 OFFSET $2', [pageSize, offset]),
         q('SELECT COUNT(*)::int AS total FROM nebula.roles'),
@@ -856,7 +856,7 @@ export default class NebulaMetaController {
   async listArchitectSpecs({ request, response }: HttpContext) {
     try {
       const { requirement_id } = request.qs()
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
+      const { offset, page, pageSize } = parsePagination(request.qs())
 
       const conditions: string[] = []
       const params: any[] = []
@@ -934,7 +934,7 @@ export default class NebulaMetaController {
   async listArtifactProvenance({ request, response }: HttpContext) {
     try {
       const { subject_type, subject_id, source_type, source_id } = request.qs()
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
+      const { offset, page, pageSize } = parsePagination(request.qs())
 
       const conditions: string[] = []
       const params: any[] = []
@@ -1275,7 +1275,7 @@ export default class NebulaMetaController {
   }
 
   /** GET /api/inventory */
-  async inventory(_ctx: HttpContext) {
+  async inventory({ response }: HttpContext) {
     try {
       const { rows: sysRows } = await q(
         `SELECT s.id AS "systemId", s.name AS "systemName",
@@ -1345,7 +1345,7 @@ export default class NebulaMetaController {
   async systemExternalIds({ request, response }: HttpContext) {
     try {
       const { id } = request.params()
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
+      const { offset, page, pageSize } = parsePagination(request.qs())
       const { rows: [sys] } = await q(
         'SELECT asset_id FROM systems WHERE id = $1', [id]
       )

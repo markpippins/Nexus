@@ -173,7 +173,7 @@ export default class NebulaConduitController {
   /** GET /api/conduit/deleted-plans */
   async conduitDeletedPlans({ request, response }: HttpContext) {
     try {
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
+      const { offset, page, pageSize } = parsePagination(request.qs())
       const [dataResult, countResult] = await Promise.all([
         q('SELECT * FROM nebula.plans WHERE deleted = 1 ORDER BY updated_at DESC LIMIT ? OFFSET ?', [pageSize, offset]),
         q('SELECT COUNT(*)::int AS total FROM nebula.plans WHERE deleted = 1'),
@@ -241,7 +241,7 @@ export default class NebulaConduitController {
     try {
       const qs = request.qs()
       const { status } = qs
-      const { offset, limit, page, pageSize } = parsePagination(qs)
+      const { offset, page, pageSize } = parsePagination(qs)
 
       const clauses: string[] = []
       const filterParams: any[] = []
@@ -338,15 +338,15 @@ export default class NebulaConduitController {
         return
       }
 
-      const { rows: [request] } = await qT(trx, 'SELECT * FROM execution.requests WHERE id = ?', [requestId])
+      const { rows: [reqRow] } = await qT(trx, 'SELECT * FROM execution.requests WHERE id = ?', [requestId])
       if (!request) {
         await trx.rollback()
         response.status(404).json({ error: 'Request not found' })
         return
       }
-      if (!['ADMITTED', 'READY'].includes(request.status)) {
+      if (!['ADMITTED', 'READY'].includes(reqRow.status)) {
         await trx.rollback()
-        response.status(400).json({ error: `Request must be ADMITTED or READY to lease (current: ${request.status})` })
+        response.status(400).json({ error: `Request must be ADMITTED or READY to lease (current: ${reqRow.status})` })
         return
       }
 
@@ -793,7 +793,7 @@ export default class NebulaConduitController {
     try {
       const qs = request.qs()
       const { requestId, type } = qs
-      const { offset, limit, page, pageSize } = parsePagination(qs)
+      const { offset, page, pageSize } = parsePagination(qs)
 
       const clauses: string[] = []
       const filterParams: any[] = []

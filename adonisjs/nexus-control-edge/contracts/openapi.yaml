@@ -4,6 +4,331 @@ info:
   version: 0.0.0
 tags: []
 paths:
+  /api/agendas:
+    get:
+      operationId: get_api_agendas
+      description: List agendas.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/agendas/{id}:
+    get:
+      operationId: get_api_agendas_2
+      description: Get a single agenda.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/agendas/{id}/finalize:
+    post:
+      operationId: post_api_agendas_finalize
+      description: Finalize an agenda.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/agendas/{id}/items:
+    delete:
+      operationId: delete_api_agendas_items
+      description: Delete agenda items.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_agendas_items
+      description: Add an agenda item.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/agent-records:
+    get:
+      operationId: get_api_agent_records
+      description: List agent records.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_agent_records
+      description: Create an agent record.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/agent-records/search:
+    post:
+      operationId: post_api_agent_records_search
+      description: Search agent records.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/agent-records/{id}:
+    get:
+      operationId: get_api_agent_records_2
+      description: Get a single agent record.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    patch:
+      operationId: patch_api_agent_records
+      description: Update an agent record.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_agent_records
+      description: Delete an agent record.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/architect-specs:
+    get:
+      operationId: get_api_architect_specs
+      description: List architect specs.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_architect_specs
+      description: Create an architect spec.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/architect-specs/{id}:
+    get:
+      operationId: get_api_architect_specs_2
+      description: Get a single architect spec.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_architect_specs
+      description: Delete an architect spec.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/artifact-provenance:
+    get:
+      operationId: get_api_artifact_provenance
+      description: List artifact provenance records.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_artifact_provenance
+      description: Create an artifact provenance record.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/artifact-provenance/{id}:
+    get:
+      operationId: get_api_artifact_provenance_2
+      description: Get a single artifact provenance record.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_artifact_provenance
+      description: Delete an artifact provenance record.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/assessments:
+    get:
+      operationId: get_api_assessments
+      description: List assessments.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/assessments/{id}:
+    get:
+      operationId: get_api_assessments_2
+      description: Get a single assessment.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/asset_identity_claim/{id}/resolve:
     post:
       operationId: resolveIdentityClaim
@@ -33,6 +358,112 @@ paths:
     get:
       operationId: getAssetRevision
       description: Expanded asset-revision envelope with asset, observations, parent + children.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/audit:
+    get:
+      operationId: get_api_audit
+      description: List audit files.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/audit/graph:
+    get:
+      operationId: get_api_audit_graph
+      description: Audit graph over agent_records + cross_references.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/audit/sync:
+    post:
+      operationId: post_api_audit_sync
+      description: Sync audit files from disk to DB.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/audit/{id}:
+    get:
+      operationId: get_api_audit_2
+      description: Get a single audit file.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/audit/{id}/regenerate:
+    post:
+      operationId: post_api_audit_regenerate
+      description: Regenerate an audit file from DB state.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/candidates:
+    get:
+      operationId: get_api_candidates
+      description: List candidates (alias).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/candidates/{id}:
+    get:
+      operationId: get_api_candidates_2
+      description: Get a single candidate (alias).
       parameters:
         - name: id
           in: path
@@ -256,6 +687,19 @@ paths:
             schema:
               type: object
               unevaluatedProperties: {}
+  /api/cascade/subscriber-status:
+    get:
+      operationId: get_api_cascade_subscriber_status
+      description: Cascade interactive-turn subscriber status.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/concept_relationship/{id}/evidence:
     get:
       operationId: getConceptRelationshipEvidence
@@ -266,6 +710,291 @@ paths:
           required: true
           schema:
             type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/conduit/deleted-plans:
+    get:
+      operationId: get_api_conduit_deleted_plans
+      description: List deleted conduit plans.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/conduit/plans:
+    get:
+      operationId: get_api_conduit_plans
+      description: List conduit plans.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/conduit/plans/as-of:
+    get:
+      operationId: get_api_conduit_plans_as_of
+      description: List conduit plans as of a timestamp.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/conduit/plans/{id}/history:
+    get:
+      operationId: get_api_conduit_plans_history
+      description: Get conduit plan history.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/conduit/plans/{id}/receipts:
+    get:
+      operationId: get_api_conduit_plans_receipts
+      description: Get conduit plan receipts.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/conversations:
+    get:
+      operationId: get_api_conversations
+      description: List conversations.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/conversations/by-snapshot/{snapshotId}:
+    get:
+      operationId: get_api_conversations_by_snapshot
+      description: Get a conversation by snapshot id.
+      parameters:
+        - name: snapshotId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/conversations/by-snapshot/{snapshotId}/blocks:
+    get:
+      operationId: get_api_conversations_by_snapshot_blocks
+      description: Get blocks for a conversation by snapshot id.
+      parameters:
+        - name: snapshotId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/conversations/{id}/blocks:
+    get:
+      operationId: get_api_conversations_blocks
+      description: Get blocks for a conversation.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/conversations/{id}/snapshots:
+    get:
+      operationId: get_api_conversations_snapshots
+      description: List snapshots for a conversation.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/counts:
+    get:
+      operationId: get_api_counts
+      description: Aggregate row counts across the data plane.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/cpf:
+    get:
+      operationId: get_api_cpf
+      description: Compilation-readiness funnel query.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/cpf/count:
+    get:
+      operationId: get_api_cpf_count
+      description: Compilation-readiness band counts.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/cpf/promote:
+    post:
+      operationId: post_api_cpf_promote
+      description: Promote a candidate (CPF >= 0.7).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/cross-references:
+    post:
+      operationId: post_api_cross_references
+      description: Create a cross-reference.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    get:
+      operationId: get_api_cross_references
+      description: List cross-references.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/cross-references/{id}:
+    get:
+      operationId: get_api_cross_references_2
+      description: Get a single cross-reference.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_cross_references
+      description: Delete a cross-reference.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/docs:
+    get:
+      operationId: get_api_docs
+      description: Read known doc files from a workspace directory.
+      parameters: []
       responses:
         '200':
           description: The request has succeeded.
@@ -348,6 +1077,78 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /api/evidence-links:
+    post:
+      operationId: post_api_evidence_links
+      description: Create an evidence link.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    get:
+      operationId: get_api_evidence_links
+      description: List evidence links.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_evidence_links_2
+      description: Bulk-delete evidence links.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/evidence-links/{id}:
+    get:
+      operationId: get_api_evidence_links_2
+      description: Get a single evidence link.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_evidence_links
+      description: Delete an evidence link.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/evidence_item:
     get:
       operationId: listEvidenceItems
@@ -361,10 +1162,781 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /api/execution/attempts:
+    post:
+      operationId: post_api_execution_attempts
+      description: Create an execution attempt.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/execution/leases/acquire:
+    post:
+      operationId: post_api_execution_leases_acquire
+      description: Acquire an execution lease.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/execution/leases/{id}/release:
+    post:
+      operationId: post_api_execution_leases_release
+      description: Release an execution lease.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/execution/leases/{id}/renew:
+    post:
+      operationId: post_api_execution_leases_renew
+      description: Renew an execution lease.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/execution/receipts:
+    post:
+      operationId: post_api_execution_receipts
+      description: Issue an execution receipt.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    get:
+      operationId: get_api_execution_receipts
+      description: List execution receipts.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/execution/requests:
+    post:
+      operationId: post_api_execution_requests
+      description: Create an execution request.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    get:
+      operationId: get_api_execution_requests
+      description: List execution requests.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/execution/requests/{id}:
+    get:
+      operationId: get_api_execution_requests_2
+      description: Get a single execution request.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/execution/requests/{id}/transition:
+    patch:
+      operationId: patch_api_execution_requests_transition
+      description: Transition an execution request.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/execution/state:
+    get:
+      operationId: get_api_execution_state
+      description: Get execution state.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/external-ids:
+    get:
+      operationId: get_api_external_ids
+      description: Reverse lookup via asset_relation.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/external-ids/{id}:
+    patch:
+      operationId: patch_api_external_ids
+      description: Deprecated — returns 410.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/features:
+    post:
+      operationId: post_api_features
+      description: Create a feature.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/features/move:
+    post:
+      operationId: post_api_features_move
+      description: Re-parent a feature to a different subsystem.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/features/{id}:
+    patch:
+      operationId: patch_api_features
+      description: Update a feature.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_features
+      description: Delete a feature.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    get:
+      operationId: get_api_features
+      description: Get a single feature.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/features/{id}/agendas:
+    get:
+      operationId: get_api_features_agendas
+      description: List agendas for a feature.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/features/{id}/harvest-candidates:
+    get:
+      operationId: get_api_features_harvest_candidates
+      description: List harvest candidates for a feature.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/features/{id}/implementation-plans:
+    get:
+      operationId: get_api_features_implementation_plans
+      description: List implementation plans for a feature.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/features/{id}/intent-records:
+    get:
+      operationId: get_api_features_intent_records
+      description: List intent records for a feature.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/features/{id}/specifications:
+    get:
+      operationId: get_api_features_specifications
+      description: List specifications for a feature.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/features/{id}/work-requests:
+    get:
+      operationId: get_api_features_work_requests
+      description: List work requests for a feature.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/harvest-candidates:
+    get:
+      operationId: get_api_harvest_candidates
+      description: List harvest candidates.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_harvest_candidates
+      description: Create a harvest candidate.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/harvest-candidates/discover:
+    post:
+      operationId: post_api_harvest_candidates_discover
+      description: Discover harvest candidates.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/harvest-candidates/promote-to-plan:
+    post:
+      operationId: post_api_harvest_candidates_promote_to_plan
+      description: Promote a candidate to a plan.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/harvest-candidates/{id}:
+    get:
+      operationId: get_api_harvest_candidates_2
+      description: Get a single harvest candidate.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    patch:
+      operationId: patch_api_harvest_candidates
+      description: Update a harvest candidate.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/harvest-candidates/{id}/dependencies:
+    get:
+      operationId: get_api_harvest_candidates_dependencies
+      description: List dependencies for a harvest candidate.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/harvest-candidates/{id}/promote:
+    post:
+      operationId: post_api_harvest_candidates_promote
+      description: Promote a harvest candidate.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/harvest-candidates/{id}/spawn-plan:
+    post:
+      operationId: post_api_harvest_candidates_spawn_plan
+      description: Spawn a plan from a harvest candidate.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/harvests:
+    get:
+      operationId: get_api_harvests
+      description: List harvests.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_harvests
+      description: Create a harvest.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/harvests/distribution:
+    get:
+      operationId: get_api_harvests_distribution
+      description: Harvest distribution.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/harvests/{id}:
+    get:
+      operationId: get_api_harvests_2
+      description: Get a single harvest.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_harvests
+      description: Delete a harvest.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/harvests/{id}/transcript:
+    get:
+      operationId: get_api_harvests_transcript
+      description: Get a harvest transcript.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/health:
     get:
       operationId: voyagerHealth
       description: Voyager health probe.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/implementation-plans/statuses:
+    get:
+      operationId: get_api_implementation_plans_statuses
+      description: List implementation-plan statuses.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/import:
+    post:
+      operationId: post_api_import
+      description: Import data.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/inbox-pointer/{role}:
+    get:
+      operationId: get_api_inbox_pointer
+      description: Get the inbox pointer for a role.
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    put:
+      operationId: put_api_inbox_pointer
+      description: Set the inbox pointer for a role.
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/inbox-pointers:
+    get:
+      operationId: get_api_inbox_pointers
+      description: List all inbox pointers.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/intent-records:
+    get:
+      operationId: get_api_intent_records
+      description: List intent records.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/intent-records/{id}:
+    get:
+      operationId: get_api_intent_records_2
+      description: Get a single intent record.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/intents:
+    get:
+      operationId: get_api_intents
+      description: List intent records.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/intents/{id}:
+    get:
+      operationId: get_api_intents_2
+      description: Get a single intent record.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/inventory:
+    get:
+      operationId: get_api_inventory
+      description: Rollup counts for the full hierarchy tree.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/knowledge/view:
+    get:
+      operationId: get_api_knowledge_view
+      description: Combined knowledge-graph payload for visualization.
       parameters: []
       responses:
         '200':
@@ -477,6 +2049,19 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /api/observations:
+    get:
+      operationId: get_api_observations
+      description: List observations.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/observations/directories:
     get:
       operationId: listDirectoryObservations
@@ -539,10 +2124,857 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /api/observations/{id}:
+    get:
+      operationId: get_api_observations_2
+      description: Get a single observation.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/op-registry:
+    post:
+      operationId: post_api_op_registry
+      description: Create an op-registry entry.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    get:
+      operationId: get_api_op_registry
+      description: List op-registry entries.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/op-registry/fork:
+    post:
+      operationId: post_api_op_registry_fork
+      description: Fork an op-registry entry.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/op-registry/{id}:
+    get:
+      operationId: get_api_op_registry_2
+      description: Get a single op-registry entry.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_op_registry
+      description: Delete an op-registry entry.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/op-registry/{id}/deprecate:
+    patch:
+      operationId: patch_api_op_registry_deprecate
+      description: Deprecate an op-registry entry.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/op-registry/{id}/lineage:
+    get:
+      operationId: get_api_op_registry_lineage
+      description: Get op-registry entry lineage.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/op-registry/{id}/supersede:
+    patch:
+      operationId: patch_api_op_registry_supersede
+      description: Supersede an op-registry entry.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/open-questions:
+    get:
+      operationId: get_api_open_questions
+      description: List open questions.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_open_questions
+      description: Create an open question.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/open-questions/{id}:
+    get:
+      operationId: get_api_open_questions_2
+      description: Get a single open question.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/open-questions/{id}/answer:
+    put:
+      operationId: put_api_open_questions_answer
+      description: Legacy single-answer endpoint.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/open-questions/{id}/answers:
+    get:
+      operationId: get_api_open_questions_answers
+      description: List answers for an open question.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_open_questions_answers
+      description: Record an answer for an open question.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/open-questions/{id}/participants:
+    get:
+      operationId: get_api_open_questions_participants
+      description: List participants for an open question.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_open_questions_participants
+      description: Add a participant to an open question.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/open-questions/{id}/resolve:
+    put:
+      operationId: put_api_open_questions_resolve
+      description: Resolve an open question.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/open-questions/{id}/timeline:
+    get:
+      operationId: get_api_open_questions_timeline
+      description: Deliberation timeline for an open question.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/plans:
+    get:
+      operationId: get_api_plans
+      description: List plans.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_plans
+      description: Create a plan.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/plans/{id}:
+    get:
+      operationId: get_api_plans_2
+      description: Get a single plan.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/plans/{planRef}/candidates:
+    get:
+      operationId: get_api_plans_candidates
+      description: List candidates for a plan.
+      parameters:
+        - name: planRef
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/preferences:
+    get:
+      operationId: get_api_preferences
+      description: Get user preferences.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/preferences/{key}:
+    put:
+      operationId: put_api_preferences
+      description: Set a user preference.
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_preferences
+      description: Delete a user preference.
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/projection-overrides:
+    post:
+      operationId: post_api_projection_overrides
+      description: Create a projection override.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/projection-overrides/{id}:
+    delete:
+      operationId: delete_api_projection_overrides
+      description: Delete a projection override.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/projections:
+    get:
+      operationId: get_api_projections
+      description: List projections.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_projections
+      description: Create a projection.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/projections/{id}:
+    delete:
+      operationId: delete_api_projections
+      description: Delete a projection.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/projections/{id}/render:
+    post:
+      operationId: post_api_projections_render
+      description: Render a projection.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/refresh-stats:
+    post:
+      operationId: post_api_refresh_stats
+      description: Refresh nebula materialized views.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/representation_relationship/{id}/evidence:
     get:
       operationId: getRepresentationRelationshipEvidence
       description: All evidence for a representation relationship.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/requirements:
+    get:
+      operationId: get_api_requirements
+      description: 'List requirements (filters: systemId, subsystemId, featureId).'
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_requirements
+      description: Create a requirement.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/requirements/batch:
+    patch:
+      operationId: patch_api_requirements_batch
+      description: Batch-update requirements.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/requirements/{id}:
+    get:
+      operationId: get_api_requirements_2
+      description: Get a single requirement.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    patch:
+      operationId: patch_api_requirements
+      description: Update a requirement.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_requirements
+      description: Delete a requirement.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/requirements/{id}/children:
+    get:
+      operationId: get_api_requirements_children
+      description: List requirement children.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/requirements/{id}/compile:
+    post:
+      operationId: post_api_requirements_compile
+      description: Compile a requirement into WorkRequest IR (two-stage compiler).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/requirements/{id}/dependencies:
+    get:
+      operationId: get_api_requirements_dependencies
+      description: List requirement dependencies.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_requirements_dependencies
+      description: Create a requirement dependency.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/requirements/{id}/dependencies/{depId}:
+    delete:
+      operationId: delete_api_requirements_dependencies
+      description: Delete a requirement dependency.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: depId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/requirements/{id}/move:
+    post:
+      operationId: post_api_requirements_move
+      description: Move a requirement to a new status.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/role-leases:
+    get:
+      operationId: get_api_role_leases
+      description: List role leases.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/role-leases/consume:
+    post:
+      operationId: post_api_role_leases_consume
+      description: Consume a role lease.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/role-leases/issue:
+    post:
+      operationId: post_api_role_leases_issue
+      description: Issue a role lease.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/role-leases/stale:
+    get:
+      operationId: get_api_role_leases_stale
+      description: List stale role leases.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/role-leases/{id}/renew:
+    post:
+      operationId: post_api_role_leases_renew
+      description: Renew a role lease.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/role-leases/{id}/revoke:
+    post:
+      operationId: post_api_role_leases_revoke
+      description: Revoke a role lease.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/roles:
+    get:
+      operationId: get_api_roles
+      description: List governance roles.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/roles/{id}:
+    get:
+      operationId: get_api_roles_2
+      description: Get a single role.
       parameters:
         - name: id
           in: path
@@ -588,6 +3020,220 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /api/search:
+    get:
+      operationId: get_api_search
+      description: Cross-entity full-text search.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/search/semantic:
+    post:
+      operationId: post_api_search_semantic
+      description: Vector similarity search against the knowledge graph.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/seed:
+    post:
+      operationId: post_api_seed
+      description: Seed demo data.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/segments:
+    post:
+      operationId: post_api_segments
+      description: Create a segment.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/segments/{id}:
+    patch:
+      operationId: patch_api_segments
+      description: Update a segment.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_segments
+      description: Delete a segment.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/sessions:
+    get:
+      operationId: get_api_sessions
+      description: List work sessions.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_sessions
+      description: Create a work session.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/sessions/{id}:
+    patch:
+      operationId: patch_api_sessions
+      description: Update a work session.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_sessions
+      description: Delete a work session.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/snapshots:
+    post:
+      operationId: post_api_snapshots
+      description: Create a snapshot.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/snapshots/{id}/blocks:
+    get:
+      operationId: get_api_snapshots_blocks
+      description: Get blocks for a snapshot.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/snapshots/{id}/projection:
+    get:
+      operationId: get_api_snapshots_projection
+      description: Get the projection for a snapshot.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/snapshots/{id}/references:
+    get:
+      operationId: get_api_snapshots_references
+      description: Get references for a snapshot.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/spans:
     get:
       operationId: listMetadataSpans
@@ -605,6 +3251,86 @@ paths:
     get:
       operationId: getMetadataSpan
       description: Get a single metadata span.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/specifications:
+    get:
+      operationId: get_api_specifications
+      description: List specifications.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/specifications/{id}:
+    get:
+      operationId: get_api_specifications_2
+      description: Get a single specification.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/specifications/{id}/link-requirements:
+    post:
+      operationId: post_api_specifications_link_requirements
+      description: Link requirements to a specification.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/specs:
+    get:
+      operationId: get_api_specs
+      description: List specs.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/specs/{id}:
+    get:
+      operationId: get_api_specs_2
+      description: Get a single spec.
       parameters:
         - name: id
           in: path
@@ -645,6 +3371,611 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /api/subsystems:
+    post:
+      operationId: post_api_subsystems
+      description: Create a subsystem.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/subsystems/move:
+    post:
+      operationId: post_api_subsystems_move
+      description: Re-parent a subsystem to a different system.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/subsystems/{id}:
+    patch:
+      operationId: patch_api_subsystems
+      description: Update a subsystem.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_subsystems
+      description: Delete a subsystem.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    get:
+      operationId: get_api_subsystems
+      description: Get a single subsystem.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/subsystems/{id}/agendas:
+    get:
+      operationId: get_api_subsystems_agendas
+      description: List agendas for a subsystem.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/subsystems/{id}/docs:
+    get:
+      operationId: get_api_subsystems_docs
+      description: Read docs for a subsystem workspace.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/subsystems/{id}/harvest-candidates:
+    get:
+      operationId: get_api_subsystems_harvest_candidates
+      description: List harvest candidates for a subsystem.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/subsystems/{id}/implementation-plans:
+    get:
+      operationId: get_api_subsystems_implementation_plans
+      description: List implementation plans for a subsystem.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/subsystems/{id}/intent-records:
+    get:
+      operationId: get_api_subsystems_intent_records
+      description: List intent records for a subsystem.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/subsystems/{id}/specifications:
+    get:
+      operationId: get_api_subsystems_specifications
+      description: List specifications for a subsystem.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/subsystems/{id}/work-requests:
+    get:
+      operationId: get_api_subsystems_work_requests
+      description: List work requests for a subsystem.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems:
+    get:
+      operationId: get_api_systems
+      description: List systems.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_systems
+      description: Create a system.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems/demote/{id}:
+    post:
+      operationId: post_api_systems_demote
+      description: Demote a system into a subsystem of another system.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems/{id}:
+    patch:
+      operationId: patch_api_systems
+      description: Update a system.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_systems
+      description: Delete a system.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    get:
+      operationId: get_api_systems_2
+      description: Get a single system.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems/{id}/agendas:
+    get:
+      operationId: get_api_systems_agendas
+      description: List agendas for a system.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems/{id}/docs:
+    get:
+      operationId: get_api_systems_docs
+      description: Read docs for a system workspace.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems/{id}/external-ids:
+    get:
+      operationId: get_api_systems_external_ids
+      description: List owned services via asset_relation.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_systems_external_ids
+      description: Deprecated — returns 410.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems/{id}/external-ids/{eid}:
+    delete:
+      operationId: delete_api_systems_external_ids
+      description: Deprecated — returns 410.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: eid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems/{id}/folders:
+    post:
+      operationId: post_api_systems_folders
+      description: Create a system folder.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems/{id}/harvest-candidates:
+    get:
+      operationId: get_api_systems_harvest_candidates
+      description: List harvest candidates for a system.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems/{id}/implementation-plans:
+    get:
+      operationId: get_api_systems_implementation_plans
+      description: List implementation plans for a system.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems/{id}/info:
+    get:
+      operationId: get_api_systems_info
+      description: List info tabs for a system.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems/{id}/info/{tabId}:
+    put:
+      operationId: put_api_systems_info
+      description: Save an info tab.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tabId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_api_systems_info
+      description: Delete an info tab.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tabId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems/{id}/intent-records:
+    get:
+      operationId: get_api_systems_intent_records
+      description: List intent records for a system.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems/{id}/inventory:
+    get:
+      operationId: get_api_systems_inventory
+      description: Unified inventory for a system via asset_relation.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems/{id}/specifications:
+    get:
+      operationId: get_api_systems_specifications
+      description: List specifications for a system.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems/{id}/work-requests:
+    get:
+      operationId: get_api_systems_work_requests
+      description: List work requests for a system.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/systems/{systemId}/folders/{folderId}:
+    delete:
+      operationId: delete_api_systems_folders
+      description: Delete a system folder.
+      parameters:
+        - name: systemId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: folderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/topology/edge-hints:
     get:
       operationId: listEdgeHints
@@ -675,6 +4006,80 @@ paths:
     get:
       operationId: getTopologySignal
       description: Get a single topology signal.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/work-requests:
+    get:
+      operationId: get_api_work_requests
+      description: List work requests.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/work-requests/{id}:
+    get:
+      operationId: get_api_work_requests_2
+      description: Get a single work request.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/workspaces:
+    get:
+      operationId: get_api_workspaces
+      description: List system workspaces.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_api_workspaces
+      description: Create a system workspace.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/workspaces/{id}:
+    delete:
+      operationId: delete_api_workspaces
+      description: Delete a system workspace.
       parameters:
         - name: id
           in: path

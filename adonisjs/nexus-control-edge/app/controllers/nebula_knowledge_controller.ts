@@ -19,7 +19,7 @@ export default class NebulaKnowledgeController {
     try {
       const qs = request.qs()
       const { section, entity_type, search } = qs
-      const { offset, limit, page, pageSize } = parsePagination(qs)
+      const { offset, page, pageSize } = parsePagination(qs)
 
       const conditions: string[] = []
       const filterParams: any[] = []
@@ -78,7 +78,7 @@ export default class NebulaKnowledgeController {
   async relations({ request, response }: HttpContext) {
     try {
       const { section, entityId } = request.params()
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
+      const { offset, page, pageSize } = parsePagination(request.qs())
 
       const [outbound, inbound, outboundCount, inboundCount] = await Promise.all([
         q(
@@ -251,7 +251,7 @@ export default class NebulaKnowledgeController {
   /** GET /api/knowledge/cross-references */
   async crossReferences({ request, response }: HttpContext) {
     try {
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
+      const { offset, page, pageSize } = parsePagination(request.qs())
       const xrefSubquery = `(
         SELECT xr.id, xr.map_name, xr.source_section, xr.source_id,
                xr.target_section, xr.target_id, xr.weight
@@ -342,7 +342,7 @@ export default class NebulaKnowledgeController {
     try {
       const qs = request.qs()
       const { intent_id, status, search } = qs
-      const { offset, limit, page, pageSize } = parsePagination(qs)
+      const { offset, page, pageSize } = parsePagination(qs)
 
       const conditions: string[] = ['deleted_at IS NULL']
       const filterParams: any[] = []

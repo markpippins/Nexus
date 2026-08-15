@@ -22,7 +22,7 @@ export default class NebulaHierarchyController {
   async listSystems({ request, response }: HttpContext) {
     try {
       const qs = request.qs()
-      const { offset, limit, page, pageSize } = parsePagination(qs)
+      const { offset, page, pageSize } = parsePagination(qs)
       const { rows } = await q(
         `SELECT * FROM systems ORDER BY created_at ASC LIMIT ? OFFSET ?`,
         [pageSize, offset]
@@ -357,7 +357,7 @@ export default class NebulaHierarchyController {
     try {
       const qs = request.qs()
       const { systemId, subsystemId, featureId } = qs
-      const { offset, limit, page, pageSize } = parsePagination(qs)
+      const { offset, page, pageSize } = parsePagination(qs)
 
       const clauses: string[] = []
       const vals: any[] = []
@@ -374,7 +374,7 @@ export default class NebulaHierarchyController {
         q(`SELECT COUNT(*)::int AS total FROM requirements ${where}`, vals),
       ])
 
-      const items = []
+      const items: any[] = []
       for (const r of dataResult.rows) {
         items.push(await this.reqJson(r))
       }
@@ -392,9 +392,9 @@ export default class NebulaHierarchyController {
            GROUP BY requirement_id`,
           [ids]
         )
-        const qcMap = new Map(qcRows.map((r: any) => [r.requirement_id, r]))
-        for (const item of items) {
-          const qc = qcMap.get(item.id)
+        const qcMap = new Map<string, any>(qcRows.map((r: any) => [r.requirement_id, r]))
+        for (const item of items as any[]) {
+          const qc: any = qcMap.get(item.id)
           item.questionCounts = qc
             ? { total: qc.total, openCount: qc.open_count, blockingCount: qc.blocking_count }
             : { total: 0, openCount: 0, blockingCount: 0 }
@@ -446,7 +446,7 @@ export default class NebulaHierarchyController {
   async requirementChildren({ request, response }: HttpContext) {
     try {
       const { id } = request.params()
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
+      const { offset, page, pageSize } = parsePagination(request.qs())
 
       const [dataResult, countResult] = await Promise.all([
         q(
@@ -469,7 +469,7 @@ export default class NebulaHierarchyController {
   async requirementDependencies({ request, response }: HttpContext) {
     try {
       const { id } = request.params()
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
+      const { offset, page, pageSize } = parsePagination(request.qs())
 
       const [dataResult, countResult] = await Promise.all([
         q(

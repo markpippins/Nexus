@@ -2,7 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { q, qT, toEpochMs, camelCaseRow, parsePagination, NEXUS_ROOT, AUDIT_ROOT } from '../services/nebula_helpers.js'
+import { q, qT, camelCaseRow, parsePagination, NEXUS_ROOT, AUDIT_ROOT } from '../services/nebula_helpers.js'
 
 /**
  * nebula-srv (Wave 3.1) — docs/plans/audit/preferences/info/import/seed.
@@ -176,7 +176,7 @@ export default class NebulaDocsController {
     try {
       const qs = request.qs()
       const { status } = qs
-      const { offset, limit, page, pageSize } = parsePagination(qs)
+      const { offset, page, pageSize } = parsePagination(qs)
 
       const clauses: string[] = []
       const vals: any[] = []
@@ -243,7 +243,7 @@ export default class NebulaDocsController {
   async createPlan({ request, response }: HttpContext) {
     try {
       const body = request.body()
-      const { title, project = 'nexus', goal = '', filesAffected = [], acceptanceCriteria = [], dependencies = [], promptRef = '' } = body
+      const { title, goal = '', filesAffected = [], acceptanceCriteria = [], dependencies = [], promptRef = '' } = body
       if (!title) {
         response.status(400).json({ error: 'title is required' })
         return
@@ -319,7 +319,7 @@ export default class NebulaDocsController {
   async systemPlans({ request, response }: HttpContext) {
     try {
       const { id } = request.params()
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
+      const { offset, page, pageSize } = parsePagination(request.qs())
       const [dataResult, countResult] = await Promise.all([
         q(
           `SELECT DISTINCT p.plan_number AS id, p.title, p.goal, p.content,
@@ -367,7 +367,7 @@ export default class NebulaDocsController {
   async subsystemPlans({ request, response }: HttpContext) {
     try {
       const { id } = request.params()
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
+      const { offset, page, pageSize } = parsePagination(request.qs())
       const [dataResult, countResult] = await Promise.all([
         q(
           `SELECT DISTINCT p.plan_number AS id, p.title, p.goal, p.content,
@@ -415,7 +415,7 @@ export default class NebulaDocsController {
   async featurePlans({ request, response }: HttpContext) {
     try {
       const { id } = request.params()
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
+      const { offset, page, pageSize } = parsePagination(request.qs())
       const [dataResult, countResult] = await Promise.all([
         q(
           `SELECT DISTINCT p.plan_number AS id, p.title, p.goal, p.content,
@@ -464,7 +464,7 @@ export default class NebulaDocsController {
   /** GET /api/audit */
   async listAudit({ request, response }: HttpContext) {
     try {
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
+      const { offset, page, pageSize } = parsePagination(request.qs())
       const [dataResult, countResult] = await Promise.all([
         q(
           'SELECT id, file_path, size_bytes, recorded_on_dt FROM audit_files ORDER BY file_path LIMIT ? OFFSET ?',
@@ -674,7 +674,7 @@ export default class NebulaDocsController {
   async listInfoTabs({ request, response }: HttpContext) {
     try {
       const { id } = request.params()
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
+      const { offset, page, pageSize } = parsePagination(request.qs())
       const [dataResult, countResult] = await Promise.all([
         q(
           'SELECT tab_id, content FROM system_info_tabs WHERE system_id = ? ORDER BY tab_id LIMIT ? OFFSET ?',
@@ -887,12 +887,12 @@ export default class NebulaDocsController {
         trx,
         "INSERT INTO systems (name, description, readme) VALUES ('E-Commerce Platform', 'Main customer facing retail platform', '# E-Commerce Platform Architecture\\nThis system handles all customer-facing interactions.\\n\\n## Tech Stack\\n- Angular 21\\n- Node.js API\\n- PostgreSQL') RETURNING *"
       )
-      const { rows: [f1] } = await qT(
+      const { rows: [_f1] } = await qT(
         trx,
         "INSERT INTO system_folders (system_id, name, category, note) VALUES (?, 'webapp', 'UI', 'Main storefront angular app') RETURNING *",
         [sys.id]
       )
-      const { rows: [f2] } = await qT(
+      const { rows: [_f2] } = await qT(
         trx,
         "INSERT INTO system_folders (system_id, name, category, note) VALUES (?, 'api-gateway', 'Service', 'BFF for mobile and web') RETURNING *",
         [sys.id]

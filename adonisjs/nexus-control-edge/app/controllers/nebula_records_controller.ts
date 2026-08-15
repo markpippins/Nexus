@@ -377,7 +377,7 @@ export default class NebulaRecordsController {
   /** GET /api/projections */
   async listProjections({ request, response }: HttpContext) {
     try {
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
+      const { offset, page, pageSize } = parsePagination(request.qs())
       const [dataResult, countResult] = await Promise.all([
         q(
           'SELECT id, name, type, description, target_path, model, schedule, created_at, recorded_on_dt FROM nebula.projections ORDER BY name LIMIT ? OFFSET ?',
@@ -538,7 +538,7 @@ export default class NebulaRecordsController {
     try {
       const qs = request.qs()
       const { sourceType, sourceId, targetType, targetId, relType } = qs
-      const { offset, limit, page, pageSize } = parsePagination(qs)
+      const { offset, page, pageSize } = parsePagination(qs)
 
       const clauses: string[] = []
       const vals: any[] = []
@@ -632,7 +632,7 @@ export default class NebulaRecordsController {
       }
 
       const { rows: [row] } = await q(
-        `INSERT INTO knowledge.evidence_links
+        `INSERT INTO steward.evidence_links
            (knowledge_entity_id, nebula_harvest_id, nebula_candidate_id,
             link_type, confidence, provenance, rationale, source_span, metadata)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -665,7 +665,7 @@ export default class NebulaRecordsController {
     try {
       const qs = request.qs()
       const { knowledgeEntityId, nebulaHarvestId, nebulaCandidateId, linkType, provenance, minConfidence, maxConfidence } = qs
-      const { offset, limit, page, pageSize } = parsePagination(qs)
+      const { offset, page, pageSize } = parsePagination(qs)
 
       const clauses: string[] = []
       const vals: any[] = []
@@ -681,10 +681,10 @@ export default class NebulaRecordsController {
 
       const [dataResult, countResult] = await Promise.all([
         q(
-          `SELECT * FROM knowledge.evidence_links ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+          `SELECT * FROM steward.evidence_links ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
           [...vals, pageSize, offset]
         ),
-        q(`SELECT COUNT(*)::int AS total FROM knowledge.evidence_links ${where}`, vals),
+        q(`SELECT COUNT(*)::int AS total FROM steward.evidence_links ${where}`, vals),
       ])
 
       response.json({
@@ -703,7 +703,7 @@ export default class NebulaRecordsController {
   async getEvidenceLink({ request, response }: HttpContext) {
     try {
       const { id } = request.params()
-      const { rows: [row] } = await q('SELECT * FROM knowledge.evidence_links WHERE id = ?', [id])
+      const { rows: [row] } = await q('SELECT * FROM steward.evidence_links WHERE id = ?', [id])
       if (!row) {
         response.status(404).json({ error: 'Evidence link not found' })
         return
@@ -719,7 +719,7 @@ export default class NebulaRecordsController {
   async deleteEvidenceLink({ request, response }: HttpContext) {
     try {
       const { id } = request.params()
-      const { rowCount } = await q('DELETE FROM knowledge.evidence_links WHERE id = ?', [id])
+      const { rowCount } = await q('DELETE FROM steward.evidence_links WHERE id = ?', [id])
       if (rowCount === 0) {
         response.status(404).json({ error: 'Evidence link not found' })
         return
@@ -739,7 +739,7 @@ export default class NebulaRecordsController {
         response.status(400).json({ error: 'knowledgeEntityId query parameter is required for bulk delete' })
         return
       }
-      const { rowCount } = await q('DELETE FROM knowledge.evidence_links WHERE knowledge_entity_id = ?', [knowledgeEntityId])
+      const { rowCount } = await q('DELETE FROM steward.evidence_links WHERE knowledge_entity_id = ?', [knowledgeEntityId])
       response.json({ deleted: rowCount })
     } catch (e: any) {
       const { status, body } = err(e)

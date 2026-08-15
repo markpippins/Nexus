@@ -401,4 +401,1083 @@ namespace org.nexus.controledge {
   @get
   @doc("Summary counts across all voyager tables.")
   op getVoyagerStats(): Record<unknown>;
+
+  // ========================================================================
+  // nebula-srv (re-homed Wave 3.1) — canonical data-plane surface
+  // ========================================================================
+
+  @route("/api/systems")
+  @get
+  @doc("List systems.")
+  op get_api_systems(): Record<unknown>;
+
+  @route("/api/systems")
+  @post
+  @doc("Create a system.")
+  op post_api_systems(): Record<unknown>;
+
+  @route("/api/systems/{id}")
+  @patch
+  @doc("Update a system.")
+  op patch_api_systems(@path id: string): Record<unknown>;
+
+  @route("/api/systems/{id}")
+  @delete
+  @doc("Delete a system.")
+  op delete_api_systems(@path id: string): Record<unknown>;
+
+  @route("/api/systems/{id}")
+  @get
+  @doc("Get a single system.")
+  op get_api_systems_2(@path id: string): Record<unknown>;
+
+  @route("/api/subsystems")
+  @post
+  @doc("Create a subsystem.")
+  op post_api_subsystems(): Record<unknown>;
+
+  @route("/api/subsystems/{id}")
+  @patch
+  @doc("Update a subsystem.")
+  op patch_api_subsystems(@path id: string): Record<unknown>;
+
+  @route("/api/subsystems/{id}")
+  @delete
+  @doc("Delete a subsystem.")
+  op delete_api_subsystems(@path id: string): Record<unknown>;
+
+  @route("/api/subsystems/{id}")
+  @get
+  @doc("Get a single subsystem.")
+  op get_api_subsystems(@path id: string): Record<unknown>;
+
+  @route("/api/features")
+  @post
+  @doc("Create a feature.")
+  op post_api_features(): Record<unknown>;
+
+  @route("/api/features/{id}")
+  @patch
+  @doc("Update a feature.")
+  op patch_api_features(@path id: string): Record<unknown>;
+
+  @route("/api/features/{id}")
+  @delete
+  @doc("Delete a feature.")
+  op delete_api_features(@path id: string): Record<unknown>;
+
+  @route("/api/features/{id}")
+  @get
+  @doc("Get a single feature.")
+  op get_api_features(@path id: string): Record<unknown>;
+
+  @route("/api/requirements")
+  @get
+  @doc("List requirements (filters: systemId, subsystemId, featureId).")
+  op get_api_requirements(): Record<unknown>;
+
+  @route("/api/requirements/{id}")
+  @get
+  @doc("Get a single requirement.")
+  op get_api_requirements_2(@path id: string): Record<unknown>;
+
+  @route("/api/requirements/{id}/children")
+  @get
+  @doc("List requirement children.")
+  op get_api_requirements_children(@path id: string): Record<unknown>;
+
+  @route("/api/requirements/{id}/dependencies")
+  @get
+  @doc("List requirement dependencies.")
+  op get_api_requirements_dependencies(@path id: string): Record<unknown>;
+
+  @route("/api/requirements/{id}/dependencies")
+  @post
+  @doc("Create a requirement dependency.")
+  op post_api_requirements_dependencies(@path id: string): Record<unknown>;
+
+  @route("/api/requirements/{id}/dependencies/{depId}")
+  @delete
+  @doc("Delete a requirement dependency.")
+  op delete_api_requirements_dependencies(@path id: string, @path depId: string): Record<unknown>;
+
+  @route("/api/requirements")
+  @post
+  @doc("Create a requirement.")
+  op post_api_requirements(): Record<unknown>;
+
+  @route("/api/requirements/batch")
+  @patch
+  @doc("Batch-update requirements.")
+  op patch_api_requirements_batch(): Record<unknown>;
+
+  @route("/api/requirements/{id}")
+  @patch
+  @doc("Update a requirement.")
+  op patch_api_requirements(@path id: string): Record<unknown>;
+
+  @route("/api/requirements/{id}")
+  @delete
+  @doc("Delete a requirement.")
+  op delete_api_requirements(@path id: string): Record<unknown>;
+
+  @route("/api/requirements/{id}/move")
+  @post
+  @doc("Move a requirement to a new status.")
+  op post_api_requirements_move(@path id: string): Record<unknown>;
+
+  @route("/api/requirements/{id}/compile")
+  @post
+  @doc("Compile a requirement into WorkRequest IR (two-stage compiler).")
+  op post_api_requirements_compile(@path id: string): Record<unknown>;
+
+  @route("/api/systems/{id}/folders")
+  @post
+  @doc("Create a system folder.")
+  op post_api_systems_folders(@path id: string): Record<unknown>;
+
+  @route("/api/systems/{systemId}/folders/{folderId}")
+  @delete
+  @doc("Delete a system folder.")
+  op delete_api_systems_folders(@path systemId: string, @path folderId: string): Record<unknown>;
+
+  @route("/api/sessions")
+  @get
+  @doc("List work sessions.")
+  op get_api_sessions(): Record<unknown>;
+
+  @route("/api/sessions")
+  @post
+  @doc("Create a work session.")
+  op post_api_sessions(): Record<unknown>;
+
+  @route("/api/sessions/{id}")
+  @patch
+  @doc("Update a work session.")
+  op patch_api_sessions(@path id: string): Record<unknown>;
+
+  @route("/api/features/move")
+  @post
+  @doc("Re-parent a feature to a different subsystem.")
+  op post_api_features_move(): Record<unknown>;
+
+  @route("/api/subsystems/move")
+  @post
+  @doc("Re-parent a subsystem to a different system.")
+  op post_api_subsystems_move(): Record<unknown>;
+
+  @route("/api/systems/demote/{id}")
+  @post
+  @doc("Demote a system into a subsystem of another system.")
+  op post_api_systems_demote(@path id: string): Record<unknown>;
+
+  @route("/api/sessions/{id}")
+  @delete
+  @doc("Delete a work session.")
+  op delete_api_sessions(@path id: string): Record<unknown>;
+
+  @route("/api/workspaces")
+  @get
+  @doc("List system workspaces.")
+  op get_api_workspaces(): Record<unknown>;
+
+  @route("/api/workspaces")
+  @post
+  @doc("Create a system workspace.")
+  op post_api_workspaces(): Record<unknown>;
+
+  @route("/api/workspaces/{id}")
+  @delete
+  @doc("Delete a system workspace.")
+  op delete_api_workspaces(@path id: string): Record<unknown>;
+
+  @route("/api/docs")
+  @get
+  @doc("Read known doc files from a workspace directory.")
+  op get_api_docs(): Record<unknown>;
+
+  @route("/api/subsystems/{id}/docs")
+  @get
+  @doc("Read docs for a subsystem workspace.")
+  op get_api_subsystems_docs(@path id: string): Record<unknown>;
+
+  @route("/api/systems/{id}/docs")
+  @get
+  @doc("Read docs for a system workspace.")
+  op get_api_systems_docs(@path id: string): Record<unknown>;
+
+  @route("/api/plans")
+  @get
+  @doc("List plans.")
+  op get_api_plans(): Record<unknown>;
+
+  @route("/api/plans/{id}")
+  @get
+  @doc("Get a single plan.")
+  op get_api_plans_2(@path id: string): Record<unknown>;
+
+  @route("/api/plans")
+  @post
+  @doc("Create a plan.")
+  op post_api_plans(): Record<unknown>;
+
+  @route("/api/implementation-plans/statuses")
+  @get
+  @doc("List implementation-plan statuses.")
+  op get_api_implementation_plans_statuses(): Record<unknown>;
+
+  @route("/api/systems/{id}/implementation-plans")
+  @get
+  @doc("List implementation plans for a system.")
+  op get_api_systems_implementation_plans(@path id: string): Record<unknown>;
+
+  @route("/api/subsystems/{id}/implementation-plans")
+  @get
+  @doc("List implementation plans for a subsystem.")
+  op get_api_subsystems_implementation_plans(@path id: string): Record<unknown>;
+
+  @route("/api/features/{id}/implementation-plans")
+  @get
+  @doc("List implementation plans for a feature.")
+  op get_api_features_implementation_plans(@path id: string): Record<unknown>;
+
+  @route("/api/audit")
+  @get
+  @doc("List audit files.")
+  op get_api_audit(): Record<unknown>;
+
+  @route("/api/audit/graph")
+  @get
+  @doc("Audit graph over agent_records + cross_references.")
+  op get_api_audit_graph(): Record<unknown>;
+
+  @route("/api/audit/{id}")
+  @get
+  @doc("Get a single audit file.")
+  op get_api_audit_2(@path id: string): Record<unknown>;
+
+  @route("/api/audit/sync")
+  @post
+  @doc("Sync audit files from disk to DB.")
+  op post_api_audit_sync(): Record<unknown>;
+
+  @route("/api/audit/{id}/regenerate")
+  @post
+  @doc("Regenerate an audit file from DB state.")
+  op post_api_audit_regenerate(@path id: string): Record<unknown>;
+
+  @route("/api/preferences")
+  @get
+  @doc("Get user preferences.")
+  op get_api_preferences(): Record<unknown>;
+
+  @route("/api/preferences/{key}")
+  @put
+  @doc("Set a user preference.")
+  op put_api_preferences(@path key: string): Record<unknown>;
+
+  @route("/api/preferences/{key}")
+  @delete
+  @doc("Delete a user preference.")
+  op delete_api_preferences(@path key: string): Record<unknown>;
+
+  @route("/api/systems/{id}/info")
+  @get
+  @doc("List info tabs for a system.")
+  op get_api_systems_info(@path id: string): Record<unknown>;
+
+  @route("/api/systems/{id}/info/{tabId}")
+  @put
+  @doc("Save an info tab.")
+  op put_api_systems_info(@path id: string, @path tabId: string): Record<unknown>;
+
+  @route("/api/systems/{id}/info/{tabId}")
+  @delete
+  @doc("Delete an info tab.")
+  op delete_api_systems_info(@path id: string, @path tabId: string): Record<unknown>;
+
+  @route("/api/import")
+  @post
+  @doc("Import data.")
+  op post_api_import(): Record<unknown>;
+
+  @route("/api/seed")
+  @post
+  @doc("Seed demo data.")
+  op post_api_seed(): Record<unknown>;
+
+  @route("/api/harvests")
+  @get
+  @doc("List harvests.")
+  op get_api_harvests(): Record<unknown>;
+
+  @route("/api/harvests/distribution")
+  @get
+  @doc("Harvest distribution.")
+  op get_api_harvests_distribution(): Record<unknown>;
+
+  @route("/api/harvests/{id}")
+  @get
+  @doc("Get a single harvest.")
+  op get_api_harvests_2(@path id: string): Record<unknown>;
+
+  @route("/api/harvests/{id}/transcript")
+  @get
+  @doc("Get a harvest transcript.")
+  op get_api_harvests_transcript(@path id: string): Record<unknown>;
+
+  @route("/api/harvest-candidates/{id}/promote")
+  @post
+  @doc("Promote a harvest candidate.")
+  op post_api_harvest_candidates_promote(@path id: string): Record<unknown>;
+
+  @route("/api/harvest-candidates/promote-to-plan")
+  @post
+  @doc("Promote a candidate to a plan.")
+  op post_api_harvest_candidates_promote_to_plan(): Record<unknown>;
+
+  @route("/api/harvests")
+  @post
+  @doc("Create a harvest.")
+  op post_api_harvests(): Record<unknown>;
+
+  @route("/api/harvests/{id}")
+  @delete
+  @doc("Delete a harvest.")
+  op delete_api_harvests(@path id: string): Record<unknown>;
+
+  @route("/api/plans/{planRef}/candidates")
+  @get
+  @doc("List candidates for a plan.")
+  op get_api_plans_candidates(@path planRef: string): Record<unknown>;
+
+  @route("/api/systems/{id}/harvest-candidates")
+  @get
+  @doc("List harvest candidates for a system.")
+  op get_api_systems_harvest_candidates(@path id: string): Record<unknown>;
+
+  @route("/api/subsystems/{id}/harvest-candidates")
+  @get
+  @doc("List harvest candidates for a subsystem.")
+  op get_api_subsystems_harvest_candidates(@path id: string): Record<unknown>;
+
+  @route("/api/features/{id}/harvest-candidates")
+  @get
+  @doc("List harvest candidates for a feature.")
+  op get_api_features_harvest_candidates(@path id: string): Record<unknown>;
+
+  @route("/api/intent-records")
+  @get
+  @doc("List intent records.")
+  op get_api_intent_records(): Record<unknown>;
+
+  @route("/api/systems/{id}/intent-records")
+  @get
+  @doc("List intent records for a system.")
+  op get_api_systems_intent_records(@path id: string): Record<unknown>;
+
+  @route("/api/subsystems/{id}/intent-records")
+  @get
+  @doc("List intent records for a subsystem.")
+  op get_api_subsystems_intent_records(@path id: string): Record<unknown>;
+
+  @route("/api/features/{id}/intent-records")
+  @get
+  @doc("List intent records for a feature.")
+  op get_api_features_intent_records(@path id: string): Record<unknown>;
+
+  @route("/api/intent-records/{id}")
+  @get
+  @doc("Get a single intent record.")
+  op get_api_intent_records_2(@path id: string): Record<unknown>;
+
+  @route("/api/agendas")
+  @get
+  @doc("List agendas.")
+  op get_api_agendas(): Record<unknown>;
+
+  @route("/api/agendas/{id}")
+  @get
+  @doc("Get a single agenda.")
+  op get_api_agendas_2(@path id: string): Record<unknown>;
+
+  @route("/api/systems/{id}/agendas")
+  @get
+  @doc("List agendas for a system.")
+  op get_api_systems_agendas(@path id: string): Record<unknown>;
+
+  @route("/api/subsystems/{id}/agendas")
+  @get
+  @doc("List agendas for a subsystem.")
+  op get_api_subsystems_agendas(@path id: string): Record<unknown>;
+
+  @route("/api/features/{id}/agendas")
+  @get
+  @doc("List agendas for a feature.")
+  op get_api_features_agendas(@path id: string): Record<unknown>;
+
+  @route("/api/agendas/{id}/items")
+  @delete
+  @doc("Delete agenda items.")
+  op delete_api_agendas_items(@path id: string): Record<unknown>;
+
+  @route("/api/agendas/{id}/finalize")
+  @post
+  @doc("Finalize an agenda.")
+  op post_api_agendas_finalize(@path id: string): Record<unknown>;
+
+  @route("/api/agendas/{id}/items")
+  @post
+  @doc("Add an agenda item.")
+  op post_api_agendas_items(@path id: string): Record<unknown>;
+
+  @route("/api/specifications")
+  @get
+  @doc("List specifications.")
+  op get_api_specifications(): Record<unknown>;
+
+  @route("/api/specifications/{id}")
+  @get
+  @doc("Get a single specification.")
+  op get_api_specifications_2(@path id: string): Record<unknown>;
+
+  @route("/api/systems/{id}/specifications")
+  @get
+  @doc("List specifications for a system.")
+  op get_api_systems_specifications(@path id: string): Record<unknown>;
+
+  @route("/api/subsystems/{id}/specifications")
+  @get
+  @doc("List specifications for a subsystem.")
+  op get_api_subsystems_specifications(@path id: string): Record<unknown>;
+
+  @route("/api/features/{id}/specifications")
+  @get
+  @doc("List specifications for a feature.")
+  op get_api_features_specifications(@path id: string): Record<unknown>;
+
+  @route("/api/work-requests")
+  @get
+  @doc("List work requests.")
+  op get_api_work_requests(): Record<unknown>;
+
+  @route("/api/work-requests/{id}")
+  @get
+  @doc("Get a single work request.")
+  op get_api_work_requests_2(@path id: string): Record<unknown>;
+
+  @route("/api/systems/{id}/work-requests")
+  @get
+  @doc("List work requests for a system.")
+  op get_api_systems_work_requests(@path id: string): Record<unknown>;
+
+  @route("/api/subsystems/{id}/work-requests")
+  @get
+  @doc("List work requests for a subsystem.")
+  op get_api_subsystems_work_requests(@path id: string): Record<unknown>;
+
+  @route("/api/features/{id}/work-requests")
+  @get
+  @doc("List work requests for a feature.")
+  op get_api_features_work_requests(@path id: string): Record<unknown>;
+
+  @route("/api/harvest-candidates")
+  @get
+  @doc("List harvest candidates.")
+  op get_api_harvest_candidates(): Record<unknown>;
+
+  @route("/api/harvest-candidates/{id}")
+  @get
+  @doc("Get a single harvest candidate.")
+  op get_api_harvest_candidates_2(@path id: string): Record<unknown>;
+
+  @route("/api/candidates")
+  @get
+  @doc("List candidates (alias).")
+  op get_api_candidates(): Record<unknown>;
+
+  @route("/api/candidates/{id}")
+  @get
+  @doc("Get a single candidate (alias).")
+  op get_api_candidates_2(@path id: string): Record<unknown>;
+
+  @route("/api/harvest-candidates/{id}")
+  @patch
+  @doc("Update a harvest candidate.")
+  op patch_api_harvest_candidates(@path id: string): Record<unknown>;
+
+  @route("/api/harvest-candidates/{id}/spawn-plan")
+  @post
+  @doc("Spawn a plan from a harvest candidate.")
+  op post_api_harvest_candidates_spawn_plan(@path id: string): Record<unknown>;
+
+  @route("/api/harvest-candidates")
+  @post
+  @doc("Create a harvest candidate.")
+  op post_api_harvest_candidates(): Record<unknown>;
+
+  @route("/api/specifications/{id}/link-requirements")
+  @post
+  @doc("Link requirements to a specification.")
+  op post_api_specifications_link_requirements(@path id: string): Record<unknown>;
+
+  @route("/api/specs")
+  @get
+  @doc("List specs.")
+  op get_api_specs(): Record<unknown>;
+
+  @route("/api/specs/{id}")
+  @get
+  @doc("Get a single spec.")
+  op get_api_specs_2(@path id: string): Record<unknown>;
+
+  @route("/api/harvest-candidates/discover")
+  @post
+  @doc("Discover harvest candidates.")
+  op post_api_harvest_candidates_discover(): Record<unknown>;
+
+  @route("/api/agent-records")
+  @get
+  @doc("List agent records.")
+  op get_api_agent_records(): Record<unknown>;
+
+  @route("/api/agent-records/{id}")
+  @get
+  @doc("Get a single agent record.")
+  op get_api_agent_records_2(@path id: string): Record<unknown>;
+
+  @route("/api/agent-records/search")
+  @post
+  @doc("Search agent records.")
+  op post_api_agent_records_search(): Record<unknown>;
+
+  @route("/api/agent-records")
+  @post
+  @doc("Create an agent record.")
+  op post_api_agent_records(): Record<unknown>;
+
+  @route("/api/agent-records/{id}")
+  @patch
+  @doc("Update an agent record.")
+  op patch_api_agent_records(@path id: string): Record<unknown>;
+
+  @route("/api/agent-records/{id}")
+  @delete
+  @doc("Delete an agent record.")
+  op delete_api_agent_records(@path id: string): Record<unknown>;
+
+  @route("/api/inbox-pointer/{role}")
+  @get
+  @doc("Get the inbox pointer for a role.")
+  op get_api_inbox_pointer(@path role: string): Record<unknown>;
+
+  @route("/api/inbox-pointer/{role}")
+  @put
+  @doc("Set the inbox pointer for a role.")
+  op put_api_inbox_pointer(@path role: string): Record<unknown>;
+
+  @route("/api/inbox-pointers")
+  @get
+  @doc("List all inbox pointers.")
+  op get_api_inbox_pointers(): Record<unknown>;
+
+  @route("/api/projections")
+  @get
+  @doc("List projections.")
+  op get_api_projections(): Record<unknown>;
+
+  @route("/api/projections")
+  @post
+  @doc("Create a projection.")
+  op post_api_projections(): Record<unknown>;
+
+  @route("/api/projections/{id}/render")
+  @post
+  @doc("Render a projection.")
+  op post_api_projections_render(@path id: string): Record<unknown>;
+
+  @route("/api/projections/{id}")
+  @delete
+  @doc("Delete a projection.")
+  op delete_api_projections(@path id: string): Record<unknown>;
+
+  @route("/api/cross-references")
+  @post
+  @doc("Create a cross-reference.")
+  op post_api_cross_references(): Record<unknown>;
+
+  @route("/api/cross-references")
+  @get
+  @doc("List cross-references.")
+  op get_api_cross_references(): Record<unknown>;
+
+  @route("/api/cross-references/{id}")
+  @get
+  @doc("Get a single cross-reference.")
+  op get_api_cross_references_2(@path id: string): Record<unknown>;
+
+  @route("/api/cross-references/{id}")
+  @delete
+  @doc("Delete a cross-reference.")
+  op delete_api_cross_references(@path id: string): Record<unknown>;
+
+  @route("/api/evidence-links")
+  @post
+  @doc("Create an evidence link.")
+  op post_api_evidence_links(): Record<unknown>;
+
+  @route("/api/evidence-links")
+  @get
+  @doc("List evidence links.")
+  op get_api_evidence_links(): Record<unknown>;
+
+  @route("/api/evidence-links/{id}")
+  @get
+  @doc("Get a single evidence link.")
+  op get_api_evidence_links_2(@path id: string): Record<unknown>;
+
+  @route("/api/evidence-links/{id}")
+  @delete
+  @doc("Delete an evidence link.")
+  op delete_api_evidence_links(@path id: string): Record<unknown>;
+
+  @route("/api/evidence-links")
+  @delete
+  @doc("Bulk-delete evidence links.")
+  op delete_api_evidence_links_2(): Record<unknown>;
+
+  @route("/api/conversations/by-snapshot/{snapshotId}")
+  @get
+  @doc("Get a conversation by snapshot id.")
+  op get_api_conversations_by_snapshot(@path snapshotId: string): Record<unknown>;
+
+  @route("/api/conversations")
+  @get
+  @doc("List conversations.")
+  op get_api_conversations(): Record<unknown>;
+
+  @route("/api/conversations/{id}/snapshots")
+  @get
+  @doc("List snapshots for a conversation.")
+  op get_api_conversations_snapshots(@path id: string): Record<unknown>;
+
+  @route("/api/snapshots/{id}/blocks")
+  @get
+  @doc("Get blocks for a snapshot.")
+  op get_api_snapshots_blocks(@path id: string): Record<unknown>;
+
+  @route("/api/conversations/{id}/blocks")
+  @get
+  @doc("Get blocks for a conversation.")
+  op get_api_conversations_blocks(@path id: string): Record<unknown>;
+
+  @route("/api/conversations/by-snapshot/{snapshotId}/blocks")
+  @get
+  @doc("Get blocks for a conversation by snapshot id.")
+  op get_api_conversations_by_snapshot_blocks(@path snapshotId: string): Record<unknown>;
+
+  @route("/api/snapshots")
+  @post
+  @doc("Create a snapshot.")
+  op post_api_snapshots(): Record<unknown>;
+
+  @route("/api/segments")
+  @post
+  @doc("Create a segment.")
+  op post_api_segments(): Record<unknown>;
+
+  @route("/api/segments/{id}")
+  @patch
+  @doc("Update a segment.")
+  op patch_api_segments(@path id: string): Record<unknown>;
+
+  @route("/api/segments/{id}")
+  @delete
+  @doc("Delete a segment.")
+  op delete_api_segments(@path id: string): Record<unknown>;
+
+  @route("/api/projection-overrides")
+  @post
+  @doc("Create a projection override.")
+  op post_api_projection_overrides(): Record<unknown>;
+
+  @route("/api/projection-overrides/{id}")
+  @delete
+  @doc("Delete a projection override.")
+  op delete_api_projection_overrides(@path id: string): Record<unknown>;
+
+  @route("/api/snapshots/{id}/projection")
+  @get
+  @doc("Get the projection for a snapshot.")
+  op get_api_snapshots_projection(@path id: string): Record<unknown>;
+
+  @route("/api/snapshots/{id}/references")
+  @get
+  @doc("Get references for a snapshot.")
+  op get_api_snapshots_references(@path id: string): Record<unknown>;
+
+  @route("/api/knowledge/view")
+  @get
+  @doc("Combined knowledge-graph payload for visualization.")
+  op get_api_knowledge_view(): Record<unknown>;
+
+  @route("/api/op-registry")
+  @post
+  @doc("Create an op-registry entry.")
+  op post_api_op_registry(): Record<unknown>;
+
+  @route("/api/op-registry")
+  @get
+  @doc("List op-registry entries.")
+  op get_api_op_registry(): Record<unknown>;
+
+  @route("/api/op-registry/{id}")
+  @get
+  @doc("Get a single op-registry entry.")
+  op get_api_op_registry_2(@path id: string): Record<unknown>;
+
+  @route("/api/op-registry/{id}/deprecate")
+  @patch
+  @doc("Deprecate an op-registry entry.")
+  op patch_api_op_registry_deprecate(@path id: string): Record<unknown>;
+
+  @route("/api/op-registry/{id}/supersede")
+  @patch
+  @doc("Supersede an op-registry entry.")
+  op patch_api_op_registry_supersede(@path id: string): Record<unknown>;
+
+  @route("/api/op-registry/{id}")
+  @delete
+  @doc("Delete an op-registry entry.")
+  op delete_api_op_registry(@path id: string): Record<unknown>;
+
+  @route("/api/op-registry/fork")
+  @post
+  @doc("Fork an op-registry entry.")
+  op post_api_op_registry_fork(): Record<unknown>;
+
+  @route("/api/op-registry/{id}/lineage")
+  @get
+  @doc("Get op-registry entry lineage.")
+  op get_api_op_registry_lineage(@path id: string): Record<unknown>;
+
+  @route("/api/conduit/plans")
+  @get
+  @doc("List conduit plans.")
+  op get_api_conduit_plans(): Record<unknown>;
+
+  @route("/api/conduit/plans/as-of")
+  @get
+  @doc("List conduit plans as of a timestamp.")
+  op get_api_conduit_plans_as_of(): Record<unknown>;
+
+  @route("/api/conduit/plans/{id}/history")
+  @get
+  @doc("Get conduit plan history.")
+  op get_api_conduit_plans_history(@path id: string): Record<unknown>;
+
+  @route("/api/conduit/plans/{id}/receipts")
+  @get
+  @doc("Get conduit plan receipts.")
+  op get_api_conduit_plans_receipts(@path id: string): Record<unknown>;
+
+  @route("/api/conduit/deleted-plans")
+  @get
+  @doc("List deleted conduit plans.")
+  op get_api_conduit_deleted_plans(): Record<unknown>;
+
+  @route("/api/execution/requests")
+  @post
+  @doc("Create an execution request.")
+  op post_api_execution_requests(): Record<unknown>;
+
+  @route("/api/execution/requests")
+  @get
+  @doc("List execution requests.")
+  op get_api_execution_requests(): Record<unknown>;
+
+  @route("/api/execution/requests/{id}")
+  @get
+  @doc("Get a single execution request.")
+  op get_api_execution_requests_2(@path id: string): Record<unknown>;
+
+  @route("/api/execution/requests/{id}/transition")
+  @patch
+  @doc("Transition an execution request.")
+  op patch_api_execution_requests_transition(@path id: string): Record<unknown>;
+
+  @route("/api/execution/leases/acquire")
+  @post
+  @doc("Acquire an execution lease.")
+  op post_api_execution_leases_acquire(): Record<unknown>;
+
+  @route("/api/execution/leases/{id}/renew")
+  @post
+  @doc("Renew an execution lease.")
+  op post_api_execution_leases_renew(@path id: string): Record<unknown>;
+
+  @route("/api/execution/leases/{id}/release")
+  @post
+  @doc("Release an execution lease.")
+  op post_api_execution_leases_release(@path id: string): Record<unknown>;
+
+  @route("/api/role-leases/issue")
+  @post
+  @doc("Issue a role lease.")
+  op post_api_role_leases_issue(): Record<unknown>;
+
+  @route("/api/role-leases/{id}/renew")
+  @post
+  @doc("Renew a role lease.")
+  op post_api_role_leases_renew(@path id: string): Record<unknown>;
+
+  @route("/api/role-leases/{id}/revoke")
+  @post
+  @doc("Revoke a role lease.")
+  op post_api_role_leases_revoke(@path id: string): Record<unknown>;
+
+  @route("/api/role-leases")
+  @get
+  @doc("List role leases.")
+  op get_api_role_leases(): Record<unknown>;
+
+  @route("/api/cascade/subscriber-status")
+  @get
+  @doc("Cascade interactive-turn subscriber status.")
+  op get_api_cascade_subscriber_status(): Record<unknown>;
+
+  @route("/api/role-leases/stale")
+  @get
+  @doc("List stale role leases.")
+  op get_api_role_leases_stale(): Record<unknown>;
+
+  @route("/api/role-leases/consume")
+  @post
+  @doc("Consume a role lease.")
+  op post_api_role_leases_consume(): Record<unknown>;
+
+  @route("/api/execution/attempts")
+  @post
+  @doc("Create an execution attempt.")
+  op post_api_execution_attempts(): Record<unknown>;
+
+  @route("/api/execution/receipts")
+  @post
+  @doc("Issue an execution receipt.")
+  op post_api_execution_receipts(): Record<unknown>;
+
+  @route("/api/execution/receipts")
+  @get
+  @doc("List execution receipts.")
+  op get_api_execution_receipts(): Record<unknown>;
+
+  @route("/api/execution/state")
+  @get
+  @doc("Get execution state.")
+  op get_api_execution_state(): Record<unknown>;
+
+  @route("/api/open-questions")
+  @get
+  @doc("List open questions.")
+  op get_api_open_questions(): Record<unknown>;
+
+  @route("/api/open-questions/{id}/answers")
+  @get
+  @doc("List answers for an open question.")
+  op get_api_open_questions_answers(@path id: string): Record<unknown>;
+
+  @route("/api/open-questions/{id}/answers")
+  @post
+  @doc("Record an answer for an open question.")
+  op post_api_open_questions_answers(@path id: string): Record<unknown>;
+
+  @route("/api/open-questions")
+  @post
+  @doc("Create an open question.")
+  op post_api_open_questions(): Record<unknown>;
+
+  @route("/api/open-questions/{id}/answer")
+  @put
+  @doc("Legacy single-answer endpoint.")
+  op put_api_open_questions_answer(@path id: string): Record<unknown>;
+
+  @route("/api/open-questions/{id}/resolve")
+  @put
+  @doc("Resolve an open question.")
+  op put_api_open_questions_resolve(@path id: string): Record<unknown>;
+
+  @route("/api/roles")
+  @get
+  @doc("List governance roles.")
+  op get_api_roles(): Record<unknown>;
+
+  @route("/api/roles/{id}")
+  @get
+  @doc("Get a single role.")
+  op get_api_roles_2(@path id: string): Record<unknown>;
+
+  @route("/api/intents")
+  @get
+  @doc("List intent records.")
+  op get_api_intents(): Record<unknown>;
+
+  @route("/api/intents/{id}")
+  @get
+  @doc("Get a single intent record.")
+  op get_api_intents_2(@path id: string): Record<unknown>;
+
+  @route("/api/assessments")
+  @get
+  @doc("List assessments.")
+  op get_api_assessments(): Record<unknown>;
+
+  @route("/api/assessments/{id}")
+  @get
+  @doc("Get a single assessment.")
+  op get_api_assessments_2(@path id: string): Record<unknown>;
+
+  @route("/api/observations")
+  @get
+  @doc("List observations.")
+  op get_api_observations(): Record<unknown>;
+
+  @route("/api/observations/{id}")
+  @get
+  @doc("Get a single observation.")
+  op get_api_observations_2(@path id: string): Record<unknown>;
+
+  @route("/api/open-questions/{id}")
+  @get
+  @doc("Get a single open question.")
+  op get_api_open_questions_2(@path id: string): Record<unknown>;
+
+  @route("/api/open-questions/{id}/timeline")
+  @get
+  @doc("Deliberation timeline for an open question.")
+  op get_api_open_questions_timeline(@path id: string): Record<unknown>;
+
+  @route("/api/open-questions/{id}/participants")
+  @get
+  @doc("List participants for an open question.")
+  op get_api_open_questions_participants(@path id: string): Record<unknown>;
+
+  @route("/api/open-questions/{id}/participants")
+  @post
+  @doc("Add a participant to an open question.")
+  op post_api_open_questions_participants(@path id: string): Record<unknown>;
+
+  @route("/api/harvest-candidates/{id}/dependencies")
+  @get
+  @doc("List dependencies for a harvest candidate.")
+  op get_api_harvest_candidates_dependencies(@path id: string): Record<unknown>;
+
+  @route("/api/search")
+  @get
+  @doc("Cross-entity full-text search.")
+  op get_api_search(): Record<unknown>;
+
+  @route("/api/counts")
+  @get
+  @doc("Aggregate row counts across the data plane.")
+  op get_api_counts(): Record<unknown>;
+
+  @route("/api/architect-specs")
+  @get
+  @doc("List architect specs.")
+  op get_api_architect_specs(): Record<unknown>;
+
+  @route("/api/architect-specs/{id}")
+  @get
+  @doc("Get a single architect spec.")
+  op get_api_architect_specs_2(@path id: string): Record<unknown>;
+
+  @route("/api/architect-specs")
+  @post
+  @doc("Create an architect spec.")
+  op post_api_architect_specs(): Record<unknown>;
+
+  @route("/api/architect-specs/{id}")
+  @delete
+  @doc("Delete an architect spec.")
+  op delete_api_architect_specs(@path id: string): Record<unknown>;
+
+  @route("/api/artifact-provenance")
+  @get
+  @doc("List artifact provenance records.")
+  op get_api_artifact_provenance(): Record<unknown>;
+
+  @route("/api/artifact-provenance/{id}")
+  @get
+  @doc("Get a single artifact provenance record.")
+  op get_api_artifact_provenance_2(@path id: string): Record<unknown>;
+
+  @route("/api/artifact-provenance")
+  @post
+  @doc("Create an artifact provenance record.")
+  op post_api_artifact_provenance(): Record<unknown>;
+
+  @route("/api/artifact-provenance/{id}")
+  @delete
+  @doc("Delete an artifact provenance record.")
+  op delete_api_artifact_provenance(@path id: string): Record<unknown>;
+
+  @route("/api/search/semantic")
+  @post
+  @doc("Vector similarity search against the knowledge graph.")
+  op post_api_search_semantic(): Record<unknown>;
+
+  @route("/api/cpf")
+  @get
+  @doc("Compilation-readiness funnel query.")
+  op get_api_cpf(): Record<unknown>;
+
+  @route("/api/cpf/count")
+  @get
+  @doc("Compilation-readiness band counts.")
+  op get_api_cpf_count(): Record<unknown>;
+
+  @route("/api/cpf/promote")
+  @post
+  @doc("Promote a candidate (CPF >= 0.7).")
+  op post_api_cpf_promote(): Record<unknown>;
+
+  @route("/api/refresh-stats")
+  @post
+  @doc("Refresh nebula materialized views.")
+  op post_api_refresh_stats(): Record<unknown>;
+
+  @route("/api/systems/{id}/inventory")
+  @get
+  @doc("Unified inventory for a system via asset_relation.")
+  op get_api_systems_inventory(@path id: string): Record<unknown>;
+
+  @route("/api/inventory")
+  @get
+  @doc("Rollup counts for the full hierarchy tree.")
+  op get_api_inventory(): Record<unknown>;
+
+  @route("/api/systems/{id}/external-ids")
+  @get
+  @doc("List owned services via asset_relation.")
+  op get_api_systems_external_ids(@path id: string): Record<unknown>;
+
+  @route("/api/systems/{id}/external-ids")
+  @post
+  @doc("Deprecated — returns 410.")
+  op post_api_systems_external_ids(@path id: string): Record<unknown>;
+
+  @route("/api/systems/{id}/external-ids/{eid}")
+  @delete
+  @doc("Deprecated — returns 410.")
+  op delete_api_systems_external_ids(@path id: string, @path eid: string): Record<unknown>;
+
+  @route("/api/external-ids")
+  @get
+  @doc("Reverse lookup via asset_relation.")
+  op get_api_external_ids(): Record<unknown>;
+
+  @route("/api/external-ids/{id}")
+  @patch
+  @doc("Deprecated — returns 410.")
+  op patch_api_external_ids(@path id: string): Record<unknown>;
 }
