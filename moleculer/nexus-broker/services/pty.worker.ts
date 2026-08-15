@@ -12,8 +12,7 @@ import { v4 as uuidv4 } from "uuid";
  * broker bus, or kept standalone; the process lifecycle now lives here.)
  */
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const pty = require("node-pty");
+import pty from "node-pty";
 
 interface PtySession {
   id: string;

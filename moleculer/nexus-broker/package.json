@@ -4,7 +4,7 @@
   "description": "Moleculer worker-tier broker for the consolidated nexus runtime (D-2026-08-14-002)",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "moleculer-runner --hot --repl services/**/*.service.ts",
+    "dev": "moleculer-runner --hot --repl \"services/**/*.{service,worker}.ts\"",
     "start": "moleculer-runner --mask \"**/*.js\" dist/services",
     "build": "tsc",
     "cli": "moleculer connect NATS",
