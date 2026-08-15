@@ -4,6 +4,376 @@ info:
   version: 0.0.0
 tags: []
 paths:
+  /api/asset_identity_claim/{id}/resolve:
+    post:
+      operationId: resolveIdentityClaim
+      description: Transition an open identity claim to resolved | rejected.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              unevaluatedProperties: {}
+  /api/asset_revision/{id}:
+    get:
+      operationId: getAssetRevision
+      description: Expanded asset-revision envelope with asset, observations, parent + children.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/canonical_asset/{id}:
+    get:
+      operationId: getCanonicalAsset
+      description: 'Expanded canonical-asset envelope: revisions, identity claims, relations, external ids.'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/canonical_asset/{id}/external-ids:
+    get:
+      operationId: listExternalIds
+      description: List cross-schema external ids (nebula systems) for a canonical asset.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: createExternalId
+      description: Create a cross-schema link to a nebula system.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              unevaluatedProperties: {}
+  /api/canonical_asset/{id}/external-ids/{eid}:
+    delete:
+      operationId: deleteExternalId
+      description: Soft-expire a cross-schema link.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: eid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/canonical_asset/{id}/identity-claims:
+    get:
+      operationId: listAssetClaims
+      description: List identity claims for a canonical asset.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: createAssetClaim
+      description: Create an identity claim scoped to a canonical asset.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              unevaluatedProperties: {}
+  /api/canonical_asset/{id}/relations:
+    get:
+      operationId: listAssetRelations
+      description: List relations (inbound + outbound) for a canonical asset.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: createAssetRelation
+      description: Create a directed relation with automatic direction resolution.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              unevaluatedProperties: {}
+  /api/canonical_asset/{id}/revisions:
+    get:
+      operationId: listAssetRevisions
+      description: Paginated revisions of a canonical asset.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: createAssetRevision
+      description: Create a revision scoped to a canonical asset.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              unevaluatedProperties: {}
+  /api/concept_relationship/{id}/evidence:
+    get:
+      operationId: getConceptRelationshipEvidence
+      description: All evidence for a concept relationship.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/drift_finding/{id}/resolve:
+    post:
+      operationId: resolveDriftFinding
+      description: Resolve a drift finding (detected → resolved).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              unevaluatedProperties: {}
+  /api/entities:
+    get:
+      operationId: listVoyagerEntities
+      description: 'List entities (filters: minStability, canonicalPath; paging).'
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/entities/by-id/{entityId}:
+    get:
+      operationId: getEntityByEntityId
+      description: Get an entity by entity_id (UUID) with drift history.
+      parameters:
+        - name: entityId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/entities/{id}:
+    get:
+      operationId: getVoyagerEntity
+      description: Get an entity by surrogate id with drift history.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/evidence_item:
+    get:
+      operationId: listEvidenceItems
+      description: 'List evidence items (filters: evidenceType, origin, uri, sourceHash; paging).'
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/health:
+    get:
+      operationId: voyagerHealth
+      description: Voyager health probe.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/links:
     get:
       operationId: listLinks
@@ -94,6 +464,347 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Ok'
+  /api/meta:
+    get:
+      operationId: semanticsMeta
+      description: 'Semantics schema overview: tables, row counts, stored procs, writable params.'
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/observations/directories:
+    get:
+      operationId: listDirectoryObservations
+      description: 'List directory observations (filters: scanEpochId, path; paging).'
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/observations/files:
+    get:
+      operationId: listFileObservations
+      description: 'List file observations (filters: scanEpochId, path, deviceId, inode; paging).'
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/observations/files/by-id/{observationId}:
+    get:
+      operationId: getFileObservationByObsId
+      description: Get a file observation by observation_id (UUID).
+      parameters:
+        - name: observationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/observations/files/{id}:
+    get:
+      operationId: getFileObservation
+      description: Get a file observation by surrogate id.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/representation_relationship/{id}/evidence:
+    get:
+      operationId: getRepresentationRelationshipEvidence
+      description: All evidence for a representation relationship.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/scan-epochs:
+    get:
+      operationId: listScanEpochs
+      description: List scan epochs (most recent first; paging).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/scan-epochs/{id}:
+    get:
+      operationId: getScanEpoch
+      description: Get a single scan epoch.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/spans:
+    get:
+      operationId: listMetadataSpans
+      description: 'List metadata spans (filters: spanType, markdownRole, minConfidence, observationId; paging).'
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/spans/{id}:
+    get:
+      operationId: getMetadataSpan
+      description: Get a single metadata span.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/statement_evidence:
+    get:
+      operationId: listStatementEvidence
+      description: 'List statement-evidence links (filters: statementType, statementId, role; paging).'
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/stats:
+    get:
+      operationId: getVoyagerStats
+      description: Summary counts across all voyager tables.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/topology/edge-hints:
+    get:
+      operationId: listEdgeHints
+      description: 'List observation edge hints (filters: evidenceType, minConfidence; paging).'
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/topology/signals:
+    get:
+      operationId: listTopologySignals
+      description: 'List topology signals (filters: scanEpochId, structureType; paging).'
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/topology/signals/{id}:
+    get:
+      operationId: getTopologySignal
+      description: Get a single topology signal.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/{table}:
+    get:
+      operationId: listSemanticsTable
+      description: Generic list for a semantics.* table (active rows by default; includeExpired, limit, offset).
+      parameters:
+        - name: table
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: addSemanticsRow
+      description: Generic add via add_<table> stored proc (p_* body params).
+      parameters:
+        - name: table
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              unevaluatedProperties: {}
+  /api/{table}/{id}:
+    get:
+      operationId: getSemanticsRow
+      description: Generic get-by-id for a semantics.* table (matches id or natural key).
+      parameters:
+        - name: table
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    patch:
+      operationId: updateSemanticsRow
+      description: Generic append-only replace via update_<table> stored proc.
+      parameters:
+        - name: table
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              unevaluatedProperties: {}
+    delete:
+      operationId: deleteSemanticsRow
+      description: Generic soft-delete (expire-not-delete) for a semantics.* table.
+      parameters:
+        - name: table
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /health:
     get:
       operationId: health
@@ -329,6 +1040,216 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/TaskIndexEntry'
+  /terrain/cli-tools:
+    get:
+      operationId: listCliTools
+      description: List CLI tools.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: registerCliTool
+      description: Upsert a CLI tool by name.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              unevaluatedProperties: {}
+  /terrain/dependencies:
+    get:
+      operationId: listTerrainDependencies
+      description: List service dependencies with resolved source/target names.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: registerTerrainDependency
+      description: Upsert a service dependency by resolved source/target.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              unevaluatedProperties: {}
+  /terrain/mcp-servers:
+    get:
+      operationId: listMcpServers
+      description: List MCP servers in the terrain topology.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: registerMcpServer
+      description: Upsert an MCP server by name.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              unevaluatedProperties: {}
+  /terrain/runnable-services:
+    get:
+      operationId: listRunnableServices
+      description: List runnable services.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: registerRunnableService
+      description: Upsert a runnable service by name.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              unevaluatedProperties: {}
+  /terrain/servers:
+    get:
+      operationId: listTerrainServers
+      description: List terrain servers (hosts).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /terrain/services/status:
+    patch:
+      operationId: setTerrainServiceStatus
+      description: 'Set a service status (body: {name, status}).'
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              unevaluatedProperties: {}
+  /terrain/services/{name}:
+    get:
+      operationId: getTerrainService
+      description: Look up a service by name across MCP servers, runnable services, and servers.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /terrain/services/{name}/running:
+    get:
+      operationId: isTerrainServiceRunning
+      description: Check whether a named service is ONLINE.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /terrain/summary:
+    get:
+      operationId: getTerrainSummary
+      description: Aggregate counts across the terrain topology.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
 components:
   schemas:
     ErrorResponse:
