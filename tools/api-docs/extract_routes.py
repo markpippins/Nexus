@@ -40,6 +40,10 @@ def comment_above(lines, idx, max_lines=6):
     """Join the `//` comment lines immediately above line idx (if any)."""
     parts = []
     j = idx - 1
+    # Skip a leading blank line (e.g. `// comment`, blank, `code`) so the
+    # scan reaches the comment block instead of stopping at the blank.
+    while j >= 0 and not lines[j].strip():
+        j -= 1
     while j >= 0 and len(parts) < max_lines:
         s = lines[j].strip()
         if s.startswith("//"):

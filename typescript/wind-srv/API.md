@@ -12,14 +12,14 @@ REST API for the wind workflow schema: offices, titles, tasks, workflow graphs, 
 | GET | `/api/edges` | List edges for a version |
 | POST | `/api/edges` | Create edge |
 | DELETE | `/api/edges/:id` | Delete edge |
-| GET | `/api/event-types` |  |
-| POST | `/api/event-types` |  |
-| DELETE | `/api/event-types/:eventType` |  |
-| GET | `/api/event-types/:eventType` |  |
-| GET | `/api/events` |  |
-| POST | `/api/events` |  |
-| GET | `/api/events/:id` |  |
-| POST | `/api/events/poll` |  |
+| GET | `/api/event-types` | List event types |
+| POST | `/api/event-types` | Register a new event type |
+| DELETE | `/api/event-types/:eventType` | Delete event type |
+| GET | `/api/event-types/:eventType` | Get single event type |
+| GET | `/api/events` | List events (with optional filters) |
+| POST | `/api/events` | Create event |
+| GET | `/api/events/:id` | Get single event |
+| POST | `/api/events/poll` | Poll unconsumed events (FOR UPDATE SKIP LOCKED) |
 | GET | `/api/instances` | List instances (optionally filter by status or workflow_id) |
 | POST | `/api/instances` | Start a workflow instance Creates an instance and tickets for the entrypoint node(s) |
 | GET | `/api/instances/:id` | Get instance by ID (with tickets) |
@@ -27,7 +27,7 @@ REST API for the wind workflow schema: offices, titles, tasks, workflow graphs, 
 | POST | `/api/instances/:id/execute` | Execute — run the harness for a ticket's task |
 | POST | `/api/instances/:id/pause` | Pause an instance |
 | POST | `/api/instances/:id/resume` | Resume a paused instance |
-| POST | `/api/instances/:id/run` |  |
+| POST | `/api/instances/:id/run` | Run an instance to completion (loop: execute → advance → … until terminal). |
 | POST | `/api/instances/:id/stop` | Stop (cancel) an instance |
 | GET | `/api/nodes` | List nodes for a version |
 | POST | `/api/nodes` | Create node |
