@@ -84,6 +84,7 @@ ALL_SERVICES=(
     "cpf-api.service"          # port 3108 — CPF funnel data API
     "atlas.service"            # port 8090 — graph views persistence
     "execution-srv.service"    # port 3110 — execution observability REST API
+    "harness-srv.service"      # port 3420 — generic execution harness (Tackle role context + Wind task context)
     "mcp-bridge.service"       # ports 3131-3134 — generic stdio-to-SSE bridge (knowledge/vision/peb/terrain MCPs)
     "tools-aggregator.service" # port 3210 — unified MCP tool-discovery aggregator
     "slash-command-mcp.service" # port 3220 — Phase-2 DSL MCP (command_lookup/execute/completions → aggregator)
@@ -166,6 +167,7 @@ SERVICE_PORTS=(
 ["cpf-api.service"]="3108"
     ["atlas.service"]="8090"
     ["execution-srv.service"]="3110"
+    ["harness-srv.service"]="3420"
     ["mcp-bridge.service"]="3131"     # one of ports 3131-3134 — any bridge target's /health works
     ["tools-aggregator.service"]="3210"
     ["slash-command-mcp.service"]="3220"
