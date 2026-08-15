@@ -1768,4 +1768,325 @@ namespace org.nexus.controledge {
   @get
   @doc("Sweep active work requests for projection drift.")
   op get_wr_drift_scan(): Record<unknown>;
+
+// ── wind-srv (Wave 3.4) ───────────────────────────────────────────
+  @route("/api/offices")
+  @get
+  @doc("List all wind offices")
+  op get_offices(): Record<unknown>;
+
+  @route("/api/offices/{id}")
+  @get
+  @doc("Get a wind office by ID")
+  op get_offices_id(@path id: string): Record<unknown>;
+
+  @route("/api/offices")
+  @post
+  @doc("Create a wind office")
+  op post_offices(): Record<unknown>;
+
+  @route("/api/offices/{id}")
+  @put
+  @doc("Update a wind office")
+  op put_offices_id(@path id: string): Record<unknown>;
+
+  @route("/api/offices/{id}")
+  @delete
+  @doc("Delete a wind office")
+  op delete_offices_id(@path id: string): Record<unknown>;
+
+  @route("/api/titles")
+  @get
+  @doc("List wind titles (optionally by office)")
+  op get_titles(): Record<unknown>;
+
+  @route("/api/titles/{id}")
+  @get
+  @doc("Get a wind title by ID")
+  op get_titles_id(@path id: string): Record<unknown>;
+
+  @route("/api/titles")
+  @post
+  @doc("Create a wind title")
+  op post_titles(): Record<unknown>;
+
+  @route("/api/titles/{id}")
+  @put
+  @doc("Update a wind title")
+  op put_titles_id(@path id: string): Record<unknown>;
+
+  @route("/api/titles/{id}")
+  @delete
+  @doc("Delete a wind title")
+  op delete_titles_id(@path id: string): Record<unknown>;
+
+  @route("/api/v-roles")
+  @get
+  @doc("List wind v_roles (nebula.roles view)")
+  op get_v_roles(): Record<unknown>;
+
+  @route("/api/v-roles/{name}")
+  @get
+  @doc("Get a wind v_role by name")
+  op get_v_roles_name(@path name: string): Record<unknown>;
+
+  @route("/api/workflows")
+  @get
+  @doc("List wind workflows")
+  op get_wind_workflows(): Record<unknown>;
+
+  @route("/api/workflows/{id}")
+  @get
+  @doc("Get a wind workflow with versions")
+  op get_workflows_id(@path id: string): Record<unknown>;
+
+  @route("/api/workflows")
+  @post
+  @doc("Create a wind workflow")
+  op post_workflows(): Record<unknown>;
+
+  @route("/api/workflows/{id}")
+  @put
+  @doc("Update a wind workflow")
+  op put_workflows_id(@path id: string): Record<unknown>;
+
+  @route("/api/workflows/{id}")
+  @delete
+  @doc("Delete a wind workflow")
+  op delete_workflows_id(@path id: string): Record<unknown>;
+
+  @route("/api/versions")
+  @get
+  @doc("List wind workflow versions for a workflow")
+  op get_versions(): Record<unknown>;
+
+  @route("/api/versions/{id}")
+  @get
+  @doc("Get a wind workflow version with nodes and edges")
+  op get_versions_id(@path id: string): Record<unknown>;
+
+  @route("/api/versions")
+  @post
+  @doc("Create a wind workflow version (auto-increment)")
+  op post_versions(): Record<unknown>;
+
+  @route("/api/versions/{id}/activate")
+  @post
+  @doc("Activate a wind workflow version")
+  op post_versions_id_activate(@path id: string): Record<unknown>;
+
+  @route("/api/versions/{id}")
+  @delete
+  @doc("Delete a wind workflow version")
+  op delete_versions_id(@path id: string): Record<unknown>;
+
+  @route("/api/nodes")
+  @get
+  @doc("List wind workflow nodes for a version")
+  op get_nodes(): Record<unknown>;
+
+  @route("/api/nodes/{id}")
+  @get
+  @doc("Get a wind workflow node by ID")
+  op get_nodes_id(@path id: string): Record<unknown>;
+
+  @route("/api/nodes")
+  @post
+  @doc("Create a wind workflow node")
+  op post_nodes(): Record<unknown>;
+
+  @route("/api/nodes/{id}")
+  @put
+  @doc("Update a wind workflow node")
+  op put_nodes_id(@path id: string): Record<unknown>;
+
+  @route("/api/nodes/{id}")
+  @delete
+  @doc("Delete a wind workflow node")
+  op delete_nodes_id(@path id: string): Record<unknown>;
+
+  @route("/api/edges")
+  @get
+  @doc("List wind workflow edges for a version")
+  op get_edges(): Record<unknown>;
+
+  @route("/api/edges")
+  @post
+  @doc("Create a wind workflow edge")
+  op post_edges(): Record<unknown>;
+
+  @route("/api/edges/{id}")
+  @delete
+  @doc("Delete a wind workflow edge")
+  op delete_edges_id(@path id: string): Record<unknown>;
+
+  @route("/api/tasks")
+  @get
+  @doc("List wind tasks (optionally by office)")
+  op get_tasks(): Record<unknown>;
+
+  @route("/api/tasks/{id}")
+  @get
+  @doc("Get a wind task with outcomes")
+  op get_tasks_id(@path id: string): Record<unknown>;
+
+  @route("/api/tasks")
+  @post
+  @doc("Create a wind task")
+  op post_tasks(): Record<unknown>;
+
+  @route("/api/tasks/{id}")
+  @put
+  @doc("Update a wind task")
+  op put_tasks_id(@path id: string): Record<unknown>;
+
+  @route("/api/tasks/{id}")
+  @delete
+  @doc("Delete a wind task")
+  op delete_tasks_id(@path id: string): Record<unknown>;
+
+  @route("/api/outcomes")
+  @get
+  @doc("List wind task outcomes for a task")
+  op get_outcomes(): Record<unknown>;
+
+  @route("/api/outcomes/{id}")
+  @get
+  @doc("Get a wind task outcome by ID")
+  op get_outcomes_id(@path id: string): Record<unknown>;
+
+  @route("/api/outcomes")
+  @post
+  @doc("Create a wind task outcome")
+  op post_outcomes(): Record<unknown>;
+
+  @route("/api/outcomes/{id}")
+  @delete
+  @doc("Delete a wind task outcome")
+  op delete_outcomes_id(@path id: string): Record<unknown>;
+
+  @route("/api/instances")
+  @get
+  @doc("List wind workflow instances")
+  op get_instances(): Record<unknown>;
+
+  @route("/api/instances/{id}")
+  @get
+  @doc("Get a wind workflow instance with tickets")
+  op get_instances_id(@path id: string): Record<unknown>;
+
+  @route("/api/instances")
+  @post
+  @doc("Start a wind workflow instance")
+  op post_instances(): Record<unknown>;
+
+  @route("/api/instances/{id}/pause")
+  @post
+  @doc("Pause a wind workflow instance")
+  op post_instances_id_pause(@path id: string): Record<unknown>;
+
+  @route("/api/instances/{id}/resume")
+  @post
+  @doc("Resume a paused wind workflow instance")
+  op post_instances_id_resume(@path id: string): Record<unknown>;
+
+  @route("/api/instances/{id}/stop")
+  @post
+  @doc("Stop (fail) a wind workflow instance")
+  op post_instances_id_stop(@path id: string): Record<unknown>;
+
+  @route("/api/instances/{id}/execute")
+  @post
+  @doc("Execute a ticket's task via harness")
+  op post_instances_id_execute(@path id: string): Record<unknown>;
+
+  @route("/api/instances/{id}/advance")
+  @post
+  @doc("Advance a ticket with an outcome")
+  op post_instances_id_advance(@path id: string): Record<unknown>;
+
+  @route("/api/instances/{id}/run")
+  @post
+  @doc("Auto-run an instance to completion")
+  op post_instances_id_run(@path id: string): Record<unknown>;
+
+  @route("/api/tickets")
+  @get
+  @doc("List wind tickets")
+  op get_tickets(): Record<unknown>;
+
+  @route("/api/tickets/{id}")
+  @get
+  @doc("Get a wind ticket by ID")
+  op get_tickets_id(@path id: string): Record<unknown>;
+
+  @route("/api/tickets/{id}/status")
+  @put
+  @doc("Update a wind ticket status")
+  op put_tickets_id_status(@path id: string): Record<unknown>;
+
+  @route("/api/tickets/{id}/cancel")
+  @post
+  @doc("Cancel a wind ticket")
+  op post_tickets_id_cancel(@path id: string): Record<unknown>;
+
+  @route("/api/receipts")
+  @get
+  @doc("List wind receipts (optionally by ticket)")
+  op get_receipts(): Record<unknown>;
+
+  @route("/api/receipts/{id}")
+  @get
+  @doc("Get a wind receipt by ID")
+  op get_receipts_id(@path id: string): Record<unknown>;
+
+  @route("/api/validate/{version_id}")
+  @get
+  @doc("Validate a wind workflow version graph")
+  op get_validate_version_id(@path version_id: string): Record<unknown>;
+
+  @route("/api/validate/{version_id}/structure")
+  @post
+  @doc("Validate wind workflow version structure")
+  op post_validate_version_id_structure(@path version_id: string): Record<unknown>;
+
+  @route("/api/events")
+  @get
+  @doc("List wind events")
+  op get_events(): Record<unknown>;
+
+  @route("/api/events/poll")
+  @post
+  @doc("Poll unconsumed wind events")
+  op post_events_poll(): Record<unknown>;
+
+  @route("/api/events/{id}")
+  @get
+  @doc("Get a wind event by ID")
+  op get_events_id(@path id: string): Record<unknown>;
+
+  @route("/api/events")
+  @post
+  @doc("Create a wind event (broadcast to NATS)")
+  op post_events(): Record<unknown>;
+
+  @route("/api/event-types")
+  @get
+  @doc("List wind event types")
+  op get_event_types(): Record<unknown>;
+
+  @route("/api/event-types/{eventType}")
+  @get
+  @doc("Get a wind event type by key")
+  op get_event_types_eventType(@path eventType: string): Record<unknown>;
+
+  @route("/api/event-types")
+  @post
+  @doc("Register a wind event type")
+  op post_event_types(): Record<unknown>;
+
+  @route("/api/event-types/{eventType}")
+  @delete
+  @doc("Delete a wind event type")
+  op delete_event_types_eventType(@path eventType: string): Record<unknown>;
 }

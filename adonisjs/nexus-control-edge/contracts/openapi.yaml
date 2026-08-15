@@ -1248,6 +1248,49 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /api/edges:
+    get:
+      operationId: get_edges
+      description: List wind workflow edges for a version
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_edges
+      description: Create a wind workflow edge
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/edges/{id}:
+    delete:
+      operationId: delete_edges_id
+      description: Delete a wind workflow edge
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/entities:
     get:
       operationId: listVoyagerEntities
@@ -1283,6 +1326,122 @@ paths:
     get:
       operationId: getVoyagerEntity
       description: Get an entity by surrogate id with drift history.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/event-types:
+    get:
+      operationId: get_event_types
+      description: List wind event types
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_event_types
+      description: Register a wind event type
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/event-types/{eventType}:
+    get:
+      operationId: get_event_types_eventType
+      description: Get a wind event type by key
+      parameters:
+        - name: eventType
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_event_types_eventType
+      description: Delete a wind event type
+      parameters:
+        - name: eventType
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/events:
+    get:
+      operationId: get_events
+      description: List wind events
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_events
+      description: Create a wind event (broadcast to NATS)
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/events/poll:
+    post:
+      operationId: post_events_poll
+      description: Poll unconsumed wind events
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/events/{id}:
+    get:
+      operationId: get_events_id
+      description: Get a wind event by ID
       parameters:
         - name: id
           in: path
@@ -2427,6 +2586,157 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /api/instances:
+    get:
+      operationId: get_instances
+      description: List wind workflow instances
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_instances
+      description: Start a wind workflow instance
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/instances/{id}:
+    get:
+      operationId: get_instances_id
+      description: Get a wind workflow instance with tickets
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/instances/{id}/advance:
+    post:
+      operationId: post_instances_id_advance
+      description: Advance a ticket with an outcome
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/instances/{id}/execute:
+    post:
+      operationId: post_instances_id_execute
+      description: Execute a ticket's task via harness
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/instances/{id}/pause:
+    post:
+      operationId: post_instances_id_pause
+      description: Pause a wind workflow instance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/instances/{id}/resume:
+    post:
+      operationId: post_instances_id_resume
+      description: Resume a paused wind workflow instance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/instances/{id}/run:
+    post:
+      operationId: post_instances_id_run
+      description: Auto-run an instance to completion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/instances/{id}/stop:
+    post:
+      operationId: post_instances_id_stop
+      description: Stop (fail) a wind workflow instance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/intent-records:
     get:
       operationId: get_api_intent_records
@@ -2618,6 +2928,83 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /api/nodes:
+    get:
+      operationId: get_nodes
+      description: List wind workflow nodes for a version
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_nodes
+      description: Create a wind workflow node
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/nodes/{id}:
+    get:
+      operationId: get_nodes_id
+      description: Get a wind workflow node by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    put:
+      operationId: put_nodes_id
+      description: Update a wind workflow node
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_nodes_id
+      description: Delete a wind workflow node
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/observations:
     get:
       operationId: get_api_observations
@@ -2697,6 +3084,83 @@ paths:
     get:
       operationId: get_api_observations_2
       description: Get a single observation.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/offices:
+    get:
+      operationId: get_offices
+      description: List all wind offices
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_offices
+      description: Create a wind office
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/offices/{id}:
+    get:
+      operationId: get_offices_id
+      description: Get a wind office by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    put:
+      operationId: put_offices_id
+      description: Update a wind office
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_offices_id
+      description: Delete a wind office
       parameters:
         - name: id
           in: path
@@ -3005,6 +3469,66 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /api/outcomes:
+    get:
+      operationId: get_outcomes
+      description: List wind task outcomes for a task
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_outcomes
+      description: Create a wind task outcome
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/outcomes/{id}:
+    get:
+      operationId: get_outcomes_id
+      description: Get a wind task outcome by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_outcomes_id
+      description: Delete a wind task outcome
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/plans:
     get:
       operationId: get_api_plans
@@ -3192,6 +3716,37 @@ paths:
     post:
       operationId: post_api_projections_render
       description: Render a projection.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/receipts:
+    get:
+      operationId: get_receipts
+      description: List wind receipts (optionally by ticket)
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/receipts/{id}:
+    get:
+      operationId: get_receipts_id
+      description: Get a wind receipt by ID
       parameters:
         - name: id
           in: path
@@ -4545,6 +5100,227 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /api/tasks:
+    get:
+      operationId: get_tasks
+      description: List wind tasks (optionally by office)
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_tasks
+      description: Create a wind task
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/tasks/{id}:
+    get:
+      operationId: get_tasks_id
+      description: Get a wind task with outcomes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    put:
+      operationId: put_tasks_id
+      description: Update a wind task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_tasks_id
+      description: Delete a wind task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/tickets:
+    get:
+      operationId: get_tickets
+      description: List wind tickets
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/tickets/{id}:
+    get:
+      operationId: get_tickets_id
+      description: Get a wind ticket by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/tickets/{id}/cancel:
+    post:
+      operationId: post_tickets_id_cancel
+      description: Cancel a wind ticket
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/tickets/{id}/status:
+    put:
+      operationId: put_tickets_id_status
+      description: Update a wind ticket status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/titles:
+    get:
+      operationId: get_titles
+      description: List wind titles (optionally by office)
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_titles
+      description: Create a wind title
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/titles/{id}:
+    get:
+      operationId: get_titles_id
+      description: Get a wind title by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    put:
+      operationId: put_titles_id
+      description: Update a wind title
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_titles_id
+      description: Delete a wind title
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/topology/edge-hints:
     get:
       operationId: listEdgeHints
@@ -4650,6 +5426,151 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /api/v-roles:
+    get:
+      operationId: get_v_roles
+      description: List wind v_roles (nebula.roles view)
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/v-roles/{name}:
+    get:
+      operationId: get_v_roles_name
+      description: Get a wind v_role by name
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/validate/{version_id}:
+    get:
+      operationId: get_validate_version_id
+      description: Validate a wind workflow version graph
+      parameters:
+        - name: version_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/validate/{version_id}/structure:
+    post:
+      operationId: post_validate_version_id_structure
+      description: Validate wind workflow version structure
+      parameters:
+        - name: version_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/versions:
+    get:
+      operationId: get_versions
+      description: List wind workflow versions for a workflow
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_versions
+      description: Create a wind workflow version (auto-increment)
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/versions/{id}:
+    get:
+      operationId: get_versions_id
+      description: Get a wind workflow version with nodes and edges
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_versions_id
+      description: Delete a wind workflow version
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/versions/{id}/activate:
+    post:
+      operationId: post_versions_id_activate
+      description: Activate a wind workflow version
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/work-requests:
     get:
       operationId: get_api_work_requests
@@ -4667,6 +5588,83 @@ paths:
     get:
       operationId: get_api_work_requests_2
       description: Get a single work request.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/workflows:
+    get:
+      operationId: get_wind_workflows
+      description: List wind workflows
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_workflows
+      description: Create a wind workflow
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/workflows/{id}:
+    get:
+      operationId: get_workflows_id
+      description: Get a wind workflow with versions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    put:
+      operationId: put_workflows_id
+      description: Update a wind workflow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    delete:
+      operationId: delete_workflows_id
+      description: Delete a wind workflow
       parameters:
         - name: id
           in: path

@@ -57,6 +57,7 @@
     "@vinejs/vine": "^3.0.1",
     "ioredis": "^5.4.1",
     "luxon": "^3.7.2",
+    "nats": "^2.29.3",
     "pg": "^8.13.1",
     "reflect-metadata": "^0.2.2",
     "yaml": "^2.9.0"
