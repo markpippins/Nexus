@@ -16,6 +16,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NEXUS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SYSTEMD_USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 
+# ── Source centralized .env (service target configuration) ─────────────
+# This exports <UNIT>_TARGET variables for all services.
+# See .env.example for the full list of variables.
+if [ -f "${NEXUS_ROOT}/.env" ]; then
+    set -a  # Automatically export all variables
+    source "${NEXUS_ROOT}/.env"
+    set +a
+    echo "Sourced ${NEXUS_ROOT}/.env"
+else
+    echo "WARNING: ${NEXUS_ROOT}/.env not found — using defaults"
+fi
+
 # ── Ordered service list ───────────────────────────────────────────────
 # Infrastructure first, then databases, then backends, then MCPs
 ALL_SERVICES=(
