@@ -10,6 +10,7 @@
         "builder",
         "critic",
         "engineer",
+        "engineer-ii",
         "inspector",
         "planner",
         "reviewer"
@@ -44,6 +45,7 @@
         "builder",
         "critic",
         "engineer",
+        "engineer-ii",
         "inspector",
         "planner",
         "reviewer"
@@ -78,7 +80,8 @@
       ],
       "roles": [
         "builder",
-        "engineer"
+        "engineer",
+        "engineer-ii"
       ],
       "sha256": "69d21ce769629edd510e335e55046800f8cb96916ab69fbc03dfb83119cef819",
       "slug": "builder-workflow",
@@ -108,6 +111,7 @@
         "critic",
         "DBA",
         "engineer",
+        "engineer-ii",
         "epistemologist",
         "inspector",
         "planner",
@@ -141,6 +145,7 @@
         "critic",
         "DBA",
         "engineer",
+        "engineer-ii",
         "epistemologist",
         "inspector",
         "planner",
@@ -173,6 +178,7 @@
         "builder",
         "critic",
         "engineer",
+        "engineer-ii",
         "inspector",
         "planner",
         "reviewer"
@@ -207,6 +213,7 @@
         "builder",
         "critic",
         "engineer",
+        "engineer-ii",
         "inspector",
         "planner",
         "reviewer"
@@ -236,7 +243,8 @@
         "nebula_update_requirement"
       ],
       "roles": [
-        "engineer"
+        "engineer",
+        "engineer-ii"
       ],
       "sha256": "2bfc96bb6050d16be898033f511d4c4381853a98d48937534816dfbdfbd69fd9",
       "slug": "engineer-backlog-check",
@@ -270,6 +278,7 @@
         "critic",
         "DBA",
         "engineer",
+        "engineer-ii",
         "epistemologist",
         "inspector",
         "planner",
@@ -304,7 +313,8 @@
       ],
       "roles": [
         "analyst",
-        "engineer"
+        "engineer",
+        "engineer-ii"
       ],
       "sha256": "054debbbdc10f1fad0ae596d6134aecabf408d33abcd7b6893c7b45645da7365",
       "slug": "investigation-resources",
@@ -381,6 +391,7 @@
         "critic",
         "DBA",
         "engineer",
+        "engineer-ii",
         "epistemologist",
         "inspector",
         "planner",
@@ -410,6 +421,7 @@
         "architect",
         "builder",
         "engineer",
+        "engineer-ii",
         "planner"
       ],
       "sha256": "e89b1c0d883553921da533d08c0d3ab32b8ae550f9a79174b1b8f1a124fb8cde",
@@ -442,6 +454,7 @@
         "critic",
         "DBA",
         "engineer",
+        "engineer-ii",
         "epistemologist",
         "inspector",
         "planner",
@@ -473,6 +486,7 @@
         "builder",
         "DBA",
         "engineer",
+        "engineer-ii",
         "epistemologist",
         "planner",
         "reviewer"
@@ -640,6 +654,7 @@
       "mcp_tools": [],
       "roles": [
         "engineer",
+        "engineer-ii",
         "inspector",
         "reviewer"
       ],
@@ -669,6 +684,7 @@
         "critic",
         "DBA",
         "engineer",
+        "engineer-ii",
         "epistemologist",
         "inspector",
         "planner",
@@ -702,6 +718,7 @@
         "builder",
         "critic",
         "engineer",
+        "engineer-ii",
         "inspector",
         "planner",
         "reviewer"
@@ -738,7 +755,8 @@
       ],
       "roles": [
         "builder",
-        "engineer"
+        "engineer",
+        "engineer-ii"
       ],
       "sha256": "5fdb48bba237129e0cf4dc1246c008f94d72e811d1316f907c03b8573aaa137a",
       "slug": "plan-deletion-cleanup",
@@ -769,6 +787,7 @@
       ],
       "roles": [
         "engineer",
+        "engineer-ii",
         "planner"
       ],
       "sha256": "1afb347189b8030cb301987dba650221f35a746dbce5ccb51ba3b16a01ba7359",
@@ -825,6 +844,7 @@
       "roles": [
         "builder",
         "engineer",
+        "engineer-ii",
         "planner"
       ],
       "sha256": "2c0f380d1d29597deeff3e414ec297046f20630620834311b3504cf7b3475572",
@@ -856,6 +876,7 @@
         "builder",
         "critic",
         "engineer",
+        "engineer-ii",
         "inspector",
         "planner",
         "reviewer"
@@ -890,6 +911,7 @@
         "builder",
         "critic",
         "engineer",
+        "engineer-ii",
         "inspector",
         "planner",
         "reviewer"
@@ -919,6 +941,7 @@
       "roles": [
         "architect",
         "engineer",
+        "engineer-ii",
         "planner"
       ],
       "sha256": "bf2b613fffa3e8784135cdcc0e3f778d8542d59a9d48a42bb7fa37c24afa38b9",
@@ -948,6 +971,7 @@
         "critic",
         "DBA",
         "engineer",
+        "engineer-ii",
         "epistemologist",
         "inspector",
         "planner",
@@ -980,7 +1004,8 @@
       ],
       "roles": [
         "builder",
-        "engineer"
+        "engineer",
+        "engineer-ii"
       ],
       "sha256": "acf9a5e781bc90cdf29b7a0ab1ea31399b544beefa49e8b313ba950227544566",
       "slug": "role-lease-orientation",
@@ -1009,7 +1034,8 @@
         "nebula_create_agent_record"
       ],
       "roles": [
-        "engineer"
+        "engineer",
+        "engineer-ii"
       ],
       "sha256": "83fbfcfff2ca604246dfbb0567202ea6665dd2edd0f65b60f4784d9ab35b685b",
       "slug": "rover-harvest-notification",
@@ -1034,7 +1060,8 @@
       "roles": [
         "architect",
         "builder",
-        "engineer"
+        "engineer",
+        "engineer-ii"
       ],
       "sha256": "e0d503237723c3d53ce309e2d9846acc08d0b2169590696189f28e1e0d3f0ac5",
       "slug": "seed-integrity",
@@ -1067,6 +1094,7 @@
         "critic",
         "DBA",
         "engineer",
+        "engineer-ii",
         "epistemologist",
         "inspector",
         "planner",
@@ -1100,6 +1128,7 @@
         "critic",
         "DBA",
         "engineer",
+        "engineer-ii",
         "epistemologist",
         "inspector",
         "planner",
@@ -1129,7 +1158,8 @@
         "terrain_list_services"
       ],
       "roles": [
-        "engineer"
+        "engineer",
+        "engineer-ii"
       ],
       "sha256": "b064c658a02543d2cd36b279d25d3c8c29e7d261ce25c87bee2b2977dd5730af",
       "slug": "terrain-registration",
@@ -1164,6 +1194,7 @@
         "critic",
         "DBA",
         "engineer",
+        "engineer-ii",
         "epistemologist",
         "inspector",
         "planner",
@@ -1196,6 +1227,7 @@
         "architect",
         "builder",
         "engineer",
+        "engineer-ii",
         "planner",
         "reviewer"
       ],
@@ -1221,7 +1253,8 @@
       "mcp_tools": [],
       "roles": [
         "builder",
-        "engineer"
+        "engineer",
+        "engineer-ii"
       ],
       "sha256": "5b231e5c928551faf77b714693254f2936eaac29ad0b4f1dbba37366e9571ec0",
       "slug": "verification-commands",
@@ -1255,6 +1288,7 @@
         "builder",
         "critic",
         "engineer",
+        "engineer-ii",
         "inspector",
         "planner",
         "reviewer"
@@ -1277,6 +1311,6 @@
       ]
     }
   ],
-  "role_count": 230,
+  "role_count": 264,
   "schema": "tackle"
 }

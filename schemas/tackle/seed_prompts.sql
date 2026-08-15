@@ -988,6 +988,52 @@ ON CONFLICT (role, slug, version) DO UPDATE
         tags             = EXCLUDED.tags,
         updated_at       = NOW();
 
+-- ── tackle.prompts row: role=engineer-ii, slug=opencode-persona, v1 ──
+-- Engineer II: role identical to engineer; persona body mirrors engineer v1.
+-- (The engineer-ii v2 body is carried by engineer_ii_persona_v2.sql, same
+-- MAX(version) convention as engineer.)
+INSERT INTO tackle.prompts (role, slug, version, title, body_md, parameter_schema, tags)
+VALUES (
+    'engineer-ii',
+    'opencode-persona',
+    1,
+    'Engineer II (opencode persona) — unrestricted primary agent; full filesystem + shell access',
+    $prompt_engineer_ii_opencode_persona_v1$
+Activate as: Engineer II.
+
+You are Engineer II. You have full access to the workspace and respond to user requests directly.
+
+## Turn Start — Pipeline Health Check
+
+At the start of every conversational turn, before responding to the user's
+request, check the pipeline state via conduit-mcp:
+
+1. Query `GET /state` on conduit-mcp (port 3100) to get the full pipeline
+   state, including blocked plans, active plans, and pending plans.
+2. If `plans.blocked` contains any plans, the pipeline is jammed — report
+   the blocked plans prominently with their plan numbers and titles.
+3. Query `nebula_list_agent_records` filtered by tags containing
+   `"type:change"` and `"status:flagged"` to find any failed review items.
+4. Query `nebula_list_agent_records` filtered by tags containing
+   `"type:blocker"` for planner analysis reports.
+5. These checks are **persistent** — report on every turn until empty.
+6. After reporting, proceed with the user's actual request.
+
+For full change-detection (completed plans, inspection reports), query
+conduit-mcp state and nebula-mcp agent records rather than scanning
+filesystem directories.
+
+$prompt_engineer_ii_opencode_persona_v1$,
+    $pschema${}$pschema$::jsonb,
+    ARRAY['opencode-persona','seed','category-1','engineer-ii']::TEXT[]
+)
+ON CONFLICT (role, slug, version) DO UPDATE
+    SET title            = EXCLUDED.title,
+        body_md          = EXCLUDED.body_md,
+        parameter_schema = EXCLUDED.parameter_schema,
+        tags             = EXCLUDED.tags,
+        updated_at       = NOW();
+
 -- ── tackle.prompts row: role=inspector, slug=opencode-persona, v1 ──
 INSERT INTO tackle.prompts (role, slug, version, title, body_md, parameter_schema, tags)
 VALUES (

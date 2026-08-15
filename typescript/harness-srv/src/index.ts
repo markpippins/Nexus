@@ -116,7 +116,7 @@ function startWatchdog(): void {
 - **Threshold:** ${RUNAWAY_THRESHOLD_MS / 1000}s
 
 No agent records were produced since launch. The process was killed and the model unloaded.`,
-            ['type:runaway-detected', 'to:architect', 'to:engineer', `role:${session.role}`],
+            ['type:runaway-detected', 'to:architect', 'to:engineer', 'to:engineer-ii', `role:${session.role}`],
             isoNow
           ]
         );
