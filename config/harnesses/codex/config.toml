@@ -1,0 +1,47 @@
+model = "gpt-5.5"
+model_reasoning_effort = "medium"
+
+[projects."/home/codex/dev/nexus"]
+trust_level = "trusted"
+
+[projects."/home/codex/dev/nexus-duality"]
+trust_level = "trusted"
+
+[projects."/home/codex"]
+trust_level = "trusted"
+
+[projects."/home/codex/dev"]
+trust_level = "trusted"
+
+[projects."/home/codex/dev/nexus/python/ai/losm"]
+trust_level = "trusted"
+
+[projects."/home/codex/dev/nexus/angular/semantics-ui"]
+trust_level = "trusted"
+
+[plugins."github@openai-curated"]
+enabled = true
+
+[tui.model_availability_nux]
+"gpt-5.5" = 4
+
+[notice.model_migrations]
+"gpt-5.3-codex" = "gpt-5.4"
+"gpt-5.4" = "gpt-5.5"
+
+[mcp_servers.pipelines-mcp]
+url = "http://localhost:3100"
+
+[mcp_servers.pipelines-mcp.tools.query_conduit_state]
+approval_mode = "approve"
+
+[mcp_servers.pipelines-mcp.tools.query_nebula_backlog]
+approval_mode = "approve"
+
+[profiles.ollama-launch]
+openai_base_url = "http://127.0.0.1:11434/v1/"
+forced_login_method = "api"
+model_provider = "ollama-launch"
+[model_providers.ollama-launch]
+name = "Ollama"
+base_url = "http://127.0.0.1:11434/v1/"
