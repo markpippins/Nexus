@@ -33,10 +33,10 @@ export function toKnex(sql: string, params: any[] = []): { sql: string; values: 
   return { sql: converted, values }
 }
 
-/** Run a raw query on the named nebula connection. */
-export async function q(sql: string, params: any[] = []) {
+/** Run a raw query on a named Lucid connection (default: nebula). */
+export async function q(sql: string, params: any[] = [], conn = 'nebula') {
   const { sql: c, values } = toKnex(sql, params)
-  return db.connection('nebula').rawQuery(c, values)
+  return db.connection(conn).rawQuery(c, values)
 }
 
 /** Run a raw query on a transaction client. */

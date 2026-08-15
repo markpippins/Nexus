@@ -4840,6 +4840,70 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /config/cron:
+    get:
+      operationId: get_config_cron
+      description: Pipeline cron interval.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /config/failure-recovery:
+    get:
+      operationId: get_config_failure_recovery
+      description: Failure recovery config.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    post:
+      operationId: post_config_failure_recovery
+      description: Save failure recovery config.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /governance/events:
+    get:
+      operationId: get_governance_events
+      description: List governance events.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /governance/replay:
+    post:
+      operationId: post_governance_replay
+      description: Replay receipts into governance events.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /health:
     get:
       operationId: health
@@ -4955,6 +5019,24 @@ paths:
       operationId: getKnowledgeSummary
       description: Aggregate counts across the knowledge graph.
       parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /log/{sessionId}:
+    get:
+      operationId: get_log_session
+      description: SSE stream of a session log.
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: The request has succeeded.
@@ -5277,6 +5359,191 @@ paths:
       operationId: getTerrainSummary
       description: Aggregate counts across the terrain topology.
       parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /tickets/detect:
+    post:
+      operationId: post_tickets_detect
+      description: Detect stale and expired tickets.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /tickets/lineage/{planId}:
+    get:
+      operationId: get_tickets_lineage
+      description: Ticket audit trail for a plan.
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /tokens/plan/{planId}:
+    get:
+      operationId: get_tokens_plan
+      description: Token usage summary for a plan.
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /tokens/role/{role}:
+    get:
+      operationId: get_tokens_role
+      description: Token usage summary for a role.
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /tokens/ticket/{ticketId}:
+    get:
+      operationId: get_tokens_ticket
+      description: Token usage for a ticket.
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /vision/receipts:
+    get:
+      operationId: get_vision_receipts
+      description: List receipts for a plan.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /vision/work-requests:
+    post:
+      operationId: post_vision_work_requests
+      description: Create or upsert a work request.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+    get:
+      operationId: get_vision_work_requests
+      description: List work requests.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /vision/work-requests/{id}:
+    get:
+      operationId: get_vision_work_requests_id
+      description: Get a single work request.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /workflows:
+    get:
+      operationId: get_workflows
+      description: List active workflow sessions.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /wr/drift-scan:
+    get:
+      operationId: get_wr_drift_scan
+      description: Sweep active work requests for projection drift.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /wr/{id}/projection-drift:
+    get:
+      operationId: get_wr_projection_drift
+      description: Check projection-vs-replay drift for a work request.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: The request has succeeded.

@@ -1679,4 +1679,93 @@ namespace org.nexus.controledge {
   @get
   @doc("List active watches for a thread.")
   op get_api_duality_watches_thread(@path threadId: string): Record<unknown>;
+  @route("/workflows")
+  @get
+  @doc("List active workflow sessions.")
+  op get_workflows(): Record<unknown>;
+
+  @route("/tickets/detect")
+  @post
+  @doc("Detect stale and expired tickets.")
+  op post_tickets_detect(): Record<unknown>;
+
+  @route("/tickets/lineage/{planId}")
+  @get
+  @doc("Ticket audit trail for a plan.")
+  op get_tickets_lineage(@path planId: string): Record<unknown>;
+
+  @route("/tokens/plan/{planId}")
+  @get
+  @doc("Token usage summary for a plan.")
+  op get_tokens_plan(@path planId: string): Record<unknown>;
+
+  @route("/tokens/role/{role}")
+  @get
+  @doc("Token usage summary for a role.")
+  op get_tokens_role(@path role: string): Record<unknown>;
+
+  @route("/tokens/ticket/{ticketId}")
+  @get
+  @doc("Token usage for a ticket.")
+  op get_tokens_ticket(@path ticketId: string): Record<unknown>;
+
+  @route("/config/cron")
+  @get
+  @doc("Pipeline cron interval.")
+  op get_config_cron(): Record<unknown>;
+
+  @route("/config/failure-recovery")
+  @get
+  @doc("Failure recovery config.")
+  op get_config_failure_recovery(): Record<unknown>;
+
+  @route("/config/failure-recovery")
+  @post
+  @doc("Save failure recovery config.")
+  op post_config_failure_recovery(): Record<unknown>;
+
+  @route("/log/{sessionId}")
+  @get
+  @doc("SSE stream of a session log.")
+  op get_log_session(@path sessionId: string): Record<unknown>;
+
+  @route("/governance/replay")
+  @post
+  @doc("Replay receipts into governance events.")
+  op post_governance_replay(): Record<unknown>;
+
+  @route("/governance/events")
+  @get
+  @doc("List governance events.")
+  op get_governance_events(): Record<unknown>;
+
+  @route("/vision/work-requests")
+  @post
+  @doc("Create or upsert a work request.")
+  op post_vision_work_requests(): Record<unknown>;
+
+  @route("/vision/work-requests")
+  @get
+  @doc("List work requests.")
+  op get_vision_work_requests(): Record<unknown>;
+
+  @route("/vision/work-requests/{id}")
+  @get
+  @doc("Get a single work request.")
+  op get_vision_work_requests_id(@path id: string): Record<unknown>;
+
+  @route("/vision/receipts")
+  @get
+  @doc("List receipts for a plan.")
+  op get_vision_receipts(): Record<unknown>;
+
+  @route("/wr/{id}/projection-drift")
+  @get
+  @doc("Check projection-vs-replay drift for a work request.")
+  op get_wr_projection_drift(@path id: string): Record<unknown>;
+
+  @route("/wr/drift-scan")
+  @get
+  @doc("Sweep active work requests for projection drift.")
+  op get_wr_drift_scan(): Record<unknown>;
 }

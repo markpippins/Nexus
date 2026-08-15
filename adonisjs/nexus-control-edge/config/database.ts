@@ -42,6 +42,22 @@ const dbConfig = defineConfig({
       searchPath: ['nebula', 'public'],
       pool: { min: 2, max: 10 },
     },
+    // Re-homed conduit-srv SQL runs with search_path=conduit,vision,peb,tackle
+    // (the original pool carried `-c search_path=conduit,vision,peb,tackle`).
+    // Unqualified names like `sessions`, `circuit_breaker`, `transition_event`
+    // resolve exactly as they did upstream.
+    conduit: {
+      client: 'pg',
+      connection: {
+        host: env.get('PG_HOST'),
+        port: env.get('PG_PORT'),
+        user: env.get('PG_USER'),
+        password: env.get('PG_PASSWORD'),
+        database: env.get('PG_DB_NAME'),
+      },
+      searchPath: ['conduit', 'vision', 'peb', 'tackle'],
+      pool: { min: 2, max: 10 },
+    },
   },
 })
 

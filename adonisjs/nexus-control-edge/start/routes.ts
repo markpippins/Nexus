@@ -19,6 +19,32 @@ import router from '@adonisjs/core/services/router'
 // ── Health ────────────────────────────────────────────────────────────
 router.get('/health', [() => import('#controllers/health_controller'), 'index'])
 
+// ── conduit-srv (re-homed Wave 3.3) ───────────────────────────────────
+// Ported from nexus/typescript/conduit-srv/src/routes/*.ts. Mounted at
+// ROOT level (no /api prefix) for backward compat with conduit-mcp
+// consumers, matching the original service. Queries run against the
+// `conduit` named connection (search_path=conduit,vision,peb,tackle).
+router.group(() => {
+  router.get('/workflows', [() => import('#controllers/conduit_controller'), 'listWorkflows'])
+  router.post('/tickets/detect', [() => import('#controllers/conduit_controller'), 'detectTickets'])
+  router.get('/tickets/lineage/:planId', [() => import('#controllers/conduit_controller'), 'ticketLineage'])
+  router.get('/tokens/plan/:planId', [() => import('#controllers/conduit_controller'), 'tokensByPlan'])
+  router.get('/tokens/role/:role', [() => import('#controllers/conduit_controller'), 'tokensByRole'])
+  router.get('/tokens/ticket/:ticketId', [() => import('#controllers/conduit_controller'), 'tokensByTicket'])
+  router.get('/config/cron', [() => import('#controllers/conduit_controller'), 'getCron'])
+  router.get('/config/failure-recovery', [() => import('#controllers/conduit_controller'), 'getFailureRecovery'])
+  router.post('/config/failure-recovery', [() => import('#controllers/conduit_controller'), 'saveFailureRecovery'])
+  router.get('/log/:sessionId', [() => import('#controllers/conduit_controller'), 'sessionLog'])
+  router.post('/governance/replay', [() => import('#controllers/conduit_controller'), 'replayGovernance'])
+  router.get('/governance/events', [() => import('#controllers/conduit_controller'), 'listGovernanceEvents'])
+  router.post('/vision/work-requests', [() => import('#controllers/conduit_controller'), 'upsertWorkRequest'])
+  router.get('/vision/work-requests', [() => import('#controllers/conduit_controller'), 'listWorkRequests'])
+  router.get('/vision/work-requests/:id', [() => import('#controllers/conduit_controller'), 'getWorkRequest'])
+  router.get('/vision/receipts', [() => import('#controllers/conduit_controller'), 'listReceipts'])
+  router.get('/wr/:id/projection-drift', [() => import('#controllers/conduit_controller'), 'projectionDrift'])
+  router.get('/wr/drift-scan', [() => import('#controllers/conduit_controller'), 'driftScan'])
+})
+
 // ── ui-tools: navigation links ────────────────────────────────────────
 router.group(() => {
   router.get('/api/links', [() => import('#controllers/links_controller'), 'index'])
