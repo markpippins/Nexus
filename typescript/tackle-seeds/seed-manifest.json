@@ -9,6 +9,7 @@
         "architect",
         "builder",
         "critic",
+        "devops",
         "engineer",
         "engineer-ii",
         "inspector",
@@ -44,6 +45,7 @@
         "architect",
         "builder",
         "critic",
+        "devops",
         "engineer",
         "engineer-ii",
         "inspector",
@@ -80,6 +82,7 @@
       ],
       "roles": [
         "builder",
+        "devops",
         "engineer",
         "engineer-ii"
       ],
@@ -110,6 +113,7 @@
         "builder",
         "critic",
         "DBA",
+        "devops",
         "engineer",
         "engineer-ii",
         "epistemologist",
@@ -144,6 +148,7 @@
         "builder",
         "critic",
         "DBA",
+        "devops",
         "engineer",
         "engineer-ii",
         "epistemologist",
@@ -177,6 +182,7 @@
         "auditor",
         "builder",
         "critic",
+        "devops",
         "engineer",
         "engineer-ii",
         "inspector",
@@ -212,6 +218,7 @@
         "auditor",
         "builder",
         "critic",
+        "devops",
         "engineer",
         "engineer-ii",
         "inspector",
@@ -243,6 +250,7 @@
         "nebula_update_requirement"
       ],
       "roles": [
+        "devops",
         "engineer",
         "engineer-ii"
       ],
@@ -277,6 +285,7 @@
         "builder",
         "critic",
         "DBA",
+        "devops",
         "engineer",
         "engineer-ii",
         "epistemologist",
@@ -313,6 +322,7 @@
       ],
       "roles": [
         "analyst",
+        "devops",
         "engineer",
         "engineer-ii"
       ],
@@ -390,6 +400,7 @@
         "builder",
         "critic",
         "DBA",
+        "devops",
         "engineer",
         "engineer-ii",
         "epistemologist",
@@ -420,6 +431,7 @@
       "roles": [
         "architect",
         "builder",
+        "devops",
         "engineer",
         "engineer-ii",
         "planner"
@@ -453,6 +465,7 @@
         "builder",
         "critic",
         "DBA",
+        "devops",
         "engineer",
         "engineer-ii",
         "epistemologist",
@@ -485,6 +498,7 @@
         "auditor",
         "builder",
         "DBA",
+        "devops",
         "engineer",
         "engineer-ii",
         "epistemologist",
@@ -653,6 +667,7 @@
       "body_md": "## Procedure\n\nThe conduit MCP /health endpoint includes an orphanScan section:\n- Plans deleted in DB (deleted=1) that still have .md files on disk\n- .md files on disk with no corresponding DB row\n\nUse this as a periodic check. The watcher getState() also filters soft-deleted plans from the filesystem-driven cache.",
       "mcp_tools": [],
       "roles": [
+        "devops",
         "engineer",
         "engineer-ii",
         "inspector",
@@ -683,6 +698,7 @@
         "builder",
         "critic",
         "DBA",
+        "devops",
         "engineer",
         "engineer-ii",
         "epistemologist",
@@ -717,6 +733,7 @@
         "architect",
         "builder",
         "critic",
+        "devops",
         "engineer",
         "engineer-ii",
         "inspector",
@@ -755,6 +772,7 @@
       ],
       "roles": [
         "builder",
+        "devops",
         "engineer",
         "engineer-ii"
       ],
@@ -786,6 +804,7 @@
         "conduit-mcp_hard_delete_plan"
       ],
       "roles": [
+        "devops",
         "engineer",
         "engineer-ii",
         "planner"
@@ -843,6 +862,7 @@
       "mcp_tools": [],
       "roles": [
         "builder",
+        "devops",
         "engineer",
         "engineer-ii",
         "planner"
@@ -875,6 +895,7 @@
         "architect",
         "builder",
         "critic",
+        "devops",
         "engineer",
         "engineer-ii",
         "inspector",
@@ -910,6 +931,7 @@
         "architect",
         "builder",
         "critic",
+        "devops",
         "engineer",
         "engineer-ii",
         "inspector",
@@ -940,6 +962,7 @@
       ],
       "roles": [
         "architect",
+        "devops",
         "engineer",
         "engineer-ii",
         "planner"
@@ -970,6 +993,7 @@
         "builder",
         "critic",
         "DBA",
+        "devops",
         "engineer",
         "engineer-ii",
         "epistemologist",
@@ -1004,6 +1028,7 @@
       ],
       "roles": [
         "builder",
+        "devops",
         "engineer",
         "engineer-ii"
       ],
@@ -1034,6 +1059,7 @@
         "nebula_create_agent_record"
       ],
       "roles": [
+        "devops",
         "engineer",
         "engineer-ii"
       ],
@@ -1060,6 +1086,7 @@
       "roles": [
         "architect",
         "builder",
+        "devops",
         "engineer",
         "engineer-ii"
       ],
@@ -1093,6 +1120,7 @@
         "builder",
         "critic",
         "DBA",
+        "devops",
         "engineer",
         "engineer-ii",
         "epistemologist",
@@ -1127,6 +1155,7 @@
         "builder",
         "critic",
         "DBA",
+        "devops",
         "engineer",
         "engineer-ii",
         "epistemologist",
@@ -1158,6 +1187,7 @@
         "terrain_list_services"
       ],
       "roles": [
+        "devops",
         "engineer",
         "engineer-ii"
       ],
@@ -1193,6 +1223,7 @@
         "builder",
         "critic",
         "DBA",
+        "devops",
         "engineer",
         "engineer-ii",
         "epistemologist",
@@ -1226,6 +1257,7 @@
       "roles": [
         "architect",
         "builder",
+        "devops",
         "engineer",
         "engineer-ii",
         "planner",
@@ -1253,6 +1285,7 @@
       "mcp_tools": [],
       "roles": [
         "builder",
+        "devops",
         "engineer",
         "engineer-ii"
       ],
@@ -1287,6 +1320,7 @@
         "architect",
         "builder",
         "critic",
+        "devops",
         "engineer",
         "engineer-ii",
         "inspector",
@@ -1311,6 +1345,6 @@
       ]
     }
   ],
-  "role_count": 264,
+  "role_count": 298,
   "schema": "tackle"
 }

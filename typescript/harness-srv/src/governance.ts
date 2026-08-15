@@ -34,7 +34,7 @@ const CONDUIT_MCP_URL = (process.env.CONDUIT_MCP_URL || "http://localhost:3100")
 // outside this set fall back to "builder" for the agent_role field.
 const KNOWN_EXECUTORS = new Set([
   "planner", "builder", "reviewer", "analyst",
-  "critic", "inspector", "architect", "engineer", "engineer-ii", "leased-builder",
+  "critic", "inspector", "architect", "engineer", "engineer-ii", "devops", "leased-builder",
   "watchdog",
 ]);
 
