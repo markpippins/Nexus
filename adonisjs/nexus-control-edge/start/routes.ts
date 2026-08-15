@@ -115,6 +115,22 @@ router.group(() => {
   router.delete('/api/event-types/:eventType', [() => import('#controllers/wind_event_controller'), 'deleteEventType'])
 })
 
+// ── kernel-srv: kernel event system ───────────────────────────────────
+router.group(() => {
+  router.post('/api/kernel/transitions', [() => import('#controllers/kernel_controller'), 'transitions'])
+  router.get('/api/kernel/transitions/:event_id', [() => import('#controllers/kernel_controller'), 'transitionById'])
+  router.get('/api/kernel/transitions/:event_id/causality', [() => import('#controllers/kernel_controller'), 'causality'])
+  router.post('/api/kernel/receipts', [() => import('#controllers/kernel_controller'), 'receipts'])
+  router.get('/api/kernel/receipts/:id/chain', [() => import('#controllers/kernel_controller'), 'receiptChain'])
+  router.get('/api/kernel/plans/:plan_number/receipts', [() => import('#controllers/kernel_controller'), 'planReceipts'])
+  router.get('/api/kernel/aggregates/:aggregate_type/:aggregate_id/events', [() => import('#controllers/kernel_controller'), 'aggregateEvents'])
+  router.get('/api/kernel/policy/active', [() => import('#controllers/kernel_controller'), 'policyActive'])
+  router.get('/api/kernel/policy/maturity', [() => import('#controllers/kernel_controller'), 'policyMaturity'])
+  router.get('/api/kernel/health/recent-events', [() => import('#controllers/kernel_controller'), 'recentEvents'])
+  router.get('/api/kernel/health/receipt-integrity', [() => import('#controllers/kernel_controller'), 'receiptIntegrity'])
+  router.get('/api/kernel/events/stream', [() => import('#controllers/kernel_controller'), 'eventsStream'])
+})
+
 // ── ui-tools: navigation links ────────────────────────────────────────
 router.group(() => {
   router.get('/api/links', [() => import('#controllers/links_controller'), 'index'])

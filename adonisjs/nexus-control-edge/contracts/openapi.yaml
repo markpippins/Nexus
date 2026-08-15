@@ -2812,6 +2812,180 @@ paths:
               schema:
                 type: object
                 unevaluatedProperties: {}
+  /api/kernel/aggregates/{aggregate_type}/{aggregate_id}/events:
+    get:
+      operationId: get_kernel_aggregate_events
+      parameters:
+        - name: aggregate_type
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: aggregate_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/kernel/events/stream:
+    get:
+      operationId: get_kernel_events_stream
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/kernel/health/receipt-integrity:
+    get:
+      operationId: get_kernel_health_receipt_integrity
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/kernel/health/recent-events:
+    get:
+      operationId: get_kernel_health_recent_events
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/kernel/plans/{plan_number}/receipts:
+    get:
+      operationId: get_kernel_plan_receipts
+      parameters:
+        - name: plan_number
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/kernel/policy/active:
+    get:
+      operationId: get_kernel_policy_active
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/kernel/policy/maturity:
+    get:
+      operationId: get_kernel_policy_maturity
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/kernel/receipts:
+    post:
+      operationId: post_kernel_receipts
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/kernel/receipts/{id}/chain:
+    get:
+      operationId: get_kernel_receipt_chain
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/kernel/transitions:
+    post:
+      operationId: post_kernel_transitions
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/kernel/transitions/{event_id}:
+    get:
+      operationId: get_kernel_transition
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
+  /api/kernel/transitions/{event_id}/causality:
+    get:
+      operationId: get_kernel_transition_causality
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                unevaluatedProperties: {}
   /api/knowledge/view:
     get:
       operationId: get_api_knowledge_view

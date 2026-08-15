@@ -2449,4 +2449,54 @@ namespace org.nexus.controledge {
   @post
   @doc("Render all enabled projections")
   op post_projections_render_all(): Record<unknown>;
+// ── kernel-srv (/api/kernel) ──
+@route("/api/kernel/transitions")
+@post
+op post_kernel_transitions(): Record<unknown>;
+
+@route("/api/kernel/transitions/{event_id}")
+@get
+op get_kernel_transition(event_id: string): Record<unknown>;
+
+@route("/api/kernel/transitions/{event_id}/causality")
+@get
+op get_kernel_transition_causality(event_id: string): Record<unknown>;
+
+@route("/api/kernel/receipts")
+@post
+op post_kernel_receipts(): Record<unknown>;
+
+@route("/api/kernel/receipts/{id}/chain")
+@get
+op get_kernel_receipt_chain(id: string): Record<unknown>;
+
+@route("/api/kernel/plans/{plan_number}/receipts")
+@get
+op get_kernel_plan_receipts(plan_number: string): Record<unknown>;
+
+@route("/api/kernel/aggregates/{aggregate_type}/{aggregate_id}/events")
+@get
+op get_kernel_aggregate_events(aggregate_type: string, aggregate_id: string): Record<unknown>;
+
+@route("/api/kernel/policy/active")
+@get
+op get_kernel_policy_active(): Record<unknown>;
+
+@route("/api/kernel/policy/maturity")
+@get
+op get_kernel_policy_maturity(): Record<unknown>;
+
+@route("/api/kernel/health/recent-events")
+@get
+op get_kernel_health_recent_events(): Record<unknown>;
+
+@route("/api/kernel/health/receipt-integrity")
+@get
+op get_kernel_health_receipt_integrity(): Record<unknown>;
+
+@route("/api/kernel/events/stream")
+@get
+op get_kernel_events_stream(): Record<unknown>;
+
+
 }
