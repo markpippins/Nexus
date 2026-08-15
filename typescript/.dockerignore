@@ -1,0 +1,12 @@
+# Build context root for the legacy-tier Dockerfiles (docker/legacy-tier).
+# Keep the context lean: per-service node_modules are huge and installed
+# fresh inside each image anyway.
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+**/*.service
+**/__tests__
+**/.git
