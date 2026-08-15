@@ -131,6 +131,33 @@ router.group(() => {
   router.get('/api/kernel/events/stream', [() => import('#controllers/kernel_controller'), 'eventsStream'])
 })
 
+// ── peb-srv: plan-execution blackbox ──────────────────────────────────
+router.group(() => {
+  router.get('/api/peb/health', [() => import('#controllers/peb_controller'), 'health'])
+  router.get('/api/peb/health/circuit-breakers', [() => import('#controllers/peb_controller'), 'circuitBreakers'])
+  router.get('/api/peb/health/violations/summary', [() => import('#controllers/peb_controller'), 'violationsSummary'])
+  router.get('/api/peb/health/entropy', [() => import('#controllers/peb_controller'), 'entropy'])
+  router.get('/api/peb/events/stream', [() => import('#controllers/peb_controller'), 'eventsStream'])
+  router.get('/api/peb/events', [() => import('#controllers/peb_controller'), 'listEvents'])
+  router.get('/api/peb/events/:receipt_id', [() => import('#controllers/peb_controller'), 'getEvent'])
+  router.post('/api/peb/events/:receipt_id/replay', [() => import('#controllers/peb_controller'), 'replayEvent'])
+  router.get('/api/peb/transactions', [() => import('#controllers/peb_controller'), 'listTransactions'])
+  router.get('/api/peb/transactions/:id', [() => import('#controllers/peb_controller'), 'getTransaction'])
+  router.get('/api/peb/transactions/:id/lineage', [() => import('#controllers/peb_controller'), 'transactionLineage'])
+  router.get('/api/peb/traces/:id/tree', [() => import('#controllers/peb_controller'), 'traceTree'])
+  router.get('/api/peb/decisions', [() => import('#controllers/peb_controller'), 'listDecisions'])
+  router.get('/api/peb/decisions/next-number', [() => import('#controllers/peb_controller'), 'nextDecisionNumber'])
+  router.get('/api/peb/decisions/:id', [() => import('#controllers/peb_controller'), 'getDecision'])
+  router.post('/api/peb/decisions', [() => import('#controllers/peb_controller'), 'createDecision'])
+  router.patch('/api/peb/decisions/:id', [() => import('#controllers/peb_controller'), 'updateDecision'])
+  router.post('/api/peb/decisions/:id/supersede', [() => import('#controllers/peb_controller'), 'supersedeDecision'])
+  router.get('/api/peb/decisions/:id/chain', [() => import('#controllers/peb_controller'), 'decisionChain'])
+  router.get('/api/peb/entities/:entity_id/capability-gap', [() => import('#controllers/peb_controller'), 'capabilityGap'])
+  router.get('/api/peb/entities/:entity_id/capabilities', [() => import('#controllers/peb_controller'), 'entityCapabilities'])
+  router.get('/api/peb/state/:key/versions', [() => import('#controllers/peb_controller'), 'stateVersions'])
+  router.get('/api/peb/state/:key/diff', [() => import('#controllers/peb_controller'), 'stateDiff'])
+})
+
 // ── ui-tools: navigation links ────────────────────────────────────────
 router.group(() => {
   router.get('/api/links', [() => import('#controllers/links_controller'), 'index'])

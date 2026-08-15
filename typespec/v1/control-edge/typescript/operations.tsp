@@ -2499,4 +2499,98 @@ op get_kernel_health_receipt_integrity(): Record<unknown>;
 op get_kernel_events_stream(): Record<unknown>;
 
 
+// ── peb-srv (/api/peb) ──
+@route("/api/peb/health")
+@get
+op get_peb_health(): Record<unknown>;
+
+@route("/api/peb/health/circuit-breakers")
+@get
+op get_peb_health_circuit_breakers(): Record<unknown>;
+
+@route("/api/peb/health/violations/summary")
+@get
+op get_peb_health_violations_summary(): Record<unknown>;
+
+@route("/api/peb/health/entropy")
+@get
+op get_peb_health_entropy(): Record<unknown>;
+
+@route("/api/peb/events/stream")
+@get
+op get_peb_events_stream(): Record<unknown>;
+
+@route("/api/peb/events")
+@get
+op get_peb_events(): Record<unknown>;
+
+@route("/api/peb/events/{receipt_id}")
+@get
+op get_peb_event(receipt_id: string): Record<unknown>;
+
+@route("/api/peb/events/{receipt_id}/replay")
+@post
+op post_peb_event_replay(receipt_id: string): Record<unknown>;
+
+@route("/api/peb/transactions")
+@get
+op get_peb_transactions(): Record<unknown>;
+
+@route("/api/peb/transactions/{id}")
+@get
+op get_peb_transaction(id: string): Record<unknown>;
+
+@route("/api/peb/transactions/{id}/lineage")
+@get
+op get_peb_transaction_lineage(id: string): Record<unknown>;
+
+@route("/api/peb/traces/{id}/tree")
+@get
+op get_peb_trace_tree(id: string): Record<unknown>;
+
+@route("/api/peb/decisions")
+@get
+op get_peb_decisions(): Record<unknown>;
+
+@route("/api/peb/decisions/next-number")
+@get
+op get_peb_decisions_next_number(): Record<unknown>;
+
+@route("/api/peb/decisions/{id}")
+@get
+op get_peb_decision(id: string): Record<unknown>;
+
+@route("/api/peb/decisions")
+@post
+op post_peb_decisions(): Record<unknown>;
+
+@route("/api/peb/decisions/{id}")
+@patch
+op patch_peb_decision(id: string): Record<unknown>;
+
+@route("/api/peb/decisions/{id}/supersede")
+@post
+op post_peb_decision_supersede(id: string): Record<unknown>;
+
+@route("/api/peb/decisions/{id}/chain")
+@get
+op get_peb_decision_chain(id: string): Record<unknown>;
+
+@route("/api/peb/entities/{entity_id}/capability-gap")
+@get
+op get_peb_entity_capability_gap(entity_id: string): Record<unknown>;
+
+@route("/api/peb/entities/{entity_id}/capabilities")
+@get
+op get_peb_entity_capabilities(entity_id: string): Record<unknown>;
+
+@route("/api/peb/state/{key}/versions")
+@get
+op get_peb_state_versions(key: string): Record<unknown>;
+
+@route("/api/peb/state/{key}/diff")
+@get
+op get_peb_state_diff(key: string): Record<unknown>;
+
+
 }
