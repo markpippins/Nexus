@@ -27,6 +27,21 @@ const dbConfig = defineConfig({
         paths: ['database/migrations'],
       },
     },
+    // Re-homed nebula-srv SQL runs against the nebula schema (the original
+    // pool carried `-c search_path=nebula`). Named connection so the giant
+    // port's unqualified table names resolve exactly as they did upstream.
+    nebula: {
+      client: 'pg',
+      connection: {
+        host: env.get('PG_HOST'),
+        port: env.get('PG_PORT'),
+        user: env.get('PG_USER'),
+        password: env.get('PG_PASSWORD'),
+        database: env.get('PG_DB_NAME'),
+      },
+      searchPath: ['nebula', 'public'],
+      pool: { min: 2, max: 10 },
+    },
   },
 })
 

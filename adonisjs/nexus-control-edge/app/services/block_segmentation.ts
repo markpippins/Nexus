@@ -1,0 +1,522 @@
+import { q, qT, toKnex } from './nebula_helpers.js'
+import type { DbLike } from './nebula_helpers.js'
+
+/**
+ * Block Segmentation Service — ported from
+ * nexus/typescript/nebula-srv/src/block-segmentation.service.ts
+ * (Wave 3.1). SQL kept verbatim; pg $n placeholders are converted to
+ * knex ? at runtime via q()/toKnex().
+ */
+
+export interface BlockViewModel {
+  blockId: string
+  index: number
+  type: string
+  content: string
+  isInSegment: boolean
+  segmentStart: boolean
+  segmentEnd: boolean
+  bpVisible: boolean
+  suppressed: boolean
+}
+
+export interface SnapshotEntry {
+  id: string
+  conversation_id: string
+  snapshot_index: number
+  source_hash: string
+  capture_mode: string
+  block_count: number
+  created_by: string
+  created_at: string
+}
+
+export interface BlockEntry {
+  id: string
+  conversation_id: string
+  snapshot_id: string
+  block_index: number
+  parent_turn_id: string | null
+  parent_block_id: string | null
+  block_type: string
+  content_md: string
+  content_hash: string
+  role: string | null
+  dom_path: string | null
+  dom_fingerprint: string | null
+  first_line_no: number | null
+  last_line_no: number | null
+  created_at: string
+}
+
+export interface SegmentEntry {
+  id: string
+  conversation_id: string
+  snapshot_id: string
+  start_block_id: string
+  end_block_id: string
+  start_block_index: number
+  end_block_index: number
+  segment_type: string | null
+  state: string
+  source: string
+  title: string | null
+  notes_md: string | null
+  created_by: string
+  created_at: string
+}
+
+export interface HarvestReferenceEntry {
+  id: string
+  conversation_id: string
+  snapshot_id: string
+  source_block_id: string | null
+  source_segment_id: string | null
+  target_block_id: string | null
+  target_segment_id: string | null
+  edge_type: string
+  confidence: number
+  state: string
+  source: string
+  reason: string | null
+  evidence_json: any
+  provenance_json: any
+  created_by: string
+  created_at: string
+}
+
+export interface ProjectionOverrideEntry {
+  id: string
+  conversation_id: string
+  snapshot_id: string
+  target_type: string
+  target_id: string
+  projection_target: string
+  override_type: string
+  reason_code: string
+  notes_md: string | null
+  source: string
+  created_by: string
+  created_at: string
+}
+
+const CREATED_AT_CAST = `to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at`
+
+// ── 1. List snapshots for a conversation ─────────────────────────────
+
+export async function listSnapshots(conversationId: string): Promise<{ snapshots: SnapshotEntry[] }> {
+  const { rows } = await q(
+    `SELECT id, conversation_id, snapshot_index, source_hash, capture_mode,
+            block_count, created_by,
+            ${CREATED_AT_CAST}
+     FROM nebula.conversation_snapshots
+     WHERE conversation_id = ?
+     ORDER BY snapshot_index DESC`,
+    [conversationId]
+  )
+  return { snapshots: rows }
+}
+
+// ── 2. List blocks for a snapshot, with optional diff ────────────────
+
+export async function listBlocks(
+  snapshotId: string,
+  diffFrom?: string,
+): Promise<{
+  blocks: BlockEntry[]
+  segments: SegmentEntry[]
+  overrides: ProjectionOverrideEntry[]
+  diff?: { added: number; modified: number; removed: number; unchanged: number }
+}> {
+  const { rows: blocks } = await q(
+    `SELECT id, conversation_id, snapshot_id, block_index, parent_turn_id,
+            parent_block_id, block_type, content_md, content_hash,
+            role,
+            dom_path, dom_fingerprint, first_line_no, last_line_no,
+            ${CREATED_AT_CAST}
+     FROM nebula.conversation_blocks
+     WHERE snapshot_id = ?
+     ORDER BY block_index`,
+    [snapshotId]
+  )
+
+  const { rows: segments } = await q(
+    `SELECT id, conversation_id, snapshot_id, start_block_id, end_block_id,
+            start_block_index, end_block_index, segment_type, state, source,
+            title, notes_md, created_by,
+            ${CREATED_AT_CAST}
+     FROM nebula.segments
+     WHERE snapshot_id = ?
+     ORDER BY start_block_index`,
+    [snapshotId]
+  )
+
+  const { rows: overrides } = await q(
+    `SELECT id, conversation_id, snapshot_id, target_type, target_id,
+            projection_target, override_type, reason_code, notes_md,
+            source, created_by,
+            ${CREATED_AT_CAST}
+     FROM nebula.projection_overrides
+     WHERE snapshot_id = ?
+     ORDER BY created_at`,
+    [snapshotId]
+  )
+
+  let diff: { added: number; modified: number; removed: number; unchanged: number } | undefined
+  if (diffFrom) {
+    const { rows: prevBlocks } = await q(
+      `SELECT block_index, content_hash
+       FROM nebula.conversation_blocks
+       WHERE snapshot_id = ?
+       ORDER BY block_index`,
+      [diffFrom]
+    )
+
+    const prevMap = new Map<number, string>()
+    for (const pb of prevBlocks) prevMap.set(pb.block_index, pb.content_hash)
+
+    diff = { added: 0, modified: 0, removed: 0, unchanged: 0 }
+    const seenIndexes = new Set<number>()
+    for (const b of blocks) {
+      seenIndexes.add(b.block_index)
+      const prevHash = prevMap.get(b.block_index)
+      if (prevHash === undefined) {
+        diff.added++
+      } else if (prevHash !== b.content_hash) {
+        diff.modified++
+      } else {
+        diff.unchanged++
+      }
+    }
+    for (const idx of prevMap.keys()) {
+      if (!seenIndexes.has(idx)) diff.removed++
+    }
+  }
+
+  return { blocks, segments, overrides, diff }
+}
+
+// ── 3. Create a new snapshot ─────────────────────────────────────────
+
+export async function createSnapshot(
+  trx: DbLike,
+  params: {
+    conversationId: string
+    snapshotIndex: number
+    sourceHash: string
+    captureMode?: string
+    blockCount?: number
+    createdBy?: string
+    blocks?: Array<{
+      blockIndex: number
+      blockType: string
+      contentMd: string
+      contentHash: string
+      parentTurnId?: string
+      parentBlockId?: string
+      domPath?: string
+      domFingerprint?: string
+      firstLineNo?: number
+      lastLineNo?: number
+    }>
+  },
+): Promise<{ snapshot: SnapshotEntry; blockCount: number }> {
+  const { rows: [snapshot] } = await qT(
+    trx,
+    `INSERT INTO nebula.conversation_snapshots
+     (conversation_id, snapshot_index, source_hash, capture_mode,
+      block_count, created_by)
+     VALUES (?, ?, ?, ?, ?, ?)
+     RETURNING id, conversation_id, snapshot_index, source_hash,
+               capture_mode, block_count, created_by,
+               ${CREATED_AT_CAST}`,
+    [
+      params.conversationId,
+      params.snapshotIndex,
+      params.sourceHash,
+      params.captureMode || 'INCREMENTAL',
+      params.blockCount || 0,
+      params.createdBy || 'SYSTEM',
+    ]
+  )
+
+  let insertedBlockCount = 0
+  if (params.blocks && params.blocks.length > 0) {
+    for (const b of params.blocks) {
+      await qT(
+        trx,
+        `INSERT INTO nebula.conversation_blocks
+         (conversation_id, snapshot_id, block_index, parent_turn_id,
+          parent_block_id, block_type, content_md, content_hash,
+          dom_path, dom_fingerprint, first_line_no, last_line_no)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          params.conversationId,
+          snapshot.id,
+          b.blockIndex,
+          b.parentTurnId || null,
+          b.parentBlockId || null,
+          b.blockType || 'paragraph',
+          b.contentMd,
+          b.contentHash,
+          b.domPath || null,
+          b.domFingerprint || null,
+          b.firstLineNo || null,
+          b.lastLineNo || null,
+        ]
+      )
+      insertedBlockCount++
+    }
+  }
+
+  return { snapshot, blockCount: insertedBlockCount }
+}
+
+async function resolveBlockId(snapshotId: string, blockIndex: number): Promise<string | null> {
+  const { rows } = await q(
+    `SELECT id FROM nebula.conversation_blocks
+     WHERE snapshot_id = ? AND block_index = ?
+     LIMIT 1`,
+    [snapshotId, blockIndex]
+  )
+  return rows.length > 0 ? rows[0].id : null
+}
+
+function looksLikeUuid(s: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+}
+
+// ── 4. Commit a segment ──────────────────────────────────────────────
+
+export async function createSegment(
+  params: {
+    conversationId: string
+    snapshotId: string
+    startBlockId: string
+    endBlockId: string
+    startBlockIndex: number
+    endBlockIndex: number
+    segmentType?: string
+    source?: string
+    title?: string
+    notesMd?: string
+    createdBy?: string
+  },
+): Promise<SegmentEntry> {
+  let startBlockId = params.startBlockId
+  let endBlockId = params.endBlockId
+
+  if (!looksLikeUuid(startBlockId)) {
+    const resolved = await resolveBlockId(params.snapshotId, params.startBlockIndex)
+    if (!resolved) {
+      throw new Error(`No block found at index ${params.startBlockIndex} in snapshot ${params.snapshotId}`)
+    }
+    startBlockId = resolved
+  }
+  if (!looksLikeUuid(endBlockId)) {
+    const resolved = await resolveBlockId(params.snapshotId, params.endBlockIndex)
+    if (!resolved) {
+      throw new Error(`No block found at index ${params.endBlockIndex} in snapshot ${params.snapshotId}`)
+    }
+    endBlockId = resolved
+  }
+
+  const { rows: [segment] } = await q(
+    `INSERT INTO nebula.segments
+     (conversation_id, snapshot_id, start_block_id, end_block_id,
+      start_block_index, end_block_index, segment_type, state, source,
+      title, notes_md, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'CONFIRMED', ?, ?, ?, ?)
+     RETURNING id, conversation_id, snapshot_id, start_block_id,
+               end_block_id, start_block_index, end_block_index,
+               segment_type, state, source, title, notes_md, created_by,
+               ${CREATED_AT_CAST}`,
+    [
+      params.conversationId,
+      params.snapshotId,
+      startBlockId,
+      endBlockId,
+      params.startBlockIndex,
+      params.endBlockIndex,
+      params.segmentType || null,
+      params.source || 'USER',
+      params.title || null,
+      params.notesMd || null,
+      params.createdBy || 'USER',
+    ]
+  )
+  return segment
+}
+
+// ── 5. Update a segment ──────────────────────────────────────────────
+
+export async function updateSegment(
+  segmentId: string,
+  updates: {
+    segmentType?: string
+    state?: string
+    title?: string
+    notesMd?: string
+  },
+): Promise<SegmentEntry | null> {
+  const sets: string[] = []
+  const vals: any[] = []
+  if (updates.segmentType !== undefined) { sets.push('segment_type = ?'); vals.push(updates.segmentType) }
+  if (updates.state !== undefined) { sets.push('state = ?'); vals.push(updates.state) }
+  if (updates.title !== undefined) { sets.push('title = ?'); vals.push(updates.title) }
+  if (updates.notesMd !== undefined) { sets.push('notes_md = ?'); vals.push(updates.notesMd) }
+
+  if (sets.length === 0) return null
+
+  vals.push(segmentId)
+  const { sql, values } = toKnex(
+    `UPDATE nebula.segments SET ${sets.join(', ')} WHERE id = ?
+     RETURNING id, conversation_id, snapshot_id, start_block_id,
+               end_block_id, start_block_index, end_block_index,
+               segment_type, state, source, title, notes_md, created_by,
+               ${CREATED_AT_CAST}`,
+    vals
+  )
+  const { rows: [segment] } = await q(sql, values)
+  return segment || null
+}
+
+// ── 6. Supersede a segment (bitemporal expire) ───────────────────────
+
+export async function supersedeSegment(segmentId: string): Promise<{ ok: boolean }> {
+  const { rowCount } = await q(
+    'UPDATE nebula.segments SET valid_until = now() WHERE id = ? AND valid_until > now()',
+    [segmentId]
+  )
+  if (rowCount === 0) throw new Error('Segment not found')
+  return { ok: true }
+}
+
+// ── 7. Add a projection override ─────────────────────────────────────
+
+export async function createProjectionOverride(
+  params: {
+    conversationId: string
+    snapshotId: string
+    targetType: string
+    targetId: string
+    projectionTarget?: string
+    overrideType?: string
+    reasonCode?: string
+    notesMd?: string
+    source?: string
+    createdBy?: string
+  },
+): Promise<ProjectionOverrideEntry> {
+  const { rows: [override] } = await q(
+    `INSERT INTO nebula.projection_overrides
+     (conversation_id, snapshot_id, target_type, target_id,
+      projection_target, override_type, reason_code, notes_md,
+      source, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     RETURNING id, conversation_id, snapshot_id, target_type, target_id,
+               projection_target, override_type, reason_code, notes_md,
+               source, created_by,
+               ${CREATED_AT_CAST}`,
+    [
+      params.conversationId,
+      params.snapshotId,
+      params.targetType || 'BLOCK',
+      params.targetId,
+      params.projectionTarget || 'BP',
+      params.overrideType || 'EXCLUDE',
+      params.reasonCode || 'USER_OVERRIDE',
+      params.notesMd || null,
+      params.source || 'USER',
+      params.createdBy || 'USER',
+    ]
+  )
+  return override
+}
+
+// ── 8. Remove a projection override (bitemporal expire) ──────────────
+
+export async function removeProjectionOverride(overrideId: string): Promise<{ ok: boolean }> {
+  const { rowCount } = await q(
+    'UPDATE nebula.projection_overrides SET valid_until = now() WHERE id = ? AND valid_until > now()',
+    [overrideId]
+  )
+  if (rowCount === 0) throw new Error('Override not found')
+  return { ok: true }
+}
+
+// ── 9. Get BP projection for a snapshot ──────────────────────────────
+
+export async function getProjection(
+  snapshotId: string,
+  projectionTarget: string = 'BP',
+): Promise<{
+  blocks: BlockEntry[]
+  segments: SegmentEntry[]
+  overrides: ProjectionOverrideEntry[]
+}> {
+  const { rows: blocks } = await q(
+    `SELECT id, conversation_id, snapshot_id, block_index, parent_turn_id,
+            parent_block_id, block_type, content_md, content_hash,
+            role,
+            dom_path, dom_fingerprint, first_line_no, last_line_no,
+            ${CREATED_AT_CAST}
+     FROM nebula.conversation_blocks
+     WHERE snapshot_id = ?
+     ORDER BY block_index`,
+    [snapshotId]
+  )
+
+  const { rows: segments } = await q(
+    `SELECT * FROM nebula.segments
+     WHERE snapshot_id = ?
+     ORDER BY start_block_index`,
+    [snapshotId]
+  )
+
+  const { rows: overrides } = await q(
+    `SELECT id, conversation_id, snapshot_id, target_type, target_id,
+            projection_target, override_type, reason_code, notes_md,
+            source, created_by,
+            ${CREATED_AT_CAST}
+     FROM nebula.projection_overrides
+     WHERE snapshot_id = ?
+       AND projection_target = ?
+     ORDER BY created_at`,
+    [snapshotId, projectionTarget]
+  )
+
+  return { blocks, segments, overrides }
+}
+
+// ── 10. Get harvest references for a snapshot ────────────────────────
+
+export async function listReferences(
+  snapshotId: string,
+  filters?: {
+    state?: string
+    edgeType?: string
+    minConfidence?: number
+  },
+): Promise<{ references: HarvestReferenceEntry[] }> {
+  const clauses: string[] = ['snapshot_id = ?']
+  const vals: any[] = [snapshotId]
+  if (filters?.state) { clauses.push('state = ?'); vals.push(filters.state) }
+  if (filters?.edgeType) { clauses.push('edge_type = ?'); vals.push(filters.edgeType) }
+  if (filters?.minConfidence !== undefined) { clauses.push('confidence >= ?'); vals.push(filters.minConfidence) }
+
+  const where = clauses.join(' AND ')
+
+  const { rows } = await q(
+    `SELECT id, conversation_id, snapshot_id, source_block_id,
+            source_segment_id, target_block_id, target_segment_id,
+            edge_type, confidence, state, source, reason,
+            evidence_json, provenance_json, created_by,
+            ${CREATED_AT_CAST}
+     FROM nebula.harvest_references
+     WHERE ${where}
+     ORDER BY confidence DESC`,
+    vals
+  )
+  return { references: rows }
+}
