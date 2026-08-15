@@ -84,6 +84,10 @@ ALL_SERVICES=(
     "semantics-mcp.service"      # port 3161 — semantics MCP (→ semantics-srv)
     "apidocs-srv.service"        # port 3180 — API docs index (Swagger UI + ReDoc over all *-srv specs)
 
+    # Consolidated runtime (re-homed fleet — P0-2 remediation)
+    "nexus-control-edge.service" # port 8082 — single AdonisJS HTTP edge (all REST servers re-homed)
+    "nexus-broker.service"       # port 4080 — Moleculer worker tier (harness/pty/execution/solir)
+
     # API servers (non-UI services)
     "wind-srv.service"         # port 3300 — Wind IDE workflow API
     "mildred-dam-api.service"   # port 3140 — Mildred Digital Asset Management
@@ -154,6 +158,8 @@ SERVICE_PORTS=(
     ["tools-aggregator.service"]="3210"
     ["slash-command-mcp.service"]="3220"
     ["service-broker-mcp.service"]="3112"
+    ["nexus-control-edge.service"]="8082"
+    ["nexus-broker.service"]="4080"
     ["wind-srv.service"]="3300"
     ["mildred-dam-api.service"]="3140"
     ["voyager-srv.service"]="3114"

@@ -1,0 +1,24 @@
+[Unit]
+# nexus-control-edge — the single AdonisJS HTTP edge of the consolidated runtime
+# (D-2026-08-14-002; data-edge deleted per R-A-2026-08-15-001). Hosts all REST
+# surfaces re-homed from the Express *-srv fleet on :8082. Remediates P0-2 (E3):
+# previously ran as an ad-hoc foreground process that died on machine restart.
+Description=Nexus Control Edge (AdonisJS, port 8082)
+After=network.target postgresql.service redis.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/adonisjs/nexus-control-edge
+Environment=NODE_ENV=production
+Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/node --import=ts-node-maintained/register/esm --enable-source-maps --disable-warning=ExperimentalWarning bin/server.js
+Restart=always
+RestartSec=5
+StandardOutput=append:/tmp/nexus-control-edge.log
+StandardError=append:/tmp/nexus-control-edge.log
+
+[Install]
+WantedBy=default.target
