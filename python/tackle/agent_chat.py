@@ -67,7 +67,7 @@ AGENT_CHAT_TOKEN = os.environ.get("AGENT_CHAT_TOKEN", "")
 AGENT_CHAT_MAX_PER_ROLE = int(os.environ.get("AGENT_CHAT_MAX_PER_ROLE", "1"))
 AGENT_CHAT_MAX_GLOBAL = int(os.environ.get("AGENT_CHAT_MAX_GLOBAL", "4"))
 
-VALID_ROLES = ["planner", "builder", "reviewer", "critic", "analyst", "architect", "inspector", "engineer", "engineer-ii", "devops", "rover"]
+VALID_ROLES = ["planner", "builder", "reviewer", "critic", "analyst", "architect", "inspector", "engineer", "engineer-ii", "devops", "topologist", "rover"]
 
 # ── AI config resolution (delegates to tackle.db / tackle-mcp) ──
 
@@ -442,6 +442,7 @@ _AGENT_DESCRIPTIONS = {
     "engineer": "Reports on the Nebula backlog by querying requirements, systems, and subsystems. Identifies priority work and stale items.",
     "engineer-ii": "Reports on the Nebula backlog by querying requirements, systems, and subsystems. Identifies priority work and stale items.",
     "devops": "Infrastructure operations and systems administration — system scripts, container setup/maintenance, migrations, and sysadmin tasks. Expansion of engineer with sysadmin concerns.",
+    "topologist": "Interactive representative of the terrain subsystem — verifies local docs match actual service configuration; validates specs/plans/work requests against live capabilities; offers running alternatives for unavailable services.",
     "rover": "Processes chat transcripts through the harvesting pipeline. Extracts specifications, code blocks, and agenda items to ROVER/ audit folder.",
 }
 

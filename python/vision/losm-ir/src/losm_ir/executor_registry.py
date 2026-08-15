@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 # because they do not own DAG nodes.
 DEFAULT_KNOWN_EXECUTORS: FrozenSet[str] = frozenset({
     "planner", "builder", "reviewer", "analyst",
-    "critic", "inspector", "architect", "engineer", "engineer-ii", "devops", "leased-builder",
+    "critic", "inspector", "architect", "engineer", "engineer-ii", "devops", "topologist", "leased-builder",
 })
 
 

@@ -14,7 +14,8 @@
         "engineer-ii",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "c8ee53af63a26ab4b810700caa8f8cb323062c0c9f70d92cd48ef11c47a5dc6d",
       "slug": "agent-config-template",
@@ -50,7 +51,8 @@
         "engineer-ii",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "bd6589270775bfdd183ddd3fd4531ca9c60401a470c96d28445c04d97467c305",
       "slug": "bootstrap-self-update",
@@ -84,7 +86,8 @@
         "builder",
         "devops",
         "engineer",
-        "engineer-ii"
+        "engineer-ii",
+        "topologist"
       ],
       "sha256": "69d21ce769629edd510e335e55046800f8cb96916ab69fbc03dfb83119cef819",
       "slug": "builder-workflow",
@@ -119,7 +122,8 @@
         "epistemologist",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "362605eacbf94c686442feee321b2ae14cc26c5ead0293735e39cf0e70512963",
       "slug": "conduit-mcp-tools",
@@ -154,7 +158,8 @@
         "epistemologist",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "55a87f408dd0c685263dd9b401518f8b479301878b061e745121079575170887",
       "slug": "day-night-boundary",
@@ -187,7 +192,8 @@
         "engineer-ii",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "ae4e051724d64304f8a3cca63507e601c362215b8dbdb34fbc2010ea2a580f16",
       "slug": "duality-execution-harness",
@@ -223,7 +229,8 @@
         "engineer-ii",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "0f3f3bec960847447f0766a9d27bead5070d45a2e7ae3ef910af09b7bf9f3559",
       "slug": "duality-interactive-polling",
@@ -252,7 +259,8 @@
       "roles": [
         "devops",
         "engineer",
-        "engineer-ii"
+        "engineer-ii",
+        "topologist"
       ],
       "sha256": "2bfc96bb6050d16be898033f511d4c4381853a98d48937534816dfbdfbd69fd9",
       "slug": "engineer-backlog-check",
@@ -291,7 +299,8 @@
         "epistemologist",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "aaf19bac0def929f44ac6b3f94813eafeba8e4131e9feaea1e9e6ec6e42a6c85",
       "slug": "inbox-query-procedure",
@@ -324,7 +333,8 @@
         "analyst",
         "devops",
         "engineer",
-        "engineer-ii"
+        "engineer-ii",
+        "topologist"
       ],
       "sha256": "054debbbdc10f1fad0ae596d6134aecabf408d33abcd7b6893c7b45645da7365",
       "slug": "investigation-resources",
@@ -406,7 +416,8 @@
         "epistemologist",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "5b19814bbea213c687a1787c1a220cc1bc7e25e172aefb175a8aff6c7fb64c8d",
       "slug": "knowledge-stratification",
@@ -434,7 +445,8 @@
         "devops",
         "engineer",
         "engineer-ii",
-        "planner"
+        "planner",
+        "topologist"
       ],
       "sha256": "e89b1c0d883553921da533d08c0d3ab32b8ae550f9a79174b1b8f1a124fb8cde",
       "slug": "mcp-server-config",
@@ -471,7 +483,8 @@
         "epistemologist",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "81d16958f5c8bf456d1313cc3d3c8f6db1a7943e1cca389db146a004ee23aff4",
       "slug": "nebula-mcp-tools",
@@ -503,7 +516,8 @@
         "engineer-ii",
         "epistemologist",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "6b66a16af3b9b62e6569f9e1a5a55ca97c79b49e7029bdf65f7102817fbeb89b",
       "slug": "nexus-boot-procedure",
@@ -671,7 +685,8 @@
         "engineer",
         "engineer-ii",
         "inspector",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "39a91babefdba93622be4d96f6076fe4554326093d71fc789b81663df9b2393e",
       "slug": "orphan-detection",
@@ -704,7 +719,8 @@
         "epistemologist",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "94efb56303b8b929f021e915e6c95db8c0251eefca1ee9e44dea0004d660b10a",
       "slug": "per-role-outbox-table",
@@ -738,7 +754,8 @@
         "engineer-ii",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "1ffb2d1f09b684fb80ab4f87a4c9dbdd42681612c649fc863d0d49ac2f2a718c",
       "slug": "pipeline-health-check",
@@ -774,7 +791,8 @@
         "builder",
         "devops",
         "engineer",
-        "engineer-ii"
+        "engineer-ii",
+        "topologist"
       ],
       "sha256": "5fdb48bba237129e0cf4dc1246c008f94d72e811d1316f907c03b8573aaa137a",
       "slug": "plan-deletion-cleanup",
@@ -807,7 +825,8 @@
         "devops",
         "engineer",
         "engineer-ii",
-        "planner"
+        "planner",
+        "topologist"
       ],
       "sha256": "1afb347189b8030cb301987dba650221f35a746dbce5ccb51ba3b16a01ba7359",
       "slug": "planner-create-plan",
@@ -865,7 +884,8 @@
         "devops",
         "engineer",
         "engineer-ii",
-        "planner"
+        "planner",
+        "topologist"
       ],
       "sha256": "2c0f380d1d29597deeff3e414ec297046f20630620834311b3504cf7b3475572",
       "slug": "plan-template-format",
@@ -900,7 +920,8 @@
         "engineer-ii",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "0d2e7b80c3cadec9495f390942aca333ef32b5d39e6369eb2e72429c5b0cfe69",
       "slug": "post-turn-self-update",
@@ -936,7 +957,8 @@
         "engineer-ii",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "98b18816aea847683b1b0a9a30f13b7e3256c62e6099da448bbb6a3d67659b0e",
       "slug": "prompt-capture",
@@ -965,7 +987,8 @@
         "devops",
         "engineer",
         "engineer-ii",
-        "planner"
+        "planner",
+        "topologist"
       ],
       "sha256": "bf2b613fffa3e8784135cdcc0e3f778d8542d59a9d48a42bb7fa37c24afa38b9",
       "slug": "proposal-capture",
@@ -999,7 +1022,8 @@
         "epistemologist",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "f0b1af8f27a778561df95a74b8c9cd4b49bbb725f271242553c82a6cd57d6389",
       "slug": "role-governance",
@@ -1030,7 +1054,8 @@
         "builder",
         "devops",
         "engineer",
-        "engineer-ii"
+        "engineer-ii",
+        "topologist"
       ],
       "sha256": "acf9a5e781bc90cdf29b7a0ab1ea31399b544beefa49e8b313ba950227544566",
       "slug": "role-lease-orientation",
@@ -1061,7 +1086,8 @@
       "roles": [
         "devops",
         "engineer",
-        "engineer-ii"
+        "engineer-ii",
+        "topologist"
       ],
       "sha256": "83fbfcfff2ca604246dfbb0567202ea6665dd2edd0f65b60f4784d9ab35b685b",
       "slug": "rover-harvest-notification",
@@ -1088,7 +1114,8 @@
         "builder",
         "devops",
         "engineer",
-        "engineer-ii"
+        "engineer-ii",
+        "topologist"
       ],
       "sha256": "e0d503237723c3d53ce309e2d9846acc08d0b2169590696189f28e1e0d3f0ac5",
       "slug": "seed-integrity",
@@ -1126,7 +1153,8 @@
         "epistemologist",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "fa89f80946beb39192f43e005743e76852f42809caf25fb117246969d4284a5d",
       "slug": "tackle-mcp-tools",
@@ -1161,7 +1189,8 @@
         "epistemologist",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "83d7ac6d0b3d5c444447fdd755b5b936dd91a3ef7a6aeaa2717fa229d54d5302",
       "slug": "tag-routing-reference",
@@ -1189,7 +1218,8 @@
       "roles": [
         "devops",
         "engineer",
-        "engineer-ii"
+        "engineer-ii",
+        "topologist"
       ],
       "sha256": "b064c658a02543d2cd36b279d25d3c8c29e7d261ce25c87bee2b2977dd5730af",
       "slug": "terrain-registration",
@@ -1229,7 +1259,8 @@
         "epistemologist",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "20a67b199b3fd6cc919dbe6faf011055362f05be880dc79575b6eb45c2775b56",
       "slug": "thread-tracking",
@@ -1261,7 +1292,8 @@
         "engineer",
         "engineer-ii",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "9c54413efe5087564504cb46d5c478aafb241296b96b3af591e3b1e2c61d235b",
       "slug": "turn-based-planning-check",
@@ -1287,7 +1319,8 @@
         "builder",
         "devops",
         "engineer",
-        "engineer-ii"
+        "engineer-ii",
+        "topologist"
       ],
       "sha256": "5b231e5c928551faf77b714693254f2936eaac29ad0b4f1dbba37366e9571ec0",
       "slug": "verification-commands",
@@ -1325,7 +1358,8 @@
         "engineer-ii",
         "inspector",
         "planner",
-        "reviewer"
+        "reviewer",
+        "topologist"
       ],
       "sha256": "fc4ec999702a31373f195990af0eefb317c98f2424eb990fdc31a834db8365d8",
       "slug": "work-request-participation",
@@ -1345,6 +1379,6 @@
       ]
     }
   ],
-  "role_count": 298,
+  "role_count": 332,
   "schema": "tackle"
 }

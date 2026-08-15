@@ -620,6 +620,7 @@ const DEFAULT_ROLES: { name: string; description: string }[] = [
   { name: "engineer", description: "Primary implementation agent — writes code, runs commands, integrates systems" },
   { name: "engineer-ii", description: "Primary implementation agent — writes code, runs commands, integrates systems" },
   { name: "devops", description: "Infrastructure operations and systems administration — system scripts, container setup/maintenance, migrations, sysadmin tasks; expansion of engineer with sysadmin concerns" },
+  { name: "topologist", description: "Interactive representative of the terrain subsystem — verifies local service docs match actual configuration; validates specs/plans/work requests against live capabilities; offers running alternatives for unavailable services" },
   { name: "architect", description: "System design authority — owns architecture decisions, cross-system contracts, and design lineage" },
   { name: "planner", description: "Work decomposition authority — creates and manages implementation plans, promotes proposals" },
   { name: "builder", description: "Implementation executor — picks up pending plans and implements them against acceptance criteria" },
@@ -1668,7 +1669,7 @@ const DEFAULT_MODELS: Array<{ id: string; name: string; harnessId: string; provi
   { id: "mod-codex-gpt4o", name: "GPT-4o (via Codex)", harnessId: "harn-codex-cli", providerId: "prov-codex", modelId: "gpt-4o" },
 ];
 
-const ALL_ROLES = ["planner", "builder", "reviewer", "critic", "analyst", "architect", "inspector", "engineer", "engineer-ii", "devops", "rover"] as const;
+const ALL_ROLES = ["planner", "builder", "reviewer", "critic", "analyst", "architect", "inspector", "engineer", "engineer-ii", "devops", "topologist", "rover"] as const;
 
 export async function seedDefaultAIConfig(force?: boolean): Promise<{
   seeded: boolean; providers: number; harnesses: number; models: number; roles: number; message: string;

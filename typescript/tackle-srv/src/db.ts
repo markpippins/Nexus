@@ -1036,6 +1036,7 @@ const DEFAULT_ROLES: { name: string; description: string }[] = [
   { name: "engineer", description: "Primary implementation agent — writes code, runs commands, integrates systems" },
   { name: "engineer-ii", description: "Primary implementation agent — writes code, runs commands, integrates systems" },
   { name: "devops", description: "Infrastructure operations and systems administration — system scripts, container setup/maintenance, migrations, sysadmin tasks; expansion of engineer with sysadmin concerns" },
+  { name: "topologist", description: "Interactive representative of the terrain subsystem — verifies local service docs match actual configuration; validates specs/plans/work requests against live capabilities; offers running alternatives for unavailable services" },
   { name: "architect", description: "System design authority — owns architecture decisions, cross-system contracts, and design lineage" },
   { name: "planner", description: "Work decomposition authority — creates and manages implementation plans, promotes proposals" },
   { name: "builder", description: "Implementation executor — picks up pending plans and implements them against acceptance criteria" },
