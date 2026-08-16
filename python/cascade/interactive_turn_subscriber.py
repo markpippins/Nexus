@@ -379,6 +379,39 @@ def _extract_opencode_text(stdout: str) -> str:
     return stdout
 
 
+def _extract_opencode_trace(stdout: str) -> str:
+    """Extract the agent's reasoning trace from an opencode `--format json`
+    event stream.
+
+    opencode emits `reasoning` events alongside `text` events (shape mirrors
+    text: `{"type":"reasoning","part":{"text":...}}`; some versions put the
+    text at the top level). The response extractor drops them — this collects
+    them so the "agent thinking" trace can be surfaced in the UI the way
+    Freebuff shows it. Returns joined reasoning text, or "" when the stream
+    carries none (tool-only turns, non-JSON output, older agents).
+    """
+    if not stdout:
+        return ""
+    parts: list[str] = []
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if ev.get("type") != "reasoning":
+            continue
+        part = ev.get("part") or {}
+        t = part.get("text") if isinstance(part, dict) else None
+        if not isinstance(t, str):
+            t = ev.get("text")  # older envelope shape: top-level text
+        if isinstance(t, str) and t.strip():
+            parts.append(t)
+    return "\n\n".join(parts)
+
+
 def _compose_failure_detail(
     stderr: str, stdout: str, exit_code: int, job_id: str | None = None,
 ) -> str:
@@ -452,6 +485,9 @@ def _invoke_agent_harness(
                 # reduce it to the assistant's text so the conversation
                 # response is readable rather than raw event envelopes.
                 "stdout": _extract_opencode_text(data.get("stdout", "")),
+                # Keep the reasoning trace ("agent thinking") for the UI —
+                # extracted from the RAW stream, not the reduced stdout.
+                "trace": _extract_opencode_trace(data.get("stdout", "")),
                 "stderr": data.get("stderr", ""),
                 "job_id": data.get("job_id"),
             }
@@ -576,6 +612,7 @@ def _build_thread_context(pg_conn: Any, thread_id: str, role: str) -> str:
                FROM assembly.comments c
                LEFT JOIN assembly.users u ON u.id = c.posted_by_id
                WHERE c.post_id = %s::uuid
+                 AND (c.role IS NULL OR c.role <> 'thinking')
                ORDER BY c.created DESC
                LIMIT 30""",
             (thread_id,),
@@ -623,6 +660,7 @@ def _build_incremental_context(
                FROM assembly.comments c
                LEFT JOIN assembly.users u ON u.id = c.posted_by_id
                WHERE c.post_id = %s::uuid
+                 AND (c.role IS NULL OR c.role <> 'thinking')
                ORDER BY c.created DESC
                LIMIT 1""",
             (thread_id,),
@@ -840,6 +878,20 @@ async def handle_comment_created(
             )
             _bump_turn_count(pg_conn, watch_id)
             continue
+
+        # 4.5. Post the agent's reasoning trace ("thinking") BEFORE the
+        #     response so the thread reads thinking → answer, matching the
+        #     Freebuff UX. Only the harness (opencode JSON event stream)
+        #     path carries reasoning today; leased freebuff sessions own
+        #     their context and emit none here.
+        trace = result.get("trace") or ""
+        if isinstance(trace, str) and trace.strip():
+            _post_assembly_comment(
+                thread_id, trace[:4000], "thinking",
+                model=lease.get("model") if lease else None,
+            )
+            _log("Posted reasoning trace for %s (%d chars)",
+                 watch_role, min(len(trace), 4000))
 
         # 5. Post agent response
         response_preview = stdout[:3000]
