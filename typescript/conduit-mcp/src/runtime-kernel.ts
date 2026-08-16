@@ -75,6 +75,9 @@ export interface WorkRequestState {
   lastEvent: RuntimeEventType;
   lastTimestamp: string;
   createdAt: string;
+  /** D6: held-for-normalization marker — compiled-and-PASSing but deliberately
+   * unreleased. Distinct from "never compiled" and "failed". */
+  normalization_pending?: boolean;
 }
 
 // ── Compiler output (what the compiler is allowed to emit) ─────────
@@ -109,6 +112,8 @@ export interface CompilerOutput {
     resolvedOps: string[];
     registryVersion: string;
   };
+  /** D6: mark a WR held-for-normalization (advisory; no conduit plan change). */
+  normalization_pending?: boolean;
 }
 
 // ── Transition table ───────────────────────────────────────────────
@@ -290,6 +295,10 @@ export function reduce(
       event.type === "WR_FAILED"
         ? (event.payload?.error as string) || undefined
         : undefined,
+    normalization_pending:
+      event.type === "WR_SUBMITTED"
+        ? (event.payload?.normalization_pending as boolean) || state.normalization_pending
+        : state.normalization_pending,
   };
 }
 
@@ -455,6 +464,7 @@ export function compilerOutputToEvent(output: CompilerOutput): RuntimeEvent {
       intent: output.intent,
       constraints: output.constraints,
       opTrace: output.opTrace,
+      normalization_pending: output.normalization_pending,
     },
   };
 }

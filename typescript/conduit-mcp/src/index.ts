@@ -949,7 +949,7 @@ app.post("/wr/submit", async (req, res) => {
     await createWorkRequest({
       id: event.wrId,
       dco_json: JSON.stringify(output),
-      context: { intent: output.intent, constraints: output.constraints, opTrace: output.opTrace },
+      context: { intent: output.intent, constraints: output.constraints, opTrace: output.opTrace, normalization_pending: output.normalization_pending },
       status: "draft",
       title: output.intent?.objective || "",
     });

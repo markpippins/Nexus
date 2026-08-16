@@ -1876,7 +1876,7 @@ export function registerToolHandlers(
       await createWorkRequest({
         id: event.wrId,
         dco_json: JSON.stringify(args),
-        context: { intent: args.intent, constraints: args.constraints, opTrace: args.opTrace },
+        context: { intent: args.intent, constraints: args.constraints, opTrace: args.opTrace, normalization_pending: args.normalization_pending },
         status: "draft",
         title: args.intent?.objective || "",
       });
