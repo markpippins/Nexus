@@ -12,6 +12,18 @@ Design principle:
     CIR-1 violations are auto-removed (they are structurally broken).
     CIR-2/3/4/5 violations are reported but NOT wrapped by default.
     Use --apply to quarantine violations in-place.
+
+Quarantine-envelope contract (reconciled with tools/arl/invariants.py):
+    every quarantine writes the SAME sanctioned envelope shape:
+
+        {"status": "quarantined_CIRn" | "blocked_by_CIRn",
+         "reason":  "<machine-readable reason>",
+         "original": <the wrapped value — may be a nested object>}
+
+    The `status` prefix is the reserved marker. ARL's I1 exempts this exact
+    envelope (object-valued `original` is the wrapped value, not recursion)
+    and flags only envelope-inside-envelope nesting. Keep this shape — do not
+    rename `original`, add keys, or write bare `original` wrappers.
 """
 
 import difflib

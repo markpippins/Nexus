@@ -1,5 +1,10 @@
 # nexus/tools/api-docs — *-srv REST-API + OpenAPI tooling
 
+> **Runtime reflection (Wave 4 label):** this tooling observes live source —
+> route registrations in the code — and projects them into committed
+> `openapi.yaml` + `API.md` artifacts. It is a projection pipeline, not an
+> authority: the routes in source are canonical, the docs are derived.
+
 Keeps the REST-API documentation of every `*-srv` project under
 `nexus/typescript/` and `nexus/python/` current with the actual route
 registrations in source.

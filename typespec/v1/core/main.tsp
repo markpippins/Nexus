@@ -1,7 +1,8 @@
-import "@typespec/http";
-using Http;
-
-@service(#{ title: "Nexus Core" })
+// Shared model library — NOT a service.
+// Core defines canonical DTOs that service namespaces import; it exposes no
+// routes and is never emitted as a standalone service contract. (Demoted from
+// @service in Wave 4 folder hygiene — service role belongs to the *-broker/
+// *-registry namespaces, not to core.)
 namespace com.aibizarchitect.nexus.v1.core;
 
 

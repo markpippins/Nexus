@@ -14,6 +14,7 @@ Usage:
     python tools/cir1/lint.py --cir5               # CIR-1 + CIR-5
     python tools/cir1/lint.py --strict             # CIR-1 blocking (exit 1 on violation)
     python tools/cir1/lint.py --strict --cir2|--cir3|--cir4|--cir5
+    python tools/cir1/lint.py --all --strict --json   # machine-readable report
 
 Exit codes:
     0 — all checks pass
@@ -413,6 +414,7 @@ def main():
 
     active_cirs = {"cir1": True}
     strict = False
+    output_json = "--json" in sys.argv
 
     for arg in sys.argv[1:]:
         if arg == "--strict":
@@ -456,6 +458,25 @@ def main():
         check_cir5(cir5_index, all_violations)
 
     # Report
+    if output_json:
+        items = []
+        for entry in all_violations:
+            path, rule, code, detail = entry
+            items.append({
+                "path": str(path),
+                "rule": rule,
+                "code": code,
+                "detail": detail,
+            })
+        active_flags = sorted(k.upper() for k, v in active_cirs.items() if v)
+        print(json.dumps({
+            "status": "PASS" if not all_violations else "FAIL",
+            "cirs": active_flags,
+            "total_violations": len(all_violations),
+            "violations": items,
+        }, indent=2))
+        sys.exit(1 if all_violations and strict else 0)
+
     by_rule = {}
     for v in all_violations:
         rule = v[1]

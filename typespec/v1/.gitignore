@@ -1,3 +1,9 @@
 # Generated TypeSpec output (OpenAPI3 schema, client SDKs).
 # Contracts are the source of truth; emitted artifacts are re-generated on demand.
 tsp-output/
+
+# Generated staging (Wave 4 folder hygiene): contents are disposable emitter
+# output. Keep the tracked .gitkeep so the dir exists; never commit generated
+# files here.
+staging/*
+!staging/.gitkeep

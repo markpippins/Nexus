@@ -1,7 +1,7 @@
 .PHONY: cir1 cir1-scan cir1-lint cir1-fix cir1-validate \
         cir2-lint cir2-validate cir3-lint cir3-validate cir4-lint cir4-validate \
         cir5-lint cir5-validate \
-        cir-arl authority-check cir-verify install-hooks \
+        cir-arl authority-check cir-verify contract-audit install-hooks \
         test-db-setup test-db-reset test \
         mesh-test seed-guard-bootstrap seed-guard-test \
         apidocs-extract apidocs-gen apidocs-validate apidocs-regen \
@@ -20,8 +20,8 @@ cir1-scan:
 	@rg -n "intent_source|\.pipeline/|PIPELINE_|ExecutionState|ExecutorRegistry" . -g '!.git' -g '!*.lock' || true
 
 cir1-lint:
-	@echo "[CIR-1] AST linting JSON..."
-	@python3 tools/cir1/lint.py
+	@echo "[CIR-1] AST linting JSON (full CIR-1..5 -- default path includes CIR-5)..."
+	@python3 tools/cir1/lint.py --all
 
 cir1-fix:
 	@echo "[CIR-1] WARNING: patch.py is opt-in. Use 'make cir1-apply' or run patch.py --apply directly."
@@ -32,8 +32,8 @@ cir1-apply:
 	@python3 tools/cir1/patch.py --apply
 
 cir1-validate:
-	@echo "[CIR-1] validation gate..."
-	@python3 tools/cir1/lint.py --strict
+	@echo "[CIR-1] validation gate (full CIR-1..5)..."
+	@python3 tools/cir1/lint.py --all --strict
 
 # ─── CIR-2: Cross-layer isolation ────────────────────────────────────────────
 
@@ -89,6 +89,15 @@ cir-arl:
 
 cir-arl-json:
 	@python3 tools/arl_linter.py --json
+
+# ─── Contract audit: one entrypoint for the whole contract stack ────────────
+
+contract-audit:
+	@echo "Running full contract audit (arl + cir1-5 + authority + projection-ir + graph + apidocs)..."
+	@python3 tools/contract_audit.py
+
+contract-audit-json:
+	@python3 tools/contract_audit.py --json
 
 # ─── CIR v2: Full verification suite ─────────────────────────────────────────
 
