@@ -938,12 +938,14 @@ export function createRoutes(pool: Pool): Router {
       if (!reqt) return res.status(404).json({ error: 'Requirement not found' });
       // ── Backlog→ToDo auto-compile trigger (Plan 1062) ────────────
       // When a requirement transitions to ToDo, fire-and-forget the
-      // two-stage compiler to generate WorkRequest IR + conduit plan.
+      // two-stage compiler to generate WorkRequest IR. D2 (CP-2): compile
+      // is now pre-row — it no longer implies a conduit plan row. Plan
+      // creation is a separate release-time step (CP-9 release gate).
       if (status !== undefined && reqt.status === 'ToDo') {
         fetch(`http://localhost:3101/api/requirements/${id}/compile`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ createPlan: true }),
+          body: JSON.stringify({ createPlan: false }),
         }).catch(() => { /* compilation is best-effort */ });
       }
       res.json({
