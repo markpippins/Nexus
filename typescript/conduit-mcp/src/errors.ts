@@ -9,7 +9,9 @@ export type ErrorCode =
   | "TITLE_MISMATCH"
   | "PARSE_ERROR"
   | "NEBULA_UNAVAILABLE"
-  | "NOT_FOUND";
+  | "NOT_FOUND"
+  | "CIR_SDM_REJECTED"
+  | "CIR_SDM_UNAVAILABLE";
 
 export interface AppError {
   error: {

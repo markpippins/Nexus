@@ -25,6 +25,12 @@ import {
   computeCompileVerdictId,
   runCompileGate,
 } from "./db";
+import {
+  gateWrTransition,
+  recordGovernedDecisions,
+  surfaceBlocker,
+  CirsdmEnforceResult,
+} from "./cirsdm";
 import * as api from "./conduit-client";
 import {
   validateCompilerOutput,
@@ -2091,6 +2097,34 @@ export function registerToolHandlers(
       const events = dbEventsToRuntimeEvents(rawEvents);
       const state = foldEvents(args.wrId, events);
       validateTransitionWithOps(state.status, args.type as any, getOpTrace(events));
+      // T23 Step 8: CIR-SDM pre-row enforcement gate (fail-closed).
+      const cirsdm = await gateWrTransition(
+        events,
+        args.type,
+        rawEvents[0].work_request_id,
+      ).catch(async (e: any) => {
+        await surfaceBlocker(
+          `enforcement unavailable for ${args.wrId} (${args.type}): ${e.message}`,
+        );
+        throw createError(
+          "CIR_SDM_UNAVAILABLE",
+          `CIR-SDM enforcement unavailable (fail-closed): ${e.message}`,
+        );
+      });
+      if (cirsdm.reject) {
+        await recordGovernedDecisions(cirsdm.decisions);
+        throw createError(
+          "CIR_SDM_REJECTED",
+          `transition ${args.type} violates an enforced CIR-SDM rule`,
+          cirsdm.decisions.map((d) => d.violation_id),
+        );
+      }
+      const warnings = cirsdm.violations.filter((v) => !v.blocking);
+      if (warnings.length > 0) {
+        console.log(
+          `[CIR-SDM] warnings on ${args.wrId}: ${warnings.map((v) => `${v.rule_id}@${v.event_id}`).join(", ")}`,
+        );
+      }
       await appendEvent(args.wrId, args.type, args.payload || {});
       const rawNewEvents = await getEvents(args.wrId);
       const newState = foldEvents(args.wrId, dbEventsToRuntimeEvents(rawNewEvents));
@@ -2111,6 +2145,31 @@ export function registerToolHandlers(
       const decision = decide(state);
       if (!decision)
         return { ok: true, ticked: false, reason: `state ${state.status} has no automatic transition` };
+      // T23 Step 8: CIR-SDM pre-row enforcement gate (fail-closed). A gate
+      // outage HOLDS the tick (do not auto-advance) — mirror the D4 hold.
+      let cirsdm: CirsdmEnforceResult | null = null;
+      try {
+        cirsdm = await gateWrTransition(
+          events,
+          decision.type,
+          wr.work_request_uuid,
+        );
+      } catch (e: any) {
+        await surfaceBlocker(
+          `enforcement unavailable for ${wr.work_request_uuid} (${decision.type}): ${e.message}`,
+        );
+      }
+      if (cirsdm === null) {
+        return { ok: true, ticked: false, reason: "CIR_SDM_UNAVAILABLE: held (fail-closed)" };
+      }
+      if (cirsdm.reject) {
+        await recordGovernedDecisions(cirsdm.decisions);
+        return {
+          ok: true, ticked: false,
+          reason: `CIR_SDM_REJECTED: ${cirsdm.decisions.map((d) => d.rule_id).join(", ")}`,
+          decisions: cirsdm.decisions,
+        };
+      }
       await appendEvent(decision.wrId, decision.type, decision.payload as Record<string, unknown>);
       const rawNewEvents = await getEvents(wr.work_request_uuid);
       const newState = foldEvents(wr.work_request_uuid, dbEventsToRuntimeEvents(rawNewEvents));

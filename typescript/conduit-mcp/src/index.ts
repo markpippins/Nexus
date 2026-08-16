@@ -22,10 +22,15 @@ import {
   listWorkRequestStates,
   checkProjectionDrift,
   resolveWrUuid,
-  insertCirViolation,
 } from "./db";
 import * as api from "./conduit-client";
-import { enforceTransition, getEnforcementState } from "./cirsdm";
+import {
+  gateWrTransition,
+  recordGovernedDecisions,
+  surfaceBlocker,
+  getEnforcementState,
+  CirsdmEnforceResult,
+} from "./cirsdm";
 import {
   validateCompilerOutput,
   compilerOutputToEvent,
@@ -1081,56 +1086,30 @@ app.post("/wr/:id/transition", async (req, res) => {
     const state = foldEvents(id, events);
     // Validate the transition (D4: UNRESOLVED ops gate VALIDATED→QUEUED)
     validateTransitionWithOps(state.status, type, getOpTrace(events));
-    // T23 Step 8: CIR-SDM per-family enforcement gate — reject-or-record,
-    // never silently mutate canonical state (ruling 4a57c089). The pure
-    // evaluator lives in Python; conduit-mcp shells out to the enforcement CLI.
-    const wrUuid = rawEvents[0].work_request_id;
-    const cirsdm = await enforceTransition(
-      rawEvents.map((e) => ({
-        event_id: e.event_id,
-        work_request_id: e.work_request_id,
-        event_type: e.event_type,
-        causation_id: e.causation_id,
-        actor_type: e.actor_type,
-        occurred_at: e.occurred_at,
-      })),
-      {
-        event_id: crypto.randomUUID(),
-        type,
-        wrId: wrUuid,
-        timestamp: new Date().toISOString(),
-      },
-    );
+    // T23 Step 8: CIR-SDM pre-row enforcement gate (fail-closed).
+    let cirsdm: CirsdmEnforceResult;
+    try {
+      cirsdm = await gateWrTransition(events, type, rawEvents[0].work_request_id);
+    } catch (e: any) {
+      await surfaceBlocker(`enforcement unavailable for ${id} (${type}): ${e.message}`);
+      res.status(500).json({ ok: false, error: `CIR_SDM_UNAVAILABLE: ${e.message}` });
+      return;
+    }
     if (cirsdm.reject) {
-      // Record the governed decision (idempotent) then reject the transition.
-      for (const d of cirsdm.decisions) {
-        await insertCirViolation({
-          violation_id: d.violation_id,
-          cer_id: d.cer_id,
-          event_id: d.event_id,
-          rule_id: d.rule_id,
-          rule_version: d.rule_version,
-          severity: d.severity,
-          description: d.description,
-          detected_at: d.detected_at,
-          blocking: d.blocking,
-        }).catch((e: any) =>
-          console.error(`[CIR-SDM] failed to record decision: ${e.message}`),
-        );
-      }
-      console.log(
-        `[CIR-SDM] transition ${type} on ${id} REJECTED (${cirsdm.state}): ` +
-          cirsdm.decisions
-            .map((d) => `${d.rule_id}@${d.event_id}`)
-            .join(", "),
-      );
+      await recordGovernedDecisions(cirsdm.decisions);
       res.status(422).json({
         ok: false,
-        error: "CIR_SDM_BLOCKED: transition violates an enforced CIR-SDM rule",
+        error: "CIR_SDM_REJECTED: transition violates an enforced CIR-SDM rule",
         state: cirsdm.state,
         decisions: cirsdm.decisions,
       });
       return;
+    }
+    const warnings = cirsdm.violations.filter((v) => !v.blocking);
+    if (warnings.length > 0) {
+      console.log(
+        `[CIR-SDM] warnings on ${id}: ${warnings.map((v) => `${v.rule_id}@${v.event_id}`).join(", ")}`,
+      );
     }
     // Persist the event
     await appendEvent(id, type, payload || {});
@@ -1182,6 +1161,25 @@ app.post("/wr/tick", async (_req, res) => {
     const decision = decide(state);
     if (!decision) {
       res.json({ ok: true, ticked: false, reason: `state ${state.status} has no automatic transition` });
+      return;
+    }
+    // T23 Step 8: CIR-SDM pre-row enforcement gate (fail-closed) — HOLD the
+    // tick on a gate outage (mirror the D4 UNRESOLVED hold).
+    let cirsdm: CirsdmEnforceResult;
+    try {
+      cirsdm = await gateWrTransition(events, decision.type, wr.work_request_uuid);
+    } catch (e: any) {
+      await surfaceBlocker(`enforcement unavailable for ${wr.work_request_uuid} (${decision.type}): ${e.message}`);
+      res.json({ ok: true, ticked: false, reason: "CIR_SDM_UNAVAILABLE: held (fail-closed)" });
+      return;
+    }
+    if (cirsdm.reject) {
+      await recordGovernedDecisions(cirsdm.decisions);
+      res.json({
+        ok: true, ticked: false,
+        reason: `CIR_SDM_REJECTED: ${cirsdm.decisions.map((d) => d.rule_id).join(", ")}`,
+        decisions: cirsdm.decisions,
+      });
       return;
     }
     await appendEvent(decision.wrId, decision.type, decision.payload as Record<string, unknown>);
@@ -1310,11 +1308,12 @@ async function start() {
   await watcher.initialize();
 
   // T23 Step 8: log the CIR-SDM enforcement posture at startup (shadow vs
-  // enforced) so the gate's state is auditable (ruling 4a57c089).
+  // enforced) so the gate's state is auditable (ruling 4a57c089). A failed
+  // startup check is a blocker — never proceed silently.
   try {
     console.log(`[CIR-SDM] ${await getEnforcementState()}`);
   } catch (e: any) {
-    console.warn(`[CIR-SDM] enforcement state unavailable: ${e.message}`);
+    await surfaceBlocker(`enforcement state unavailable at startup: ${e.message}`);
   }
 
   app.listen(PORT, () => {
