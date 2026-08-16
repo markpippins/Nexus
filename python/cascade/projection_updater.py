@@ -45,11 +45,6 @@ import sys
 import time
 from typing import Any
 
-# ── Path setup ──────────────────────────────────────────────────────
-_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _PARENT not in sys.path:
-    sys.path.insert(0, _PARENT)
-
 # ── Configuration ───────────────────────────────────────────────────
 DATABASE_URL = os.getenv(
     "DATABASE_URL",

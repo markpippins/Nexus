@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nexus-nats-envelope"
+version = "1.0.0"
+description = "Canonical, transport-neutral event envelope shared across nexus services (cascade, voyager, voyager-adapter)."
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.setuptools]
+packages = ["nats_envelope"]
+
+[tool.setuptools.package-dir]
+nats_envelope = "."

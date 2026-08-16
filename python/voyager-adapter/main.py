@@ -20,15 +20,9 @@ import json
 import logging
 import os
 import signal
-import sys
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
-
-# Ensure the shared nats_envelope package is importable
-_SHARED = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if _SHARED not in sys.path:
-    sys.path.insert(0, _SHARED)
 
 from nats_envelope.envelope import CanonicalEnvelope
 
