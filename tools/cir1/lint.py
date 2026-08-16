@@ -73,7 +73,11 @@ def classify(path: str):
 
     Priority: BUILD > SCHEMA > DATA > GOVERNANCE > RUNTIME > DATA(fallback)
     """
-    p = path.lstrip("./")
+    # strip only a leading ./ prefix — never the leading dot of hidden dirs
+    # (lstrip("./") stripped ALL leading '.'/'/' chars, corrupting .agents/ → agents/)
+    p = path.strip()
+    if p.startswith("./"):
+        p = p[2:]
 
     # 1. BUILD — fastest exclusion
     if any(x in p for x in [
@@ -202,7 +206,11 @@ def load_native_domains():
 
 def get_native_tokens_for_path(path: str):
     """Return set of tokens native to this path's domain."""
-    p = path.lstrip("./")
+    # strip only a leading ./ prefix — never the leading dot of hidden dirs
+    # (lstrip("./") stripped ALL leading '.'/'/' chars, corrupting .agents/ → agents/)
+    p = path.strip()
+    if p.startswith("./"):
+        p = p[2:]
     for prefix, tokens in _NATIVE_DOMAINS.items():
         if p.startswith(prefix) or ("/" + prefix) in p:
             return set(tokens)

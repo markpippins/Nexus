@@ -51,7 +51,11 @@ SEMANTIC_CLASSES = {
 # ─── CIR-SDM: Semantic Domain Model ─────────────────────────────────────────
 
 def classify(path: str):
-    p = path.lstrip("./")
+    # strip only a leading ./ prefix — never the leading dot of hidden dirs
+    # (lstrip("./") stripped ALL leading '.'/'/' chars, corrupting .agents/ → agents/)
+    p = path.strip()
+    if p.startswith("./"):
+        p = p[2:]
     if any(x in p for x in [
         "node_modules", "__pycache__", ".git",
         "package-lock.json", "package.json",
@@ -155,7 +159,11 @@ def load_native_domains():
 
 
 def get_native_tokens_for_path(path: str):
-    p = path.lstrip("./")
+    # strip only a leading ./ prefix — never the leading dot of hidden dirs
+    # (lstrip("./") stripped ALL leading '.'/'/' chars, corrupting .agents/ → agents/)
+    p = path.strip()
+    if p.startswith("./"):
+        p = p[2:]
     for prefix, tokens in _NATIVE_DOMAINS.items():
         if p.startswith(prefix) or ("/" + prefix) in p:
             return set(tokens)
