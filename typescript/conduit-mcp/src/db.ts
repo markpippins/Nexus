@@ -4664,6 +4664,45 @@ export async function getEvents(wrId: string): Promise<WorkRequestEventRow[]> {
   );
 }
 
+// ── CIR-SDM violation persistence (T23 Step 8) ─────────────────────
+// Governed-decision record: a blocking violation detected at WR-transition
+// admission is recorded in peb.cir_violations (INSERT-only, idempotent on the
+// deterministic violation_id) — never a mutation of canonical WR rows.
+
+export interface CirViolationRow {
+  violation_id: string;
+  cer_id: string | null;
+  event_id: string;
+  rule_id: string;
+  rule_version: string;
+  severity: string;
+  description: string;
+  detected_at: number | null;
+  blocking: boolean;
+}
+
+export async function insertCirViolation(v: CirViolationRow): Promise<number> {
+  return qRun(
+    `INSERT INTO ${PEB_SCHEMA}.cir_violations
+       (violation_id, cer_id, event_id, rule_id, rule_version, severity, description, detected_at, blocking)
+     VALUES (@violation_id, @cer_id, @event_id, @rule_id, @rule_version, @severity, @description, @detected_at, @blocking)
+     ON CONFLICT (violation_id) DO NOTHING`,
+    {
+      violation_id: v.violation_id,
+      cer_id: v.cer_id,
+      event_id: v.event_id,
+      rule_id: v.rule_id,
+      rule_version: v.rule_version,
+      severity: v.severity,
+      description: v.description,
+      detected_at: v.detected_at
+        ? new Date(v.detected_at * 1000).toISOString()
+        : null,
+      blocking: v.blocking,
+    },
+  );
+}
+
 export async function getAllEvents(filters?: {
   eventType?: string;
   limit?: number;
