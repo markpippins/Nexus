@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1PMjF1LDXBr9sR76k3W7rAPcPg9Swkj8sMyVemL12DF87sw2MvdeR78pb6h2TQi
+\restrict jovuU5Y4QT6J9zJJPlHEaRlS0iEgtC8RVckSF7HUfl5iKpg8zE12aR0zfVoq5fh
 
 -- Dumped from database version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
@@ -33,6 +33,50 @@ COMMENT ON SCHEMA resolution IS 'SOL sandbox: greenfield redevelopment of semant
 
 
 --
+-- Name: admit_and_record(uuid, text, text, text, jsonb, uuid); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.admit_and_record(p_transaction_id uuid, p_idempotency_key text, p_entity_id text, p_tool_name text, p_input jsonb, p_state_transition_id uuid) RETURNS text
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_concept_name      text;
+    v_check_entity_id   uuid;
+    v_check             RECORD;
+    v_admission_result  text;
+BEGIN
+    SELECT c.name INTO v_concept_name
+    FROM resolution.concept_state_transition cst
+    JOIN resolution.concept c ON c.id = cst.concept_id
+    WHERE cst.id = p_state_transition_id;
+    IF v_concept_name IS NULL THEN
+        RAISE EXCEPTION 'no concept_state_transition for id %', p_state_transition_id;
+    END IF;
+
+    v_check_entity_id := resolution.resolve_entity_uuid(p_entity_id, v_concept_name);
+
+    SELECT * INTO v_check FROM resolution.check_transition_guard(p_state_transition_id, v_check_entity_id);
+    v_admission_result := CASE WHEN v_check.admitted THEN 'ADMITTED' ELSE 'REJECTED' END;
+
+    INSERT INTO peb.transactions (id, idempotency_key, entity_id, admission_result, tool_name, input, created_at)
+    VALUES (p_transaction_id, p_idempotency_key, p_entity_id, v_admission_result, p_tool_name, p_input, now());
+
+    IF NOT v_check.admitted THEN
+        INSERT INTO peb.violations (id, transaction_id, violation_type, severity, entity_id, context, resolution, created_at)
+        VALUES (gen_random_uuid(), p_transaction_id,
+                CASE v_check.rule_type WHEN 'invariant' THEN 'INVARIANT_VIOLATED' ELSE 'GUARD_FAILED' END,
+                'hard', p_entity_id,
+                jsonb_build_object('rule_name', v_check.rule_name, 'rule_type', v_check.rule_type,
+                                    'reason', v_check.reason, 'compiled_sql', v_check.compiled_sql),
+                'rejected', now());
+    END IF;
+
+    RETURN v_admission_result;
+END;
+$$;
+
+
+--
 -- Name: check_expression_acyclic(); Type: FUNCTION; Schema: resolution; Owner: -
 --
 
@@ -60,6 +104,157 @@ BEGIN
     END IF;
 
     RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: check_relationship_rule(uuid, uuid); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.check_relationship_rule(p_concept_relationship_id uuid, p_from_entity_id uuid) RETURNS TABLE(admitted boolean, rule_name text, rule_type text, compiled_sql text, reason text)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    r RECORD;
+    v_result boolean;
+    v_sql    text;
+BEGIN
+    FOR r IN
+        SELECT rl.name, rl.rule_type, rl.expression_id, rl.notes
+        FROM resolution.rule rl
+        WHERE rl.rule_type = 'conditional' AND rl.concept_relationship_id = p_concept_relationship_id
+    LOOP
+        IF r.expression_id IS NULL THEN
+            RETURN QUERY SELECT false, r.name, r.rule_type, NULL::text,
+                'conditional has no expression_id wired up -- failing closed';
+            RETURN;
+        END IF;
+
+        SELECT eg.result, eg.compiled_sql INTO v_result, v_sql
+        FROM resolution.evaluate_relationship_guard(r.expression_id, p_from_entity_id) eg;
+
+        IF NOT v_result THEN
+            RETURN QUERY SELECT false, r.name, r.rule_type, v_sql, coalesce(r.notes, 'conditional failed');
+            RETURN;
+        END IF;
+    END LOOP;
+
+    RETURN QUERY SELECT true, NULL::text, NULL::text, NULL::text,
+        'all conditionals passed (or none registered) -- checked FROM-side only, see notes';
+END;
+$$;
+
+
+--
+-- Name: FUNCTION check_relationship_rule(p_concept_relationship_id uuid, p_from_entity_id uuid); Type: COMMENT; Schema: resolution; Owner: -
+--
+
+COMMENT ON FUNCTION resolution.check_relationship_rule(p_concept_relationship_id uuid, p_from_entity_id uuid) IS 'Only evaluates against the relationship''s FROM-side entity. A conditional needing to reference BOTH sides (e.g. comparing the from and to entities'' attributes to each other) is not expressible yet -- evaluate_relationship_guard has exactly one root. Real two-sided conditionals will need that extended, not worked around here.';
+
+
+--
+-- Name: check_representation_rule(uuid, uuid); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.check_representation_rule(p_representation_id uuid, p_entity_id uuid) RETURNS TABLE(admitted boolean, rule_name text, rule_type text, compiled_sql text, reason text)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    r RECORD;
+    v_result boolean;
+    v_sql    text;
+BEGIN
+    FOR r IN
+        SELECT rl.name, rl.rule_type, rl.expression_id, rl.notes
+        FROM resolution.rule rl
+        WHERE rl.representation_id = p_representation_id
+    LOOP
+        IF r.expression_id IS NULL THEN
+            RETURN QUERY SELECT false, r.name, r.rule_type, NULL::text,
+                'representation rule has no expression_id wired up -- failing closed';
+            RETURN;
+        END IF;
+
+        SELECT eg.result, eg.compiled_sql INTO v_result, v_sql
+        FROM resolution.evaluate_relationship_guard(r.expression_id, p_entity_id) eg;
+
+        IF NOT v_result THEN
+            RETURN QUERY SELECT false, r.name, r.rule_type, v_sql, coalesce(r.notes, 'representation rule failed');
+            RETURN;
+        END IF;
+    END LOOP;
+
+    RETURN QUERY SELECT true, NULL::text, NULL::text, NULL::text, 'all representation rules passed (or none registered)';
+END;
+$$;
+
+
+--
+-- Name: check_transition_guard(uuid, uuid); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.check_transition_guard(p_state_transition_id uuid, p_entity_id uuid) RETURNS TABLE(admitted boolean, rule_name text, rule_type text, compiled_sql text, reason text)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_concept_id uuid;
+    r RECORD;
+    v_result boolean;
+    v_sql    text;
+BEGIN
+    SELECT concept_id INTO v_concept_id
+    FROM resolution.concept_state_transition WHERE id = p_state_transition_id;
+    IF v_concept_id IS NULL THEN
+        RAISE EXCEPTION 'no concept_state_transition for id %', p_state_transition_id;
+    END IF;
+
+    -- 1. guard-type rules attached specifically to this transition
+    FOR r IN
+        SELECT rl.name, rl.rule_type, rl.expression_id, rl.notes
+        FROM resolution.rule rl
+        WHERE rl.rule_type = 'guard' AND rl.state_transition_id = p_state_transition_id
+    LOOP
+        IF r.expression_id IS NULL THEN
+            RETURN QUERY SELECT false, r.name, r.rule_type, NULL::text,
+                'guard has no expression_id wired up -- cannot evaluate, failing closed';
+            RETURN;
+        END IF;
+        SELECT eg.result, eg.compiled_sql INTO v_result, v_sql
+        FROM resolution.evaluate_relationship_guard(r.expression_id, p_entity_id) eg;
+        IF NOT v_result THEN
+            RETURN QUERY SELECT false, r.name, r.rule_type, v_sql, coalesce(r.notes, 'guard failed');
+            RETURN;
+        END IF;
+    END LOOP;
+
+    -- 2. invariant-type rules on the CONCEPT this transition belongs to --
+    -- these must hold no matter which transition is being attempted.
+    FOR r IN
+        SELECT rl.name, rl.rule_type, rl.expression_id, rl.notes
+        FROM resolution.rule rl
+        WHERE rl.rule_type = 'invariant' AND rl.concept_id = v_concept_id
+    LOOP
+        IF r.expression_id IS NULL THEN
+            RETURN QUERY SELECT false, r.name, r.rule_type, NULL::text,
+                'invariant has no expression_id wired up -- cannot evaluate, failing closed';
+            RETURN;
+        END IF;
+        SELECT eg.result, eg.compiled_sql INTO v_result, v_sql
+        FROM resolution.evaluate_relationship_guard(r.expression_id, p_entity_id) eg;
+        IF NOT v_result THEN
+            RETURN QUERY SELECT false, r.name, r.rule_type, v_sql, coalesce(r.notes, 'invariant violated');
+            RETURN;
+        END IF;
+    END LOOP;
+
+    -- still narrow, worth stating plainly: concept_relationship-attached
+    -- and representation-attached rules are NOT checked here. Those apply
+    -- when a relationship instance or a physical write happens, not when
+    -- a single entity transitions state -- a different trigger point this
+    -- function doesn't cover yet.
+    RETURN QUERY SELECT true, NULL::text, NULL::text, NULL::text,
+        'all guards and invariants passed (or none registered)';
 END;
 $$;
 
@@ -260,10 +455,13 @@ DECLARE
     v_quantifier text;
     v_operator   text;
     v_literal    text;
+    v_attr_id    uuid;
+    v_binding    resolution.concept_attribute_binding%ROWTYPE;
     v_left_id    uuid;
     v_right_id   uuid;
 BEGIN
-    SELECT kind, quantifier, operator, literal_value INTO v_kind, v_quantifier, v_operator, v_literal
+    SELECT kind, quantifier, operator, literal_value, attribute_id
+    INTO v_kind, v_quantifier, v_operator, v_literal, v_attr_id
     FROM resolution.expression WHERE id = expr_id;
 
     IF v_kind = 'relationship_ref' THEN
@@ -275,13 +473,19 @@ BEGIN
             RAISE EXCEPTION 'unknown quantifier %', v_quantifier;
         END IF;
 
+    ELSIF v_kind = 'attribute_ref' THEN
+        SELECT * INTO v_binding FROM resolution.concept_attribute_binding WHERE attribute_id = v_attr_id;
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'no concept_attribute_binding for attribute %', v_attr_id;
+        END IF;
+        RETURN format('(SELECT %I FROM %I.%I WHERE id = %s)',
+            v_binding.column_name, v_binding.schema_name, v_binding.table_name, literal_root_ref);
+
     ELSIF v_kind = 'operator' THEN
         SELECT child_expression_id INTO v_left_id  FROM resolution.expression_operand
             WHERE parent_expression_id = expr_id AND position = 1;
         SELECT child_expression_id INTO v_right_id FROM resolution.expression_operand
             WHERE parent_expression_id = expr_id AND position = 2;
-        -- each side of the root operator gets the SAME literal root ref --
-        -- we're still above any table alias at this level.
         RETURN format('(%s %s %s)',
             resolution.compile_root(v_left_id, literal_root_ref),
             v_operator,
@@ -292,7 +496,7 @@ BEGIN
         RETURN quote_literal(v_literal);
 
     ELSE
-        RAISE EXCEPTION 'compile_root: unsupported root-level kind % (attribute_ref has no meaning with no table in scope)', v_kind;
+        RAISE EXCEPTION 'compile_root: unsupported root-level kind %', v_kind;
     END IF;
 END;
 $$;
@@ -344,6 +548,44 @@ BEGIN
     RETURN QUERY SELECT v_sql, v_result;
 END;
 $$;
+
+
+--
+-- Name: resolve_entity_uuid(text, text); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.resolve_entity_uuid(p_external_id text, p_concept_name text) RETURNS uuid
+    LANGUAGE plpgsql
+    AS $_$
+DECLARE
+    v_asset_id uuid;
+    v_schema   text;
+    v_table    text;
+    v_result   uuid;
+BEGIN
+    SELECT id INTO v_asset_id FROM resolution.canonical_asset
+    WHERE canonical_asset_id = p_external_id AND expired_at IS NULL;
+    IF v_asset_id IS NULL THEN
+        RAISE EXCEPTION 'no active canonical_asset for external id %', p_external_id;
+    END IF;
+
+    SELECT r.schema_name, r.table_name INTO v_schema, v_table
+    FROM resolution.representation r
+    JOIN resolution.concept c ON c.id = r.concept_id AND c.name = p_concept_name
+    JOIN resolution.representation_identity ri ON ri.representation_id = r.id;
+    IF v_table IS NULL THEN
+        RAISE EXCEPTION 'no identity-bearing representation found for concept %', p_concept_name;
+    END IF;
+
+    EXECUTE format('SELECT id FROM %I.%I WHERE asset_id = $1', v_schema, v_table)
+        INTO v_result USING v_asset_id;
+    IF v_result IS NULL THEN
+        RAISE EXCEPTION 'canonical_asset % has no matching row in %.%', p_external_id, v_schema, v_table;
+    END IF;
+
+    RETURN v_result;
+END;
+$_$;
 
 
 SET default_tablespace = '';
@@ -585,6 +827,8 @@ CREATE TABLE resolution.expression (
     concept_relationship_id uuid,
     quantifier text,
     CONSTRAINT expression_kind_check CHECK ((kind = ANY (ARRAY['literal'::text, 'attribute_ref'::text, 'operator'::text, 'function_call'::text, 'relationship_ref'::text]))),
+    CONSTRAINT expression_kind_fields_check CHECK ((((kind = 'literal'::text) AND (literal_value IS NOT NULL) AND (attribute_id IS NULL) AND (function_name IS NULL) AND (concept_relationship_id IS NULL) AND (operator IS NULL)) OR ((kind = 'attribute_ref'::text) AND (attribute_id IS NOT NULL) AND (literal_value IS NULL) AND (function_name IS NULL) AND (concept_relationship_id IS NULL) AND (operator IS NULL)) OR ((kind = 'operator'::text) AND (operator IS NOT NULL) AND (attribute_id IS NULL) AND (literal_value IS NULL) AND (function_name IS NULL) AND (concept_relationship_id IS NULL)) OR ((kind = 'function_call'::text) AND (function_name IS NOT NULL) AND (attribute_id IS NULL) AND (literal_value IS NULL) AND (concept_relationship_id IS NULL) AND (operator IS NULL)) OR ((kind = 'relationship_ref'::text) AND (concept_relationship_id IS NOT NULL) AND (quantifier IS NOT NULL) AND (attribute_id IS NULL) AND (literal_value IS NULL) AND (function_name IS NULL) AND (operator IS NULL)))),
+    CONSTRAINT expression_operator_whitelist_check CHECK (((operator IS NULL) OR (operator = ANY (ARRAY['='::text, '<>'::text, '>'::text, '<'::text, '>='::text, '<='::text, 'AND'::text, 'OR'::text])))),
     CONSTRAINT expression_quantifier_check CHECK (((quantifier IS NULL) OR (quantifier = ANY (ARRAY['EXISTS'::text, 'ALL'::text, 'COUNT'::text]))))
 );
 
@@ -1970,5 +2214,5 @@ ALTER TABLE ONLY resolution.work_request
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1PMjF1LDXBr9sR76k3W7rAPcPg9Swkj8sMyVemL12DF87sw2MvdeR78pb6h2TQi
+\unrestrict jovuU5Y4QT6J9zJJPlHEaRlS0iEgtC8RVckSF7HUfl5iKpg8zE12aR0zfVoq5fh
 
