@@ -2,6 +2,11 @@
  * Centralized REST API Client for Platform Operations Registry API
  * Targets /api/v1/registry/* endpoints with support for switching between
  * Live REST Backend mode and Client Mock mode.
+ *
+ * Live mode normalizes the real Nexus service-registry backend shapes into
+ * barbie's front-end contracts (see DRIFT_REPORT.md). The backend serves:
+ *   - systems / registration / aggregate / logs / metrics under /api/v1/registry/*
+ *   - services / frameworks / deployments / servers / libraries / lookups flat under /api/v1/*
  */
 
 import {
@@ -36,14 +41,6 @@ import {
 const STORAGE_MODE_KEY = 'platform_api_mode';
 const STORAGE_URL_KEY = 'platform_api_base_url';
 
-// Default to 'mock' mode since there's no real backend configured.
-// In mock mode all data is served by the barbie Express server's embedded routes.
-// Remove this file's .env BACKEND_URL and the systemd service's
-// Environment=BACKEND_URL to keep the proxy disabled.
-// Clear any stale 'live' mode from a previous browser session (no backend available).
-if (localStorage.getItem(STORAGE_MODE_KEY) === 'live') {
-  localStorage.removeItem(STORAGE_MODE_KEY);
-}
 let currentMode: 'live' | 'mock' = (localStorage.getItem(STORAGE_MODE_KEY) as 'live' | 'mock') || 'mock';
 let currentBaseUrl: string = localStorage.getItem(STORAGE_URL_KEY) || '/api/v1/registry';
 
@@ -62,6 +59,170 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   }
 
   return res.json();
+}
+
+// ── Live-mode normalization layer ───────────────────────────────────
+
+// currentBaseUrl defaults to /api/v1/registry. Flat entity endpoints live
+// directly under /api/v1 (no /registry segment), so derive that base.
+function flatBaseUrl(): string {
+  return currentBaseUrl.replace(/\/registry\/?$/, '');
+}
+
+// Map backend uppercase enums → barbie lowercase HealthStatus.
+function toHealthStatus(raw: unknown): HealthStatus {
+  const s = String(raw ?? '').toUpperCase();
+  if (['ACTIVE', 'HEALTHY', 'RUNNING', 'UP'].includes(s)) return 'healthy';
+  if (['DEGRADED', 'DEPRECATED', 'WARNING'].includes(s)) return 'degraded';
+  if (['UNHEALTHY', 'CRITICAL', 'FAILED', 'DOWN'].includes(s)) return 'critical';
+  return 'offline'; // ARCHIVED, INACTIVE, STOPPED, DECOMMISSIONED, unknown
+}
+
+// Convert backend paged envelope { data, meta: { page, per_page, total, last_page } }
+// → barbie { data, meta: { page, size, totalItems, totalPages } }. Handles raw arrays.
+function normalizePaged<T>(raw: any, mapper: (item: any) => T): PaginatedResponse<T> {
+  const items = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.data) ? raw.data : []);
+  const meta = (raw && raw.meta) || {};
+  const total = Number(meta.total ?? items.length);
+  const perPage = Number(meta.per_page ?? items.length);
+  const lastPage = Number(meta.last_page ?? (perPage > 0 ? Math.ceil(total / perPage) : 0));
+  return {
+    data: items.map(mapper),
+    meta: {
+      // Backend is 0-indexed; barbie UI is 1-indexed.
+    page: Number(meta.page ?? 0) + 1,
+      size: perPage,
+      totalItems: total,
+      totalPages: lastPage,
+    },
+  };
+}
+
+function mapService(s: any): Service {
+  return {
+    id: String(s.id ?? ''),
+    name: s.name ?? '',
+    type: s.type?.name ?? 'Unknown',
+    version: s.version ?? 'n/a',
+    status: toHealthStatus(s.status),
+    systemId: s.systemId != null ? String(s.systemId) : '',
+    systemName: s.systemName ?? '',
+    endpoint: s.apiBasePath ?? s.endpoint ?? '',
+    environment: (s.environment as Environment) ?? 'production',
+    hostedServicesCount: Number(s.hostedServicesCount ?? 0),
+    hostedServices: Array.isArray(s.hostedServices) ? s.hostedServices : [],
+    frameworkId: s.frameworkId != null ? String(s.frameworkId) : undefined,
+    frameworkName: s.framework?.name ?? '',
+    serverId: s.serverId != null ? String(s.serverId) : undefined,
+    serverHostname: s.serverHostname ?? undefined,
+    lastHeartbeat: s.updatedAt ?? s.lastHeartbeat ?? '',
+    uptimePercent: Number(s.uptimePercent ?? 0),
+    rps: Number(s.rps ?? 0),
+    latencyMs: Number(s.latencyMs ?? 0),
+    errorRate: Number(s.errorRate ?? 0),
+    description: s.description ?? '',
+  };
+}
+
+function mapServer(s: any): Server {
+  return {
+    id: String(s.id ?? ''),
+    name: s.name ?? s.hostname ?? '',
+    hostname: s.hostname ?? '',
+    ipAddress: s.ipAddress ?? '',
+    serverType: s.type?.name ?? s.serverType ?? '',
+    operatingSystem: s.operatingSystem?.name ?? s.operatingSystem ?? '',
+    environment: (s.environmentType?.name?.toLowerCase() as Environment) ?? (s.environment as Environment) ?? 'production',
+    status: toHealthStatus(s.status),
+    cpuUsage: Number(s.cpuUsage ?? 0),
+    memoryUsage: Number(s.memoryUsage ?? 0),
+    diskUsage: Number(s.diskUsage ?? 0),
+    datacenterRegion: s.region ?? s.datacenterRegion ?? '',
+    activePodsCount: Number(s.activePodsCount ?? 0),
+    lastPing: s.updatedAt ?? s.lastPing ?? '',
+  };
+}
+
+function mapDeployment(d: any): Deployment {
+  return {
+    id: String(d.id ?? ''),
+    serviceId: d.serviceId != null ? String(d.serviceId) : '',
+    serviceName: d.service?.name ?? d.serviceName ?? '',
+    environment: (d.environment as Environment) ?? 'production',
+    version: d.version ?? '',
+    status: toHealthStatus(d.healthStatus ?? d.status),
+    deployedAt: d.deployedAt ?? d.updatedAt ?? '',
+    deployedBy: d.deployedBy ?? '',
+    replicasReady: Number(d.replicasReady ?? 0),
+    replicasTarget: Number(d.replicasTarget ?? 0),
+    commitHash: d.commitHash ?? '',
+    clusterName: d.clusterName ?? '',
+  };
+}
+
+function mapFramework(f: any): Framework {
+  return {
+    id: String(f.id ?? ''),
+    name: f.name ?? '',
+    category: f.category?.name ?? f.category ?? '',
+    language: f.language?.name ?? f.language ?? '',
+    version: f.currentVersion ?? f.latestVersion ?? f.version ?? '',
+    servicesCount: f.servicesCount != null ? Number(f.servicesCount) : undefined,
+  };
+}
+
+function mapLibrary(l: any): Library {
+  return {
+    id: String(l.id ?? ''),
+    name: l.name ?? '',
+    category: l.category?.name ?? l.category ?? '',
+    language: l.language?.name ?? l.language ?? '',
+    version: l.currentVersion ?? l.version ?? '',
+    vulnerabilitiesCount: Number(l.vulnerabilitiesCount ?? 0),
+  };
+}
+
+function mapSystem(s: any): System {
+  return {
+    id: String(s.id ?? ''),
+    name: s.name ?? '',
+    description: s.description ?? '',
+    owner: s.owner ?? '',
+    environment: (s.environment as Environment) ?? 'production',
+    status: s.activeFlag === false ? 'offline' : 'healthy',
+    servicesCount: Number(s.servicesCount ?? 0),
+    services: Array.isArray(s.services) ? s.services : [],
+    tier: (s.tier as System['tier']) ?? 'Tier 3 - Standard',
+  };
+}
+
+function mapLookup(type: LookupType, l: any): LookupEntry {
+  return {
+    id: String(l.id ?? ''),
+    lookupType: type,
+    key: l.key ?? l.name ?? '',
+    name: l.name ?? '',
+    description: l.description,
+  };
+}
+
+function mapAggregate(raw: any): PlatformAggregateState {
+  return {
+    totalSystems: Number(raw.totalSystems ?? 0),
+    totalServices: Number(raw.totalServices ?? 0),
+    totalServers: Number(raw.totalServers ?? 0),
+    totalDeployments: Number(raw.totalDeployments ?? 0),
+    healthyCount: Number(raw.healthyCount ?? 0),
+    degradedCount: Number(raw.degradedCount ?? 0),
+    criticalCount: Number(raw.criticalCount ?? 0),
+    offlineCount: Number(raw.offlineCount ?? 0),
+    overallHealthPercent: Number(raw.overallHealthPercent ?? 0),
+    avgLatencyMs: Number(raw.avgLatencyMs ?? 0),
+    totalRps: Number(raw.totalRps ?? 0),
+    activeIncidentsCount: Number(raw.activeIncidentsCount ?? 0),
+    nodes: Array.isArray(raw.nodes) ? raw.nodes : [],
+    edges: Array.isArray(raw.edges) ? raw.edges : [],
+  };
 }
 
 export const registryApi = {
@@ -101,8 +262,8 @@ export const registryApi = {
     }
 
     const query = new URLSearchParams();
-    if (params?.page) query.append('page', String(params.page));
-    if (params?.size) query.append('size', String(params.size));
+    if (params?.page) query.append('page', String(params.page - 1)); // backend 0-indexed
+    if (params?.size) query.append('per_page', String(params.size));
     if (params?.search) query.append('search', params.search);
     if (params?.status) query.append('status', params.status);
     if (params?.system) query.append('system', params.system);
@@ -110,7 +271,8 @@ export const registryApi = {
     if (params?.sortBy) query.append('sortBy', params.sortBy);
     if (params?.sortOrder) query.append('sortOrder', params.sortOrder);
 
-    return fetchJson<PaginatedResponse<Service>>(`${currentBaseUrl}/services?${query.toString()}`);
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/services?${query.toString()}`);
+    return normalizePaged(raw, mapService);
   },
 
   getServicesWithHosted: async (size = 1000): Promise<PaginatedResponse<Service>> => {
@@ -120,7 +282,8 @@ export const registryApi = {
         meta: { page: 1, size: mockServices.length, totalItems: mockServices.length, totalPages: 1 }
       };
     }
-    return fetchJson<PaginatedResponse<Service>>(`${currentBaseUrl}/services/with-hosted?size=${size}`);
+    const raw = await fetchJson<any>(`${currentBaseUrl}/services/with-hosted?size=${size}`);
+    return normalizePaged(raw, mapService);
   },
 
   getServiceById: async (id: string): Promise<Service> => {
@@ -128,7 +291,8 @@ export const registryApi = {
       const found = mockServices.find(s => s.id === id) || mockServices[0];
       return found;
     }
-    return fetchJson<Service>(`${currentBaseUrl}/services/${id}`);
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/services/${id}`);
+    return mapService(raw);
   },
 
   getServiceDetails: async (serviceName: string): Promise<{ service: Service; deployments: Deployment[]; server?: Server }> => {
@@ -138,14 +302,21 @@ export const registryApi = {
       const srv = mockServers.find(s => s.id === svc.serverId);
       return { service: svc, deployments: deps, server: srv };
     }
-    return fetchJson(`${currentBaseUrl}/services/${encodeURIComponent(serviceName)}/details`);
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/services/${encodeURIComponent(serviceName)}/details`);
+    return {
+      service: raw.service ? mapService(raw.service) : mapService(raw),
+      deployments: Array.isArray(raw.deployments) ? raw.deployments.map(mapDeployment) : [],
+      server: raw.server ? mapServer(raw.server) : undefined,
+    };
   },
 
   getServicesByOperation: async (operation: string): Promise<{ data: Service[]; operation: string }> => {
     if (currentMode === 'mock') {
       return { data: mockServices, operation };
     }
-    return fetchJson(`${currentBaseUrl}/services/by-operation/${encodeURIComponent(operation)}`);
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/services/by-operation/${encodeURIComponent(operation)}`);
+    const items = Array.isArray(raw) ? raw : (Array.isArray(raw.data) ? raw.data : []);
+    return { data: items.map(mapService), operation };
   },
 
   createService: async (data: Partial<Service>): Promise<Service> => {
@@ -176,10 +347,11 @@ export const registryApi = {
       mockServices.push(newSvc);
       return newSvc;
     }
-    return fetchJson<Service>(`${currentBaseUrl}/services`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/services`, {
       method: 'POST',
       body: JSON.stringify(data)
     });
+    return mapService(raw);
   },
 
   updateService: async (id: string, data: Partial<Service>): Promise<Service> => {
@@ -191,10 +363,11 @@ export const registryApi = {
       }
       return mockServices[0];
     }
-    return fetchJson<Service>(`${currentBaseUrl}/services/${id}`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/services/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
     });
+    return mapService(raw);
   },
 
   deleteService: async (id: string): Promise<{ message: string; service: Service }> => {
@@ -203,9 +376,10 @@ export const registryApi = {
       const removed = idx !== -1 ? mockServices.splice(idx, 1)[0] : mockServices[0];
       return { message: 'Mock deleted', service: removed };
     }
-    return fetchJson(`${currentBaseUrl}/services/${id}`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/services/${id}`, {
       method: 'DELETE'
     });
+    return { message: raw?.message ?? 'Deleted', service: mapService(raw?.service ?? raw) };
   },
 
   // --- SERVERS ---
@@ -223,13 +397,14 @@ export const registryApi = {
       };
     }
     const query = new URLSearchParams();
-    if (params?.page) query.append('page', String(params.page));
-    if (params?.size) query.append('size', String(params.size));
+    if (params?.page) query.append('page', String(params.page - 1)); // backend 0-indexed
+    if (params?.size) query.append('per_page', String(params.size));
     if (params?.search) query.append('search', params.search);
     if (params?.status) query.append('status', params.status);
     if (params?.environment) query.append('environment', params.environment);
 
-    return fetchJson<PaginatedResponse<Server>>(`${currentBaseUrl}/servers?${query.toString()}`);
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/servers?${query.toString()}`);
+    return normalizePaged(raw, mapServer);
   },
 
   createServer: async (data: Partial<Server>): Promise<Server> => {
@@ -253,10 +428,11 @@ export const registryApi = {
       mockServers.push(srv);
       return srv;
     }
-    return fetchJson<Server>(`${currentBaseUrl}/servers`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/servers`, {
       method: 'POST',
       body: JSON.stringify(data)
     });
+    return mapServer(raw);
   },
 
   updateServer: async (id: string, data: Partial<Server>): Promise<Server> => {
@@ -265,10 +441,11 @@ export const registryApi = {
       if (idx !== -1) mockServers[idx] = { ...mockServers[idx], ...data };
       return mockServers[0];
     }
-    return fetchJson<Server>(`${currentBaseUrl}/servers/${id}`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/servers/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
     });
+    return mapServer(raw);
   },
 
   deleteServer: async (id: string): Promise<{ message: string; server: Server }> => {
@@ -277,9 +454,10 @@ export const registryApi = {
       const removed = idx !== -1 ? mockServers.splice(idx, 1)[0] : mockServers[0];
       return { message: 'Mock server deleted', server: removed };
     }
-    return fetchJson(`${currentBaseUrl}/servers/${id}`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/servers/${id}`, {
       method: 'DELETE'
     });
+    return { message: raw?.message ?? 'Deleted', server: mapServer(raw?.server ?? raw) };
   },
 
   // --- DEPLOYMENTS ---
@@ -297,13 +475,14 @@ export const registryApi = {
       };
     }
     const query = new URLSearchParams();
-    if (params?.page) query.append('page', String(params.page));
-    if (params?.size) query.append('size', String(params.size));
+    if (params?.page) query.append('page', String(params.page - 1)); // backend 0-indexed
+    if (params?.size) query.append('per_page', String(params.size));
     if (params?.search) query.append('search', params.search);
     if (params?.status) query.append('status', params.status);
     if (params?.environment) query.append('environment', params.environment);
 
-    return fetchJson<PaginatedResponse<Deployment>>(`${currentBaseUrl}/deployments?${query.toString()}`);
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/deployments?${query.toString()}`);
+    return normalizePaged(raw, mapDeployment);
   },
 
   createDeployment: async (data: Partial<Deployment>): Promise<Deployment> => {
@@ -325,10 +504,11 @@ export const registryApi = {
       mockDeployments.push(dep);
       return dep;
     }
-    return fetchJson<Deployment>(`${currentBaseUrl}/deployments`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/deployments`, {
       method: 'POST',
       body: JSON.stringify(data)
     });
+    return mapDeployment(raw);
   },
 
   updateDeployment: async (id: string, data: Partial<Deployment>): Promise<Deployment> => {
@@ -337,10 +517,11 @@ export const registryApi = {
       if (idx !== -1) mockDeployments[idx] = { ...mockDeployments[idx], ...data };
       return mockDeployments[0];
     }
-    return fetchJson<Deployment>(`${currentBaseUrl}/deployments/${id}`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/deployments/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
     });
+    return mapDeployment(raw);
   },
 
   deleteDeployment: async (id: string): Promise<{ message: string; deployment: Deployment }> => {
@@ -349,9 +530,10 @@ export const registryApi = {
       const removed = idx !== -1 ? mockDeployments.splice(idx, 1)[0] : mockDeployments[0];
       return { message: 'Mock deployment deleted', deployment: removed };
     }
-    return fetchJson(`${currentBaseUrl}/deployments/${id}`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/deployments/${id}`, {
       method: 'DELETE'
     });
+    return { message: raw?.message ?? 'Deleted', deployment: mapDeployment(raw?.deployment ?? raw) };
   },
 
   // --- FRAMEWORKS ---
@@ -363,11 +545,12 @@ export const registryApi = {
       };
     }
     const query = new URLSearchParams();
-    if (params?.page) query.append('page', String(params.page));
-    if (params?.size) query.append('size', String(params.size));
+    if (params?.page) query.append('page', String(params.page - 1)); // backend 0-indexed
+    if (params?.size) query.append('per_page', String(params.size));
     if (params?.search) query.append('search', params.search);
 
-    return fetchJson<PaginatedResponse<Framework>>(`${currentBaseUrl}/frameworks?${query.toString()}`);
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/frameworks?${query.toString()}`);
+    return normalizePaged(raw, mapFramework);
   },
 
   createFramework: async (data: Partial<Framework>): Promise<Framework> => {
@@ -383,18 +566,20 @@ export const registryApi = {
       mockFrameworks.push(fw);
       return fw;
     }
-    return fetchJson<Framework>(`${currentBaseUrl}/frameworks`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/frameworks`, {
       method: 'POST',
       body: JSON.stringify(data)
     });
+    return mapFramework(raw);
   },
 
   updateFramework: async (id: string, data: Partial<Framework>): Promise<Framework> => {
     if (currentMode === 'mock') return mockFrameworks[0];
-    return fetchJson<Framework>(`${currentBaseUrl}/frameworks/${id}`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/frameworks/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
     });
+    return mapFramework(raw);
   },
 
   deleteFramework: async (id: string): Promise<{ message: string; framework: Framework }> => {
@@ -403,9 +588,10 @@ export const registryApi = {
       const removed = idx !== -1 ? mockFrameworks.splice(idx, 1)[0] : mockFrameworks[0];
       return { message: 'Mock framework deleted', framework: removed };
     }
-    return fetchJson(`${currentBaseUrl}/frameworks/${id}`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/frameworks/${id}`, {
       method: 'DELETE'
     });
+    return { message: raw?.message ?? 'Deleted', framework: mapFramework(raw?.framework ?? raw) };
   },
 
   // --- LIBRARIES ---
@@ -417,11 +603,12 @@ export const registryApi = {
       };
     }
     const query = new URLSearchParams();
-    if (params?.page) query.append('page', String(params.page));
-    if (params?.size) query.append('size', String(params.size));
+    if (params?.page) query.append('page', String(params.page - 1)); // backend 0-indexed
+    if (params?.size) query.append('per_page', String(params.size));
     if (params?.search) query.append('search', params.search);
 
-    return fetchJson<PaginatedResponse<Library>>(`${currentBaseUrl}/libraries?${query.toString()}`);
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/libraries?${query.toString()}`);
+    return normalizePaged(raw, mapLibrary);
   },
 
   createLibrary: async (data: Partial<Library>): Promise<Library> => {
@@ -437,18 +624,20 @@ export const registryApi = {
       mockLibraries.push(lib);
       return lib;
     }
-    return fetchJson<Library>(`${currentBaseUrl}/libraries`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/libraries`, {
       method: 'POST',
       body: JSON.stringify(data)
     });
+    return mapLibrary(raw);
   },
 
   updateLibrary: async (id: string, data: Partial<Library>): Promise<Library> => {
     if (currentMode === 'mock') return mockLibraries[0];
-    return fetchJson<Library>(`${currentBaseUrl}/libraries/${id}`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/libraries/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
     });
+    return mapLibrary(raw);
   },
 
   deleteLibrary: async (id: string): Promise<{ message: string; library: Library }> => {
@@ -457,9 +646,10 @@ export const registryApi = {
       const removed = idx !== -1 ? mockLibraries.splice(idx, 1)[0] : mockLibraries[0];
       return { message: 'Mock library deleted', library: removed };
     }
-    return fetchJson(`${currentBaseUrl}/libraries/${id}`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/libraries/${id}`, {
       method: 'DELETE'
     });
+    return { message: raw?.message ?? 'Deleted', library: mapLibrary(raw?.library ?? raw) };
   },
 
   // --- SYSTEMS ---
@@ -471,11 +661,13 @@ export const registryApi = {
       };
     }
     const query = new URLSearchParams();
-    if (params?.page) query.append('page', String(params.page));
-    if (params?.size) query.append('size', String(params.size));
+    if (params?.page) query.append('page', String(params.page - 1)); // backend 0-indexed
+    if (params?.size) query.append('per_page', String(params.size));
     if (params?.search) query.append('search', params.search);
 
-    return fetchJson<PaginatedResponse<System>>(`${currentBaseUrl}/systems?${query.toString()}`);
+    // NOTE: backend returns a raw array (no paged envelope) for /registry/systems.
+    const raw = await fetchJson<any>(`${currentBaseUrl}/systems?${query.toString()}`);
+    return normalizePaged(raw, mapSystem);
   },
 
   createSystem: async (data: Partial<System>): Promise<System> => {
@@ -494,18 +686,20 @@ export const registryApi = {
       mockSystems.push(sys);
       return sys;
     }
-    return fetchJson<System>(`${currentBaseUrl}/systems`, {
+    const raw = await fetchJson<any>(`${currentBaseUrl}/systems`, {
       method: 'POST',
       body: JSON.stringify(data)
     });
+    return mapSystem(raw);
   },
 
   updateSystem: async (id: string, data: Partial<System>): Promise<System> => {
     if (currentMode === 'mock') return mockSystems[0];
-    return fetchJson<System>(`${currentBaseUrl}/systems/${id}`, {
+    const raw = await fetchJson<any>(`${currentBaseUrl}/systems/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
     });
+    return mapSystem(raw);
   },
 
   deleteSystem: async (id: string): Promise<{ message: string; system: System }> => {
@@ -514,9 +708,10 @@ export const registryApi = {
       const removed = idx !== -1 ? mockSystems.splice(idx, 1)[0] : mockSystems[0];
       return { message: 'Mock system deleted', system: removed };
     }
-    return fetchJson(`${currentBaseUrl}/systems/${id}`, {
+    const raw = await fetchJson<any>(`${currentBaseUrl}/systems/${id}`, {
       method: 'DELETE'
     });
+    return { message: raw?.message ?? 'Deleted', system: mapSystem(raw?.system ?? raw) };
   },
 
   linkServiceToSystem: async (systemName: string, serviceName: string): Promise<any> => {
@@ -540,10 +735,11 @@ export const registryApi = {
       };
     }
     const query = new URLSearchParams();
-    if (params?.page) query.append('page', String(params.page));
-    if (params?.size) query.append('size', String(params.size));
+    if (params?.page) query.append('page', String(params.page - 1)); // backend 0-indexed
+    if (params?.size) query.append('per_page', String(params.size));
 
-    return fetchJson<PaginatedResponse<LookupEntry>>(`${currentBaseUrl}/${type}?${query.toString()}`);
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/${type}?${query.toString()}`);
+    return normalizePaged(raw, (item) => mapLookup(type, item));
   },
 
   createLookupEntry: async (type: LookupType, data: { key: string; name: string }): Promise<LookupEntry> => {
@@ -553,10 +749,11 @@ export const registryApi = {
       mockLookups[type].push(entry);
       return entry;
     }
-    return fetchJson<LookupEntry>(`${currentBaseUrl}/${type}`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/${type}`, {
       method: 'POST',
       body: JSON.stringify(data)
     });
+    return mapLookup(type, raw);
   },
 
   deleteLookupEntry: async (type: LookupType, id: string): Promise<{ message: string }> => {
@@ -566,9 +763,10 @@ export const registryApi = {
       }
       return { message: 'Mock lookup deleted' };
     }
-    return fetchJson(`${currentBaseUrl}/${type}/${id}`, {
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/${type}/${id}`, {
       method: 'DELETE'
     });
+    return { message: raw?.message ?? 'Deleted' };
   },
 
   // --- REGISTRATION & HEARTBEAT ---
@@ -606,10 +804,11 @@ export const registryApi = {
       mockServices.push(svc);
       return { message: 'Mock registered', service: svc };
     }
-    return fetchJson(`${currentBaseUrl}/register`, {
+    const raw = await fetchJson<any>(`${currentBaseUrl}/register`, {
       method: 'POST',
       body: JSON.stringify(data)
     });
+    return { message: raw?.message ?? 'Registered', service: mapService(raw?.service ?? raw) };
   },
 
   sendHeartbeat: async (serviceName: string): Promise<{ message: string; timestamp: string; status: string }> => {
@@ -627,9 +826,10 @@ export const registryApi = {
       const removed = idx !== -1 ? mockServices.splice(idx, 1)[0] : mockServices[0];
       return { message: 'Mock deregistered', service: removed };
     }
-    return fetchJson(`${currentBaseUrl}/deregister/${encodeURIComponent(serviceName)}/graceful`, {
+    const raw = await fetchJson<any>(`${currentBaseUrl}/deregister/${encodeURIComponent(serviceName)}/graceful`, {
       method: 'POST'
     });
+    return { message: raw?.message ?? 'Deregistered', service: mapService(raw?.service ?? raw) };
   },
 
   // --- AGGREGATE PLATFORM STATE ---
@@ -642,7 +842,8 @@ export const registryApi = {
         totalDeployments: mockDeployments.length
       };
     }
-    return fetchJson<PlatformAggregateState>(`${currentBaseUrl}/aggregate`);
+    const raw = await fetchJson<any>(`${currentBaseUrl}/aggregate`);
+    return mapAggregate(raw);
   },
 
   // --- LOGS & METRICS ---
