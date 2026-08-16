@@ -3433,6 +3433,44 @@ export async function getNewestCompileVerdictForPlan(
   );
 }
 
+/**
+ * D5 downstream analytics — compile pass/fail measurement surface (CP-9
+ * delta sub-item 1). Aggregates vision.wr_compile_verdicts by verdict_type
+ * and rule_version so pass/fail rates are measurable once the gate is live.
+ */
+export interface CompileVerdictStats {
+  total: number;
+  byVerdictType: Array<{ verdict_type: string; count: number }>;
+  byRuleVersion: Array<{ rule_version: string; count: number }>;
+}
+
+export async function getCompileVerdictStats(): Promise<CompileVerdictStats> {
+  const byType = await qAll(
+    `SELECT verdict_type, count(*)::int AS count
+     FROM ${VISION_SCHEMA}.wr_compile_verdicts
+     GROUP BY verdict_type
+     ORDER BY verdict_type`,
+  );
+  const byVersion = await qAll(
+    `SELECT rule_version, count(*)::int AS count
+     FROM ${VISION_SCHEMA}.wr_compile_verdicts
+     GROUP BY rule_version
+     ORDER BY rule_version`,
+  );
+  const total = (byType ?? []).reduce((sum: number, r: any) => sum + r.count, 0);
+  return {
+    total,
+    byVerdictType: (byType ?? []).map((r: any) => ({
+      verdict_type: r.verdict_type,
+      count: r.count,
+    })),
+    byRuleVersion: (byVersion ?? []).map((r: any) => ({
+      rule_version: r.rule_version,
+      count: r.count,
+    })),
+  };
+}
+
 export async function getReceiptCount(): Promise<{ type: string; count: number }[]> {
   return qAll(
     `SELECT type, COUNT(*) as count FROM ${VISION_SCHEMA}.receipts GROUP BY type`

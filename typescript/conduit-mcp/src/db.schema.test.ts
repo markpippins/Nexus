@@ -24,6 +24,7 @@ import {
   getNewestCompileVerdictForPlan,
   resolveEntityKeysForPlan,
   createWorkRequest,
+  getCompileVerdictStats,
 } from "./db";
 
 const DSN = process.env.CONDUIT_PG_DSN || "postgresql://pguser:pgpass@localhost:5432/nexus";
@@ -816,6 +817,54 @@ describe("createSchema on fresh database", () => {
         );
       } catch (e: any) {
         console.warn("verdict test cleanup failed:", e?.message);
+      } finally {
+        await adminPool.query(
+          `CREATE TRIGGER trg_wr_compile_verdicts_immutable
+             BEFORE UPDATE OR DELETE ON vision.wr_compile_verdicts
+             FOR EACH ROW
+             EXECUTE FUNCTION vision.wr_compile_verdicts_immutable()`,
+        );
+      }
+      await pool.end();
+    }
+  }, 30000);
+
+  // CP-9 delta sub-item 1 — analytics surface: pass/fail counts measurable
+  // by verdict_type and rule_version (D5 downstream).
+  test("v38 analytics: compile verdict counts by verdict_type/rule_version", async () => {
+    const pool = await initDb();
+    const suite = `test:wr-stats:${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const ekP = `${suite}:pass`;
+    const ekF = `${suite}:fail`;
+    try {
+      const before = await getCompileVerdictStats();
+      await insertCompileVerdict({
+        entity_key: ekP,
+        verdict_type: "WR_COMPILE_PASS",
+        rule_version: "1",
+        description: "stats pass",
+      });
+      await insertCompileVerdict({
+        entity_key: ekF,
+        verdict_type: "WR_COMPILE_FAIL",
+        rule_version: "1",
+        description: "stats fail",
+      });
+      const after = await getCompileVerdictStats();
+      expect(after.total).toBe(before.total + 2);
+      expect(after.byVerdictType.find((r) => r.verdict_type === "WR_COMPILE_PASS")).toBeDefined();
+      expect(after.byVerdictType.find((r) => r.verdict_type === "WR_COMPILE_FAIL")).toBeDefined();
+      const v1 = after.byRuleVersion.find((r) => r.rule_version === "1");
+      expect(v1).toBeDefined();
+      expect(v1!.count).toBeGreaterThanOrEqual(2);
+    } finally {
+      try {
+        await adminPool.query(
+          `DROP TRIGGER IF EXISTS trg_wr_compile_verdicts_immutable ON vision.wr_compile_verdicts`,
+        );
+        await adminPool.query(`DELETE FROM vision.wr_compile_verdicts WHERE entity_key IN ($1, $2)`, [ekP, ekF]);
+      } catch (e: any) {
+        console.warn("stats cleanup failed:", e?.message);
       } finally {
         await adminPool.query(
           `CREATE TRIGGER trg_wr_compile_verdicts_immutable

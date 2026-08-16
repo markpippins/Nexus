@@ -247,6 +247,13 @@ export function getOpTrace(
  * An UNRESOLVED WR may be stored/HELD at VALIDATED, but the explicit
  * VALIDATED→QUEUED advance is rejected with `UNRESOLVED_OPS` until its ops are
  * resolved (registry pin). Delegates to :func:`validateTransition` otherwise.
+ *
+ * CP-4 forward note (architect checklist delta 9bf28fce): when the registry
+ * pin later resolves an UNRESOLVED WR's ops, the upgrade is APPEND-ONLY — the
+ * pin emits a new resolution event; it NEVER rewrites the WR's historical
+ * event log or its existing identity. The acceptance path here must not
+ * preclude that (this guard rejects only the *explicit* VALIDATED→QUEUED
+ * advance, never the append of a resolution event).
  */
 export function validateTransitionWithOps(
   currentStatus: WorkRequestStatus,
