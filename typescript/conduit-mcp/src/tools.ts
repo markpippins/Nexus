@@ -23,6 +23,7 @@ import {
   listWorkRequestStates,
   insertCompileVerdict,
   computeCompileVerdictId,
+  runCompileGate,
 } from "./db";
 import * as api from "./conduit-client";
 import {
@@ -329,6 +330,42 @@ export const toolDefinitions: MCPToolDefinition[] = [
         },
       },
       required: ["entity_key", "verdict_type", "rule_version", "description"],
+    },
+  },
+  {
+    name: "run_compile_gate",
+    description:
+      "Run the WR-compile release gate: compare a compiled WR against its plan " +
+      "spec, classify ripple/shape/route, and persist the pre-row " +
+      "WR_COMPILE_PASS/FAIL verdict. Returns the deterministic release decision " +
+      "(verdict, diffs, route, release, verdict_id).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        wr: {
+          type: "object",
+          description: "Compiled WR surface: goal, filesAffected, acceptanceCriteria, deliverable",
+        },
+        plan: {
+          type: "object",
+          description: "Plan spec surface: goal, filesAffected, acceptanceCriteria, deliverable",
+        },
+        assignment: {
+          type: "object",
+          description: "Ripple assignment: ripple (R0-R4), shape (B/E/A), rationale?, dimensions?",
+        },
+        entity_key: {
+          type: "string",
+          description: "Compile-unit entityKey (D3, emission boundary)",
+        },
+        rule_version: {
+          type: "string",
+          description: "Optional verdict rule version (default 1)",
+        },
+        wr_id: { type: "string", description: "Optional WR row link" },
+        plan_id: { type: "string", description: "Optional plan link" },
+      },
+      required: ["wr", "plan", "assignment", "entity_key"],
     },
   },
   {
@@ -957,6 +994,25 @@ export function registerToolHandlers(
         entity_key: args.entity_key,
         verdict_type: args.verdict_type,
       };
+    },
+    run_compile_gate: async (args: {
+      wr: any;
+      plan: any;
+      assignment: any;
+      entity_key: string;
+      rule_version?: string;
+      wr_id?: string;
+      plan_id?: string;
+    }) => {
+      return await runCompileGate({
+        wr: args.wr,
+        plan: args.plan,
+        assignment: args.assignment,
+        entityKey: args.entity_key,
+        ruleVersion: args.rule_version,
+        wrId: args.wr_id ?? null,
+        planId: args.plan_id ?? null,
+      });
     },
     revise_plan: async (args: {
       planNumber: string;
