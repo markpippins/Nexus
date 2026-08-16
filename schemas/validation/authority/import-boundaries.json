@@ -1,0 +1,25 @@
+{
+  "$schema": "https://nexus.local/schema/validation/authority/import-boundaries/v1",
+  "version": 1,
+  "description": "Named import-boundary registry (T05 contract matrix rule 2). Each boundary declares a canonical module scope and the adapter/harness modules it must not import — forbidden reverse dependencies. Data, not code: tools/authority/check_import_boundaries.py reads this and enforces it.",
+  "boundaries": [
+    {
+      "name": "wrp-core-no-harness",
+      "scope": ["python/nexus_core/wrp"],
+      "forbidden_modules": ["nexus_core.harness"],
+      "rule": "Canonical WRP core (nexus_core/wrp) must not depend on the harness-construction layer (nexus_core.harness). T05 contract matrix: WRP state and harness construction are distinct concepts; wrp is canonical for the former, harness for the latter."
+    },
+    {
+      "name": "wrp-core-no-tackle",
+      "scope": ["python/nexus_core/wrp"],
+      "forbidden_modules": ["tackle"],
+      "rule": "Canonical WRP core (nexus_core/wrp) must not depend on the tackle adapter layer (tackle.agent_scheduler_runner, tackle.harness). tackle adapts the canonical harness/lease/replay interfaces; a reverse dependency would create a cycle."
+    },
+    {
+      "name": "nexus-core-no-adapter",
+      "scope": ["python/nexus_core"],
+      "forbidden_modules": ["conduit", "tackle", "vision", "voyager"],
+      "rule": "The canonical nexus_core layer must not depend on adapter/service layers (conduit runtime, tackle, Vision/LOSM, voyager). T05 contract matrix rule 2: everything other than the canonical owner is an adapter or projection; adapters depend on the core, never the reverse."
+    }
+  ]
+}

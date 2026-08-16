@@ -47,6 +47,7 @@ GATES = {
     "arl": ["python3", "tools/arl_linter.py", "--json"],
     "cir1": ["python3", "tools/cir1/lint.py", "--all", "--strict", "--json"],
     "authority": ["python3", "tools/authority/check_authority.py", "--json"],
+    "import-boundaries": ["python3", "tools/authority/check_import_boundaries.py", "--json"],
     "projection-ir": ["python3", "tools/authority/projection_ir.py", "--json", "--validate"],
     "graph": ["python3", "tools/authority/check_graph.py", "--json"],
     "jsonld": ["python3", "tools/authority/check_jsonld.py", "--json"],
@@ -116,6 +117,13 @@ def collect(gate_name, result, categorized):
             categorized[AUTHORITY_CATEGORY.get(v.get("failure_class"), "unauthorized")].append({
                 "gate": gate_name, "failure_class": v.get("failure_class"),
                 "domain": v.get("domain"), "detail": v.get("detail"),
+            })
+    elif gate_name == "import-boundaries":
+        for v in violations:
+            categorized["unauthorized"].append({
+                "gate": gate_name, "failure_class": v.get("failure_class"),
+                "boundary": v.get("boundary"),
+                "detail": f"{v.get('file')}:{v.get('line')} imports {v.get('module')} (forbidden: {v.get('forbidden')})",
             })
     elif gate_name == "arl":
         for v in violations:

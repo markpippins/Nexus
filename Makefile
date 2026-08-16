@@ -2,6 +2,7 @@
         cir2-lint cir2-validate cir3-lint cir3-validate cir4-lint cir4-validate \
         cir5-lint cir5-validate \
         cir-arl authority-check jsonld-check jsonld-map cir-verify contract-audit install-hooks \
+        import-boundaries \
         test-db-setup test-db-reset test \
         mesh-test seed-guard-bootstrap seed-guard-test \
         apidocs-extract apidocs-gen apidocs-validate apidocs-regen \
@@ -80,6 +81,12 @@ cir5-validate:
 authority-check:
 	@echo "[AUTHORITY] single-canonical-authority check..."
 	@python3 tools/authority/check_authority.py
+
+# ─── Import boundaries: forbidden reverse-dependency enforcement (T05) ───────
+
+import-boundaries:
+	@echo "[IMPORT-BOUNDARIES] named import-boundary / forbidden reverse-dependency check..."
+	@python3 tools/authority/check_import_boundaries.py
 
 # ─── CIR v2: Anti-Recursion Linter ────────────────────────────────────────────
 
