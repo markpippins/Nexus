@@ -4,6 +4,7 @@
     "nx": "https://nexus.local/schema/",
     "ag": "https://nexus.local/schema/core/agent-role/",
     "mc": "https://nexus.local/schema/extensions/model-capability/",
+    "wr": "https://nexus.local/schema/core/work-request/",
 
     "id": "@id",
     "type": "@type",

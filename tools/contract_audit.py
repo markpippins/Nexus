@@ -22,7 +22,8 @@ Gates run (each with a stable exit code + JSON surface where available):
     3. authority-check   — authority matrix validator (check_authority.py)
     4. projection-ir     — ProjectionIR envelope adapter validation
     5. graph-conformance — capability/workflow registries vs node-types.json
-    6. apidocs-drift     — committed *-srv openapi.yaml vs source routes
+    6. jsonld-resolver   — nexus.local @context URLs resolve + vocabulary validates
+    7. apidocs-drift     — committed *-srv openapi.yaml vs source routes
 
 Usage:
     python tools/contract_audit.py               # text + JSON report, exit 1 on violation
@@ -48,6 +49,7 @@ GATES = {
     "authority": ["python3", "tools/authority/check_authority.py", "--json"],
     "projection-ir": ["python3", "tools/authority/projection_ir.py", "--json", "--validate"],
     "graph": ["python3", "tools/authority/check_graph.py", "--json"],
+    "jsonld": ["python3", "tools/authority/check_jsonld.py", "--json"],
     "apidocs": ["python3", "tools/api-docs/check_drift.py", "--json", "--quiet"],
 }
 
@@ -125,6 +127,16 @@ def collect(gate_name, result, categorized):
         for v in violations:
             categorized[GRAPH_CATEGORY.get(v.get("failure_class"), "unauthorized")].append({
                 "gate": gate_name, "failure_class": v.get("failure_class"),
+                "domain": v.get("domain"), "detail": v.get("detail"),
+            })
+    elif gate_name == "jsonld":
+        # unresolved context/namespace = dangling edge (unresolved); unknown
+        # prefix / undeclared term = vocabulary contract break (unauthorized)
+        for v in violations:
+            fc = v.get("failure_class")
+            cat = "unresolved" if fc in ("unresolved-context", "unresolved-namespace", "unresolved-id") else "unauthorized"
+            categorized[cat].append({
+                "gate": gate_name, "failure_class": fc,
                 "domain": v.get("domain"), "detail": v.get("detail"),
             })
     elif gate_name == "projection-ir":

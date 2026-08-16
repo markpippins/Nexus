@@ -2,8 +2,8 @@
   "@context": {
     "@version": 1.1,
     "nx": "https://nexus.local/schema/",
-
     "ks": "https://nexus.local/schema/core/knowledge-steward/",
+    "ag": "https://nexus.local/schema/core/agent-role/",
     "id": "@id",
     "type": "@type",
     "comment": {"@id": "http://www.w3.org/2000/01/rdf-schema#comment"},

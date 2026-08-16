@@ -1,7 +1,7 @@
 .PHONY: cir1 cir1-scan cir1-lint cir1-fix cir1-validate \
         cir2-lint cir2-validate cir3-lint cir3-validate cir4-lint cir4-validate \
         cir5-lint cir5-validate \
-        cir-arl authority-check cir-verify contract-audit install-hooks \
+        cir-arl authority-check jsonld-check jsonld-map cir-verify contract-audit install-hooks \
         test-db-setup test-db-reset test \
         mesh-test seed-guard-bootstrap seed-guard-test \
         apidocs-extract apidocs-gen apidocs-validate apidocs-regen \
@@ -90,10 +90,19 @@ cir-arl:
 cir-arl-json:
 	@python3 tools/arl_linter.py --json
 
+# ─── JSON-LD resolver + validator (contract-stack Step 11) ──────────────────
+
+jsonld-check:
+	@echo "[JSONLD] resolving nexus.local @context URLs + validating vocabulary..."
+	@python3 tools/authority/check_jsonld.py
+
+jsonld-map:
+	@python3 tools/authority/check_jsonld.py --map
+
 # ─── Contract audit: one entrypoint for the whole contract stack ────────────
 
 contract-audit:
-	@echo "Running full contract audit (arl + cir1-5 + authority + projection-ir + graph + apidocs)..."
+	@echo "Running full contract audit (arl + cir1-5 + authority + projection-ir + graph + jsonld + apidocs)..."
 	@python3 tools/contract_audit.py
 
 contract-audit-json:
