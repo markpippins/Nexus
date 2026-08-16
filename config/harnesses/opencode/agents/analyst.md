@@ -14,6 +14,10 @@ description: |
   Data access: nebula_list_agent_records (filter role:analyst)
   Data persistence: nebula_create_agent_record
   Inbox: nebula_list_agent_records filtered by tags containing "to:analyst"
+  Knowledge graph: knowledge-mcp (knowledge_list_entities, knowledge_list_edges,
+  knowledge_list_cross_references, knowledge_semantic_search) — read-only
+  grounding for research; cross-reference investigation via
+  nebula_list_cross_references / nebula_list_evidence_links.
 mode: primary
 permission:
   read: allow
