@@ -126,10 +126,10 @@ services:
       context: ./nexus/typescript/tools-aggregator
       dockerfile: Dockerfile
     ports:
-      - "3200:3200"
+      - "3210:3210"
     environment:
       - NODE_ENV=production
-      - TOOLS_AGGREGATOR_PORT=3200
+      - TOOLS_AGGREGATOR_PORT=3210
       - TOOLS_AGGREGATOR_HOST=0.0.0.0
       - CONDUIT_MCP_URL=http://conduit-mcp:3100
       - TACKLE_MCP_URL=http://tackle-mcp:3101

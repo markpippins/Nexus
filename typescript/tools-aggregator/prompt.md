@@ -4,26 +4,26 @@ You have access to a **Tools Aggregator Service** that provides unified access t
 
 ### Connection Details
 
-- **Service URL:** `http://localhost:3200`
-- **Status:** Check health at `GET http://localhost:3200/health`
+- **Service URL:** `http://localhost:3210`
+- **Status:** Check health at `GET http://localhost:3210/health`
 
 ### Available Endpoints
 
 #### 1. **Discover Tools**
 ```
-GET http://localhost:3200/tools
+GET http://localhost:3210/tools
 ```
 Returns all available tools with their names, descriptions, and input schemas. Use this to understand what tools are available.
 
 #### 2. **Get a Specific Tool**
 ```
-GET http://localhost:3200/tools/{tool_name}
+GET http://localhost:3210/tools/{tool_name}
 ```
 Get detailed information about a specific tool including its full schema.
 
 #### 3. **List Tools by Service**
 ```
-GET http://localhost:3200/tools/by-service/{service_name}
+GET http://localhost:3210/tools/by-service/{service_name}
 ```
 Get all tools from a specific service. Available services:
 - `conduit-mcp` — Pipeline orchestration
@@ -37,7 +37,7 @@ Get all tools from a specific service. Available services:
 
 #### 4. **Call a Tool**
 ```
-POST http://localhost:3200/tools/call
+POST http://localhost:3210/tools/call
 Content-Type: application/json
 
 {
@@ -69,22 +69,22 @@ Content-Type: application/json
 
 1. **Discover what's available:**
    ```
-   curl http://localhost:3200/tools
+   curl http://localhost:3210/tools
    ```
 
 2. **Find a tool you need:**
    ```
-   curl http://localhost:3200/tools | grep -i "keyword"
+   curl http://localhost:3210/tools | grep -i "keyword"
    ```
 
 3. **Get its schema:**
    ```
-   curl http://localhost:3200/tools/tool_name_here
+   curl http://localhost:3210/tools/tool_name_here
    ```
 
 4. **Call it:**
    ```
-   curl -X POST http://localhost:3200/tools/call \
+   curl -X POST http://localhost:3210/tools/call \
      -H 'Content-Type: application/json' \
      -d '{"name":"tool_name_here","arguments":{"key":"value"}}'
    ```
@@ -126,7 +126,7 @@ If there's an error:
 ### Example: Query Pipeline State
 
 ```bash
-curl -X POST http://localhost:3200/tools/call \
+curl -X POST http://localhost:3210/tools/call \
   -H 'Content-Type: application/json' \
   -d '{
     "name": "query_conduit_state",
@@ -137,7 +137,7 @@ curl -X POST http://localhost:3200/tools/call \
 ### Example: List Procedures for a Role
 
 ```bash
-curl -X POST http://localhost:3200/tools/call \
+curl -X POST http://localhost:3210/tools/call \
   -H 'Content-Type: application/json' \
   -d '{
     "name": "memory_get_procedures",
