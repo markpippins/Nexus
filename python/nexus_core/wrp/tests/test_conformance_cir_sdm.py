@@ -40,9 +40,16 @@ LLM-free — no DB, no network, no wall-clock dependence.
          TypeScript TRANSITION_TABLE (DRAFT→WR_SUBMITTED→VALIDATED;
          SETTLED terminal) and pgv initial state is PHASE_2_FROZEN.
   AC13 — Future-parent (F2): a CER citing a parent event that appears LATER in
-         the stream → upstream-injection violation (warning).
-  AC14 — Interleaved multi-WR (F1): two WRs interleaved in one ordered stream,
+         the stream → upstream-injection violation (warning).   AC14 — Interleaved multi-WR (F1): two WRs interleaved in one ordered stream,
          each following its own legal lifecycle → ZERO one-way-gate violations.
+   AC15 — IR stage separation (IR-CHECK-1): a VISION.IR_PRODUCED event never
+         a parent of an EXECUTION.* event → blocking.
+   AC16 — CORE stage separation (CORE-CHECK-1): WORKREQUEST.CREATED never
+         cites an EXECUTION.* event → blocking.
+   AC17 — AUD stage extension (AUD-CHECK-1): WORKREQUEST.CREATED never cites
+         a review/inspection event → blocking (rule_audit_non_influence).
+   AC18 — Stage substrate: normalize_event classifies the CIRS-3 stage axis;
+         a forward (IR→Synthesis→Execution) stream is clean.
 
 Usage:
     cd /home/codex/dev/nexus
@@ -61,6 +68,8 @@ if _NEXUS_PYTHON not in sys.path:
 
 from nexus_core.wrp.cir_sdm import (                                 # noqa: E402
     RULE_AUDIT_NON_INFLUENCE,
+    RULE_CORE_STAGE_SEPARATION,
+    RULE_IR_STAGE_SEPARATION,
     RULE_ONE_WAY_GATE,
     RULE_PROVENANCE_CAUSATION,
     RULE_VERSION_LOCK,
@@ -103,6 +112,15 @@ def _wr(event_id, wr_id, etype, ts):
     """Build a convenience-form runtime event."""
     return {"event_id": event_id, "type": etype, "wrId": wr_id,
             "timestamp": ts}
+
+
+def _stage_ev(event_id, event_type, causation=None, actor_type="system"):
+    """Build a DB-row-shaped pipeline-stage event (CIRS-3 stage axis)."""
+    ev = {"event_id": event_id, "event_type": event_type,
+          "actor_type": actor_type}
+    if causation:
+        ev["causation_id"] = causation
+    return ev
 
 
 # Clean forward WR lifecycle: DRAFT→VALIDATED→QUEUED→CLAIMED→ACKED→SETTLED.
@@ -459,6 +477,113 @@ class TestAC12StructuralGuard(unittest.TestCase):
                                "causation_id": "prev", "actor_type": "system"})
         self.assertEqual(row.parent_event_ids, ["prev"])
         self.assertFalse(row.is_audit)
+
+
+class TestAC15IrStageSeparation(unittest.TestCase):
+    """AC15 (IR-CHECK-1) — ProjectionIR never feeds Execution edges."""
+
+    def test_ir_parent_of_execution_is_flagged(self):
+        stream = [
+            _stage_ev("ir-1", "VISION.IR_PRODUCED"),
+            _stage_ev("exec-1", "EXECUTION.STARTED", causation="ir-1"),
+        ]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_IR_STAGE_SEPARATION]
+        self.assertEqual(len(offenders), 1)
+        v = offenders[0]
+        self.assertEqual(v.event_id, "exec-1")
+        self.assertEqual(v.rule_version, "1")
+        self.assertEqual(v.severity, "blocking")
+        self.assertIn("ir-1", v.description)
+
+    def test_synthesis_parent_of_execution_is_clean(self):
+        # Synthesis → Execution is the legal forward stage order.
+        stream = [
+            _stage_ev("syn-1", "WORKREQUEST.CREATED"),
+            _stage_ev("exec-1", "EXECUTION.STARTED", causation="syn-1"),
+        ]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_IR_STAGE_SEPARATION]
+        self.assertEqual(offenders, [])
+
+
+class TestAC16CoreStageSeparation(unittest.TestCase):
+    """AC16 (CORE-CHECK-1) — Synthesis never cites Execution (reverse flow)."""
+
+    def test_synthesis_citing_execution_is_flagged(self):
+        stream = [
+            _stage_ev("exec-1", "EXECUTION.STARTED"),
+            _stage_ev("syn-1", "WORKREQUEST.CREATED", causation="exec-1"),
+        ]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_CORE_STAGE_SEPARATION]
+        self.assertEqual(len(offenders), 1)
+        v = offenders[0]
+        self.assertEqual(v.event_id, "syn-1")
+        self.assertEqual(v.severity, "blocking")
+        self.assertIn("exec-1", v.description)
+
+    def test_synthesis_citing_ir_is_clean(self):
+        # IR → Synthesis is the legal forward stage order.
+        stream = [
+            _stage_ev("ir-1", "VISION.IR_PRODUCED"),
+            _stage_ev("syn-1", "WORKREQUEST.CREATED", causation="ir-1"),
+        ]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_CORE_STAGE_SEPARATION]
+        self.assertEqual(offenders, [])
+
+
+class TestAC17AuditStageExtension(unittest.TestCase):
+    """AC17 (AUD-CHECK-1) — WORKREQUEST.CREATED never cites review/inspection."""
+
+    def test_synthesis_citing_audit_is_flagged(self):
+        stream = [
+            _cer("rev-1", domain="review", action="validate",
+                 actor_type="reviewer"),
+            _stage_ev("syn-1", "WORKREQUEST.CREATED", causation="rev-1"),
+        ]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_AUDIT_NON_INFLUENCE]
+        self.assertEqual(len(offenders), 1)
+        self.assertEqual(offenders[0].event_id, "syn-1")
+        self.assertEqual(offenders[0].severity, "blocking")
+
+    def test_synthesis_citing_generation_is_clean(self):
+        stream = [
+            _cer("spec-1", domain="specification", action="validate"),
+            _stage_ev("syn-1", "WORKREQUEST.CREATED", causation="spec-1"),
+        ]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_AUDIT_NON_INFLUENCE]
+        self.assertEqual(offenders, [])
+
+
+class TestAC18StageSubstrate(unittest.TestCase):
+    """AC18 — normalize_event classifies the CIRS-3 stage axis; forward clean."""
+
+    def test_stage_classification(self):
+        self.assertEqual(
+            normalize_event(_stage_ev("s", "WORKREQUEST.CREATED")).stage,
+            "synthesis")
+        self.assertEqual(
+            normalize_event(_stage_ev("i", "VISION.IR_PRODUCED")).stage,
+            "projection_ir")
+        self.assertEqual(
+            normalize_event(_stage_ev("e", "EXECUTION.FAILED")).stage,
+            "execution")
+        # WR runtime events and CERs have no stage classification.
+        self.assertIsNone(normalize_event(_wr("w", "wr-1", "WR_SUBMITTED", 1)).stage)
+        self.assertIsNone(normalize_event(_cer("c-1")).stage)
+
+    def test_forward_stage_order_is_clean(self):
+        # CIRS-3 forward order: ProjectionIR → Synthesis → Execution.
+        stream = [
+            _stage_ev("ir-1", "VISION.IR_PRODUCED"),
+            _stage_ev("syn-1", "WORKREQUEST.CREATED", causation="ir-1"),
+            _stage_ev("exec-1", "EXECUTION.STARTED", causation="syn-1"),
+        ]
+        self.assertEqual(evaluate(stream), [])
 
 
 if __name__ == "__main__":

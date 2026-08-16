@@ -89,11 +89,16 @@ __all__ = [
     "rule_audit_non_influence",
     "rule_provenance_causation",
     "rule_version_lock",
+    "rule_ir_stage_separation",
+    "rule_core_stage_separation",
     "WR_TRANSITIONS",
     "PGV_TRANSITIONS",
     "PGV_INITIAL_STATE",
     "AUDIT_DOMAINS",
     "AUDIT_ACTOR_TYPES",
+    "STAGE_SYNTHESIS",
+    "STAGE_IR",
+    "STAGE_EXECUTION_PREFIX",
 ]
 
 # ── Rule identifiers (stable; do not rename without a version bump) ───
@@ -102,6 +107,8 @@ RULE_ONE_WAY_GATE = "cir-sdm.one-way-gate"
 RULE_AUDIT_NON_INFLUENCE = "cir-sdm.audit-non-influence"
 RULE_PROVENANCE_CAUSATION = "cir-sdm.provenance-causation"
 RULE_VERSION_LOCK = "cir-sdm.version-lock"
+RULE_IR_STAGE_SEPARATION = "cir-sdm.ir-stage-separation"
+RULE_CORE_STAGE_SEPARATION = "cir-sdm.core-stage-separation"
 
 # Each rule family carries a deterministic version. Bump a family's version
 # when its semantics change; the version is part of every violation record so
@@ -111,6 +118,8 @@ RULE_VERSIONS: Dict[str, str] = {
     RULE_AUDIT_NON_INFLUENCE: "1",
     RULE_PROVENANCE_CAUSATION: "1",
     RULE_VERSION_LOCK: "1",
+    RULE_IR_STAGE_SEPARATION: "1",
+    RULE_CORE_STAGE_SEPARATION: "1",
 }
 
 # ── Canonical event schema ────────────────────────────────────────────
@@ -147,10 +156,21 @@ class CanonicalEvent:
         """True for WR_* runtime-status events (the one-way-gate axis).
 
         Non-WR ``event_type`` values (WORKREQUEST.CREATED, VISION.IR_PRODUCED,
-        EXECUTION.*, …) are pipeline events on a different axis — deferred to
-        the T23 Step 3 IR/CORE/AUD/CAUSAL enumeration (architect sign-off).
+        EXECUTION.*, …) are pipeline events on the CIRS-3 *stage* axis —
+        classified by :attr:`stage` (T23 Step 3).
         """
         return (not self.is_cer) and self.event_type.startswith("WR_")
+
+    @property
+    def stage(self) -> Optional[str]:
+        """CIRS-3 stage-axis classification (T23 Step 3).
+
+        Maps a pipeline event's ``event_type`` to its CIRS-3 stage:
+        ``WORKREQUEST.CREATED`` → ``synthesis``; ``VISION.IR_PRODUCED`` →
+        ``projection_ir``; ``EXECUTION.*`` → ``execution``. Returns ``None``
+        for WR_* runtime events, CERs, and unknown types.
+        """
+        return _stage_of(self.event_type)
 
 
 # ── Audit / feedback classification (CIRS-4) ──────────────────────────
@@ -176,6 +196,36 @@ def _is_audit(domain: Optional[str], actor_type: Optional[str]) -> bool:
     if actor_type is not None and actor_type.lower() in AUDIT_ACTOR_TYPES:
         return True
     return False
+
+
+# ── CIRS-3 stage axis (T23 Step 3) ────────────────────────────────────
+# Pipeline-stage events on the CIRS-3 axis (Observation → Projection →
+# ProjectionIR → Synthesis → WorkRequest → Execution). These event types are
+# in the conduit work_request_events CHECK constraint but do NOT exist in the
+# log yet — wire the recognition now so the IR/CORE/AUD checks are ready when
+# they start flowing (architect Step 3 sign-off, record d39670ec).
+
+STAGE_SYNTHESIS = "WORKREQUEST.CREATED"
+STAGE_IR = "VISION.IR_PRODUCED"
+STAGE_EXECUTION_PREFIX = "EXECUTION."
+
+
+def _stage_of(event_type: Optional[str]) -> Optional[str]:
+    """Classify a pipeline event_type onto the CIRS-3 stage axis.
+
+    ``WORKREQUEST.CREATED`` → ``synthesis``; ``VISION.IR_PRODUCED`` →
+    ``projection_ir``; ``EXECUTION.*`` → ``execution``. WR_* runtime events
+    and CERs (which carry no stage ``event_type``) classify as ``None``.
+    """
+    if not event_type:
+        return None
+    if event_type == STAGE_SYNTHESIS:
+        return "synthesis"
+    if event_type == STAGE_IR:
+        return "projection_ir"
+    if event_type.startswith(STAGE_EXECUTION_PREFIX):
+        return "execution"
+    return None
 
 
 # ── CIRS-3 legal transitions (canonical tables) ───────────────────────
@@ -642,6 +692,75 @@ def rule_version_lock(
     return violations
 
 
+# ── Rule 5: IR stage separation (IR-CHECK-1) ─────────────────────────
+
+
+def rule_ir_stage_separation(
+    events: Iterable[CanonicalEvent],
+    rule_version: str = RULE_VERSIONS[RULE_IR_STAGE_SEPARATION],
+) -> List[CIRViolation]:
+    """IR-CHECK-1 (blocking) — ProjectionIR never feeds Execution edges.
+
+    A ``VISION.IR_PRODUCED`` (ProjectionIR) event must never be a parent of
+    an ``EXECUTION.*`` stage event — IR-derived nodes never appear in
+    execution edges (CIRS IR family: execution isolation).
+    """
+    _check_rule_version(RULE_IR_STAGE_SEPARATION, rule_version)
+    materialized = list(events)
+    ir_ids = {
+        ev.event_id for ev in materialized
+        if ev.stage == "projection_ir" and ev.event_id
+    }
+    violations: List[CIRViolation] = []
+    for ev in materialized:
+        if ev.stage != "execution":
+            continue
+        for parent in ev.parent_event_ids:
+            if parent in ir_ids:
+                violations.append(_make_violation(
+                    RULE_IR_STAGE_SEPARATION, ev, "blocking",
+                    f"EXECUTION stage event cites ProjectionIR event {parent!r} "
+                    f"in causation (IR-derived nodes never in execution edges)",
+                    cer_id=ev.event_id,
+                ))
+    return violations
+
+
+# ── Rule 6: CORE stage separation (CORE-CHECK-1) ────────────────────
+
+
+def rule_core_stage_separation(
+    events: Iterable[CanonicalEvent],
+    rule_version: str = RULE_VERSIONS[RULE_CORE_STAGE_SEPARATION],
+) -> List[CIRViolation]:
+    """CORE-CHECK-1 (blocking) — Synthesis never cites Execution (reverse
+    stage flow).
+
+    A ``WORKREQUEST.CREATED`` (Synthesis) event must never cite an
+    ``EXECUTION.*`` stage event as a parent — CIRS CORE: Synthesis↔Execution
+    separation (no reverse stage flow).
+    """
+    _check_rule_version(RULE_CORE_STAGE_SEPARATION, rule_version)
+    materialized = list(events)
+    execution_ids = {
+        ev.event_id for ev in materialized
+        if ev.stage == "execution" and ev.event_id
+    }
+    violations: List[CIRViolation] = []
+    for ev in materialized:
+        if ev.stage != "synthesis":
+            continue
+        for parent in ev.parent_event_ids:
+            if parent in execution_ids:
+                violations.append(_make_violation(
+                    RULE_CORE_STAGE_SEPARATION, ev, "blocking",
+                    f"Synthesis event cites EXECUTION stage event {parent!r} "
+                    f"in causation (Synthesis↔Execution separation)",
+                    cer_id=ev.event_id,
+                ))
+    return violations
+
+
 # ── Orchestration ─────────────────────────────────────────────────────
 
 
@@ -673,6 +792,8 @@ def evaluate(
     violations.extend(rule_audit_non_influence(normalized, rule_version))
     violations.extend(rule_provenance_causation(normalized, rule_version))
     violations.extend(rule_version_lock(normalized, rule_version))
+    violations.extend(rule_ir_stage_separation(normalized, rule_version))
+    violations.extend(rule_core_stage_separation(normalized, rule_version))
 
     # Enforcement flag: only blocking-severity rules in the enforced set block.
     return [
