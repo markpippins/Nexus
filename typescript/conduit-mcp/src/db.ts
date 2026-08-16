@@ -3378,16 +3378,58 @@ export async function getNewestCompileVerdict(
   );
 }
 
-/** Newest verdict re-parented to a plan row (release-time link). */
+/**
+ * Resolve the compile-unit entityKey(s) linked to a plan, for the D5 gate.
+ *
+ * A plan links to its compile unit through the released WorkRequest whose
+ * `context.plan_id` equals the plan number (the release-emission boundary
+ * writes this link at CP-9; a WR carries its D3 entityKey from birth).
+ *
+ * Returns [] when no entityKey is resolvable — a legacy/unclassified plan,
+ * for which the gate is unchanged (no verdict = legacy behavior).
+ */
+export async function resolveEntityKeysForPlan(planId: string): Promise<string[]> {
+  const rows = await qAll(
+    `SELECT DISTINCT wr.entity_key AS entity_key
+     FROM ${VISION_SCHEMA}.work_requests wr
+     WHERE wr.entity_key IS NOT NULL
+       AND wr.context->>'plan_id' = @planId`,
+    { planId },
+  );
+  return (rows ?? []).map((r: any) => r.entity_key).filter(Boolean);
+}
+
+/**
+ * Newest verdict for a plan (the D5 bootstrap gate).
+ *
+ * Matches verdicts by the plan's resolved compile-unit entityKey(s)
+ * (canonical D5 key) OR by a release-time re-parented plan_id; newest wins.
+ * No verdict → undefined (legacy unchanged).
+ */
 export async function getNewestCompileVerdictForPlan(
   planId: string,
 ): Promise<CompileVerdictRow | undefined> {
+  const entityKeys = await resolveEntityKeysForPlan(planId);
+  if (entityKeys.length === 0) {
+    return qOne(
+      `SELECT * FROM ${VISION_SCHEMA}.wr_compile_verdicts
+       WHERE plan_id = @planId
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      { planId },
+    );
+  }
+  const placeholders = entityKeys.map((_, i) => `@ek${i}`).join(", ");
+  const params: Record<string, any> = { planId };
+  entityKeys.forEach((ek, i) => {
+    params[`ek${i}`] = ek;
+  });
   return qOne(
     `SELECT * FROM ${VISION_SCHEMA}.wr_compile_verdicts
-     WHERE plan_id = @planId
+     WHERE plan_id = @planId OR entity_key IN (${placeholders})
      ORDER BY created_at DESC
      LIMIT 1`,
-    { planId },
+    params,
   );
 }
 

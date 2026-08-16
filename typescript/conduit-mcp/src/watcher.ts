@@ -328,10 +328,10 @@ export class PipelineWatcher {
         try {
           // D5 gate — consult the newest compile verdict before bootstrapping.
           // Newest-FAIL never gets a ticket; newest-PASS is release-eligible;
-          // no verdict = legacy unchanged. The plan-scoped lookup covers
-          // release-time re-parented verdicts (plan_id). The entity_key-scoped
-          // lookup (getNewestCompileVerdict) is the canonical D5 query and is
-          // exercised by the emission boundary once CP-9 wires plan↔entityKey.
+          // no verdict = legacy unchanged. The lookup resolves the plan's
+          // compile-unit entityKey (via work_requests context.plan_id and/or
+          // ADR-006 execution.requests source_plan_id→source_wr_id) and also
+          // matches release-time re-parented verdicts (plan_id) — newest wins.
           const verdict = await getNewestCompileVerdictForPlan(plan.plan_number);
           if (verdict?.verdict_type === "WR_COMPILE_FAIL") {
             console.log(

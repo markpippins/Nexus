@@ -22,6 +22,8 @@ import {
   insertCompileVerdict,
   getNewestCompileVerdict,
   getNewestCompileVerdictForPlan,
+  resolveEntityKeysForPlan,
+  createWorkRequest,
 } from "./db";
 
 const DSN = process.env.CONDUIT_PG_DSN || "postgresql://pguser:pgpass@localhost:5432/nexus";
@@ -814,6 +816,58 @@ describe("createSchema on fresh database", () => {
         );
       } catch (e: any) {
         console.warn("verdict test cleanup failed:", e?.message);
+      } finally {
+        await adminPool.query(
+          `CREATE TRIGGER trg_wr_compile_verdicts_immutable
+             BEFORE UPDATE OR DELETE ON vision.wr_compile_verdicts
+             FOR EACH ROW
+             EXECUTE FUNCTION vision.wr_compile_verdicts_immutable()`,
+        );
+      }
+      await pool.end();
+    }
+  }, 30000);
+
+  // D5 gate entityKey linkage: a plan resolves its compile-unit entityKey
+  // from the released WorkRequest (context.plan_id) so a pre-release verdict
+  // keyed by entityKey (plan_id NULL) still gates the bootstrap pass.
+  test("v38 gate resolves plan entityKey for the D5 verdict lookup", async () => {
+    const pool = await initDb();
+    const suite = `test:wr-link:${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const planId = `plan-${suite}`;
+    const wrId = `wr-${suite}`;
+    const ek = `ek-${suite}`;
+    try {
+      // The release-emission boundary (CP-9) writes the plan link into the
+      // WR's context.plan_id; the WR carries its D3 entityKey from birth.
+      await createWorkRequest({
+        id: wrId,
+        dco_json: "{}",
+        context: { plan_id: planId },
+        status: "VALIDATED",
+        entity_key: ek,
+      });
+      expect(await resolveEntityKeysForPlan(planId)).toContain(ek);
+
+      // A pre-release verdict (plan_id NULL) keyed by entityKey must gate.
+      await insertCompileVerdict({
+        entity_key: ek,
+        verdict_type: "WR_COMPILE_FAIL",
+        rule_version: "1",
+        description: "pre-release fail",
+      });
+      const verdict = await getNewestCompileVerdictForPlan(planId);
+      expect(verdict?.verdict_type).toBe("WR_COMPILE_FAIL");
+      expect(verdict?.entity_key).toBe(ek);
+    } finally {
+      try {
+        await adminPool.query(`DELETE FROM vision.work_requests WHERE wr_id = $1`, [wrId]);
+        await adminPool.query(
+          `DROP TRIGGER IF EXISTS trg_wr_compile_verdicts_immutable ON vision.wr_compile_verdicts`,
+        );
+        await adminPool.query(`DELETE FROM vision.wr_compile_verdicts WHERE entity_key = $1`, [ek]);
+      } catch (e: any) {
+        console.warn("linkage test cleanup failed:", e?.message);
       } finally {
         await adminPool.query(
           `CREATE TRIGGER trg_wr_compile_verdicts_immutable
