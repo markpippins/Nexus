@@ -45,7 +45,7 @@ Notes:
   markers are no-ops on local psql 17.10 (verified).
 - The `resolution` schema is a SOL sandbox — "zero blast radius to
   production" per its own comment. No external schema depends on it.
-- Last applied: 2026-08-16 (record `d2bbb8c3`).
+- Last applied: 2026-08-16 (record `d1120199`).
 
 ## Related
 
