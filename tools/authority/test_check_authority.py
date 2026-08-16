@@ -7,7 +7,11 @@ case. Run with:
     python3 -m pytest tools/authority/test_check_authority.py -v
 """
 
+import hashlib
+import os
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -173,6 +177,146 @@ def test_manifest_digest_match_passes():
     ]}
     v = ca.check_manifest(matrix, manifest=fake)
     assert v == []
+
+
+# ─── regenerate verify mode (TypeSpec codegen, ready-to-flip) ────────────────
+
+REAL_WR_SRC = "schemas/wrp/work-request.schema.json"
+
+
+def _tmp_proj_dir():
+    """Create a throwaway dir under the repo root so repo-relative outputPath
+    and generator cwd (REPO_ROOT) both resolve. Caller must rmtree it."""
+    d = tempfile.mkdtemp(dir=str(ca.REPO_ROOT), prefix=".authority-regenerate-test-")
+    rel = os.path.relpath(d, str(ca.REPO_ROOT))
+    return d, rel
+
+
+def _manifest_with(output_rel, verify):
+    return {"projections": [
+        {"sourceSchema": REAL_WR_SRC,
+         "targetFormat": "pydantic-model",
+         "generator": "TypeSpec",
+         "outputPath": output_rel,
+         "lifecycle": "on-schema-change",
+         "active": True,
+         "verify": verify},
+    ]}
+
+
+def test_manifest_regenerate_runs_and_produces_output():
+    matrix = ca.load_matrix()
+    d, rel = _tmp_proj_dir()
+    try:
+        out = f"{rel}/out.txt"
+        fake = _manifest_with(out, {
+            "mode": "regenerate",
+            "command": f"printf 'generated-v1' > {out}",
+        })
+        v = ca.check_manifest(matrix, manifest=fake)
+        assert v == []
+        assert (ca.REPO_ROOT / out).read_text() == "generated-v1"
+    finally:
+        shutil.rmtree(d)
+
+
+def test_manifest_regenerate_command_failure_flagged():
+    matrix = ca.load_matrix()
+    d, rel = _tmp_proj_dir()
+    try:
+        out = f"{rel}/out.txt"
+        fake = _manifest_with(out, {"mode": "regenerate", "command": "exit 3"})
+        v = ca.check_manifest(matrix, manifest=fake)
+        assert any(x["failure_class"] == "projection-drift"
+                   and "regeneration failed" in x["detail"] and "exit 3" in x["detail"]
+                   for x in v)
+    finally:
+        shutil.rmtree(d)
+
+
+def test_manifest_regenerate_no_output_flagged():
+    matrix = ca.load_matrix()
+    d, rel = _tmp_proj_dir()
+    try:
+        out = f"{rel}/out.txt"
+        fake = _manifest_with(out, {"mode": "regenerate", "command": "true"})  # runs, writes nothing
+        v = ca.check_manifest(matrix, manifest=fake)
+        assert any(x["failure_class"] == "projection-drift"
+                   and "no output" in x["detail"] for x in v)
+    finally:
+        shutil.rmtree(d)
+
+
+def test_manifest_regenerate_requires_command():
+    matrix = ca.load_matrix()
+    d, rel = _tmp_proj_dir()
+    try:
+        out = f"{rel}/out.txt"
+        fake = _manifest_with(out, {"mode": "regenerate"})
+        v = ca.check_manifest(matrix, manifest=fake)
+        assert any(x["failure_class"] == "projection-drift"
+                   and "requires a `command`" in x["detail"] for x in v)
+    finally:
+        shutil.rmtree(d)
+
+
+def test_manifest_regenerate_digest_match_passes():
+    matrix = ca.load_matrix()
+    d, rel = _tmp_proj_dir()
+    try:
+        out = f"{rel}/out.txt"
+        content = "generated-v1\n"
+        digest = hashlib.sha256(content.encode()).hexdigest()
+        fake = _manifest_with(out, {
+            "mode": "regenerate",
+            "command": f"printf 'generated-v1\\n' > {out}",
+            "algorithm": "sha256",
+            "digest": digest,
+        })
+        v = ca.check_manifest(matrix, manifest=fake)
+        assert v == []
+    finally:
+        shutil.rmtree(d)
+
+
+def test_manifest_regenerate_digest_mismatch_flagged():
+    matrix = ca.load_matrix()
+    d, rel = _tmp_proj_dir()
+    try:
+        out = f"{rel}/out.txt"
+        # committed digest is for different content than the generator produces
+        stale = hashlib.sha256(b"older-content").hexdigest()
+        fake = _manifest_with(out, {
+            "mode": "regenerate",
+            "command": f"printf 'generated-v1' > {out}",
+            "algorithm": "sha256",
+            "digest": stale,
+        })
+        v = ca.check_manifest(matrix, manifest=fake)
+        assert any(x["failure_class"] == "projection-drift"
+                   and "committed projection is stale" in x["detail"] for x in v)
+    finally:
+        shutil.rmtree(d)
+
+
+def test_manifest_regenerate_inactive_skipped():
+    # inactive TypeSpec projections carry regenerate directives but must not
+    # execute until flipped active (codegen has not landed yet)
+    matrix = ca.load_matrix()
+    d, rel = _tmp_proj_dir()
+    try:
+        out = f"{rel}/out.txt"
+        fake = {"projections": [
+            {"sourceSchema": REAL_WR_SRC,
+             "targetFormat": "pydantic-model",
+             "outputPath": out,
+             "active": False,
+             "verify": {"mode": "regenerate", "command": "definitely-not-a-real-command"}},
+        ]}
+        v = ca.check_manifest(matrix, manifest=fake)
+        assert v == []
+    finally:
+        shutil.rmtree(d)
 
 
 # ─── green: the committed matrix must validate ───────────────────────────────

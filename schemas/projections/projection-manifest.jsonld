@@ -19,6 +19,7 @@
     "active":           {"@id": "pr:active", "@type": "xsd:boolean"},
     "verify":           "pr:verify",
     "mode":             "pr:verifyMode",
+    "command":          "pr:verifyCommand",
     "algorithm":        "pr:digestAlgorithm",
     "digest":           "pr:digest"
   },
@@ -39,7 +40,12 @@
       "generator": "TypeSpec",
       "outputPath": "angular/nexus-console/src/models/work-request.model.ts",
       "lifecycle": "on-schema-change",
-      "active": false
+      "active": false,
+      "comment": "regenerate mode ready — flip active when the TS emitter is wired",
+      "verify": {
+        "mode": "regenerate",
+        "command": "npx tsp compile typespec/v1 --emit @typespec/openapi3"
+      }
     },
     {
       "sourceSchema": "schemas/wrp/work-request.schema.json",
@@ -74,7 +80,12 @@
       "generator": "TypeSpec",
       "outputPath": "python/cascade/events/schemas.py",
       "lifecycle": "on-schema-change",
-      "active": false
+      "active": false,
+      "comment": "regenerate mode ready — flip active when the http-client-python emitter is wired",
+      "verify": {
+        "mode": "regenerate",
+        "command": "npx tsp compile typespec/v1 --emit @typespec/http-client-python"
+      }
     },
     {
       "sourceSchema": "schemas/core/harvest.jsonld",
@@ -82,7 +93,12 @@
       "generator": "TypeSpec",
       "outputPath": "python/rover/schemas.py",
       "lifecycle": "on-schema-change",
-      "active": false
+      "active": false,
+      "comment": "regenerate mode ready — flip active when the http-client-python emitter is wired",
+      "verify": {
+        "mode": "regenerate",
+        "command": "npx tsp compile typespec/v1 --emit @typespec/http-client-python"
+      }
     },
     {
       "sourceSchema": "schemas/core/knowledge-graph.jsonld",
@@ -107,7 +123,12 @@
       "generator": "TypeSpec",
       "outputPath": "angular/nexus-console/src/models/service-mesh.model.ts",
       "lifecycle": "on-schema-change",
-      "active": false
+      "active": false,
+      "comment": "regenerate mode ready — flip active when the TS emitter is wired",
+      "verify": {
+        "mode": "regenerate",
+        "command": "npx tsp compile typespec/v1 --emit @typespec/openapi3"
+      }
     }
   ]
 }

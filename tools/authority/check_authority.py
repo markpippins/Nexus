@@ -29,13 +29,16 @@ Failure classes:
     unlisted-projection  — a declared projection does not exist, a file in
                            schemas/projections/ is undeclared, or the projection
                            manifest sources from a projection/superseded artifact
-    projection-drift     — an active projection's output is missing, or its
-                           committed digest no longer matches the on-disk artifact
+    projection-drift     — an active projection's output is missing, its committed
+                           digest no longer matches the on-disk artifact, or a
+                           regenerate-mode generator fails / produces no output /
+                           produces content that diverges from the committed digest
 """
 
 import hashlib
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -72,6 +75,31 @@ def file_digest(rel, algorithm="sha256"):
         return h.hexdigest()
     except (OSError, ValueError):
         return None
+
+
+def run_generator(command, timeout=300):
+    """Run a projection generator command from the repo root.
+
+    Returns (ok, detail): ok is False on non-zero exit, timeout, or failure to
+    spawn; detail carries the exit code and a tail of the captured output so
+    the failure surfaces in the validator report."""
+    try:
+        proc = subprocess.run(
+            command,
+            shell=True,
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return False, f"generator timed out after {timeout}s"
+    except OSError as exc:
+        return False, f"could not start generator: {exc}"
+    if proc.returncode != 0:
+        tail = (proc.stderr or proc.stdout or "").strip().splitlines()[-5:]
+        return False, f"exit {proc.returncode}: " + " | ".join(tail)
+    return True, ""
 
 
 # ─── CIR-SDM classification (mirrors tools/cir1/lint.py) ────────────────────
@@ -394,6 +422,51 @@ def check_manifest(matrix, manifest=None):
         out = normalize(proj.get("outputPath", ""))
         verify = proj.get("verify") or {}
         mode = verify.get("mode", "exists")
+
+        if mode == "regenerate":
+            # Strongest mode: run the generator, then require the output and
+            # (optionally) lock the regenerated artifact against a committed
+            # digest. A passing run proves the generator actually produces the
+            # committed output — no silent divergence between source schema and
+            # projection. Designed for TypeSpec codegen: flip `active: true` on
+            # a projection with this verify block once its emitter is wired.
+            command = verify.get("command")
+            if not command:
+                violations.append({
+                    "failure_class": "projection-drift",
+                    "domain": out,
+                    "detail": "regenerate verify mode requires a `command`",
+                })
+                continue
+            ok, detail = run_generator(command)
+            if not ok:
+                violations.append({
+                    "failure_class": "projection-drift",
+                    "domain": out,
+                    "detail": f"regeneration failed: {detail}",
+                })
+                continue
+            if not path_exists(out):
+                violations.append({
+                    "failure_class": "projection-drift",
+                    "domain": src,
+                    "detail": f"regeneration produced no output on disk: {out}",
+                })
+                continue
+            if verify.get("digest"):
+                algo = verify.get("algorithm", "sha256")
+                expected = verify.get("digest")
+                actual = file_digest(out, algo)
+                if expected and actual != expected:
+                    violations.append({
+                        "failure_class": "projection-drift",
+                        "domain": out,
+                        "detail": (f"regeneration produced different content than the committed "
+                                   f"digest ({algo}): expected {expected}, got {actual} — "
+                                   f"committed projection is stale"),
+                    })
+            continue
+
         if not path_exists(out):
             violations.append({
                 "failure_class": "projection-drift",
