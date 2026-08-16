@@ -15,10 +15,13 @@ caller, never inside ``evaluate``) and renders the startup audit state.
         enforced mode.
   AC4 — Only one-way-gate is enforced: a blocking-severity violation from a
         non-enforced family (audit-non-influence) stays non-blocking in
-        enforced mode.
-  AC5 — Purity + audit state: enforce() never mutates source events, repeated
+        enforced mode.   AC5 — Purity + audit state: enforce() never mutates source events, repeated
         calls are identical, and render_enforcement_state() reports shadow vs
         enforced with the active rule set.
+   AC6 — Governed-decision record (Step 8): governed_decisions() returns only
+        blocking violations (shadow mode → empty); violation_to_row() maps all
+        peb.cir_violations columns deterministically; a canonical row is never
+        mutated by the enforcement path.
 
 Usage:
     cd /home/codex/dev/nexus
@@ -43,8 +46,10 @@ from nexus_core.wrp.enforcement import (                              # noqa: E4
     DEFAULT_ENFORCED_RULES,
     ENFORCED_RULES_KEY,
     enforce,
+    governed_decisions,
     render_enforcement_state,
     resolve_enforced_rules,
+    violation_to_row,
 )
 
 # ── Golden fixtures (self-contained; mirrors the cir_sdm fixtures) ───
@@ -179,6 +184,58 @@ class TestAC5PurityAndAuditState(unittest.TestCase):
     def test_env_key_is_stable(self):
         # The flag name is part of the binding contract — lock it.
         self.assertEqual(ENFORCED_RULES_KEY, "CIR_SDM_ENFORCE")
+
+
+class TestAC6GovernedDecisionRecord(unittest.TestCase):
+    """AC6 (Step 8) — enforcement records a governed decision, never mutates."""
+
+    def test_governed_decisions_are_blocking_only(self):
+        # Enforced mode: the reverse-transition gate violation is the one
+        # governed decision; the cold-start warning is NOT (surfaces for review).
+        stream = REVERSE_STREAM + COLD_START_STREAM
+        violations = enforce(stream, env_value="1")
+        decisions = governed_decisions(violations)
+        self.assertEqual(len(decisions), 1)
+        self.assertEqual(decisions[0].rule_id, RULE_ONE_WAY_GATE)
+        self.assertTrue(decisions[0].blocking)
+
+    def test_governed_decisions_empty_in_shadow(self):
+        # Shadow mode: nothing blocks, so nothing is a governed decision.
+        violations = enforce(REVERSE_STREAM, env_value="0")
+        self.assertEqual(governed_decisions(violations), [])
+
+    def test_violation_to_row_maps_all_columns(self):
+        decisions = governed_decisions(enforce(REVERSE_STREAM, env_value="1"))
+        self.assertEqual(len(decisions), 1)
+        row = violation_to_row(decisions[0])
+        expected_keys = {
+            "violation_id", "cer_id", "event_id", "rule_id", "rule_version",
+            "severity", "description", "detected_at", "blocking",
+        }
+        self.assertEqual(set(row.keys()), expected_keys)  # no created_at
+        self.assertEqual(row["blocking"], True)
+        self.assertEqual(row["rule_id"], RULE_ONE_WAY_GATE)
+        self.assertEqual(row["event_id"], "e6")  # the offending event
+
+    def test_violation_to_row_is_deterministic(self):
+        decisions = governed_decisions(enforce(REVERSE_STREAM, env_value="1"))
+        self.assertEqual(violation_to_row(decisions[0]),
+                         violation_to_row(decisions[0]))
+
+    def test_enforcement_never_mutates_canonical_row(self):
+        # A canonical DB-row-shaped event must be byte-identical after the
+        # full enforcement path (enforce → governed_decisions → violation_to_row).
+        canonical_row = {
+            "event_id": "ev-1", "work_request_id": "wr-1",
+            "event_type": "WR_CLAIMED", "causation_id": "prev",
+            "actor_type": "system", "occurred_at": 1,
+        }
+        snapshot = copy.deepcopy(canonical_row)
+        stream = FORWARD_LIFECYCLE + [canonical_row]
+        violations = enforce(stream, env_value="1")
+        governed_decisions(violations)
+        [violation_to_row(v) for v in violations]
+        self.assertEqual(canonical_row, snapshot)
 
 
 if __name__ == "__main__":

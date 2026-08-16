@@ -54,7 +54,7 @@ Usage (dispatch path)::
 
 from __future__ import annotations
 
-from typing import Any, FrozenSet, Iterable, List, Optional
+from typing import Any, Dict, FrozenSet, Iterable, List, Optional
 
 from nexus_core.wrp.cir_sdm import (
     CIRViolation,
@@ -68,6 +68,8 @@ __all__ = [
     "resolve_enforced_rules",
     "enforce",
     "render_enforcement_state",
+    "governed_decisions",
+    "violation_to_row",
 ]
 
 # Env flag the enforcement caller reads (never inside the pure evaluate()).
@@ -124,3 +126,36 @@ def render_enforcement_state(env_value: Optional[str]) -> str:
         "CIR-SDM enforcement: enforced "
         f"(rules: {', '.join(sorted(rules))})"
     )
+
+
+def governed_decisions(violations: Iterable[CIRViolation]) -> List[CIRViolation]:
+    """The blocking violations an enforcement outcome must reject or record.
+
+    A "governed decision" is a blocking violation (``blocking=True``) — the
+    dispatch path either rejects the transition or records the decision in
+    ``peb.cir_violations``; it never silently alters canonical state (T23
+    Step 8). Warnings and shadow-mode violations are excluded: they surface
+    for review at dispatch, never auto-block.
+    """
+    return [v for v in violations if v.blocking]
+
+
+def violation_to_row(v: CIRViolation) -> Dict[str, Any]:
+    """Map a :class:`CIRViolation` to a ``peb.cir_violations`` row dict.
+
+    Pure and deterministic — no DB, no wall clock. ``detected_at`` is the
+    offending event's epoch seconds (``0`` → ``None``, the "unknown"
+    sentinel); the persistence caller converts it to a ``TIMESTAMPTZ``.
+    ``created_at`` is deliberately unset (housekeeping — DB default ``now()``).
+    """
+    return {
+        "violation_id": v.violation_id,
+        "cer_id": v.cer_id,
+        "event_id": v.event_id,
+        "rule_id": v.rule_id,
+        "rule_version": v.rule_version,
+        "severity": v.severity,
+        "description": v.description,
+        "detected_at": v.detected_at or None,
+        "blocking": v.blocking,
+    }
