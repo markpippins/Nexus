@@ -4811,9 +4811,19 @@ export function createRoutes(pool: Pool): Router {
 
       const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
 
+      // content is excluded from the default list projection to keep list
+      // payloads small (MCP inbox checks, etc.). ?includeContent=true opts in
+      // for UIs that render record bodies in the list (agent-records/reports).
+      const listColumns = `id, record_type, role, model, title, source_path, tags,
+           system_id, subsystem_id, feature_id, plan_ref, created_at, recorded_on_dt,
+           level, visibility_scope`;
+      const columns = req.query.includeContent === 'true'
+        ? `${listColumns}, content`
+        : listColumns;
+
       const [dataResult, countResult] = await Promise.all([
         pool.query(
-          `SELECT id, record_type, role, model, title, source_path, tags, system_id, subsystem_id, feature_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
+          `SELECT ${columns}
            FROM nebula.agent_records ${where}
            ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
           [...vals, pageSize, offset]
