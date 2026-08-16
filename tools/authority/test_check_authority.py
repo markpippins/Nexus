@@ -89,6 +89,26 @@ def test_unlisted_projection_missing_file():
     assert any(x["failure_class"] == "unlisted-projection" for x in v)
 
 
+def test_manifest_source_from_projection_flagged():
+    matrix = ca.load_matrix()
+    fake = {"projections": [
+        {"sourceSchema": "schemas/core/work-request.jsonld",  # a projection, not canonical
+         "targetFormat": "json-ld", "outputPath": "x", "active": True},
+    ]}
+    v = ca.check_manifest(matrix, manifest=fake)
+    assert any("projection" in x["detail"] for x in v if x["failure_class"] == "unlisted-projection")
+
+
+def test_manifest_source_from_superseded_flagged():
+    matrix = ca.load_matrix()
+    fake = {"projections": [
+        {"sourceSchema": ".agents/schema/work_request.schema.json",  # superseded
+         "targetFormat": "json-ld", "outputPath": "x", "active": True},
+    ]}
+    v = ca.check_manifest(matrix, manifest=fake)
+    assert any("superseded" in x["detail"] for x in v if x["failure_class"] == "unlisted-projection")
+
+
 # ─── intent-vs-state split ─────────────────────────────────────────────────
 
 def test_mode_is_ir_layer_not_execution_state():
@@ -110,6 +130,12 @@ def test_real_scan_has_single_authority_per_class():
     # and the IR layer class must resolve to the canonical work-request schema
     ir_files = {rel for rel, _ in index.get("ir_layer", [])}
     assert ir_files == {"schemas/wrp/work-request.schema.json"}
+
+
+def test_manifest_sources_are_canonical():
+    matrix = ca.load_matrix()
+    v = ca.check_manifest(matrix)
+    assert v == []
 
 
 # ─── green: the committed matrix must validate ───────────────────────────────

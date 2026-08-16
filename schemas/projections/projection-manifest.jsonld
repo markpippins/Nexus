@@ -30,58 +30,74 @@
 
   "projections": [
     {
-      "sourceSchema": "nexus/schemas/core/work-request.jsonld",
+      "sourceSchema": "schemas/wrp/work-request.schema.json",
       "targetFormat": "typescript-type",
       "generator": "TypeSpec",
-      "outputPath": "nexus/angular/nexus-console/src/models/work-request.model.ts",
+      "outputPath": "angular/nexus-console/src/models/work-request.model.ts",
       "lifecycle": "on-schema-change",
       "active": true
     },
     {
-      "sourceSchema": "nexus/schemas/core/work-request.jsonld",
+      "sourceSchema": "schemas/wrp/work-request.schema.json",
       "targetFormat": "pydantic-model",
       "generator": "TypeSpec",
-      "outputPath": "nexus/python/conduit/work_request.py",
+      "outputPath": "python/conduit/work_request.py",
       "lifecycle": "on-schema-change",
       "active": true
     },
     {
-      "sourceSchema": "nexus/schemas/core/haervest.jsonld",
-      "targetFormat": "pydantic-model",
-      "generator": "TypeSpec",
-      "outputPath": "nexus/python/rover/schemas.py",
-      "lifecycle": "on-schema-change",
-      "active": false
-    },
-    {
-      "sourceSchema": "nexus/schemas/core/knowledge-graph.jsonld",
-      "targetFormat": "postgres-ddl",
+      "sourceSchema": "schemas/wrp/work-request.schema.json",
+      "targetFormat": "json-ld",
       "generator": "manual",
-      "outputPath": "nexus/schemas/projections/knowledge-graph.sql",
+      "outputPath": "schemas/core/work-request.jsonld",
       "lifecycle": "on-schema-change",
       "active": true
     },
     {
-      "sourceSchema": "nexus/schemas/core/knowledge-graph.jsonld",
-      "targetFormat": "python-migration-script",
+      "sourceSchema": "schemas/wrp/wrp-event.schema.json",
+      "targetFormat": "json-ld",
       "generator": "manual",
-      "outputPath": "nexus/python/knowledge_steward/migrate_graph.py",
+      "outputPath": "schemas/core/event.jsonld",
       "lifecycle": "on-schema-change",
       "active": true
     },
     {
-      "sourceSchema": "nexus/schemas/core/service.jsonld",
-      "targetFormat": "angular-service",
-      "generator": "TypeSpec",
-      "outputPath": "nexus/angular/nexus-console/src/models/service-mesh.model.ts",
-      "lifecycle": "on-schema-change",
-      "active": false
-    },
-    {
-      "sourceSchema": "nexus/schemas/core/event.jsonld",
+      "sourceSchema": "schemas/wrp/wrp-event.schema.json",
       "targetFormat": "python-model",
       "generator": "TypeSpec",
-      "outputPath": "nexus/python/cascade/events/schemas.py",
+      "outputPath": "python/cascade/events/schemas.py",
+      "lifecycle": "on-schema-change",
+      "active": false
+    },
+    {
+      "sourceSchema": "schemas/core/harvest.jsonld",
+      "targetFormat": "pydantic-model",
+      "generator": "TypeSpec",
+      "outputPath": "python/rover/schemas.py",
+      "lifecycle": "on-schema-change",
+      "active": false
+    },
+    {
+      "sourceSchema": "schemas/core/knowledge-graph.jsonld",
+      "targetFormat": "postgres-ddl",
+      "generator": "manual",
+      "outputPath": "schemas/projections/knowledge-graph.sql",
+      "lifecycle": "on-schema-change",
+      "active": true
+    },
+    {
+      "sourceSchema": "schemas/core/knowledge-graph.jsonld",
+      "targetFormat": "python-migration-script",
+      "generator": "manual",
+      "outputPath": "python/knowledge_steward/migrate_graph.py",
+      "lifecycle": "on-schema-change",
+      "active": true
+    },
+    {
+      "sourceSchema": "schemas/core/service.jsonld",
+      "targetFormat": "angular-service",
+      "generator": "TypeSpec",
+      "outputPath": "angular/nexus-console/src/models/service-mesh.model.ts",
       "lifecycle": "on-schema-change",
       "active": false
     }

@@ -26,8 +26,9 @@ Exit codes:
 Failure classes:
     no-authority         — a matrix domain has no resolvable canonical authority
     duplicate-class      — a semantic class is claimed by >1 authoritative file
-    unlisted-projection  — a declared projection does not exist, or a file in
-                           schemas/projections/ is not declared as a projection
+    unlisted-projection  — a declared projection does not exist, a file in
+                           schemas/projections/ is undeclared, or the projection
+                           manifest sources from a projection/superseded artifact
 """
 
 import json
@@ -43,10 +44,14 @@ PROJECTION_MANIFEST = PROJECTIONS_DIR / "projection-manifest.jsonld"
 # ─── Path helpers ────────────────────────────────────────────────────────────
 
 def normalize(p):
-    """Strip a leading ./ and any surrounding whitespace for stable comparison."""
+    """Strip a leading ./ or nexus/ prefix and surrounding whitespace for
+    stable comparison. The redundant `nexus/` prefix appears in older manifests
+    only; repo-relative paths never carry it."""
     s = str(p).strip()
     while s.startswith("./"):
         s = s[2:]
+    if s.startswith("nexus/"):
+        s = s[len("nexus/"):]
     return s
 
 
@@ -326,12 +331,52 @@ def check_unlisted_projection(matrix):
     return violations
 
 
+def check_manifest(matrix, manifest=None):
+    """unlisted-projection (manifest): a projection or superseded artifact must
+    never be used as a manifest sourceSchema — only a canonical authority may
+    be a source. This is the 'one authority per class, one projection edge per
+    artifact' rule applied to the projection manifest."""
+    violations = []
+    if manifest is None:
+        if not PROJECTION_MANIFEST.exists():
+            return violations
+        try:
+            manifest = json.loads(PROJECTION_MANIFEST.read_text())
+        except (json.JSONDecodeError, OSError):
+            return violations
+
+    projections = set()
+    superseded = set()
+    for entry in matrix.get("authorities", []):
+        for p in (entry.get("projections") or []):
+            projections.add(normalize(p))
+        for p in (entry.get("superseded") or []):
+            superseded.add(normalize(p))
+
+    for proj in manifest.get("projections", []):
+        src = normalize(proj.get("sourceSchema", ""))
+        if src in projections:
+            violations.append({
+                "failure_class": "unlisted-projection",
+                "domain": src,
+                "detail": "manifest sources from a projection, not the canonical authority",
+            })
+        elif src in superseded:
+            violations.append({
+                "failure_class": "unlisted-projection",
+                "domain": src,
+                "detail": "manifest sources from a superseded artifact",
+            })
+    return violations
+
+
 def run_checks(matrix):
     violations = []
     violations += check_registry(matrix)
     index = collect_semantic_classes(matrix, list(iter_json_files()))
     violations += check_duplicate_class(matrix, index)
     violations += check_unlisted_projection(matrix)
+    violations += check_manifest(matrix)
     return violations
 
 
