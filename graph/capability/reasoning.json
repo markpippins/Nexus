@@ -1,0 +1,85 @@
+[
+  {
+    "id": "reason.classify",
+    "type": "inference",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "text": {"type": "string"}
+      },
+      "required": ["text"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "class": {"type": "string"},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "model_hint": "flash",
+    "confidence_threshold": 0.6,
+    "validation_strategy": "deterministic_guard"
+  },
+  {
+    "id": "reason.summarize",
+    "type": "inference",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "text": {"type": "string"}
+      },
+      "required": ["text"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "summary": {"type": "string"},
+        "key_points": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "model_hint": "flash",
+    "confidence_threshold": 0.5,
+    "validation_strategy": "none"
+  },
+  {
+    "id": "reason.plan",
+    "type": "inference",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "goal": {"type": "string"},
+        "context": {"type": "object"}
+      },
+      "required": ["goal"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "steps": {"type": "array", "items": {"type": "object"}},
+        "strategy": {"type": "string"}
+      }
+    },
+    "model_hint": "pro",
+    "confidence_threshold": 0.7,
+    "validation_strategy": "human_review"
+  },
+  {
+    "id": "reason.validate",
+    "type": "deterministic",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "plan": {"type": "object"}
+      },
+      "required": ["plan"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "valid": {"type": "boolean"},
+        "errors": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "implementation": "python/conduit/plan_validator.py:validate"
+  }
+]

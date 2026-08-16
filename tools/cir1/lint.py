@@ -377,8 +377,12 @@ def check_cir5(index, violations):
         authoritative = []
         for o in occurrences:
             p = o["path"]
+            # cache/mirror/quarantine + point-in-time snapshots are generated
+            # projections, never authoritative (snapshot = Wave-3 rule)
             if "cache" not in p and "mirror" not in p \
-               and "quarantine" not in p and "CIR" not in p:
+               and "quarantine" not in p and "CIR" not in p \
+               and "snapshot" not in p and ".bak" not in p \
+               and ".pre-rebuild" not in p:
                 authoritative.append(o)
         if len(authoritative) > 1:
             a0, a1 = authoritative[0], authoritative[1]

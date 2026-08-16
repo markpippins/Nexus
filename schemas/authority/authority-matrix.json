@@ -59,7 +59,7 @@
       "kind": "json-ld",
       "superseded": [],
       "projections": ["schemas/projections/knowledge-graph.sql"],
-      "note": "Canonical graph type definition. The SQL projection is regenerated from it."
+      "note": "Canonical graph type definition. The SQL projection is regenerated from it. GraphSnapshot/VectorSnapshot (knowledge-graph.jsonld, extensions/vector-snapshot.jsonld) and graph-data backups (graph/nexus-knowledge-graph.json.bak/.pre-rebuild) are GENERATED PROJECTIONS — point-in-time artifacts that never carry canonical authority."
     }
   ]
 }

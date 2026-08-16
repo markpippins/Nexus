@@ -1,0 +1,56 @@
+{
+  "id": "filesystem-scan",
+  "description": "Filesystem observation workflow (Voyager) — scan a directory tree, classify the significance of changes, and notify.",
+  "domain": "filesystem",
+  "nodes": [
+    {
+      "id": "vfs.scan",
+      "type": "external_tool",
+      "input_schema": {
+        "type": "object",
+        "properties": {"path": {"type": "string"}},
+        "required": ["path"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {"entries": {"type": "array", "items": {"type": "object"}}}
+      },
+      "interface": {"protocol": "shell", "endpoint": "python/voyager/"}
+    },
+    {
+      "id": "reason.classify",
+      "type": "inference",
+      "input_schema": {
+        "type": "object",
+        "properties": {"text": {"type": "string"}},
+        "required": ["text"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "class": {"type": "string"},
+          "confidence": {"type": "number"}
+        }
+      },
+      "model_hint": "flash",
+      "validation_strategy": "deterministic_guard"
+    },
+    {
+      "id": "vfs.notify",
+      "type": "external_tool",
+      "input_schema": {
+        "type": "object",
+        "properties": {"message": {"type": "string"}},
+        "required": ["message"]
+      },
+      "output_schema": {"type": "object"},
+      "interface": {"protocol": "mcp", "endpoint": "voyager/notify"}
+    }
+  ],
+  "edges": [
+    {"source": "vfs.scan", "target": "reason.classify", "semantics": "data_flow"},
+    {"source": "reason.classify", "target": "vfs.notify", "semantics": "control_flow"}
+  ],
+  "entry_point": "vfs.scan",
+  "output_node": "vfs.notify"
+}

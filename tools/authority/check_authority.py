@@ -306,7 +306,11 @@ def check_duplicate_class(matrix, index):
         for rel, key in occurrences:
             if rel in superseded:
                 continue
-            if any(t in rel for t in ("cache", "mirror", "quarantine", "CIR")):
+            # cache/mirror/quarantine artifacts and point-in-time snapshots are
+            # generated projections — never authoritative (snapshot exclusion is
+            # the Wave-3 'snapshot as generated projection' rule)
+            if any(t in rel for t in ("cache", "mirror", "quarantine", "CIR",
+                                      "snapshot", ".bak", ".pre-rebuild")):
                 continue
             authoritative.append((rel, key))
         files = sorted(set(rel for rel, _ in authoritative))

@@ -1,0 +1,58 @@
+{
+  "id": "document-ingest",
+  "description": "DocLing ingestion workflow — parse an HTML source, extract chunks, and summarize the result.",
+  "domain": "ingestion",
+  "nodes": [
+    {
+      "id": "ingest.html",
+      "type": "deterministic",
+      "input_schema": {
+        "type": "object",
+        "properties": {"source": {"type": "string"}},
+        "required": ["source"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {"document": {"type": "object"}}
+      },
+      "implementation": "bin/ingest_history.py:parse_html"
+    },
+    {
+      "id": "ingest.extract",
+      "type": "deterministic",
+      "input_schema": {
+        "type": "object",
+        "properties": {"document": {"type": "object"}},
+        "required": ["document"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {"chunks": {"type": "array", "items": {"type": "object"}}}
+      },
+      "implementation": "bin/ingest_conduit_data.py:extract_chunks"
+    },
+    {
+      "id": "reason.summarize",
+      "type": "inference",
+      "input_schema": {
+        "type": "object",
+        "properties": {"text": {"type": "string"}},
+        "required": ["text"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"},
+          "key_points": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "model_hint": "flash"
+    }
+  ],
+  "edges": [
+    {"source": "ingest.html", "target": "ingest.extract", "semantics": "data_flow"},
+    {"source": "ingest.extract", "target": "reason.summarize", "semantics": "data_flow"}
+  ],
+  "entry_point": "ingest.html",
+  "output_node": "reason.summarize"
+}
