@@ -318,6 +318,16 @@ const FORBIDDEN_COMPILER_FIELDS = [
   "queuePosition",
 ];
 
+// D3: identity is owned by the EMISSION BOUNDARY (nexus_core.wrp.identity /
+// compile.py), never the compiler. A compiler emits the derivation rule +
+// canonical inputs; a pre-computed entityKey in compiler output is a contract
+// violation (any compiler change would otherwise silently change identities).
+const FORBIDDEN_IDENTITY_FIELDS = [
+  "entityKey",
+  "entity_key",
+  "identity",
+];
+
 export function validateCompilerOutput(output: unknown): asserts output is CompilerOutput {
   if (!output || typeof output !== "object") {
     throw new Error("Compiler output must be a non-null object");
@@ -331,6 +341,17 @@ export function validateCompilerOutput(output: unknown): asserts output is Compi
       throw new Error(
         `COMPILER_LEAK: Field "${field}" is forbidden in compiler output. ` +
         `Execution semantics belong to the Runtime, not the Compiler.`,
+      );
+    }
+  }
+
+  // D3: reject pre-computed identity (entityKey/identity/entity_key).
+  for (const field of FORBIDDEN_IDENTITY_FIELDS) {
+    if (field in obj) {
+      throw new Error(
+        `IDENTITY_LEAK: Field "${field}" is forbidden in compiler output. ` +
+        `entityKey is derived at the emission boundary, not pre-computed by ` +
+        `the compiler.`,
       );
     }
   }
