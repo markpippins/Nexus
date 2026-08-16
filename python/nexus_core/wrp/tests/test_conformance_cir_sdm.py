@@ -39,6 +39,10 @@ LLM-free — no DB, no network, no wall-clock dependence.
   AC12 — Structural: the canonical WR transition table still mirrors the
          TypeScript TRANSITION_TABLE (DRAFT→WR_SUBMITTED→VALIDATED;
          SETTLED terminal) and pgv initial state is PHASE_2_FROZEN.
+  AC13 — Future-parent (F2): a CER citing a parent event that appears LATER in
+         the stream → upstream-injection violation (warning).
+  AC14 — Interleaved multi-WR (F1): two WRs interleaved in one ordered stream,
+         each following its own legal lifecycle → ZERO one-way-gate violations.
 
 Usage:
     cd /home/codex/dev/nexus
@@ -347,6 +351,85 @@ class TestAC11NoMutation(unittest.TestCase):
         snapshot = copy.deepcopy(stream)
         evaluate(stream)
         self.assertEqual(stream, snapshot)
+
+
+class TestAC13FutureParent(unittest.TestCase):
+    """AC13 (F2) — a parent resolving to a LATER event is an upstream injection."""
+
+    def test_future_parent_is_flagged(self):
+        # gen-1 cites child-2 as its parent, but child-2 appears later.
+        stream = [
+            _cer("gen-1", domain="execution", action="execute",
+                 parents=("child-2",)),
+            _cer("child-2", domain="execution", action="execute"),
+        ]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_PROVENANCE_CAUSATION]
+        self.assertEqual(len(offenders), 1)
+        v = offenders[0]
+        self.assertEqual(v.event_id, "gen-1")
+        self.assertEqual(v.rule_version, "1")
+        self.assertEqual(v.severity, "warning")
+        self.assertIn("upstream injection", v.description)
+        self.assertIn("child-2", v.description)
+
+    def test_self_reference_is_flagged(self):
+        # A CER citing itself as parent resolves at its own index (>= idx).
+        stream = [_cer("gen-1", domain="execution", action="execute",
+                       parents=("gen-1",))]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_PROVENANCE_CAUSATION]
+        self.assertEqual(len(offenders), 1)
+        self.assertIn("upstream injection", offenders[0].description)
+
+    def test_earlier_parent_stays_clean(self):
+        # parent before child — legal, no provenance violation.
+        stream = [
+            _cer("spec-1", domain="specification", action="validate"),
+            _cer("gen-1", domain="execution", action="execute",
+                 parents=("spec-1",)),
+        ]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_PROVENANCE_CAUSATION]
+        self.assertEqual(offenders, [])
+
+
+class TestAC14InterleavedMultiWr(unittest.TestCase):
+    """AC14 (F1) — interleaved WRs fold per-wr_id; no false gate violations."""
+
+    def test_interleaved_legal_lifecycles(self):
+        # wr-1 and wr-2 interleave: each independently follows its own legal
+        # lifecycle. A global fold would flag these as illegal transitions.
+        stream = [
+            _wr("e1", "wr-1", "WR_SUBMITTED", 1),   # wr-1 DRAFT→VALIDATED
+            _wr("e2", "wr-2", "WR_SUBMITTED", 2),   # wr-2 DRAFT→VALIDATED
+            _wr("e3", "wr-1", "WR_VALIDATED", 3),   # wr-1 VALIDATED→QUEUED
+            _wr("e4", "wr-2", "WR_VALIDATED", 4),   # wr-2 VALIDATED→QUEUED
+            _wr("e5", "wr-1", "WR_QUEUED", 5),      # wr-1 QUEUED→CLAIMED
+            _wr("e6", "wr-2", "WR_QUEUED", 6),      # wr-2 QUEUED→CLAIMED
+            _wr("e7", "wr-1", "WR_CLAIMED", 7),     # wr-1 CLAIMED→ACKED
+            _wr("e8", "wr-1", "WR_ACKED", 8),       # wr-1 ACKED→SETTLED
+            _wr("e9", "wr-2", "WR_CLAIMED", 9),     # wr-2 CLAIMED→ACKED
+            _wr("e10", "wr-2", "WR_ACKED", 10),     # wr-2 ACKED→SETTLED
+        ]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_ONE_WAY_GATE]
+        self.assertEqual(offenders, [])
+
+    def test_reverse_transition_still_caught_per_wr(self):
+        # wr-1 is SETTLED; a WR_CLAIMED for wr-1 is illegal — but the same
+        # event type for wr-2 (which is only VALIDATED) is not.
+        stream = [
+            _wr("e1", "wr-1", "WR_SUBMITTED", 1),
+            _wr("e2", "wr-1", "WR_VALIDATED", 2),
+            _wr("e3", "wr-1", "WR_QUEUED", 3),
+            _wr("e4", "wr-1", "WR_CLAIMED", 4),
+            _wr("e5", "wr-1", "WR_ACKED", 5),       # wr-1 → SETTLED
+            _wr("e6", "wr-1", "WR_CLAIMED", 6),     # wr-1 SETTLED→ illegal
+        ]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_ONE_WAY_GATE]
+        self.assertEqual([v.event_id for v in offenders], ["e6"])
 
 
 class TestAC12StructuralGuard(unittest.TestCase):

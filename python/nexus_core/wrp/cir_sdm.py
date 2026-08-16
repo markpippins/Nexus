@@ -440,19 +440,27 @@ def rule_one_way_gate(
 ) -> List[CIRViolation]:
     """CIRS-3 — no illegal/reverse transitions in the ordered stream.
 
-    Folds the WR runtime axis (starting ``DRAFT``) and the pgv phase axis
-    (starting ``PHASE_2_FROZEN``) independently; any event whose target state
-    is not reachable from the current state is a violation. A reverse
-    transition (e.g. a ``WR_CLAIMED`` after ``SETTLED``) is caught as an
-    illegal transition from a terminal state.
+    The WR runtime axis is folded **per WorkRequest** (a dict keyed by
+    ``wr_id``): the conduit ``work_request_events`` log is interleaved, so
+    multiple WRs share one ordered stream. A single global fold would flag a
+    perfectly legal interleave (wr-1 advancing while wr-2 starts at DRAFT) as
+    an illegal transition. The pgv phase axis is folded **globally** (phase is
+    not scoped to a WR).
+
+    Any event whose target state is not reachable from its WR's current state
+    is a violation. A reverse transition (e.g. a ``WR_CLAIMED`` after
+    ``SETTLED``) is caught as an illegal transition from a terminal state.
     """
     _check_rule_version(RULE_ONE_WAY_GATE, rule_version)
     violations: List[CIRViolation] = []
-    wr_status = WR_INITIAL_STATUS
+    # Per-WR fold — key by wr_id (empty string buckets wr_id-less WR events).
+    wr_statuses: Dict[str, str] = {}
     phase = PGV_INITIAL_STATE
 
     for ev in events:
         if ev.is_wr_event:
+            wr_key = ev.wr_id or ""
+            wr_status = wr_statuses.get(wr_key, WR_INITIAL_STATUS)
             allowed = WR_TRANSITIONS.get(wr_status)
             if allowed is None:
                 # Unknown status — treat as terminal; nothing may follow.
@@ -476,7 +484,7 @@ def rule_one_way_gate(
                 # Do not advance past an illegal event — the stream stays put,
                 # so a subsequent event is also evaluated from the same status.
                 continue
-            wr_status = next_status
+            wr_statuses[wr_key] = next_status
 
         elif ev.phase is not None:
             allowed_phases = PGV_TRANSITIONS.get(phase, frozenset())
@@ -533,30 +541,49 @@ def rule_provenance_causation(
     events: Iterable[CanonicalEvent],
     rule_version: str = RULE_VERSIONS[RULE_PROVENANCE_CAUSATION],
 ) -> List[CIRViolation]:
-    """Provenance — dangling causation (a parent id resolving nowhere).
+    """Provenance — dangling or upstream-injecting causation.
 
     Every ``parent_event_id`` a CER cites must resolve to an event present
-    earlier in the stream (or be an explicitly declared external source — an
-    event with no parent ids has nothing to resolve, so it is not flagged here;
-    the version-lock rule owns the "every CER carries a version" check).
-    Severity is ``warning`` (not blocking): a missing parent is frequently a
-    stream-slice boundary, not a fabrication — exactly the "ambiguous partial
-    evidence" case T23 Step 5 requires be non-blocking.
+    **earlier** in the stream (strictly lower index than the citing event).
+    Two distinct violation classes, both ``warning`` severity:
+
+      * **dangling** — the parent id resolves to no event in the stream (an
+        ambiguous stream-slice boundary, per T23 Step 5).
+      * **upstream injection** — the parent id resolves to an event at or after
+        its child (a causal edge pointing forward in time). This is a
+        deterministic direction breach (CAUSAL: "no causal edges that inject
+        upstream"), not a slice boundary — blocking-eligible after Step 7.
+
+    An event with no parent ids has nothing to resolve, so it is not flagged
+    here; the version-lock rule owns the "every CER carries a version" check.
     """
     _check_rule_version(RULE_PROVENANCE_CAUSATION, rule_version)
     materialized = list(events)
-    known_ids = {ev.event_id for ev in materialized if ev.event_id}
+    # First-occurrence index per id — a parent resolves temporally iff it
+    # appears at an index strictly earlier than the citing event.
+    index_by_id: Dict[str, int] = {}
+    for idx, ev in enumerate(materialized):
+        if ev.event_id and ev.event_id not in index_by_id:
+            index_by_id[ev.event_id] = idx
 
     violations: List[CIRViolation] = []
-    for ev in materialized:
+    for idx, ev in enumerate(materialized):
         if ev.is_audit:
             continue
         for parent in ev.parent_event_ids:
-            if parent not in known_ids:
+            parent_idx = index_by_id.get(parent)
+            if parent_idx is None:
                 violations.append(_make_violation(
                     RULE_PROVENANCE_CAUSATION, ev, "warning",
                     f"dangling causation: parent event {parent!r} resolves to no "
                     f"event in the stream",
+                    cer_id=ev.event_id,
+                ))
+            elif parent_idx >= idx:
+                violations.append(_make_violation(
+                    RULE_PROVENANCE_CAUSATION, ev, "warning",
+                    f"upstream injection: parent event {parent!r} appears at or "
+                    f"after its child (index {parent_idx} >= {idx})",
                     cer_id=ev.event_id,
                 ))
     return violations
