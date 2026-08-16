@@ -29,8 +29,11 @@ Failure classes:
     unlisted-projection  — a declared projection does not exist, a file in
                            schemas/projections/ is undeclared, or the projection
                            manifest sources from a projection/superseded artifact
+    projection-drift     — an active projection's output is missing, or its
+                           committed digest no longer matches the on-disk artifact
 """
 
+import hashlib
 import json
 import os
 import sys
@@ -57,6 +60,18 @@ def normalize(p):
 
 def path_exists(rel):
     return (REPO_ROOT / normalize(rel)).exists()
+
+
+def file_digest(rel, algorithm="sha256"):
+    """Recompute the digest of a repo-relative file. Returns None on failure."""
+    try:
+        h = hashlib.new(algorithm)
+        with open(REPO_ROOT / normalize(rel), "rb") as fh:
+            for chunk in iter(lambda: fh.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except (OSError, ValueError):
+        return None
 
 
 # ─── CIR-SDM classification (mirrors tools/cir1/lint.py) ────────────────────
@@ -367,6 +382,31 @@ def check_manifest(matrix, manifest=None):
                 "domain": src,
                 "detail": "manifest sources from a superseded artifact",
             })
+
+        # Executable verification: active projections must resolve, and any
+        # declared digest must match the committed artifact.
+        if not proj.get("active", True):
+            continue
+        out = normalize(proj.get("outputPath", ""))
+        verify = proj.get("verify") or {}
+        mode = verify.get("mode", "exists")
+        if not path_exists(out):
+            violations.append({
+                "failure_class": "projection-drift",
+                "domain": src,
+                "detail": f"active projection output missing on disk: {out}",
+            })
+            continue
+        if mode == "digest":
+            algo = verify.get("algorithm", "sha256")
+            expected = verify.get("digest")
+            actual = file_digest(out, algo)
+            if expected and actual != expected:
+                violations.append({
+                    "failure_class": "projection-drift",
+                    "domain": out,
+                    "detail": f"digest mismatch ({algo}): expected {expected}, got {actual}",
+                })
     return violations
 
 

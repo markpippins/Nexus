@@ -138,6 +138,43 @@ def test_manifest_sources_are_canonical():
     assert v == []
 
 
+def test_manifest_active_output_missing_flagged():
+    matrix = ca.load_matrix()
+    fake = {"projections": [
+        {"sourceSchema": "schemas/wrp/work-request.schema.json",
+         "targetFormat": "typescript-type",
+         "outputPath": "nope/missing.model.ts",
+         "active": True, "verify": {"mode": "exists"}},
+    ]}
+    v = ca.check_manifest(matrix, manifest=fake)
+    assert any(x["failure_class"] == "projection-drift" and "missing" in x["detail"] for x in v)
+
+
+def test_manifest_digest_mismatch_flagged():
+    matrix = ca.load_matrix()
+    fake = {"projections": [
+        {"sourceSchema": "schemas/wrp/work-request.schema.json",
+         "targetFormat": "json-ld",
+         "outputPath": "schemas/core/work-request.jsonld",
+         "active": True, "verify": {"mode": "digest", "algorithm": "sha256", "digest": "0" * 64}},
+    ]}
+    v = ca.check_manifest(matrix, manifest=fake)
+    assert any(x["failure_class"] == "projection-drift" and "digest mismatch" in x["detail"] for x in v)
+
+
+def test_manifest_digest_match_passes():
+    matrix = ca.load_matrix()
+    real_digest = ca.file_digest("schemas/core/work-request.jsonld")
+    fake = {"projections": [
+        {"sourceSchema": "schemas/wrp/work-request.schema.json",
+         "targetFormat": "json-ld",
+         "outputPath": "schemas/core/work-request.jsonld",
+         "active": True, "verify": {"mode": "digest", "algorithm": "sha256", "digest": real_digest}},
+    ]}
+    v = ca.check_manifest(matrix, manifest=fake)
+    assert v == []
+
+
 # ─── green: the committed matrix must validate ───────────────────────────────
 
 def test_real_matrix_passes():

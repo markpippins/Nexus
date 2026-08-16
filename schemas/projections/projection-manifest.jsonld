@@ -16,7 +16,11 @@
     "generator":        "pr:generator",
     "outputPath":       "pr:outputPath",
     "lifecycle":        "pr:lifecycle",
-    "active":           {"@id": "pr:active", "@type": "xsd:boolean"}
+    "active":           {"@id": "pr:active", "@type": "xsd:boolean"},
+    "verify":           "pr:verify",
+    "mode":             "pr:verifyMode",
+    "algorithm":        "pr:digestAlgorithm",
+    "digest":           "pr:digest"
   },
 
   "@graph": [
@@ -35,7 +39,7 @@
       "generator": "TypeSpec",
       "outputPath": "angular/nexus-console/src/models/work-request.model.ts",
       "lifecycle": "on-schema-change",
-      "active": true
+      "active": false
     },
     {
       "sourceSchema": "schemas/wrp/work-request.schema.json",
@@ -43,7 +47,8 @@
       "generator": "TypeSpec",
       "outputPath": "python/conduit/work_request.py",
       "lifecycle": "on-schema-change",
-      "active": true
+      "active": true,
+      "verify": {"mode": "exists"}
     },
     {
       "sourceSchema": "schemas/wrp/work-request.schema.json",
@@ -51,7 +56,8 @@
       "generator": "manual",
       "outputPath": "schemas/core/work-request.jsonld",
       "lifecycle": "on-schema-change",
-      "active": true
+      "active": true,
+      "verify": {"mode": "digest", "algorithm": "sha256", "digest": "3c80a729889a9ab692b88c2d77fb88bbd76fd2827379d3d0324757ec0e95b614"}
     },
     {
       "sourceSchema": "schemas/wrp/wrp-event.schema.json",
@@ -59,7 +65,8 @@
       "generator": "manual",
       "outputPath": "schemas/core/event.jsonld",
       "lifecycle": "on-schema-change",
-      "active": true
+      "active": true,
+      "verify": {"mode": "digest", "algorithm": "sha256", "digest": "3d4881cadda1823871c8690a36251d839b9f007fa880d96ec0485049be338e48"}
     },
     {
       "sourceSchema": "schemas/wrp/wrp-event.schema.json",
@@ -83,7 +90,8 @@
       "generator": "manual",
       "outputPath": "schemas/projections/knowledge-graph.sql",
       "lifecycle": "on-schema-change",
-      "active": true
+      "active": true,
+      "verify": {"mode": "digest", "algorithm": "sha256", "digest": "40d3bcadbab488399e779673407ed474b3f04161315fa64e1a4fd268fb184490"}
     },
     {
       "sourceSchema": "schemas/core/knowledge-graph.jsonld",
@@ -91,7 +99,7 @@
       "generator": "manual",
       "outputPath": "python/knowledge_steward/migrate_graph.py",
       "lifecycle": "on-schema-change",
-      "active": true
+      "active": false
     },
     {
       "sourceSchema": "schemas/core/service.jsonld",
