@@ -83,7 +83,7 @@ import { ToastService } from '../../services/toast.service';
           <div
             *ngFor="let forum of forums(); trackBy: trackById; let i = index"
             [attr.data-index]="i"
-            class="group rounded-lg border transition-all duration-150"
+            class="group border transition-all duration-150"
             [class]="getDragClasses(i, forum.id)"
             draggable="true"
             (dragstart)="onDragStart($event, i, forum.id)"
@@ -174,7 +174,7 @@ import { ToastService } from '../../services/toast.service';
 
       <!-- Delete Confirmation Modal -->
       <div *ngIf="deleteTarget()" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" (click)="deleteTarget.set(null)">
-        <div class="bg-white dark:bg-steel-800 rounded-xl shadow-xl p-5 max-w-sm w-full mx-3" (click)="$event.stopPropagation()">
+        <div class="bg-white dark:bg-steel-800 shadow-xl p-5 max-w-sm w-full mx-3" (click)="$event.stopPropagation()">
           <div class="flex items-center gap-3 mb-3">
             <div class="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
               <app-icon name="alert-triangle" class="w-4 h-4 text-red-600 dark:text-red-400"></app-icon>
