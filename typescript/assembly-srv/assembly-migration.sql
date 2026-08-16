@@ -139,3 +139,13 @@ SET role = u.alias
 FROM assembly.users u
 WHERE u.id = c.posted_by_id AND c.role IS NULL
   AND u.alias IN ('sysadmin','architect','planner','engineer','engineer-ii','devops','topologist','reviewer','critic','analyst','inspector');
+
+-- 11. Duality session-watch TTL — add 'expired' status. Lazy expiry runs in
+--     the assembly-srv duality routes (GET /api/duality/watches/*): watches
+--     idle past GREATEST(idle_timeout_ms, 1h) are marked expired and are no
+--     longer resumable, so stale test sessions stop piling up while recent
+--     closed/paused sessions stay visible for their error history.
+ALTER TABLE duality.session_watches DROP CONSTRAINT IF EXISTS session_watches_status_check;
+ALTER TABLE duality.session_watches
+  ADD CONSTRAINT session_watches_status_check
+  CHECK (status = ANY (ARRAY['active'::text, 'paused'::text, 'closed'::text, 'expired'::text]));

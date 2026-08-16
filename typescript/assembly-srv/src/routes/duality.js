@@ -6,6 +6,27 @@ export const dualityRouter = Router();
 
 // ── Session Watches ──────────────────────────────────────────────────
 
+/**
+ * Lazy stale-watch expiry (TTL). Watches that have been idle longer than
+ * GREATEST(idle_timeout_ms, 1h) are marked 'expired' and drop out of session
+ * resume lookups. Runs opportunistically on the watch reads so no background
+ * sweeper is needed; 'expired' is excluded from resume but the row is kept
+ * for audit. The 1h floor prevents aggressive 5-minute timeouts from
+ * orphaning a human chat session between turns.
+ */
+async function expireStaleWatches() {
+  try {
+    await pool.query(
+      `UPDATE duality.session_watches
+       SET status = 'expired', updated_at = now()
+       WHERE status IN ('active', 'paused')
+         AND last_activity < now() - (GREATEST(idle_timeout_ms, 3600000) || ' milliseconds')::interval`
+    );
+  } catch (err) {
+    console.error('[duality] stale-watch expiry failed:', err.message);
+  }
+}
+
 /** POST /api/duality/watches — create (or reactivate) a session watch for a thread.
  *
  *  UPSERT on the (thread_id, role) unique constraint: a watch that was
@@ -61,13 +82,16 @@ dualityRouter.post('/watches', async (req, res, next) => {
  *  returned the wrong session type, and the UI silently created a new thread
  *  instead of resuming the existing one).
  *
- *  Deliberately returns the most recent watch of ANY status: a session
- *  closed by the subscriber (e.g. lease-gate failure) must stay resumable so
- *  its error history remains visible — otherwise the user's message appears
- *  to "disappear" into an orphaned thread the UI can never reach.
+ *  Deliberately returns the most recent watch of ANY status except
+ *  'expired': a session closed by the subscriber (e.g. lease-gate failure)
+ *  must stay resumable so its error history remains visible — otherwise the
+ *  user's message appears to "disappear" into an orphaned thread the UI can
+ *  never reach. Only stale watches (idle past the TTL) are expired and drop
+ *  out of resume.
  */
 dualityRouter.get('/watches/active', async (req, res, next) => {
   try {
+    await expireStaleWatches();
     const { role, forumSlug, execution_backend } = req.query;
     if (!role || !forumSlug) {
       throw new BadRequestError('role and forumSlug query params are required');
@@ -81,7 +105,7 @@ dualityRouter.get('/watches/active', async (req, res, next) => {
     const result = await pool.query(
       `SELECT thread_id, role, execution_backend, status, last_activity
        FROM duality.session_watches
-       WHERE role = $1 AND forum_slug = $2${backendClause}
+       WHERE role = $1 AND forum_slug = $2 AND status <> 'expired'${backendClause}
        ORDER BY last_activity DESC
        LIMIT 1`,
       params
@@ -110,6 +134,7 @@ dualityRouter.get('/watches/active', async (req, res, next) => {
 /** GET /api/duality/watches/:threadId — get watches for a thread. */
 dualityRouter.get('/watches/:threadId', async (req, res, next) => {
   try {
+    await expireStaleWatches();
     const result = await pool.query(
       `SELECT id, thread_id, forum_slug, role, execution_backend, max_turns,
               turn_count, idle_timeout_ms, status, last_activity, created_at
