@@ -94,6 +94,7 @@ __all__ = [
     "WR_TRANSITIONS",
     "PGV_TRANSITIONS",
     "PGV_INITIAL_STATE",
+    "EVENT_TARGET_STATUS",
     "AUDIT_DOMAINS",
     "AUDIT_ACTOR_TYPES",
     "STAGE_SYNTHESIS",
@@ -114,7 +115,7 @@ RULE_CORE_STAGE_SEPARATION = "cir-sdm.core-stage-separation"
 # when its semantics change; the version is part of every violation record so
 # consumers can tell which generation of the rule fired.
 RULE_VERSIONS: Dict[str, str] = {
-    RULE_ONE_WAY_GATE: "1",
+    RULE_ONE_WAY_GATE: "2",  # v2: cold-start sub-class (R-A-2026-08-16-011)
     RULE_AUDIT_NON_INFLUENCE: "1",
     RULE_PROVENANCE_CAUSATION: "1",
     RULE_VERSION_LOCK: "1",
@@ -267,6 +268,17 @@ WR_TRANSITIONS: Dict[str, List[Tuple[str, str]]] = {
 }
 
 WR_INITIAL_STATUS = "DRAFT"
+
+# Target status of each WR_* transition event — derived from WR_TRANSITIONS.
+# Used by the one-way-gate cold-start fold (R-A-2026-08-16-011): a
+# first-observed mid-lifecycle event still "occurred", so the fold advances to
+# the event's target status (one warning per WR, no cascade). WR_SETTLED is a
+# terminal marker event (not a transition in WR_TRANSITIONS) — target SETTLED.
+EVENT_TARGET_STATUS: Dict[str, str] = {}
+for _st, _tr in WR_TRANSITIONS.items():
+    for _ev_type, _next in _tr:
+        EVENT_TARGET_STATUS[_ev_type] = _next
+EVENT_TARGET_STATUS.setdefault("WR_SETTLED", "SETTLED")
 
 # pgv.phase_lifecycle transitions — mirrored from
 # go/wrp/ccnf-ref/.tools/pgv.state_machine.json (phase axis, independent of the
@@ -500,6 +512,13 @@ def rule_one_way_gate(
     Any event whose target state is not reachable from its WR's current state
     is a violation. A reverse transition (e.g. a ``WR_CLAIMED`` after
     ``SETTLED``) is caught as an illegal transition from a terminal state.
+
+    Cold-start sub-class (R-A-2026-08-16-011, rule v2): a *first-observed*
+    mid-lifecycle event for a ``wr_id`` is slice-boundary ambiguity (the prefix
+    is unobservable), not evidence of corruption — severity ``warning``,
+    non-blocking. The fold advances to the event's target status so subsequent
+    events fold from observed reality (one warning per WR, no cascade). A
+    WR with *observed history* that violates the table stays ``blocking``.
     """
     _check_rule_version(RULE_ONE_WAY_GATE, rule_version)
     violations: List[CIRViolation] = []
@@ -510,6 +529,7 @@ def rule_one_way_gate(
     for ev in events:
         if ev.is_wr_event:
             wr_key = ev.wr_id or ""
+            is_cold_start = wr_key not in wr_statuses
             wr_status = wr_statuses.get(wr_key, WR_INITIAL_STATUS)
             allowed = WR_TRANSITIONS.get(wr_status)
             if allowed is None:
@@ -526,6 +546,20 @@ def rule_one_way_gate(
                     break
             if next_status is None:
                 allowed_list = ", ".join(e for e, _ in allowed) or "(terminal)"
+                if is_cold_start:
+                    # R-A-2026-08-16-011: first-observed mid-lifecycle event is
+                    # slice-boundary ambiguity — warning, never blocking. The
+                    # event DID occur, so advance the fold to its target status
+                    # (one warning per WR, no cascade).
+                    target = EVENT_TARGET_STATUS.get(ev.event_type)
+                    violations.append(_make_violation(
+                        RULE_ONE_WAY_GATE, ev, "warning",
+                        f"cold-start: {ev.event_type} is the first observed "
+                        f"event for {wr_key or '(no wr_id)'} (prefix unobservable)",
+                    ))
+                    if target is not None:
+                        wr_statuses[wr_key] = target
+                    continue
                 violations.append(_make_violation(
                     RULE_ONE_WAY_GATE, ev, "blocking",
                     f"illegal WR transition: {ev.event_type} not allowed from "
@@ -767,15 +801,12 @@ def rule_core_stage_separation(
 def evaluate(
     events: Iterable[Any],
     *,
-    rule_version: str = "1",
     enforced_rules: FrozenSet[str] = frozenset(),
 ) -> List[CIRViolation]:
     """Evaluate the full rule family set over an ordered event stream.
 
     Args:
         events: Ordered list of raw runtime events and/or CERs (mixed allowed).
-        rule_version: Requested rule-version generation (all families use the
-            same generation; each violation records its family's version).
         enforced_rules: Rule ids whose *blocking*-severity violations should
             carry ``blocking=True``. Default empty = shadow mode (nothing
             blocks — T23 Step 6). The ``CIR_SDM_ENFORCE`` env flag is read by
@@ -787,13 +818,15 @@ def evaluate(
     """
     normalized = [normalize_event(e) for e in events]
 
+    # Each rule family evaluates under its OWN canonical version (families
+    # bump independently — one-way-gate is v2 after R-A-2026-08-16-011).
     violations: List[CIRViolation] = []
-    violations.extend(rule_one_way_gate(normalized, rule_version))
-    violations.extend(rule_audit_non_influence(normalized, rule_version))
-    violations.extend(rule_provenance_causation(normalized, rule_version))
-    violations.extend(rule_version_lock(normalized, rule_version))
-    violations.extend(rule_ir_stage_separation(normalized, rule_version))
-    violations.extend(rule_core_stage_separation(normalized, rule_version))
+    violations.extend(rule_one_way_gate(normalized))
+    violations.extend(rule_audit_non_influence(normalized))
+    violations.extend(rule_provenance_causation(normalized))
+    violations.extend(rule_version_lock(normalized))
+    violations.extend(rule_ir_stage_separation(normalized))
+    violations.extend(rule_core_stage_separation(normalized))
 
     # Enforcement flag: only blocking-severity rules in the enforced set block.
     return [

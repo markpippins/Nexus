@@ -50,6 +50,9 @@ LLM-free — no DB, no network, no wall-clock dependence.
          a review/inspection event → blocking (rule_audit_non_influence).
    AC18 — Stage substrate: normalize_event classifies the CIRS-3 stage axis;
          a forward (IR→Synthesis→Execution) stream is clean.
+   AC19 — Cold-start (R-A-2026-08-16-011): a first-observed mid-lifecycle WR
+         event is a warning (non-blocking) and folds to its target status;
+         a WR with observed history that violates stays blocking.
 
 Usage:
     cd /home/codex/dev/nexus
@@ -162,7 +165,7 @@ class TestAC2OneWayGate(unittest.TestCase):
         self.assertEqual(len(offenders), 1)
         v = offenders[0]
         self.assertEqual(v.event_id, "e6")
-        self.assertEqual(v.rule_version, "1")
+        self.assertEqual(v.rule_version, "2")
         self.assertEqual(v.severity, "blocking")
         self.assertIn("SETTLED", v.description)
 
@@ -584,6 +587,45 @@ class TestAC18StageSubstrate(unittest.TestCase):
             _stage_ev("exec-1", "EXECUTION.STARTED", causation="syn-1"),
         ]
         self.assertEqual(evaluate(stream), [])
+
+
+class TestAC19ColdStart(unittest.TestCase):
+    """AC19 (R-A-2026-08-16-011) — cold-start sub-class: warning, non-blocking."""
+
+    def test_lone_wr_claimed_is_cold_start_warning(self):
+        # (i) A lone WR_CLAIMED with no prefix is slice-boundary ambiguity.
+        stream = [_wr("e1", "wr-x", "WR_CLAIMED", 1)]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_ONE_WAY_GATE]
+        self.assertEqual(len(offenders), 1)
+        v = offenders[0]
+        self.assertEqual(v.event_id, "e1")
+        self.assertEqual(v.rule_version, "2")
+        self.assertEqual(v.severity, "warning")
+        self.assertFalse(v.blocking)
+        self.assertIn("cold-start", v.description)
+
+    def test_reverse_transition_stays_blocking(self):
+        # (ii) WR_CLAIMED after observed SETTLED is a genuine violation.
+        stream = FORWARD_LIFECYCLE + [_wr("e6", "wr-1", "WR_CLAIMED", 6)]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_ONE_WAY_GATE]
+        self.assertEqual(len(offenders), 1)
+        self.assertEqual(offenders[0].severity, "blocking")
+        self.assertNotIn("cold-start", offenders[0].description)
+
+    def test_cold_start_then_acked_folds_without_second_warning(self):
+        # (iii) cold-start WR_CLAIMED folds to ACKED; a following WR_ACKED is
+        # legal (ACKED→SETTLED) and produces no second warning.
+        stream = [
+            _wr("e1", "wr-x", "WR_CLAIMED", 1),
+            _wr("e2", "wr-x", "WR_ACKED", 2),
+        ]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_ONE_WAY_GATE]
+        self.assertEqual(len(offenders), 1)
+        self.assertEqual(offenders[0].event_id, "e1")
+        self.assertEqual(offenders[0].severity, "warning")
 
 
 if __name__ == "__main__":
