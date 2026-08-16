@@ -35,6 +35,7 @@ import {
   createTicketIfMissing,
   checkpointWal,
   getNewestCompileVerdictForPlan,
+  verdictBlocksBootstrap,
 } from "./db";
 import * as api from "./conduit-client";
 import { breakerRowToStatus } from "./watchers/cb-watcher";
@@ -327,16 +328,20 @@ export class PipelineWatcher {
       for (const plan of rows) {
         try {
           // D5 gate — consult the newest compile verdict before bootstrapping.
-          // Newest-FAIL never gets a ticket; newest-PASS is release-eligible;
-          // no verdict = legacy unchanged. The lookup resolves the plan's
-          // compile-unit entityKey (via work_requests context.plan_id and/or
-          // ADR-006 execution.requests source_plan_id→source_wr_id) and also
-          // matches release-time re-parented verdicts (plan_id) — newest wins.
+          // Newest-FAIL never gets a ticket; a PASS on a reserved (R3/R4)
+          // route is held (R-A-003: never auto-armed); PASS on conduit/
+          // conduit-review is release-eligible; no verdict = legacy unchanged.
+          // The lookup resolves the plan's compile-unit entityKey (via
+          // work_requests context.plan_id) and also matches release-time
+          // re-parented verdicts (plan_id) — newest wins.
           const verdict = await getNewestCompileVerdictForPlan(plan.plan_number);
-          if (verdict?.verdict_type === "WR_COMPILE_FAIL") {
+          if (verdictBlocksBootstrap(verdict)) {
+            const why =
+              verdict!.verdict_type === "WR_COMPILE_FAIL"
+                ? "newest compile verdict is WR_COMPILE_FAIL"
+                : `newest compile verdict is PASS on reserved route`;
             console.log(
-              `Auto-bootstrap blocked for plan ${plan.plan_number}: ` +
-              `newest compile verdict is WR_COMPILE_FAIL`
+              `Auto-bootstrap blocked for plan ${plan.plan_number}: ${why}`
             );
             continue;
           }

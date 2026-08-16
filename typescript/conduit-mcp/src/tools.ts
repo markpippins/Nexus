@@ -328,6 +328,13 @@ export const toolDefinitions: MCPToolDefinition[] = [
           type: "string",
           description: "Optional compile event timestamp (ISO-8601)",
         },
+        route: {
+          type: "string",
+          description:
+            "Optional classification.route (conduit|conduit-review|reserved). " +
+            "Persisted so the D5 bootstrap gate holds PASS verdicts on reserved " +
+            "(R3/R4) routes.",
+        },
       },
       required: ["entity_key", "verdict_type", "rule_version", "description"],
     },
@@ -959,6 +966,7 @@ export function registerToolHandlers(
       wr_id?: string;
       plan_id?: string;
       detected_at?: string;
+      route?: string;
     }) => {
       if (
         args.verdict_type !== "WR_COMPILE_PASS" &&
@@ -987,12 +995,14 @@ export function registerToolHandlers(
         rule_version: args.rule_version,
         description: args.description,
         detected_at: args.detected_at ?? null,
+        route: args.route ?? null,
       });
       return {
         issued: true,
         verdict_id: verdictId,
         entity_key: args.entity_key,
         verdict_type: args.verdict_type,
+        route: args.route ?? null,
       };
     },
     run_compile_gate: async (args: {

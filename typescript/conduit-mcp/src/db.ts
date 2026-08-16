@@ -2929,6 +2929,24 @@ const migrations: Migration[] = [
       console.log("[migrations] v38: created vision.wr_compile_verdicts (WR-scoped compile verdicts)");
     },
   },
+  {
+    version: 39,
+    description: "Add route to vision.wr_compile_verdicts (CP-9 review a5f096e9: D5 gate must hold reserved routes)",
+    up: async (exec) => {
+      // CP-9 review (a5f096e9): the bootstrap gate could not distinguish
+      // PASS+reserved from PASS+conduit because the verdict store had no
+      // route column — a PASS on an R3/R4 (reserved) route would auto-emit a
+      // builder ticket, which R-A-003 forbids. Persist classification.route
+      // so the D5 gate can block on FAIL OR route='reserved'. Nullable:
+      // pre-v39 verdicts and route-less issue_compile_verdict calls are
+      // legacy (no route = not reserved, legacy behavior unchanged).
+      await exec(`
+        ALTER TABLE ${VISION_SCHEMA}.wr_compile_verdicts
+            ADD COLUMN IF NOT EXISTS route TEXT;   -- classification.route: conduit | conduit-review | reserved
+      `);
+      console.log("[migrations] v39: added route column to vision.wr_compile_verdicts");
+    },
+  },
 ];
 
 /**
@@ -3306,6 +3324,8 @@ export interface CompileVerdictRow {
   description: string;
   detected_at: string | null;
   created_at: string;
+  /** classification.route (conduit | conduit-review | reserved). */
+  route: string | null;
 }
 
 export interface CompileVerdictInput {
@@ -3317,6 +3337,8 @@ export interface CompileVerdictInput {
   rule_version: string;
   description: string;
   detected_at?: string | null;
+  /** classification.route — persisted so the D5 gate can hold reserved. */
+  route?: string | null;
 }
 
 /**
@@ -3351,9 +3373,9 @@ export async function insertCompileVerdict(v: CompileVerdictInput): Promise<void
   await qRun(
     `INSERT INTO ${VISION_SCHEMA}.wr_compile_verdicts
        (verdict_id, entity_key, wr_id, plan_id, verdict_type, rule_version,
-        description, detected_at, created_at)
+        description, detected_at, route, created_at)
      VALUES (@verdictId, @entityKey, @wrId, @planId, @verdictType, @ruleVersion,
-             @description, @detectedAt, now())
+             @description, @detectedAt, @route, now())
      ON CONFLICT (verdict_id) DO NOTHING`,
     {
       verdictId,
@@ -3364,6 +3386,7 @@ export async function insertCompileVerdict(v: CompileVerdictInput): Promise<void
       ruleVersion: v.rule_version,
       description: v.description,
       detectedAt: v.detected_at ?? null,
+      route: v.route ?? null,
     },
   );
 }
@@ -3434,6 +3457,22 @@ export async function getNewestCompileVerdictForPlan(
      LIMIT 1`,
     params,
   );
+}
+
+/**
+ * D5 bootstrap gate predicate (CP-9 review a5f096e9).
+ *
+ * A compile verdict blocks auto-bootstrap when it is a FAIL, or a PASS on a
+ * reserved (R3/R4) route — R-A-003: reserved is never auto-armed (explicit
+ * Architect/human release only). ``undefined`` (no verdict) → false = legacy
+ * behavior unchanged. This is the single source of truth shared by the
+ * watcher's bootstrap pass and the tests.
+ */
+export function verdictBlocksBootstrap(
+  verdict: Pick<CompileVerdictRow, "verdict_type" | "route"> | undefined,
+): boolean {
+  if (!verdict) return false;
+  return verdict.verdict_type === "WR_COMPILE_FAIL" || verdict.route === "reserved";
 }
 
 /**
@@ -3513,6 +3552,7 @@ export async function runCompileGate(opts: {
     verdict_type: decision.verdict,
     rule_version: ruleVersion,
     description: decision.reason,
+    route: decision.classification.route,
   });
   return { ...decision, verdict_id: verdictId };
 }
