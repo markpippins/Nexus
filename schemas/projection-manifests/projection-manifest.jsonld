@@ -69,18 +69,13 @@
       }
     },
     {
-      "sourceSchema": "schemas/validation/wrp/work-request.schema.json",
+      "sourceSchema": "python/conduit/work_request.py",
       "targetFormat": "pydantic-model",
       "generator": "manual",
       "outputPath": "python/conduit/work_request.py",
-      "lifecycle": "on-schema-change",
-      "active": true,
-      "comment": "HAND-MAINTAINED, not TypeSpec-generated: no .tsp spec defines the WorkRequest DCO. Mirrors the superseded .agents/schema draft (7 lowercase states) vs canonical 11-state WRP machine — DRIFT FLAGGED. Digest-locked so silent edits fail the gate.",
-      "verify": {
-        "mode": "digest",
-        "algorithm": "sha256",
-        "digest": "d40ac5435fa03b1d133dc01d114d2d5057f7722a2cb52000343819cd597b0c0b"
-      }
+      "lifecycle": "manual",
+      "active": false,
+      "comment": "LEGACY DOMAIN CANONICAL (conduit_wr_dco), NOT a projection: the seven-state WorkRequest DCO is hand-maintained pydantic models and is no longer labeled an active digest-locked projection of the eleven-state WRP machine (D-2026-08-16-003). Retained inactive here for provenance; the authority matrix records the conduit_wr_dco domain with a migration edge to work_request for the future WRP flip."
     },
     {
       "sourceSchema": "schemas/validation/wrp/work-request.schema.json",

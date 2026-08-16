@@ -233,6 +233,42 @@ def collect_semantic_classes(matrix, files):
 
 # ─── Checks ────────────────────────────────────────────────────────────────
 
+# Tombstone status: a superseded entry may be either a plain path string
+# (must exist on disk, legacy behavior) or a tombstone record — a dict whose
+# `status` is TOMBSTONE_STATUS — for artifacts that were superseded and then
+# deleted. Tombstones carry durable provenance (path, supersededBy, note) and
+# do NOT require the artifact to exist on disk: the record itself is the truth.
+TOMBSTONE_STATUS = "tombstoned"
+TOMBSTONE_REQUIRED = ("path", "supersededBy")
+
+
+def superseded_role(entry, domain):
+    """Normalize one `superseded` list entry to (rel_path, is_tombstone).
+    Accepts a path string (legacy) or a tombstone dict."""
+    if isinstance(entry, dict):
+        return normalize(entry.get("path") or ""), True
+    return normalize(entry), False
+
+
+def check_tombstone(entry, domain):
+    """Validate a tombstone record's shape. Returns a list of violations."""
+    violations = []
+    if entry.get("status") != TOMBSTONE_STATUS:
+        violations.append({
+            "failure_class": "no-authority",
+            "domain": domain,
+            "detail": f"superseded entry has status {entry.get('status')!r}, expected '{TOMBSTONE_STATUS}'",
+        })
+    for field in TOMBSTONE_REQUIRED:
+        if not entry.get(field):
+            violations.append({
+                "failure_class": "no-authority",
+                "domain": domain,
+                "detail": f"tombstone record missing required field '{field}'",
+            })
+    return violations
+
+
 def check_registry(matrix):
     """Structural self-consistency of the matrix itself."""
     violations = []
@@ -240,6 +276,9 @@ def check_registry(matrix):
     role_by_path = {}
 
     authorities = matrix.get("authorities", [])
+    # collect every declared domain up front so migration_edge references are
+    # order-independent (a domain may point at one declared later in the list)
+    all_domains = {e.get("domain") for e in authorities if e.get("domain")}
     seen_domains = set()
     for entry in authorities:
         domain = entry.get("domain")
@@ -272,21 +311,27 @@ def check_registry(matrix):
         role_by_path.setdefault(canonical, "canonical")
 
         for p in (entry.get("superseded") or []):
-            rp = normalize(p)
-            if not path_exists(rp):
-                violations.append({
-                    "failure_class": "no-authority",
-                    "domain": domain,
-                    "detail": f"superseded artifact does not exist on disk: {rp}",
-                })
+            rp, is_tombstone = superseded_role(p, domain)
+            if is_tombstone:
+                # durable provenance record: artifact was superseded and deleted.
+                # No on-disk requirement — validate the record itself instead.
+                violations += check_tombstone(p, domain)
+            else:
+                if not path_exists(rp):
+                    violations.append({
+                        "failure_class": "no-authority",
+                        "domain": domain,
+                        "detail": f"superseded artifact does not exist on disk: {rp}",
+                    })
             # ambiguous-role: same path canonical in one domain, superseded in another
-            if role_by_path.get(rp) == "canonical":
+            if rp and role_by_path.get(rp) == "canonical":
                 violations.append({
                     "failure_class": "unlisted-projection",
                     "domain": domain,
                     "detail": f"path is both canonical and superseded: {rp}",
                 })
-            role_by_path.setdefault(rp, "superseded")
+            if rp:
+                role_by_path.setdefault(rp, "superseded")
 
         for p in (entry.get("projections") or []):
             rp = normalize(p)
@@ -304,6 +349,16 @@ def check_registry(matrix):
                 })
             role_by_path.setdefault(rp, "projection")
 
+        # migration edge: if declared, it must reference an existing domain in
+        # the matrix (the transition path to a future canonical).
+        migration_edge = entry.get("migration_edge")
+        if migration_edge and migration_edge not in all_domains:
+            violations.append({
+                "failure_class": "no-authority",
+                "domain": domain,
+                "detail": f"migration_edge references unknown domain: {migration_edge}",
+            })
+
     # duplicate-canonical: two domains claim the same canonical path
     for path, domains in canonical_by_path.items():
         if len(domains) > 1:
@@ -320,7 +375,9 @@ def superseded_paths(matrix):
     out = set()
     for entry in matrix.get("authorities", []):
         for p in (entry.get("superseded") or []):
-            out.add(normalize(p))
+            rp, _ = superseded_role(p, entry.get("domain"))
+            if rp:
+                out.add(rp)
     return out
 
 
@@ -398,7 +455,9 @@ def check_manifest(matrix, manifest=None):
         for p in (entry.get("projections") or []):
             projections.add(normalize(p))
         for p in (entry.get("superseded") or []):
-            superseded.add(normalize(p))
+            rp, _ = superseded_role(p, entry.get("domain"))
+            if rp:
+                superseded.add(rp)
 
     for proj in manifest.get("projections", []):
         src = normalize(proj.get("sourceSchema", ""))

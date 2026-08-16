@@ -17,9 +17,25 @@
       "domain": "work_request",
       "canonical": "schemas/validation/wrp/work-request.schema.json",
       "kind": "json-schema",
-      "superseded": [".agents/schema/work_request.schema.json"],
+      "superseded": [
+        {
+          "path": ".agents/schema/work_request.schema.json",
+          "status": "tombstoned",
+          "supersededBy": "schemas/validation/wrp/work-request.schema.json",
+          "note": "Pre-WRP draft schema, superseded by the canonical WorkRequest IR and deleted from the working tree (D-2026-08-16-003). Tombstone is the durable provenance record; do not resurrect."
+        }
+      ],
       "projections": ["schemas/ontology/core/work-request.jsonld"],
-      "note": "Canonical WorkRequest IR (3-layer, 11-state). Splits intent vs event-derived state: `metadata.mode` is the 3-layer IR mode (ir_layer: INTENT/BINDING/EXECUTION-BOUND), while `execution_state` + `status` are event-derived runtime state (execution_state/execution_status). .agents/schema/work_request.schema.json is the pre-WRP draft and is superseded; schemas/ontology/core/work-request.jsonld is the JSON-LD graph form."
+      "note": "Canonical WorkRequest IR (3-layer, 11-state). Splits intent vs event-derived state: `metadata.mode` is the 3-layer IR mode (ir_layer: INTENT/BINDING/EXECUTION-BOUND), while `execution_state` + `status` are event-derived runtime state (execution_state/execution_status). The pre-WRP draft .agents/schema/work_request.schema.json was superseded and deleted; it is recorded as a tombstoned superseded artifact (durable provenance, no resurrection). schemas/ontology/core/work-request.jsonld is the JSON-LD graph form."
+    },
+    {
+      "domain": "conduit_wr_dco",
+      "canonical": "python/conduit/work_request.py",
+      "kind": "runtime",
+      "superseded": [],
+      "projections": [],
+      "migration_edge": "work_request",
+      "note": "Legacy seven-state WorkRequest DCO (conduit), hand-maintained pydantic models. NOT a projection of the eleven-state WRP machine (schemas/validation/wrp/work-request.schema.json) — it is a distinct legacy domain per D-2026-08-16-003. Explicit migration edge to the `work_request` domain kept for the future WRP flip (when the real generator/semantic mapping lands)."
     },
     {
       "domain": "wrp_event",

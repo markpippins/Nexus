@@ -85,6 +85,70 @@ def test_duplicate_class_superseded_is_excluded():
     assert v == []
 
 
+# ─── tombstone superseded records ────────────────────────────────────────────
+
+def test_tombstone_superseded_does_not_require_disk():
+    # A deleted, superseded artifact recorded as a tombstone must not be
+    # flagged as no-authority just because the file no longer exists (the
+    # record is the durable provenance — D-2026-08-16-003).
+    m = _matrix([_entry("a", REAL_WR, superseded=[{
+        "path": ".agents/schema/work_request.schema.json",
+        "status": "tombstoned",
+        "supersededBy": REAL_WR,
+        "note": "deleted draft",
+    }])])
+    v = ca.check_registry(m)
+    assert all(x["failure_class"] != "no-authority" for x in v)
+
+
+def test_tombstone_missing_required_field_flagged():
+    # A tombstone without its path or supersededBy is a malformed record.
+    m = _matrix([_entry("a", REAL_WR, superseded=[{
+        "status": "tombstoned",
+    }])])
+    v = ca.check_registry(m)
+    assert any("missing required field" in x["detail"] for x in v)
+
+
+def test_tombstone_wrong_status_flagged():
+    m = _matrix([_entry("a", REAL_WR, superseded=[{
+        "path": "old.json",
+        "status": "banana",
+        "supersededBy": REAL_WR,
+    }])])
+    v = ca.check_registry(m)
+    assert any("expected 'tombstoned'" in x["detail"] for x in v)
+
+
+def test_tombstone_excluded_from_duplicate_class():
+    # Tombstoned paths stay in the superseded set so they never count as an
+    # authoritative semantic-class claimant.
+    m = _matrix([_entry("a", "f1.json", superseded=[{
+        "path": "old.json", "status": "tombstoned", "supersededBy": "f1.json",
+    }])])
+    idx = {"decision": [("f1.json", "result"), ("old.json", "result")]}
+    v = ca.check_duplicate_class(m, idx)
+    assert v == []
+
+
+# ─── migration edge ──────────────────────────────────────────────────────────
+
+def test_migration_edge_unknown_domain_flagged():
+    entry = _entry("conduit_wr_dco", "python/conduit/work_request.py")
+    entry["migration_edge"] = "no_such_domain"
+    m = _matrix([_entry("work_request", REAL_WR), entry])
+    v = ca.check_registry(m)
+    assert any("migration_edge" in x["detail"] for x in v)
+
+
+def test_migration_edge_known_domain_passes():
+    entry = _entry("conduit_wr_dco", "python/conduit/work_request.py")
+    entry["migration_edge"] = "work_request"
+    m = _matrix([_entry("work_request", REAL_WR), entry])
+    v = ca.check_registry(m)
+    assert not any("migration_edge" in x["detail"] for x in v)
+
+
 # ─── unlisted-projection ─────────────────────────────────────────────────────
 
 def test_unlisted_projection_missing_file():
