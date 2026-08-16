@@ -24,4 +24,5 @@ capability/
 ├── filesystem.json         -- Voyager capabilities (scan, observe, notify)
 ├── ingestion.json          -- DocLing/html-importer capabilities
 └── reasoning.json          -- Inference capabilities (classify, summarize, plan)
+                            -- plus deterministic plan validation (reason.validate)
 ```
