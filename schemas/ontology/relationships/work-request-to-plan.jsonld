@@ -1,0 +1,33 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "nx": "https://nexus.local/schema/",
+    "wr": "https://nexus.local/schema/ontology/core/work-request/",
+    "pl": "https://nexus.local/schema/ontology/core/plan/",
+    "ag": "https://nexus.local/schema/ontology/core/agent-role/",
+
+    "id": "@id",
+    "type": "@type",
+    "comment": {"@id": "http://www.w3.org/2000/01/rdf-schema#comment"}
+  },
+
+  "@graph": [
+    {
+      "@id": "wr:WorkRequest",
+      "comment": "A WorkRequest is implemented by one or more conduit Plans. The plan's derivedFrom references the WorkRequest's @id.",
+      "hasPart": {"@id": "pl:Plan"}
+    },
+    {
+      "@id": "pl:Plan",
+      "comment": "A Plan derives from a WorkRequest. Multiple plans may share the same parent WorkRequest (parallel implementation strategies).",
+      "derivedFrom": {"@id": "wr:WorkRequest"},
+      "hasPart": {"@id": "pl:PlanTicket"}
+    },
+    {
+      "@id": "pl:PlanTicket",
+      "comment": "A PlanTicket assigns work to an Agent. The Agent may produce a new WorkRequest if the ticket requires decomposition.",
+      "assignedTo": {"@id": "ag:Agent"},
+      "produces": {"@id": "wr:WorkRequest"}
+    }
+  ]
+}

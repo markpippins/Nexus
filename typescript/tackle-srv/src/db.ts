@@ -393,7 +393,7 @@ interface Migration {
  * - Version 2 adds missing PRIMARY KEY and UNIQUE constraints to tables
  *   that were created by older migrations without them (the 2026-07-11
  *   outage root cause).
- * - Versions 7-9 load external SQL files from nexus/schemas/tackle/ at
+ * - Versions 7-9 load external SQL files from nexus/schemas/migrations/tackle/ at
  *   runtime (prompts_tasks_tool_access.sql, seed_prompts.sql,
  *   roles_default_timestamps.sql). They were originally applied externally
  *   via psql on 2026-07-25; registered here so green-field installs
@@ -590,12 +590,12 @@ const migrations: Migration[] = [
   //    self-stamp with ON CONFLICT (version) DO UPDATE, re-running on an
   //    already-current DB is safe — though runMigrations skips them via the
   //    version check before up() is ever called. Schema SQL lives under
-  //    nexus/schemas/tackle/, resolved from this src/ dir.
+  //    nexus/schemas/migrations/tackle/, resolved from this src/ dir.
   {
     version: 7,
     description: "Create tackle.prompts (reusable versioned prompt templates), tackle.tasks (concrete assignments FK->prompts), tackle.role_tool_access (per-tool default-deny allowlist). Architect decision d708c452. [file: prompts_tasks_tool_access.sql]",
     up: async (exec) => {
-      const sqlPath = path.resolve(__dirname, "../../../schemas/tackle/prompts_tasks_tool_access.sql");
+      const sqlPath = path.resolve(__dirname, "../../../schemas/migrations/tackle/prompts_tasks_tool_access.sql");
       const sql = readFileSync(sqlPath, "utf8");
       await exec(sql);
       console.log("[tackle-migrations] v7: Created tackle.prompts, tackle.tasks, tackle.role_tool_access");
@@ -605,7 +605,7 @@ const migrations: Migration[] = [
     version: 8,
     description: "Seed tackle.prompts with 11 rows (operator system-prompt-base/tail + 9 role opencode-persona v1) and one active inspector task. Add builder-fallback role. Engineer intent ab3befcc. [file: seed_prompts.sql]",
     up: async (exec) => {
-      const sqlPath = path.resolve(__dirname, "../../../schemas/tackle/seed_prompts.sql");
+      const sqlPath = path.resolve(__dirname, "../../../schemas/migrations/tackle/seed_prompts.sql");
       const sql = readFileSync(sqlPath, "utf8");
       await exec(sql);
       console.log("[tackle-migrations] v8: Seeded 11 prompts + 1 inspector task + builder-fallback role");
@@ -615,7 +615,7 @@ const migrations: Migration[] = [
     version: 9,
     description: "Add DEFAULT NOW() to tackle.roles.created_at and tackle.roles.updated_at (baseline inconsistency fix so casual role inserts work). Spotted when seeding builder-fallback during v8. Back-compatible. [file: roles_default_timestamps.sql]",
     up: async (exec) => {
-      const sqlPath = path.resolve(__dirname, "../../../schemas/tackle/roles_default_timestamps.sql");
+      const sqlPath = path.resolve(__dirname, "../../../schemas/migrations/tackle/roles_default_timestamps.sql");
       const sql = readFileSync(sqlPath, "utf8");
       await exec(sql);
       console.log("[tackle-migrations] v9: Added DEFAULT NOW() to tackle.roles.created_at and updated_at");

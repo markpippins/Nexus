@@ -2591,6 +2591,147 @@ BEGIN
             VALUES (v_memory_id, v_role, NOW(), NULL);
         END LOOP;
     END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 42. DevOps Operations Conventions (thread-reply, escalation, inbox)
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'devops-operations-conventions',
+        'DevOps Operations Conventions (thread-reply, escalation, inbox)',
+        'Mission charter + mandatory thread-reply convention, R12 escalation, and R17 inbox check for the devops role.',
+        '\n'
+        '## Purpose\n'
+        '\n'
+        'Operational conventions for the Devops role. Load when starting work or\n'
+        'when reporting progress. Complements the persona (tackle.prompts\n'
+        '\`devops/opencode-persona\` v3).\n'
+        '\n'
+        '## Mission Charter (binding, from user)\n'
+        '\n'
+        '1. **Containerization (LEAD):** containerize the legacy \`typescript/*-srv\`\n'
+        '   services so they can run **as a group elsewhere** (warm failover standbys\n'
+        '   on a second machine). Dockerfiles, compose, images, group lifecycle.\n'
+        '2. **Ansible failover maintenance:** work with the other machine(s) via\n'
+        '   ansible — playbooks, inventory, idempotent provisioning, standby health.\n'
+        '3. **Cutover oversight (GATED):** oversee cutover to \`python/peb-kernel\` and\n'
+        '   the adonisjs/moleculer stack. **DO NOT cut over until containerization is\n'
+        '   tested locally** (group starts, health checks pass, failover works on the\n'
+        '   local machine first). The local container test is the gate.\n'
+        '\n'
+        '## Thread-Reply Convention (MANDATORY)\n'
+        '\n'
+        '- Work specified in a forum thread (checklist/dispatch/task) → reply to\n'
+        '  **that thread** with progress updates as comments.\n'
+        '- Per-checklist-item progress (\`[x]\`), deliverables **by path** (never paste\n'
+        '  credentials), blockers stated with what you need.\n'
+        '- Post on item completion; post immediately when blocked or at a handoff\n'
+        '  point (e.g. draft awaiting ratification).\n'
+        '- Agent records are supplementary; the forum thread reply is the primary\n'
+        '  progress surface.\n'
+        '- The issues forum (\`issues-and-open-questions\`) is for blockers/incidents\n'
+        '  and open questions — NOT work updates or ratification requests.\n'
+        '\n'
+        '## Escalation Process (R12)\n'
+        '\n'
+        '1. Try restart/config fix first.\n'
+        '2. Record \`["to:architect","type:escalation"]\` — problem, tried, state.\n'
+        '3. If unresolvable and blocking: also POST to Assembly\n'
+        '   \`issues-and-open-questions\` with \`role\` + \`model\` fields, using the\n'
+        '   devops Assembly user UUID (assembly-srv :3107).\n'
+        '4. DB changes route to **DBA** (\`["to:dba","type:db-change",...]\`); you own\n'
+        '   migration mechanics, the DBA owns DDL.\n'
+        '\n'
+        '## End-of-Turn Inbox Check (MANDATORY, R17)\n'
+        '\n'
+        '- Preferred: \`nexus/bin/check-inbox.sh --role devops\` (or \`nebula_get_inbox\`\n'
+        '  MCP \`{"role":"devops","limit":20}\`).\n'
+        '- Fallback: nebula REST :3101 — GET pointer, query records\n'
+        '  \`role=devops&createdAfter=<pointer_iso>\`, PUT pointer after surfacing.\n'
+        '- Surface items to the user; do NOT silently act on inbox items.\n'
+        '- If nebula-srv unreachable, surface as blocking infra issue.\n'
+        '',
+        ARRAY['devops', 'operations', 'conventions', 'thread-reply', 'escalation', 'inbox'],
+        ARRAY['devops conventions', 'thread reply', 'escalate', 'inbox check', 'containerization', 'ansible', 'cutover'],
+        ARRAY['nebula_get_inbox', 'nebula_create_agent_record', 'nebula_list_agent_records']
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY['devops'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 43. Parallel Role Loop (PRL) — cross-role doctrine
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'parallel-role-loop',
+        'Parallel Role Loop (PRL) — cross-role doctrine',
+        'Concurrent role sessions: user is NOT the message bus. Every turn = inbox check → thread sweep → act → post to thread → notify via to:<role> record → advance pointer. Work until blocker/decision, then switch tracks while awaiting.',
+        '## Parallel Role Loop (PRL) — cross-role doctrine\n'
+        '\n'
+        '### Premise\n'
+        'Multiple role sessions run concurrently (e.g., Architect in one terminal, Engineer in another, user supervising). **The user is NOT the message bus.** All cross-role communication flows through the corpus: nebula agent records (tag-routed, pointer-tracked) + Assembly forum threads (durable, timestamped, threaded). The inbox check is the attention filter that lets each role work independently.\n'
+        '\n'
+        '### The loop (every role, every turn)\n'
+        '1. **Inbox check FIRST** — \`nebula_get_inbox\` / \`nexus/bin/check-inbox.sh --role <role>\`: new \`to:<role>\` records since pointer. Surface to the user; never silently process.\n'
+        '2. **Thread sweep** — check threads you participate in (track threads, decisions forum, change-log) for new comments since your last turn.\n'
+        '3. **Act** — proceed with work until a stopping point.\n'
+        '4. **Stopping point → post to the thread** — every completion, blocker, decision, review, or question gets a forum post: decisions → decisions forum (R-A records auto-sync); track status → the track thread; completed work → change-log (R14).\n'
+        '5. **Notify via pointer** — after posting, write a \`to:<dependent-role>\` agent record (short, carrying thread IDs + record IDs + commit refs) so the other role''s next inbox check catches it.\n'
+        '6. **Advance pointer** after surfacing (R17).\n'
+        '\n'
+        '### Autonomy boundary (work until blocker or decision needed)\n'
+        '- Proceed autonomously until: (a) a decision is needed from another role, (b) a blocker surfaces, (c) a work unit completes.\n'
+        '- At each boundary: post to the thread, notify via record, then **STOP that track**.\n'
+        '- **While awaiting a decision or blocker leverage: switch to another project track** — never idle. The decision arrives via inbox on a later turn.\n'
+        '\n'
+        '### Communication rules\n'
+        '- **Never relay via user chat.** If the user relays a message from another role, treat it as out-of-band: immediately write it into the corpus (thread + record) so the loop self-heals.\n'
+        '- **Thread = durable conversation surface.** Comments, not just records. A question asked in chat is not asked until it''s a thread post + routed record.\n'
+        '- **Records carry pointers** — always embed thread IDs, record IDs, commit refs in content so the corpus is self-navigating.\n'
+        '\n'
+        '### Role-specific wiring\n'
+        '- **Engineer**: proceed until blocker/decision; switch projects while awaiting; check inbox after every turn; post to the thread at every stopping point; push cadence follows review gates, never chat acks.\n'
+        '- **Architect**: check inbox for rulings/requests each turn; rule in the decisions forum (decision records auto-sync to threads); reply in-thread; propagate go-aheads via \`to:engineer\` records with thread pointers.\n'
+        '- **All roles**: R13 clock in/out; R17 end-of-turn inbox; R14 change-log after substantive work.\n'
+        '\n'
+        '### Why\n'
+        'Without this loop, the user becomes the relay between sessions — exactly the failure this doctrine removes. Every out-of-band message is a corpus gap: the receiving role cannot see it, the pointer cannot track it, and the audit trail is incomplete.\n'
+        '\n'
+        '### Enforcement\n'
+        '- **Engineer**: doctrine embedded in \`.opencode/agents/engineer.md\` (Parallel Role Loop section) — binding at session start, not just advisory from the registry.\n'
+        '- **Architect**: doctrine embedded in \`.opencode/agents/architect.md\` (Parallel Role Loop section).\n'
+        '- Registry card stays canonical; frontmatter sections mirror it.\n'
+        '\n'
+        '### Future evolution — Question & Decision Cards (QDC)\n'
+        'Planned async mechanism: structured "question cards" and "decision cards"\n'
+        'so the user can be involved **in real time** without relaying between\n'
+        'sessions. When QDC lands:\n'
+        '- PRL becomes the synchronous baseline loop.\n'
+        '- QDCs carry the async path (question raised → card routed → user\n'
+        '  decides in real time → decision card posted → pointer notified).\n'
+        '- Cards are corpus artifacts (records + forum threads), so the audit\n'
+        '  trail stays complete.\n'
+        '',
+        ARRAY['parallel', 'cross-role', 'turn-protocol', 'messaging', 'doctrine', 'threads', 'inbox'],
+        ARRAY['user relays a message', 'out-of-band message', 'another role asked', 'decision needed', 'awaiting decision', 'keep threads up to date', 'parallel session'],
+        ARRAY['nebula_get_inbox', 'nebula_create_agent_record', 'nebula_set_inbox_pointer']
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY['analyst', 'architect', 'builder', 'critic', 'engineer', 'inspector', 'planner', 'reviewer'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
     RAISE NOTICE 'Memory procedures seeded.';
 END $$;`;
 }

@@ -5,7 +5,7 @@
  * the nebula.cross_references table. Replaces ad-hoc free-text strings.
  *
  * Spec: audit/SPECS/CROSSREF_TAXONOMY.md
- * Ontology: schemas/relationships/wrp-crossref-taxonomy.jsonld
+ * Ontology: schemas/ontology/relationships/wrp-crossref-taxonomy.jsonld
  * Plan reference: #0175
  */
 

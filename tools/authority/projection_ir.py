@@ -3,7 +3,7 @@
 ProjectionIR adapter — projection-manifest → ProjectionIR entries.
 
 The first adapter implementing graph/schema/projection-ir.md §4: converts the
-reconciled projection manifest (schemas/projections/projection-manifest.jsonld)
+reconciled projection manifest (schemas/projection-manifests/projection-manifest.jsonld)
 into validated ProjectionIREntry objects. Proves the envelope pattern on real
 data: each manifest projection becomes a read-only, ephemeral IR entry with
 operator identity, domain, confidence, constraints, and trace lineage.
@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-MANIFEST_PATH = REPO_ROOT / "schemas" / "projections" / "projection-manifest.jsonld"
+MANIFEST_PATH = REPO_ROOT / "schemas" / "projection-manifests" / "projection-manifest.jsonld"
 SCHEMA_PATH = REPO_ROOT / "graph" / "schema" / "projection-ir.schema.json"
 
 SOURCE_OPERATOR = "projection-manifest"

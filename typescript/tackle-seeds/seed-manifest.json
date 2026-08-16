@@ -1,5 +1,5 @@
 {
-  "card_count": 41,
+  "card_count": 43,
   "cards": [
     {
       "body_md": "## Agent Config Role Definition\n\nEach agent role .md file (in .opencode/agents/) MUST include a message block in its frontmatter:\n\n```yaml\n---\nassumes_role: <role>\nmessage:\n  inbox_query:\n    - tags contain \"to:<role>\"\n    - tags contain \"status:open\"\n  record_types: [list of valid record types for this role]\n  auto_present: true\n  enrich_context: true\n---\n```\n\n### Fields\n- assumes_role: The role this agent config activates (engineer, architect, planner, etc.)\n- inbox_query: Tag filters for inbox querying\n- record_types: Valid agent record types this role may write\n- auto_present: Whether to surface inbox items on every turn start\n- enrich_context: Whether to load linked system/subsystem/plan data on boot\n\n### Valid record_type values\nreport, analysis, assessment, inspection, prompt, response, engineering_log, architecture_note, decision",
@@ -176,6 +176,38 @@
         "turn boundary",
         "perceptual cycle",
         "reconciliation"
+      ]
+    },
+    {
+      "body_md": "\n## Purpose\n\nOperational conventions for the Devops role. Load when starting work or\nwhen reporting progress. Complements the persona (tackle.prompts\n`devops/opencode-persona` v3).\n\n## Mission Charter (binding, from user)\n\n1. **Containerization (LEAD):** containerize the legacy `typescript/*-srv`\n   services so they can run **as a group elsewhere** (warm failover standbys\n   on a second machine). Dockerfiles, compose, images, group lifecycle.\n2. **Ansible failover maintenance:** work with the other machine(s) via\n   ansible \u2014 playbooks, inventory, idempotent provisioning, standby health.\n3. **Cutover oversight (GATED):** oversee cutover to `python/peb-kernel` and\n   the adonisjs/moleculer stack. **DO NOT cut over until containerization is\n   tested locally** (group starts, health checks pass, failover works on the\n   local machine first). The local container test is the gate.\n\n## Thread-Reply Convention (MANDATORY)\n\n- Work specified in a forum thread (checklist/dispatch/task) \u2192 reply to\n  **that thread** with progress updates as comments.\n- Per-checklist-item progress (`[x]`), deliverables **by path** (never paste\n  credentials), blockers stated with what you need.\n- Post on item completion; post immediately when blocked or at a handoff\n  point (e.g. draft awaiting ratification).\n- Agent records are supplementary; the forum thread reply is the primary\n  progress surface.\n- The issues forum (`issues-and-open-questions`) is for blockers/incidents\n  and open questions \u2014 NOT work updates or ratification requests.\n\n## Escalation Process (R12)\n\n1. Try restart/config fix first.\n2. Record `[\"to:architect\",\"type:escalation\"]` \u2014 problem, tried, state.\n3. If unresolvable and blocking: also POST to Assembly\n   `issues-and-open-questions` with `role` + `model` fields, using the\n   devops Assembly user UUID (assembly-srv :3107).\n4. DB changes route to **DBA** (`[\"to:dba\",\"type:db-change\",...]`); you own\n   migration mechanics, the DBA owns DDL.\n\n## End-of-Turn Inbox Check (MANDATORY, R17)\n\n- Preferred: `nexus/bin/check-inbox.sh --role devops` (or `nebula_get_inbox`\n  MCP `{\"role\":\"devops\",\"limit\":20}`).\n- Fallback: nebula REST :3101 \u2014 GET pointer, query records\n  `role=devops&createdAfter=<pointer_iso>`, PUT pointer after surfacing.\n- Surface items to the user; do NOT silently act on inbox items.\n- If nebula-srv unreachable, surface as blocking infra issue.\n",
+      "mcp_tools": [
+        "nebula_get_inbox",
+        "nebula_create_agent_record",
+        "nebula_list_agent_records"
+      ],
+      "roles": [
+        "devops"
+      ],
+      "sha256": "866ae5b2743ec1980a64198cd3384fa355eab6922611f6689bb37257e2c4d4d1",
+      "slug": "devops-operations-conventions",
+      "summary": "Mission charter + mandatory thread-reply convention, R12 escalation, and R17 inbox check for the devops role.",
+      "tags": [
+        "devops",
+        "operations",
+        "conventions",
+        "thread-reply",
+        "escalation",
+        "inbox"
+      ],
+      "title": "DevOps Operations Conventions (thread-reply, escalation, inbox)",
+      "triggers": [
+        "devops conventions",
+        "thread reply",
+        "escalate",
+        "inbox check",
+        "containerization",
+        "ansible",
+        "cutover"
       ]
     },
     {
@@ -701,6 +733,46 @@
         "check health",
         "orphan scan",
         "inconsistency"
+      ]
+    },
+    {
+      "body_md": "## Parallel Role Loop (PRL) \u2014 cross-role doctrine\n\n### Premise\nMultiple role sessions run concurrently (e.g., Architect in one terminal, Engineer in another, user supervising). **The user is NOT the message bus.** All cross-role communication flows through the corpus: nebula agent records (tag-routed, pointer-tracked) + Assembly forum threads (durable, timestamped, threaded). The inbox check is the attention filter that lets each role work independently.\n\n### The loop (every role, every turn)\n1. **Inbox check FIRST** \u2014 `nebula_get_inbox` / `nexus/bin/check-inbox.sh --role <role>`: new `to:<role>` records since pointer. Surface to the user; never silently process.\n2. **Thread sweep** \u2014 check threads you participate in (track threads, decisions forum, change-log) for new comments since your last turn.\n3. **Act** \u2014 proceed with work until a stopping point.\n4. **Stopping point \u2192 post to the thread** \u2014 every completion, blocker, decision, review, or question gets a forum post: decisions \u2192 decisions forum (R-A records auto-sync); track status \u2192 the track thread; completed work \u2192 change-log (R14).\n5. **Notify via pointer** \u2014 after posting, write a `to:<dependent-role>` agent record (short, carrying thread IDs + record IDs + commit refs) so the other role's next inbox check catches it.\n6. **Advance pointer** after surfacing (R17).\n\n### Autonomy boundary (work until blocker or decision needed)\n- Proceed autonomously until: (a) a decision is needed from another role, (b) a blocker surfaces, (c) a work unit completes.\n- At each boundary: post to the thread, notify via record, then **STOP that track**.\n- **While awaiting a decision or blocker leverage: switch to another project track** \u2014 never idle. The decision arrives via inbox on a later turn.\n\n### Communication rules\n- **Never relay via user chat.** If the user relays a message from another role, treat it as out-of-band: immediately write it into the corpus (thread + record) so the loop self-heals.\n- **Thread = durable conversation surface.** Comments, not just records. A question asked in chat is not asked until it's a thread post + routed record.\n- **Records carry pointers** \u2014 always embed thread IDs, record IDs, commit refs in content so the corpus is self-navigating.\n\n### Role-specific wiring\n- **Engineer**: proceed until blocker/decision; switch projects while awaiting; check inbox after every turn; post to the thread at every stopping point; push cadence follows review gates, never chat acks.\n- **Architect**: check inbox for rulings/requests each turn; rule in the decisions forum (decision records auto-sync to threads); reply in-thread; propagate go-aheads via `to:engineer` records with thread pointers.\n- **All roles**: R13 clock in/out; R17 end-of-turn inbox; R14 change-log after substantive work.\n\n### Why\nWithout this loop, the user becomes the relay between sessions \u2014 exactly the failure this doctrine removes. Every out-of-band message is a corpus gap: the receiving role cannot see it, the pointer cannot track it, and the audit trail is incomplete.\n\n### Enforcement\n- **Engineer**: doctrine embedded in `.opencode/agents/engineer.md` (Parallel Role Loop section) \u2014 binding at session start, not just advisory from the registry.\n- **Architect**: doctrine embedded in `.opencode/agents/architect.md` (Parallel Role Loop section).\n- Registry card stays canonical; frontmatter sections mirror it.\n\n### Future evolution \u2014 Question & Decision Cards (QDC)\nPlanned async mechanism: structured \"question cards\" and \"decision cards\"\nso the user can be involved **in real time** without relaying between\nsessions. When QDC lands:\n- PRL becomes the synchronous baseline loop.\n- QDCs carry the async path (question raised \u2192 card routed \u2192 user\n  decides in real time \u2192 decision card posted \u2192 pointer notified).\n- Cards are corpus artifacts (records + forum threads), so the audit\n  trail stays complete.\n",
+      "mcp_tools": [
+        "nebula_get_inbox",
+        "nebula_create_agent_record",
+        "nebula_set_inbox_pointer"
+      ],
+      "roles": [
+        "analyst",
+        "architect",
+        "builder",
+        "critic",
+        "engineer",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "037bc7dbf232c438da49c78d8682ab74edcdb4a67be6790f3c28260c0e844d5e",
+      "slug": "parallel-role-loop",
+      "summary": "Concurrent role sessions: user is NOT the message bus. Every turn = inbox check \u2192 thread sweep \u2192 act \u2192 post to thread \u2192 notify via to:<role> record \u2192 advance pointer. Work until blocker/decision, then switch tracks while awaiting.",
+      "tags": [
+        "parallel",
+        "cross-role",
+        "turn-protocol",
+        "messaging",
+        "doctrine",
+        "threads",
+        "inbox"
+      ],
+      "title": "Parallel Role Loop (PRL) \u2014 cross-role doctrine",
+      "triggers": [
+        "user relays a message",
+        "out-of-band message",
+        "another role asked",
+        "decision needed",
+        "awaiting decision",
+        "keep threads up to date",
+        "parallel session"
       ]
     },
     {
@@ -1379,6 +1451,6 @@
       ]
     }
   ],
-  "role_count": 332,
+  "role_count": 341,
   "schema": "tackle"
 }

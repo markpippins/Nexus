@@ -50,8 +50,8 @@ def test_unresolved_context_url_flagged(monkeypatch):
 
 def test_resolvable_context_url_passes(monkeypatch):
     d, p = _tmp_doc(monkeypatch, {
-        "@context": ["https://nexus.local/schema/context/nexus-base.jsonld",
-                     "https://nexus.local/schema/core/work-request.jsonld"],
+        "@context": ["https://nexus.local/schema/ontology/context/nexus-base.jsonld",
+                     "https://nexus.local/schema/ontology/core/work-request.jsonld"],
         "type": "WorkRequest",
     })
     try:
@@ -97,9 +97,9 @@ def test_undeclared_type_flagged(monkeypatch):
 
 
 def test_declared_type_passes(monkeypatch):
-    # WorkRequest is declared in schemas/core/work-request.jsonld
+    # WorkRequest is declared in schemas/ontology/core/work-request.jsonld
     d, p = _tmp_doc(monkeypatch, {
-        "@context": ["https://nexus.local/schema/core/work-request.jsonld"],
+        "@context": ["https://nexus.local/schema/ontology/core/work-request.jsonld"],
         "type": "WorkRequest",
     })
     try:
@@ -143,11 +143,11 @@ def test_prefixed_id_identifier_not_flagged(monkeypatch):
 # ─── resolver: versioned $id / $schema URLs ─────────────────────────────────
 
 def test_resolve_versioned_ids():
-    assert cj.resolve("https://nexus.local/schema/wrp/work-request/v1") is not None
-    assert cj.resolve("https://nexus.local/schema/authority/authority-matrix/v1") is not None
-    assert cj.resolve("https://nexus.local/schema/core/stratification/v1") is not None
-    assert cj.resolve("https://nexus.local/schema/context/nexus-base.jsonld") is not None
-    assert cj.resolve("https://nexus.local/schema/core/work-request/") is not None
+    assert cj.resolve("https://nexus.local/schema/validation/wrp/work-request/v1") is not None
+    assert cj.resolve("https://nexus.local/schema/validation/authority/authority-matrix/v1") is not None
+    assert cj.resolve("https://nexus.local/schema/ontology/core/stratification/v1") is not None
+    assert cj.resolve("https://nexus.local/schema/ontology/context/nexus-base.jsonld") is not None
+    assert cj.resolve("https://nexus.local/schema/ontology/core/work-request/") is not None
     assert cj.resolve("https://nexus.local/schema/") == cj.SCHEMAS
     assert cj.resolve("https://nexus.local/schema/does/not/exist") is None
 

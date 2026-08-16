@@ -42,7 +42,7 @@ def _matrix(authorities):
     }
 
 
-REAL_WR = "schemas/wrp/work-request.schema.json"
+REAL_WR = "schemas/validation/wrp/work-request.schema.json"
 
 
 # ─── no-authority ────────────────────────────────────────────────────────────
@@ -96,7 +96,7 @@ def test_unlisted_projection_missing_file():
 def test_manifest_source_from_projection_flagged():
     matrix = ca.load_matrix()
     fake = {"projections": [
-        {"sourceSchema": "schemas/core/work-request.jsonld",  # a projection, not canonical
+        {"sourceSchema": "schemas/ontology/core/work-request.jsonld",  # a projection, not canonical
          "targetFormat": "json-ld", "outputPath": "x", "active": True},
     ]}
     v = ca.check_manifest(matrix, manifest=fake)
@@ -133,7 +133,7 @@ def test_real_scan_has_single_authority_per_class():
     assert v == []
     # and the IR layer class must resolve to the canonical work-request schema
     ir_files = {rel for rel, _ in index.get("ir_layer", [])}
-    assert ir_files == {"schemas/wrp/work-request.schema.json"}
+    assert ir_files == {"schemas/validation/wrp/work-request.schema.json"}
 
 
 def test_manifest_sources_are_canonical():
@@ -145,7 +145,7 @@ def test_manifest_sources_are_canonical():
 def test_manifest_active_output_missing_flagged():
     matrix = ca.load_matrix()
     fake = {"projections": [
-        {"sourceSchema": "schemas/wrp/work-request.schema.json",
+        {"sourceSchema": "schemas/validation/wrp/work-request.schema.json",
          "targetFormat": "typescript-type",
          "outputPath": "nope/missing.model.ts",
          "active": True, "verify": {"mode": "exists"}},
@@ -157,9 +157,9 @@ def test_manifest_active_output_missing_flagged():
 def test_manifest_digest_mismatch_flagged():
     matrix = ca.load_matrix()
     fake = {"projections": [
-        {"sourceSchema": "schemas/wrp/work-request.schema.json",
+        {"sourceSchema": "schemas/validation/wrp/work-request.schema.json",
          "targetFormat": "json-ld",
-         "outputPath": "schemas/core/work-request.jsonld",
+         "outputPath": "schemas/ontology/core/work-request.jsonld",
          "active": True, "verify": {"mode": "digest", "algorithm": "sha256", "digest": "0" * 64}},
     ]}
     v = ca.check_manifest(matrix, manifest=fake)
@@ -168,11 +168,11 @@ def test_manifest_digest_mismatch_flagged():
 
 def test_manifest_digest_match_passes():
     matrix = ca.load_matrix()
-    real_digest = ca.file_digest("schemas/core/work-request.jsonld")
+    real_digest = ca.file_digest("schemas/ontology/core/work-request.jsonld")
     fake = {"projections": [
-        {"sourceSchema": "schemas/wrp/work-request.schema.json",
+        {"sourceSchema": "schemas/validation/wrp/work-request.schema.json",
          "targetFormat": "json-ld",
-         "outputPath": "schemas/core/work-request.jsonld",
+         "outputPath": "schemas/ontology/core/work-request.jsonld",
          "active": True, "verify": {"mode": "digest", "algorithm": "sha256", "digest": real_digest}},
     ]}
     v = ca.check_manifest(matrix, manifest=fake)
@@ -181,7 +181,7 @@ def test_manifest_digest_match_passes():
 
 # ─── regenerate verify mode (TypeSpec codegen, ready-to-flip) ────────────────
 
-REAL_WR_SRC = "schemas/wrp/work-request.schema.json"
+REAL_WR_SRC = "schemas/validation/wrp/work-request.schema.json"
 
 
 def _tmp_proj_dir():

@@ -1,0 +1,76 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "nx": "https://nexus.local/schema/",
+
+    "hv": "https://nexus.local/schema/ontology/core/harvest/",
+    "id": "@id",
+    "type": "@type",
+    "comment": {"@id": "http://www.w3.org/2000/01/rdf-schema#comment"},
+
+    "Harvest":              "hv:Harvest",
+    "SpecificationAgenda":  "hv:SpecificationAgenda",
+    "SpecificationCandidate": "hv:SpecificationCandidate",
+    "HarvestedCode":        "hv:HarvestedCode",
+
+    "agendaItems":      {"@id": "hv:agendaItems", "@container": "@list"},
+    "sourceTranscript": "hv:sourceTranscript",
+    "modelUsed":        "hv:modelUsed",
+    "chunksProcessed":  {"@id": "hv:chunksProcessed", "@type": "xsd:integer"},
+    "failures":         {"@id": "hv:failures",         "@type": "xsd:integer"},
+
+    "intentDescription":    "hv:intentDescription",
+    "implementationNotes":  {"@id": "hv:implementationNotes", "@container": "@list"},
+    "openQuestions":        {"@id": "hv:openQuestions", "@container": "@list"},
+    "codeSnippets":         {"@id": "hv:codeSnippets", "@type": "@id"},
+
+    "language":  "hv:language",
+    "purpose":   "hv:purpose",
+    "rawCode":   "hv:rawCode",
+
+    "qaScore":          {"@id": "hv:qaScore", "@type": "xsd:integer"},
+    "qaNotes":          {"@id": "hv:qaNotes", "@container": "@list"},
+    "promotionStatus":  "hv:promotionStatus",
+    "promotedAt":       {"@id": "hv:promotedAt", "@type": "xsd:dateTime"}
+  },
+
+  "@graph": [
+    {
+      "@id": "hv:Harvest",
+      "@type": "rdfs:Class",
+      "subClassOf": {"@id": "nx:Harvest"},
+      "comment": "A harvested document produced from a chat transcript via LLM extraction. The top-level container for SpecificationCandidates.",
+      "properties": [
+        "hv:SpecificationAgenda", "hv:sourceTranscript", "hv:modelUsed",
+        "hv:chunksProcessed", "hv:failures",
+        "nx:createdAt", "nx:status", "nx:tags",
+        "hv:qaScore", "hv:qaNotes", "hv:promotionStatus", "hv:promotedAt",
+        "nx:derivedFrom", "nx:references", "nx:hasPart"
+      ]
+    },
+    {
+      "@id": "hv:SpecificationAgenda",
+      "@type": "rdfs:Class",
+      "subClassOf": {"@id": "nx:Harvest"},
+      "comment": "A structured extraction from a single transcript processing pass. Contains multiple candidates.",
+      "properties": ["hv:agendaItems"]
+    },
+    {
+      "@id": "hv:SpecificationCandidate",
+      "@type": "rdfs:Class",
+      "comment": "A single architectural specification or requirement mined from a transcript.",
+      "properties": [
+        "nx:title", "nx:status", "hv:intentDescription",
+        "nx:description", "hv:implementationNotes",
+        "hv:codeSnippets", "hv:openQuestions",
+        "nx:references", "nx:tags"
+      ]
+    },
+    {
+      "@id": "hv:HarvestedCode",
+      "@type": "rdfs:Class",
+      "comment": "An exact code block extracted from a transcript, with its language and purpose.",
+      "properties": ["hv:language", "hv:purpose", "hv:rawCode"]
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://nexus.local/schema/validation/wrp/event/v1",
+  "title": "WRP Event",
+  "description": "Base event contract for the WorkRequest Protocol. All WRP lifecycle events share this envelope. Compatible with the JSON-LD definition at schemas/ontology/core/event.jsonld.",
+  "type": "object",
+  "required": [
+    "event_id",
+    "wrp_id",
+    "type",
+    "timestamp",
+    "version"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Unique event identifier (UUID v4)"
+    },
+    "wrp_id": {
+      "type": "string",
+      "description": "WorkRequest ID this event belongs to"
+    },
+    "type": {
+      "type": "string",
+      "description": "Event type — identifies the lifecycle event",
+      "enum": [
+        "wrp.created",
+        "wrp.intaked",
+        "wrp.planned",
+        "wrp.critiqued",
+        "wrp.specified",
+        "wrp.approved",
+        "wrp.queued",
+        "wrp.executing",
+        "wrp.completed",
+        "wrp.archived",
+        "wrp.failed",
+        "wrp.event",
+        "wrp.note"
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of event emission"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Event schema version (additive only — never breaking)"
+    },
+    "causation_id": {
+      "type": "string",
+      "description": "ID of the event that caused this event (causality chain)"
+    },
+    "correlation_id": {
+      "type": "string",
+      "description": "Correlation ID grouping related events across WorkRequests"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Event-type-specific payload",
+      "properties": {
+        "previous_status": {
+          "type": "string",
+          "description": "Previous state before transition (for state-change events)"
+        },
+        "new_status": {
+          "type": "string",
+          "description": "New state after transition (for state-change events)"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Reason for the transition (e.g., failure reason)"
+        },
+        "actor": {
+          "type": "string",
+          "description": "Agent or system that triggered the event"
+        },
+        "details": {
+          "type": "object",
+          "description": "Arbitrary event-type-specific details"
+        }
+      }
+    }
+  }
+}

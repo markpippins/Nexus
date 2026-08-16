@@ -1,0 +1,32 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "nx": "https://nexus.local/schema/",
+    "ev": "https://nexus.local/schema/ontology/core/event/",
+    "sv": "https://nexus.local/schema/ontology/core/service/",
+
+    "id": "@id",
+    "type": "@type",
+    "comment": {"@id": "http://www.w3.org/2000/01/rdf-schema#comment"}
+  },
+
+  "@graph": [
+    {
+      "@id": "ev:Event",
+      "comment": "An Event may be triggered by a Service (e.g., a health check failure emits an event) or observed by a Service (e.g., a cascade listener).",
+      "triggers": {"@id": "ev:Event"},
+      "observedBy": {"@id": "sv:Service"}
+    },
+    {
+      "@id": "sv:Service",
+      "comment": "A Service emits Events for its lifecycle transitions (deploy, health check, config change). Events reference the service as their source.",
+      "produces": {"@id": "ev:Event"}
+    },
+    {
+      "@id": "ev:IdeaCaptured",
+      "comment": "An IdeaCaptured event may be triggered by a Service observation (e.g., a new file detected by voyager) or by a human via the console.",
+      "triggers": {"@id": "sv:Service"},
+      "derivedFrom": {"@id": "sv:Deployment"}
+    }
+  ]
+}

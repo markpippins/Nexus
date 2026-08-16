@@ -2,7 +2,7 @@
 """
 Authority Matrix Validator — single-canonical-authority enforcement.
 
-Reads schemas/authority/authority-matrix.json (data) and verifies that every
+Reads schemas/validation/authority/authority-matrix.json (data) and verifies that every
 semantic domain has exactly one authoritative artifact on disk, that no
 semantic class is claimed by two authoritative files, and that every declared
 projection resolves to a real file (or is listed when it lives in the
@@ -27,7 +27,7 @@ Failure classes:
     no-authority         — a matrix domain has no resolvable canonical authority
     duplicate-class      — a semantic class is claimed by >1 authoritative file
     unlisted-projection  — a declared projection does not exist, a file in
-                           schemas/projections/ is undeclared, or the projection
+                           schemas/projection-manifests/ is undeclared, or the projection
                            manifest sources from a projection/superseded artifact
     projection-drift     — an active projection's output is missing, its committed
                            digest no longer matches the on-disk artifact, or a
@@ -43,8 +43,8 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-MATRIX_PATH = REPO_ROOT / "schemas" / "authority" / "authority-matrix.json"
-PROJECTIONS_DIR = REPO_ROOT / "schemas" / "projections"
+MATRIX_PATH = REPO_ROOT / "schemas" / "validation" / "authority" / "authority-matrix.json"
+PROJECTIONS_DIR = REPO_ROOT / "schemas" / "projection-manifests"
 PROJECTION_MANIFEST = PROJECTIONS_DIR / "projection-manifest.jsonld"
 
 # ─── Path helpers ────────────────────────────────────────────────────────────
@@ -353,7 +353,7 @@ def check_duplicate_class(matrix, index):
 
 
 def check_unlisted_projection(matrix):
-    """unlisted-projection: files in schemas/projections/ not declared as a projection."""
+    """unlisted-projection: files in schemas/projection-manifests/ not declared as a projection."""
     violations = []
     declared = set()
     for entry in matrix.get("authorities", []):
@@ -373,7 +373,7 @@ def check_unlisted_projection(matrix):
             violations.append({
                 "failure_class": "unlisted-projection",
                 "domain": "(unlisted)",
-                "detail": f"file in schemas/projections/ is not declared as a projection: {rel}",
+                "detail": f"file in schemas/projection-manifests/ is not declared as a projection: {rel}",
             })
     return violations
 

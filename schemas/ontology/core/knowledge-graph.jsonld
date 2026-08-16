@@ -1,0 +1,98 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "nx": "https://nexus.local/schema/",
+
+    "kg": "https://nexus.local/schema/ontology/core/knowledge-graph/",
+    "id": "@id",
+    "type": "@type",
+    "comment": {"@id": "http://www.w3.org/2000/01/rdf-schema#comment"},
+
+    "GraphEntity":          "kg:GraphEntity",
+    "GraphEdge":            "kg:GraphEdge",
+    "GraphCrossReference":  "kg:GraphCrossReference",
+    "GraphSnapshot":        "kg:GraphSnapshot",
+
+    "section":       "kg:section",
+    "entityType":    "kg:entityType",
+    "entityId":      "kg:entityId",
+    "properties":    "kg:properties",
+    "embedding":     "kg:embedding",
+    "checksum":      "kg:checksum",
+    "sourceFile":    "kg:sourceFile",
+
+    "sourceSection": "kg:sourceSection",
+    "sourceId":      "kg:sourceId",
+    "relationType":  "kg:relationType",
+    "targetSection": "kg:targetSection",
+    "targetId":      "kg:targetId",
+
+    "mapName":       "kg:mapName",
+    "query":         "kg:query",
+    "queryLimit":    {"@id": "kg:queryLimit", "@type": "xsd:integer"},
+    "queryResults":  {"@id": "kg:queryResults", "@container": "@list"},
+
+    "entityCount":   {"@id": "kg:entityCount", "@type": "xsd:integer"},
+    "edgeCount":     {"@id": "kg:edgeCount", "@type": "xsd:integer"},
+    "crossRefCount": {"@id": "kg:crossRefCount", "@type": "xsd:integer"},
+    "snapshotVersion": "kg:snapshotVersion",
+    "snapshotLabel":   "kg:snapshotLabel"
+  },
+
+  "@graph": [
+    {
+      "@id": "kg:GraphEntity",
+      "@type": "rdfs:Class",
+      "comment": "A node in the knowledge graph. Every entity from the graph file becomes one row in graph_entities. Each entity belongs to a section (types, actors, decisions, etc.) and carries its original JSON as properties.",
+      "properties": [
+        "kg:section", "kg:entityId", "nx:name", "kg:entityType",
+        "nx:status", "nx:description", "kg:properties",
+        "kg:embedding", "kg:checksum", "kg:sourceFile",
+        "nx:createdAt", "nx:updatedAt"
+      ]
+    },
+    {
+      "@id": "kg:GraphEdge",
+      "@type": "rdfs:Class",
+      "comment": "A directed relationship between two graph entities. Edges represent produces, consumes, governed_by, references, depends_on, and other semantic links extracted from the original graph file.",
+      "properties": [
+        "kg:sourceSection", "kg:sourceId",
+        "kg:relationType",
+        "kg:targetSection", "kg:targetId",
+        "nx:createdAt"
+      ]
+    },
+    {
+      "@id": "kg:GraphCrossReference",
+      "@type": "rdfs:Class",
+      "comment": "A cross-reference mapping between sections of the knowledge graph. These are the explicit link tables (e.g., cirs_to_projection_algebra) that declare which entities in one section relate to which in another.",
+      "properties": [
+        "kg:mapName",
+        "kg:sourceSection", "kg:sourceId",
+        "kg:targetSection", "kg:targetId",
+        "nx:createdAt"
+      ]
+    },
+    {
+      "@id": "kg:GraphSnapshot",
+      "@type": "rdfs:Class",
+      "comment": "A point-in-time snapshot of the knowledge graph. Tracks which file was loaded, its checksum, and the counts of entities/edges/cross-refs. Enables rollback and version comparison.",
+      "properties": [
+        "kg:sourceFile", "kg:checksum",
+        "kg:entityCount", "kg:edgeCount", "kg:crossRefCount",
+        "kg:snapshotVersion", "kg:snapshotLabel",
+        "nx:timestamp"
+      ]
+    },
+    {
+      "@id": "kg:GraphQuery",
+      "@type": "rdfs:Class",
+      "comment": "A query against the knowledge graph. Returned by the Knowledge Steward in response to a natural language or structured query.",
+      "properties": [
+        "kg:query", "kg:queryLimit",
+        "kg:queryResults",
+        "nx:timestamp"
+      ]
+    }
+  ]
+}

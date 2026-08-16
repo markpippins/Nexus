@@ -24,10 +24,10 @@ def test_manifest_adapts_cleanly():
 
 def test_entry_shape_matches_spec():
     entry = pir.adapt_entry({
-        "sourceSchema": "schemas/wrp/work-request.schema.json",
+        "sourceSchema": "schemas/validation/wrp/work-request.schema.json",
         "targetFormat": "json-ld",
         "generator": "manual",
-        "outputPath": "schemas/core/work-request.jsonld",
+        "outputPath": "schemas/ontology/core/work-request.jsonld",
         "lifecycle": "on-schema-change",
         "active": True,
     })
@@ -37,12 +37,12 @@ def test_entry_shape_matches_spec():
     assert entry["domain"] == "json-ld"
     assert entry["confidence"] == 1.0
     assert entry["constraints"]  # CIRS-IR rules present
-    assert entry["trace"] == ["schemas/wrp/work-request.schema.json"]
+    assert entry["trace"] == ["schemas/validation/wrp/work-request.schema.json"]
 
 
 def test_confidence_inactive_is_speculative():
     entry = pir.adapt_entry({
-        "sourceSchema": "schemas/core/service.jsonld",
+        "sourceSchema": "schemas/ontology/core/service.jsonld",
         "targetFormat": "angular-service",
         "outputPath": "x.ts",
         "active": False,
@@ -52,16 +52,16 @@ def test_confidence_inactive_is_speculative():
 
 def test_proposition_carries_manifest_metadata():
     entry = pir.adapt_entry({
-        "sourceSchema": "schemas/core/knowledge-graph.jsonld",
+        "sourceSchema": "schemas/ontology/core/knowledge-graph.jsonld",
         "targetFormat": "postgres-ddl",
         "generator": "manual",
-        "outputPath": "schemas/projections/knowledge-graph.sql",
+        "outputPath": "schemas/projection-manifests/knowledge-graph.sql",
         "lifecycle": "on-schema-change",
         "active": True,
     })
-    assert entry["proposition"]["outputPath"] == "schemas/projections/knowledge-graph.sql"
+    assert entry["proposition"]["outputPath"] == "schemas/projection-manifests/knowledge-graph.sql"
     assert entry["proposition"]["generator"] == "manual"
-    assert entry["trace"] == ["schemas/core/knowledge-graph.jsonld"]
+    assert entry["trace"] == ["schemas/ontology/core/knowledge-graph.jsonld"]
 
 
 def test_validation_rejects_bad_entry():
@@ -74,9 +74,9 @@ def test_validation_rejects_bad_entry():
 
 def test_validation_accepts_valid_entry():
     entry = pir.adapt_entry({
-        "sourceSchema": "schemas/wrp/work-request.schema.json",
+        "sourceSchema": "schemas/validation/wrp/work-request.schema.json",
         "targetFormat": "json-ld",
-        "outputPath": "schemas/core/work-request.jsonld",
+        "outputPath": "schemas/ontology/core/work-request.jsonld",
         "active": True,
     })
     ok, reason = pir.validate(entry)

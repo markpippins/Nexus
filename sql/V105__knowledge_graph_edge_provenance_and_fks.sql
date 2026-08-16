@@ -1,6 +1,6 @@
 -- V105: Knowledge-graph edge provenance + real FK constraints (T24 step 4)
 --
--- Applies the edge-endpoint contract from schemas/projections/knowledge-graph.sql
+-- Applies the edge-endpoint contract from schemas/projection-manifests/knowledge-graph.sql
 -- to the live knowledge schema:
 --   * graph_edges gains per-edge provenance (source_migration_id, resolution,
 --     unresolved_reason) so unresolved edges are preserved losslessly instead
