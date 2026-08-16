@@ -932,6 +932,19 @@ describe("createSchema on fresh database", () => {
     }
   }, 30000);
 
+  // CP-9 back-compat: a plan with no verdict/entityKey is legacy-unchanged
+  // (the gate resolves nothing → bootstrap proceeds as today).
+  test("v38 back-compat: no verdict/entityKey → legacy unchanged", async () => {
+    const pool = await initDb();
+    const planId = `legacy-${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      expect(await resolveEntityKeysForPlan(planId)).toEqual([]);
+      expect(await getNewestCompileVerdictForPlan(planId)).toBeUndefined();
+    } finally {
+      await pool.end();
+    }
+  }, 30000);
+
   // D5 gate entityKey linkage: a plan resolves its compile-unit entityKey
   // from the released WorkRequest (context.plan_id) so a pre-release verdict
   // keyed by entityKey (plan_id NULL) still gates the bootstrap pass.
