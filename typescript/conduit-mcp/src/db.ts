@@ -60,6 +60,9 @@
 
 import crypto from "node:crypto";
 import { Pool, PoolClient, types } from "pg";
+import { evaluateReleaseGate, ReleaseDecision } from "./release-gate";
+import { RippleAssignment } from "./ripple-classifier";
+import { CompareTarget } from "./compile-compare";
 
 // ── Keep timestamps as ISO strings ─────────────────────────────────
 // pg parses TIMESTAMPTZ into Date objects by default. Override to keep
@@ -3475,6 +3478,43 @@ export async function getReceiptCount(): Promise<{ type: string; count: number }
   return qAll(
     `SELECT type, COUNT(*) as count FROM ${VISION_SCHEMA}.receipts GROUP BY type`
   );
+}
+
+/**
+ * CP-9 end-to-end: run the release gate and persist the verdict.
+ *
+ * Fuses compare → classify into the deterministic release decision
+ * (evaluateReleaseGate), then persists the pre-row verdict to
+ * vision.wr_compile_verdicts (idempotent on the deterministic verdict_id).
+ * Returns the decision + the persisted verdict_id for the caller/bootstrapper.
+ */
+export async function runCompileGate(opts: {
+  wr: CompareTarget;
+  plan: CompareTarget;
+  assignment: RippleAssignment;
+  entityKey: string;
+  ruleVersion?: string;
+  wrId?: string | null;
+  planId?: string | null;
+}): Promise<ReleaseDecision & { verdict_id: string }> {
+  const decision = evaluateReleaseGate(opts.wr, opts.plan, opts.assignment);
+  const ruleVersion = opts.ruleVersion ?? "1";
+  const verdictId = computeCompileVerdictId(
+    decision.verdict,
+    opts.entityKey,
+    ruleVersion,
+    decision.reason,
+  );
+  await insertCompileVerdict({
+    verdict_id: verdictId,
+    entity_key: opts.entityKey,
+    wr_id: opts.wrId ?? null,
+    plan_id: opts.planId ?? null,
+    verdict_type: decision.verdict,
+    rule_version: ruleVersion,
+    description: decision.reason,
+  });
+  return { ...decision, verdict_id: verdictId };
 }
 
 export async function deleteReceiptsByPlanAndType(

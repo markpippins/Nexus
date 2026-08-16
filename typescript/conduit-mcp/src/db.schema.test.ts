@@ -25,6 +25,7 @@ import {
   resolveEntityKeysForPlan,
   createWorkRequest,
   getCompileVerdictStats,
+  runCompileGate,
 } from "./db";
 
 const DSN = process.env.CONDUIT_PG_DSN || "postgresql://pguser:pgpass@localhost:5432/nexus";
@@ -865,6 +866,60 @@ describe("createSchema on fresh database", () => {
         await adminPool.query(`DELETE FROM vision.wr_compile_verdicts WHERE entity_key IN ($1, $2)`, [ekP, ekF]);
       } catch (e: any) {
         console.warn("stats cleanup failed:", e?.message);
+      } finally {
+        await adminPool.query(
+          `CREATE TRIGGER trg_wr_compile_verdicts_immutable
+             BEFORE UPDATE OR DELETE ON vision.wr_compile_verdicts
+             FOR EACH ROW
+             EXECUTE FUNCTION vision.wr_compile_verdicts_immutable()`,
+        );
+      }
+      await pool.end();
+    }
+  }, 30000);
+
+  // CP-9 end-to-end core: runCompileGate fuses compare → classify → persist.
+  test("v38 runCompileGate: compare → classify → persist verdict", async () => {
+    const pool = await initDb();
+    const suite = `test:gate:${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const ek = `${suite}:ek`;
+    const ek2 = `${suite}:ek2`;
+    const plan = {
+      goal: "inventory hardcoded ports",
+      filesAffected: [],
+      acceptanceCriteria: ["inventory of ports"],
+      deliverable: "docs/inventory.md",
+    };
+    try {
+      const pass = await runCompileGate({
+        wr: { ...plan },
+        plan,
+        assignment: { ripple: "R0", shape: "E" },
+        entityKey: ek,
+      });
+      expect(pass.verdict).toBe("WR_COMPILE_PASS");
+      expect(pass.release).toBe(true);
+      const newestPass = await getNewestCompileVerdict(ek);
+      expect(newestPass?.verdict_type).toBe("WR_COMPILE_PASS");
+      expect(newestPass?.verdict_id).toBe(pass.verdict_id);
+
+      const fail = await runCompileGate({
+        wr: { ...plan, filesAffected: ["extra.ts"] },
+        plan,
+        assignment: { ripple: "R1", shape: "E" },
+        entityKey: ek2,
+      });
+      expect(fail.verdict).toBe("WR_COMPILE_FAIL");
+      expect(fail.release).toBe(false);
+      expect((await getNewestCompileVerdict(ek2))?.verdict_type).toBe("WR_COMPILE_FAIL");
+    } finally {
+      try {
+        await adminPool.query(
+          `DROP TRIGGER IF EXISTS trg_wr_compile_verdicts_immutable ON vision.wr_compile_verdicts`,
+        );
+        await adminPool.query(`DELETE FROM vision.wr_compile_verdicts WHERE entity_key LIKE $1`, [`${suite}:%`]);
+      } catch (e: any) {
+        console.warn("gate cleanup failed:", e?.message);
       } finally {
         await adminPool.query(
           `CREATE TRIGGER trg_wr_compile_verdicts_immutable
