@@ -41,20 +41,34 @@
       "outputPath": "angular/nexus-console/src/models/work-request.model.ts",
       "lifecycle": "on-schema-change",
       "active": false,
-      "comment": "regenerate mode ready — flip active when the TS emitter is wired",
+      "comment": "cannot wire — no TypeScript emitter is installed in typespec/v1 (only http-client-java/python + openapi3). Flip active once a TS emitter lands.",
       "verify": {
         "mode": "regenerate",
         "command": "npx tsp compile typespec/v1 --emit @typespec/openapi3"
       }
     },
     {
+      "sourceSchema": "typespec/v1/conduit-kernel/python/main.tsp",
+      "targetFormat": "python-client",
+      "generator": "TypeSpec",
+      "outputPath": "python/conduit/generated/",
+      "lifecycle": "on-schema-change",
+      "active": true,
+      "comment": "Real TypeSpec emitter wiring (Wave 4): conduit-kernel spec -> http-client-python client package, emitted deterministically. Follows the peb-kernel precedent (python/peb-kernel/generated).",
+      "verify": {
+        "mode": "regenerate",
+        "command": "cd typespec/v1/conduit-kernel/python && ../../node_modules/.bin/tsp compile main.tsp"
+      }
+    },
+    {
       "sourceSchema": "schemas/wrp/work-request.schema.json",
       "targetFormat": "pydantic-model",
-      "generator": "TypeSpec",
+      "generator": "manual",
       "outputPath": "python/conduit/work_request.py",
       "lifecycle": "on-schema-change",
       "active": true,
-      "verify": {"mode": "exists"}
+      "comment": "HAND-MAINTAINED, not TypeSpec-generated: no .tsp spec defines the WorkRequest DCO. Mirrors the superseded .agents/schema draft (7 lowercase states) vs canonical 11-state WRP machine — DRIFT FLAGGED. Digest-locked so silent edits fail the gate.",
+      "verify": {"mode": "digest", "algorithm": "sha256", "digest": "d40ac5435fa03b1d133dc01d114d2d5057f7722a2cb52000343819cd597b0c0b"}
     },
     {
       "sourceSchema": "schemas/wrp/work-request.schema.json",
@@ -81,7 +95,7 @@
       "outputPath": "python/cascade/events/schemas.py",
       "lifecycle": "on-schema-change",
       "active": false,
-      "comment": "regenerate mode ready — flip active when the http-client-python emitter is wired",
+      "comment": "cannot wire — no cascade TypeSpec spec exists in typespec/v1. Remove or add the spec first.",
       "verify": {
         "mode": "regenerate",
         "command": "npx tsp compile typespec/v1 --emit @typespec/http-client-python"
@@ -90,15 +104,12 @@
     {
       "sourceSchema": "schemas/core/harvest.jsonld",
       "targetFormat": "pydantic-model",
-      "generator": "TypeSpec",
+      "generator": "manual",
       "outputPath": "python/rover/schemas.py",
       "lifecycle": "on-schema-change",
-      "active": false,
-      "comment": "regenerate mode ready — flip active when the http-client-python emitter is wired",
-      "verify": {
-        "mode": "regenerate",
-        "command": "npx tsp compile typespec/v1 --emit @typespec/http-client-python"
-      }
+      "active": true,
+      "comment": "HAND-MAINTAINED, not TypeSpec-generated: the rover spec models MCP request/response types, not the harvest schemas in this file. Digest-locked against silent edits.",
+      "verify": {"mode": "digest", "algorithm": "sha256", "digest": "df33bc74d60455b4fd7a97e4804b333003e81c50e65996f80af7362817567ae2"}
     },
     {
       "sourceSchema": "schemas/core/knowledge-graph.jsonld",
@@ -124,7 +135,7 @@
       "outputPath": "angular/nexus-console/src/models/service-mesh.model.ts",
       "lifecycle": "on-schema-change",
       "active": false,
-      "comment": "regenerate mode ready — flip active when the TS emitter is wired",
+      "comment": "cannot wire — no TypeScript emitter is installed in typespec/v1. Flip active once a TS emitter lands.",
       "verify": {
         "mode": "regenerate",
         "command": "npx tsp compile typespec/v1 --emit @typespec/openapi3"
