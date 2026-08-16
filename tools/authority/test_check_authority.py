@@ -31,6 +31,7 @@ def _matrix(authorities):
         "version": 1,
         "semantic_class_keys": {
             "execution_state": ["execution_state", "state"],
+            "ir_layer": ["metadata.mode"],
             "decision": ["decision", "result", "score"],
         },
         "authorities": authorities,
@@ -86,6 +87,29 @@ def test_unlisted_projection_missing_file():
     m = _matrix([_entry("a", REAL_WR, projections=["nope/proj.sql"])])
     v = ca.check_registry(m)
     assert any(x["failure_class"] == "unlisted-projection" for x in v)
+
+
+# ─── intent-vs-state split ─────────────────────────────────────────────────
+
+def test_mode_is_ir_layer_not_execution_state():
+    matrix = ca.load_matrix()
+    keys = matrix["semantic_class_keys"]
+    # `mode` is overloaded (pipeline `mode: execute` vs IR-layer `metadata.mode`),
+    # so it must be tracked as a *qualified* key, never a flat execution_state alias
+    assert "metadata.mode" in keys["ir_layer"]
+    assert "mode" not in keys["ir_layer"]
+    assert "mode" not in keys["execution_state"]
+
+
+def test_real_scan_has_single_authority_per_class():
+    matrix = ca.load_matrix()
+    index = ca.collect_semantic_classes(matrix, list(ca.iter_json_files()))
+    # every detected class must resolve to exactly one authoritative file
+    v = ca.check_duplicate_class(matrix, index)
+    assert v == []
+    # and the IR layer class must resolve to the canonical work-request schema
+    ir_files = {rel for rel, _ in index.get("ir_layer", [])}
+    assert ir_files == {"schemas/wrp/work-request.schema.json"}
 
 
 # ─── green: the committed matrix must validate ───────────────────────────────

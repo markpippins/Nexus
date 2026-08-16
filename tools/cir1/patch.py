@@ -38,9 +38,10 @@ SCHEMA_STATE_KEYS = [
 ]
 
 SEMANTIC_CLASSES = {
-    # `mode` is intentionally NOT an execution_state key (see lint.py): in the WRP
-    # schema it is the 3-layer IR mode, not runtime state.
+    # Intent-vs-state split: `execution_state` is event-derived runtime state,
+    # `ir_layer` is the 3-layer IR mode (INTENT/BINDING/EXECUTION-BOUND).
     "execution_state": ["execution_state", "state"],
+    "ir_layer": ["metadata.mode"],
     "pipeline_intent": ["intent_source", "PIPELINE_INTENT"],
     "decision": ["decision", "result", "score"],
     "runtime_snapshot": ["snapshot", "snapshot_ref"],
@@ -297,7 +298,20 @@ def patch_cir4(obj, mode, domain):
 
 # ─── CIR-5: Quarantine duplicate semantic authority ─────────────────────────
 
-def _cir5_collect(obj, path, index, mode, domain):
+def _semantic_key_matches(key, ancestors, class_keys):
+    """Qualified-key matching: a class key like `metadata.mode` matches the
+    bare key `mode` only when `metadata` is among its ancestors."""
+    for ck in class_keys:
+        if "." in ck:
+            head, tail = ck.split(".", 1)
+            if tail == key and head in ancestors:
+                return True
+        elif ck == key:
+            return True
+    return False
+
+
+def _cir5_collect(obj, path, index, mode, domain, ancestors=()):
     level = CIR_APPLY.get((domain, mode, 5))
     if level is None or level == "MINIMAL" or level == "LIMITED":
         return
@@ -309,16 +323,16 @@ def _cir5_collect(obj, path, index, mode, domain):
             if _is_quarantined(v):
                 continue
             for cls, keys in SEMANTIC_CLASSES.items():
-                if k in keys:
+                if _semantic_key_matches(k, ancestors, keys):
                     index.setdefault(cls, []).append({
                         "path": fpath,
                         "key": k,
                         "value": v,
                     })
-            _cir5_collect(v, path, index, mode, domain)
+            _cir5_collect(v, path, index, mode, domain, ancestors + (k,))
     elif isinstance(obj, list):
         for v in obj:
-            _cir5_collect(v, path, index, mode, domain)
+            _cir5_collect(v, path, index, mode, domain, ancestors)
 
 
 def _cir5_find_duplicates(index):
@@ -334,7 +348,7 @@ def _cir5_find_duplicates(index):
     return duplicates
 
 
-def patch_cir5(obj, path, duplicates_set, mode, domain):
+def patch_cir5(obj, path, duplicates_set, mode, domain, ancestors=()):
     level = CIR_APPLY.get((domain, mode, 5))
     if level is None or level == "MINIMAL" or level == "LIMITED":
         return obj
@@ -344,7 +358,7 @@ def patch_cir5(obj, path, duplicates_set, mode, domain):
         for k in list(obj.keys()):
             v = obj[k]
             for cls, keys in SEMANTIC_CLASSES.items():
-                if k in keys and (str(path), k) in duplicates_set:
+                if _semantic_key_matches(k, ancestors, keys) and (str(path), k) in duplicates_set:
                     if not _is_quarantined(v):
                         obj[k] = {
                             "status": "quarantined_CIR5",
@@ -353,9 +367,9 @@ def patch_cir5(obj, path, duplicates_set, mode, domain):
                             "original": v,
                         }
             if not _is_quarantined(v):
-                obj[k] = patch_cir5(v, path, duplicates_set, mode, domain)
+                obj[k] = patch_cir5(v, path, duplicates_set, mode, domain, ancestors + (k,))
     elif isinstance(obj, list):
-        return [patch_cir5(x, path, duplicates_set, mode, domain) for x in obj]
+        return [patch_cir5(x, path, duplicates_set, mode, domain, ancestors) for x in obj]
     return obj
 
 

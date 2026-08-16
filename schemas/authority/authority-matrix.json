@@ -5,6 +5,7 @@
 
   "semantic_class_keys": {
     "execution_state": ["execution_state", "state"],
+    "ir_layer": ["metadata.mode"],
     "pipeline_intent": ["intent_source", "PIPELINE_INTENT"],
     "decision": ["decision", "result", "score"],
     "runtime_snapshot": ["snapshot", "snapshot_ref"],
@@ -18,7 +19,7 @@
       "kind": "json-schema",
       "superseded": [".agents/schema/work_request.schema.json"],
       "projections": ["schemas/core/work-request.jsonld"],
-      "note": "Canonical WorkRequest IR (3-layer, 11-state). .agents/schema/work_request.schema.json is the pre-WRP draft and is superseded. schemas/core/work-request.jsonld is the JSON-LD graph form."
+      "note": "Canonical WorkRequest IR (3-layer, 11-state). Splits intent vs event-derived state: `metadata.mode` is the 3-layer IR mode (ir_layer: INTENT/BINDING/EXECUTION-BOUND), while `execution_state` + `status` are event-derived runtime state (execution_state/execution_status). .agents/schema/work_request.schema.json is the pre-WRP draft and is superseded; schemas/core/work-request.jsonld is the JSON-LD graph form."
     },
     {
       "domain": "wrp_event",

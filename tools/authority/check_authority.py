@@ -136,6 +136,21 @@ def iter_json_files():
 
 # ─── Semantic-class index (mirrors CIR-5 collect, data-driven keys) ─────────
 
+def _semantic_key_matches(key, ancestors, class_keys):
+    """Qualified-key matching: a class key like `metadata.mode` matches the
+    bare key `mode` only when `metadata` is among its ancestors. Bare class
+    keys match the bare key directly. Disambiguates the overloaded `mode` key
+    (pipeline `mode: execute` vs the IR-layer `metadata.mode`)."""
+    for ck in class_keys:
+        if "." in ck:
+            head, tail = ck.split(".", 1)
+            if tail == key and head in ancestors:
+                return True
+        elif ck == key:
+            return True
+    return False
+
+
 def collect_semantic_classes(matrix, files):
     """Return {semantic_class: [(rel_path, key), ...]} for all scoped, non-quarantined files."""
     keys_by_class = matrix.get("semantic_class_keys", {})
@@ -151,18 +166,18 @@ def collect_semantic_classes(matrix, files):
         if CIR5_APPLY.get((domain, mode)) in (None, "MINIMAL"):
             continue
 
-        def walk(obj):
+        def walk(obj, ancestors=()):
             if _is_quarantined(obj):
                 return
             if isinstance(obj, dict):
                 for k, v in obj.items():
                     for cls, keys in keys_by_class.items():
-                        if k in keys:
+                        if _semantic_key_matches(k, ancestors, keys):
                             index.setdefault(cls, []).append((rel, k))
-                    walk(v)
+                    walk(v, ancestors + (k,))
             elif isinstance(obj, list):
                 for v in obj:
-                    walk(v)
+                    walk(v, ancestors)
 
         walk(data)
     return index
