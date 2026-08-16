@@ -28,7 +28,9 @@ import {
   compilerOutputToEvent,
   foldEvents,
   decide,
-  validateTransition,
+  validateTransitionWithOps,
+  getOpTrace,
+  isUnresolvedOps,
   getDecisionPriority,
   dbEventsToRuntimeEvents,
   WorkRequestState,
@@ -1932,8 +1934,9 @@ export function registerToolHandlers(
       const rawEvents = await getEvents(args.wrId);
       if (rawEvents.length === 0)
         throw createError("NOT_FOUND", `WorkRequest ${args.wrId} not found`);
-      const state = foldEvents(args.wrId, dbEventsToRuntimeEvents(rawEvents));
-      validateTransition(state.status, args.type as any);
+      const events = dbEventsToRuntimeEvents(rawEvents);
+      const state = foldEvents(args.wrId, events);
+      validateTransitionWithOps(state.status, args.type as any, getOpTrace(events));
       await appendEvent(args.wrId, args.type, args.payload || {});
       const rawNewEvents = await getEvents(args.wrId);
       const newState = foldEvents(args.wrId, dbEventsToRuntimeEvents(rawNewEvents));
@@ -1945,7 +1948,12 @@ export function registerToolHandlers(
       if (!wr)
         return { ok: true, ticked: false, reason: "no runnable work requests" };
       const rawEvents = await getEvents(wr.work_request_uuid);
-      const state = foldEvents(wr.work_request_uuid, dbEventsToRuntimeEvents(rawEvents));
+      const events = dbEventsToRuntimeEvents(rawEvents);
+      const state = foldEvents(wr.work_request_uuid, events);
+      // D4: never auto-advance an UNRESOLVED WR past VALIDATED.
+      if (state.status === "VALIDATED" && isUnresolvedOps(getOpTrace(events))) {
+        return { ok: true, ticked: false, reason: "UNRESOLVED_OPS: held at VALIDATED, not auto-advancing" };
+      }
       const decision = decide(state);
       if (!decision)
         return { ok: true, ticked: false, reason: `state ${state.status} has no automatic transition` };

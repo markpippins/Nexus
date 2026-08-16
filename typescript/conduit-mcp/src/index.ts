@@ -29,7 +29,9 @@ import {
   compilerOutputToEvent,
   foldEvents,
   decide,
-  validateTransition,
+  validateTransitionWithOps,
+  getOpTrace,
+  isUnresolvedOps,
   dbEventsToRuntimeEvents,
   WorkRequestState,
 } from "./runtime-kernel";
@@ -1075,8 +1077,8 @@ app.post("/wr/:id/transition", async (req, res) => {
     }
     const events = dbEventsToRuntimeEvents(rawEvents);
     const state = foldEvents(id, events);
-    // Validate the transition
-    validateTransition(state.status, type);
+    // Validate the transition (D4: UNRESOLVED ops gate VALIDATED→QUEUED)
+    validateTransitionWithOps(state.status, type, getOpTrace(events));
     // Persist the event
     await appendEvent(id, type, payload || {});
     // Return new state
@@ -1119,6 +1121,11 @@ app.post("/wr/tick", async (_req, res) => {
     const rawEvents = await getEvents(wr.work_request_uuid);
     const events = dbEventsToRuntimeEvents(rawEvents);
     const state = foldEvents(wr.work_request_uuid, events);
+    // D4: never auto-advance an UNRESOLVED WR past VALIDATED.
+    if (state.status === "VALIDATED" && isUnresolvedOps(getOpTrace(events))) {
+      res.json({ ok: true, ticked: false, reason: "UNRESOLVED_OPS: held at VALIDATED, not auto-advancing" });
+      return;
+    }
     const decision = decide(state);
     if (!decision) {
       res.json({ ok: true, ticked: false, reason: `state ${state.status} has no automatic transition` });

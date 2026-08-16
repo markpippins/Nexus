@@ -198,6 +198,70 @@ export function validateTransition(
 }
 
 /**
+ * D4: an opTrace with no resolved ops is "UNRESOLVED" — a first-class valid
+ * state for storage/compare/classify/HELD, but NOT admissible to execution.
+ * A missing opTrace is treated as unresolved (fail-closed).
+ */
+export function isUnresolvedOps(opTrace?: {
+  ipNodes?: string[];
+  resolvedOps?: string[];
+  registryVersion?: string;
+}): boolean {
+  if (!opTrace) return true;
+  if (opTrace.registryVersion === "UNRESOLVED") return true;
+  if (!opTrace.resolvedOps || opTrace.resolvedOps.length === 0) return true;
+  return false;
+}
+
+/**
+ * Extract the opTrace from a WR's event log (the WR_SUBMITTED event payload).
+ * Returns undefined when the WR has no submission event yet.
+ */
+export function getOpTrace(
+  events: RuntimeEvent[],
+): { ipNodes?: string[]; resolvedOps?: string[]; registryVersion?: string } | undefined {
+  for (const e of events) {
+    if (e.type === "WR_SUBMITTED" && e.payload?.opTrace) {
+      return e.payload.opTrace as {
+        ipNodes?: string[];
+        resolvedOps?: string[];
+        registryVersion?: string;
+      };
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Validate a transition with D4 op-resolution awareness.
+ *
+ * An UNRESOLVED WR may be stored/HELD at VALIDATED, but the explicit
+ * VALIDATED→QUEUED advance is rejected with `UNRESOLVED_OPS` until its ops are
+ * resolved (registry pin). Delegates to :func:`validateTransition` otherwise.
+ */
+export function validateTransitionWithOps(
+  currentStatus: WorkRequestStatus,
+  event: RuntimeEventType,
+  opTrace?: {
+    ipNodes?: string[];
+    resolvedOps?: string[];
+    registryVersion?: string;
+  },
+): WorkRequestStatus {
+  if (
+    currentStatus === "VALIDATED" &&
+    event === "WR_VALIDATED" &&
+    isUnresolvedOps(opTrace)
+  ) {
+    throw new Error(
+      "UNRESOLVED_OPS: cannot advance VALIDATED→QUEUED with unresolved opcodes " +
+      "(registryVersion UNRESOLVED or empty resolvedOps)",
+    );
+  }
+  return validateTransition(currentStatus, event);
+}
+
+/**
  * Reduce: apply a single event to a state, producing a new state.
  * This is a PURE function — no side effects, no I/O.
  */
