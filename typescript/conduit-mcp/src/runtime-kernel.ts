@@ -22,6 +22,8 @@
  * Terminal states: SETTLED, REJECTED, FAILED, NOOP, DEFERRED
  */
 
+import type { SweepScope } from "./sweep-scope";
+
 // ── Status enum ────────────────────────────────────────────────────
 
 export const WR_STATUSES = [
@@ -91,6 +93,8 @@ export interface WorkRequestState {
 export interface CompilerIntentInputs {
   deliverable?: string;
   outputs?: string[];
+  /** D7: pinned sweep scope (canonical input — feeds entityKey). */
+  scope?: SweepScope;
   [key: string]: unknown;
 }
 

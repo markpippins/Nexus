@@ -1,3 +1,5 @@
+import type { SweepScope } from "./sweep-scope";
+
 // Pipeline state types
 
 export type PlanStatus =
@@ -24,6 +26,8 @@ export interface PlanCard {
   dependencies?: string[];
   /** D1: first-class output path/kind for read-only/recon nodes. */
   deliverable?: string;
+  /** D7: pinned sweep scope (recon nodes; canonical input). */
+  scope?: SweepScope;
   promptRef?: string; // prompt number this plan was spawned from
   priority?: number;
   /** Per-role ticket detail: role → { status, id, created_at, expires_at, objective } */
@@ -102,6 +106,8 @@ export interface ParsedPlan {
   dependencies: string[];
   /** D1: first-class output path/kind for read-only/recon nodes. */
   deliverable?: string;
+  /** D7: pinned sweep scope (recon nodes; canonical input). */
+  scope?: SweepScope;
 }
 
 // Agent heartbeat types (v034)
