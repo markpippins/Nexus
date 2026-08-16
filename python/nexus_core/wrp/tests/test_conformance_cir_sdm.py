@@ -53,6 +53,10 @@ LLM-free — no DB, no network, no wall-clock dependence.
    AC19 — Cold-start (R-A-2026-08-16-011): a first-observed mid-lifecycle WR
          event is a warning (non-blocking) and folds to its target status;
          a WR with observed history that violates stays blocking.
+   AC20 — IR payload separation (IR-CHECK-2, R-A-2026-08-16-013): a CER with
+         domain=projection_ir (an IR-domain CER) → warning; generation-domain
+         CERs stay clean; non-CER VISION.IR_PRODUCED stage events are NOT
+         flagged here (they classify on the stage axis, not this rule).
 
 Usage:
     cd /home/codex/dev/nexus
@@ -70,8 +74,10 @@ if _NEXUS_PYTHON not in sys.path:
     sys.path.insert(0, _NEXUS_PYTHON)
 
 from nexus_core.wrp.cir_sdm import (                                 # noqa: E402
+    IR_DOMAIN,
     RULE_AUDIT_NON_INFLUENCE,
     RULE_CORE_STAGE_SEPARATION,
+    RULE_IR_PAYLOAD_SEPARATION,
     RULE_IR_STAGE_SEPARATION,
     RULE_ONE_WAY_GATE,
     RULE_PROVENANCE_CAUSATION,
@@ -587,6 +593,52 @@ class TestAC18StageSubstrate(unittest.TestCase):
             _stage_ev("exec-1", "EXECUTION.STARTED", causation="syn-1"),
         ]
         self.assertEqual(evaluate(stream), [])
+
+
+class TestAC20IrPayloadSeparation(unittest.TestCase):
+    """AC20 (IR-CHECK-2, R-A-2026-08-16-013) — CER carrying IR payload → warning."""
+
+    def test_ir_domain_cer_is_flagged(self):
+        # A CER with domain=projection_ir is an IR-domain CER → one warning.
+        stream = [_cer("ir-cer-1", domain="projection_ir")]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_IR_PAYLOAD_SEPARATION]
+        self.assertEqual(len(offenders), 1)
+        v = offenders[0]
+        self.assertEqual(v.event_id, "ir-cer-1")
+        self.assertEqual(v.cer_id, "ir-cer-1")
+        self.assertEqual(v.rule_version, "1")
+        self.assertEqual(v.severity, "warning")
+        self.assertFalse(v.blocking)
+        self.assertIn(IR_DOMAIN, v.description)
+
+    def test_generation_domain_cer_is_clean(self):
+        # execution/specification/system CERs are generation domains — clean.
+        stream = [
+            _cer("spec-1", domain="specification"),
+            _cer("exec-1", domain="execution"),
+            _cer("sys-1", domain="system"),
+        ]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_IR_PAYLOAD_SEPARATION]
+        self.assertEqual(offenders, [])
+
+    def test_stage_axis_ir_event_is_not_flagged_here(self):
+        # A non-CER VISION.IR_PRODUCED stage event classifies on the stage axis
+        # (IR-CHECK-1/2's stage substrate), NOT as an IR-domain CER — so this
+        # rule must not fire on it.
+        stream = [_stage_ev("ir-1", "VISION.IR_PRODUCED")]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_IR_PAYLOAD_SEPARATION]
+        self.assertEqual(offenders, [])
+
+    def test_domain_matching_is_case_insensitive(self):
+        # The ruling specifies lowercase projection_ir; classification is
+        # normalized (same .lower() doctrine as _is_audit).
+        stream = [_cer("ir-cer-2", domain="Projection_IR")]
+        offenders = [v for v in evaluate(stream)
+                     if v.rule_id == RULE_IR_PAYLOAD_SEPARATION]
+        self.assertEqual(len(offenders), 1)
 
 
 class TestAC19ColdStart(unittest.TestCase):

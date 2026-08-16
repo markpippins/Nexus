@@ -60,6 +60,12 @@ violations, bit-for-bit.
                                          resolves nowhere) → violation.
   4. ``cir-sdm.version-lock``          — a stream mixing CCNF versions (or a
                                          CER missing its version) → violation.
+  5. ``cir-sdm.ir-stage-separation``   — IR-CHECK-1: a ProjectionIR event never
+                                         a parent of an EXECUTION.* event.
+  6. ``cir-sdm.core-stage-separation`` — CORE-CHECK-1: Synthesis never cites an
+                                         EXECUTION.* event.
+  7. ``cir-sdm.ir-payload-separation`` — IR-CHECK-2: a CER carrying IR payload
+                                         (domain=projection_ir) → warning.
 
 Usage::
 
@@ -91,6 +97,7 @@ __all__ = [
     "rule_version_lock",
     "rule_ir_stage_separation",
     "rule_core_stage_separation",
+    "rule_ir_payload_separation",
     "WR_TRANSITIONS",
     "PGV_TRANSITIONS",
     "PGV_INITIAL_STATE",
@@ -100,6 +107,7 @@ __all__ = [
     "STAGE_SYNTHESIS",
     "STAGE_IR",
     "STAGE_EXECUTION_PREFIX",
+    "IR_DOMAIN",
 ]
 
 # ── Rule identifiers (stable; do not rename without a version bump) ───
@@ -110,6 +118,7 @@ RULE_PROVENANCE_CAUSATION = "cir-sdm.provenance-causation"
 RULE_VERSION_LOCK = "cir-sdm.version-lock"
 RULE_IR_STAGE_SEPARATION = "cir-sdm.ir-stage-separation"
 RULE_CORE_STAGE_SEPARATION = "cir-sdm.core-stage-separation"
+RULE_IR_PAYLOAD_SEPARATION = "cir-sdm.ir-payload-separation"
 
 # Each rule family carries a deterministic version. Bump a family's version
 # when its semantics change; the version is part of every violation record so
@@ -121,6 +130,7 @@ RULE_VERSIONS: Dict[str, str] = {
     RULE_VERSION_LOCK: "1",
     RULE_IR_STAGE_SEPARATION: "1",
     RULE_CORE_STAGE_SEPARATION: "1",
+    RULE_IR_PAYLOAD_SEPARATION: "1",
 }
 
 # ── Canonical event schema ────────────────────────────────────────────
@@ -209,6 +219,11 @@ def _is_audit(domain: Optional[str], actor_type: Optional[str]) -> bool:
 STAGE_SYNTHESIS = "WORKREQUEST.CREATED"
 STAGE_IR = "VISION.IR_PRODUCED"
 STAGE_EXECUTION_PREFIX = "EXECUTION."
+
+# CER domain value that marks an IR payload (R-A-2026-08-16-013). Reuses the
+# stage-axis vocabulary: VISION.IR_PRODUCED classifies to this same string in
+# _stage_of. IR-CHECK-2 keys on this domain, not on payload shape.
+IR_DOMAIN = "projection_ir"
 
 
 def _stage_of(event_type: Optional[str]) -> Optional[str]:
@@ -795,6 +810,39 @@ def rule_core_stage_separation(
     return violations
 
 
+# ── Rule 7: IR payload separation (IR-CHECK-2) ────────────────────────
+
+
+def rule_ir_payload_separation(
+    events: Iterable[CanonicalEvent],
+    rule_version: str = RULE_VERSIONS[RULE_IR_PAYLOAD_SEPARATION],
+) -> List[CIRViolation]:
+    """IR-CHECK-2 (warning) — a CER must never carry an IR payload.
+
+    A CER whose ``domain == "projection_ir"`` is an IR-domain CER
+    (R-A-2026-08-16-013): IR payloads belong on the stage axis
+    (``VISION.IR_PRODUCED``), never in the CCNF compile output. The
+    discriminator is the *domain value*, never the payload shape — payload is
+    an opaque data carrier and shape-drifts (same doctrine as ``_is_audit``:
+    domain is the reliable signal). Non-CER stage events already classify via
+    the ``stage`` axis, so this rule keys on ``is_cer`` only.
+    """
+    _check_rule_version(RULE_IR_PAYLOAD_SEPARATION, rule_version)
+    materialized = list(events)
+    violations: List[CIRViolation] = []
+    for ev in materialized:
+        if not ev.is_cer:
+            continue
+        if ev.domain is not None and ev.domain.lower() == IR_DOMAIN:
+            violations.append(_make_violation(
+                RULE_IR_PAYLOAD_SEPARATION, ev, "warning",
+                f"CER carries IR payload (domain={IR_DOMAIN}) — IR payloads "
+                f"belong on the stage axis, not the CCNF compile output",
+                cer_id=ev.event_id,
+            ))
+    return violations
+
+
 # ── Orchestration ─────────────────────────────────────────────────────
 
 
@@ -827,6 +875,7 @@ def evaluate(
     violations.extend(rule_version_lock(normalized))
     violations.extend(rule_ir_stage_separation(normalized))
     violations.extend(rule_core_stage_separation(normalized))
+    violations.extend(rule_ir_payload_separation(normalized))
 
     # Enforcement flag: only blocking-severity rules in the enforced set block.
     return [
