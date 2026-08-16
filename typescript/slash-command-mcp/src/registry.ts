@@ -1,18 +1,20 @@
 /**
- * slash-command-mcp — registry access layer.
+ * slash-command-mcp — registry access layer (pg-free).
  *
- * Reads mcp.command_registry (canonical, seeded by mcp-registry-seeder).
+ * D-2026-08-16-002: `mcp.command_registry` access now lives behind the
+ * tools-aggregator's owned read-model (tools-aggregator/src/command-registry.ts).
+ * This module is a thin HTTP client over the aggregator's `/commands/*`
+ * REST namespace — no direct PostgreSQL imports, no `pg` dependency.
+ *
  * All lookups are read-only; the registry is refreshed out-of-band by the
- * seeder, never by this server.
+ * mcp-registry-seeder, never by slash-command-mcp.
  */
 
-import { Client, Pool } from "pg";
 import type { InputSchema, MCPProtocol } from "mcp-types";
 
-const PG_DSN =
-  process.env.MCP_PG_DSN ||
-  process.env.CONDUIT_PG_DSN ||
-  "postgresql://pguser:pgpass@localhost:5432/nexus";
+
+const AGGREGATOR_URL =
+  process.env.AGGREGATOR_URL || "http://localhost:3210";
 
 export interface RegistryRow {
   id: string;
@@ -25,16 +27,6 @@ export interface RegistryRow {
   schema_hash: string | null;
   last_seen_at: string | null;
   updated_at: string | null;
-}
-
-// Pool is lazy — no connections until first query.
-let pool: Pool | null = null;
-
-function getPool(): Pool {
-  if (!pool) {
-    pool = new Pool({ connectionString: PG_DSN, max: 5 });
-  }
-  return pool;
 }
 
 /** Normalize a service token for matching: tolerate missing/present "-mcp" suffix. */
@@ -55,86 +47,79 @@ export function serviceCandidates(token: string): string[] {
   return candidates;
 }
 
+class RegistryHttpError extends Error {
+  constructor(message: string, public code = "REGISTRY_ERROR") {
+    super(message);
+    this.name = "RegistryHttpError";
+  }
+}
+
+async function registryGet<T>(path: string): Promise<T> {
+  const url = `${AGGREGATOR_URL.replace(/\/+$/, "")}${path}`;
+  const res = await fetch(url, {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const body = (await res.json()) as { error?: string; code?: string };
+      detail = body?.error || body?.code || detail;
+    } catch {
+      /* keep HTTP status */
+    }
+    throw new RegistryHttpError(detail);
+  }
+  return (await res.json()) as T;
+}
+
 /** Fetch the exact registry row for (service, command). */
 export async function findCommand(
   service: string,
   command: string
 ): Promise<RegistryRow | null> {
-  const client = new Client({ connectionString: PG_DSN });
-  await client.connect();
-  try {
-    const { rows } = await client.query<RegistryRow>(
-      `SELECT id, service, command, description, param_schema, source_mcp, protocol,
-              schema_hash, last_seen_at, updated_at
-       FROM mcp.command_registry
-       WHERE service = $1 AND command = $2
-       LIMIT 1`,
-      [service, command]
-    );
-    return rows[0] ?? null;
-  } finally {
-    await client.end();
-  }
+  const data = await registryGet<{ command?: any }>(
+    `/commands/${encodeURIComponent(service)}/${encodeURIComponent(command)}`
+  );
+  return data?.command ?? null;
 }
 
 /** Resolve a command that may be bare (no service) — must be unique. */
 export async function resolveCommand(
   command: string
 ): Promise<{ row: RegistryRow; serviceMatched: string } | { matches: string[] }> {
-  const client = new Client({ connectionString: PG_DSN });
-  await client.connect();
-  try {
-    const { rows } = await client.query<RegistryRow>(
-      `SELECT id, service, command, description, param_schema, source_mcp, protocol,
-              schema_hash, last_seen_at, updated_at
-       FROM mcp.command_registry
-       WHERE command = $1
-       ORDER BY service`,
-      [command]
-    );
-    if (rows.length === 0) {
-      return { matches: [] };
-    }
-    if (rows.length === 1) {
-      return { row: rows[0], serviceMatched: rows[0].service };
-    }
-    return { matches: rows.map((r) => r.service) };
-  } finally {
-    await client.end();
+  const data = await registryGet<{ row?: RegistryRow | null; matches?: string[] }>(
+    `/commands/resolve/${encodeURIComponent(command)}`
+  );
+  if (data?.row) {
+    return { row: data.row, serviceMatched: data.row.service };
   }
+  return { matches: data?.matches || [] };
 }
 
 /** Resolve a service token to its canonical name, or null. */
 export async function resolveService(token: string): Promise<string | null> {
+  const services = await listServices();
   const candidates = serviceCandidates(token);
-  const client = new Client({ connectionString: PG_DSN });
-  await client.connect();
-  try {
-    const { rows } = await client.query<{ service: string }>(
-      `SELECT DISTINCT service FROM mcp.command_registry WHERE service = ANY($1)`,
-      [candidates]
-    );
-    if (rows.length === 0) return null;
-    // Prefer exact match over "-mcp" appended guess.
-    if (rows.some((r) => r.service === token)) return token;
-    return rows[0].service;
-  } finally {
-    await client.end();
-  }
+  const match = services.find((s) => candidates.includes(s));
+  return match ?? null;
 }
 
 /** List all service names (canonical). */
 export async function listServices(): Promise<string[]> {
-  const client = new Client({ connectionString: PG_DSN });
-  await client.connect();
-  try {
-    const { rows } = await client.query<{ service: string }>(
-      `SELECT DISTINCT service FROM mcp.command_registry ORDER BY service`
-    );
-    return rows.map((r) => r.service);
-  } finally {
-    await client.end();
-  }
+  const data = await registryGet<{ services?: string[] }>("/commands/services");
+  return data?.services ?? [];
+}
+
+/** Search commands across all services by command-name prefix (via aggregator). */
+export async function searchCommands(
+  prefix: string,
+  limit = 20
+): Promise<{ command: string; service: string }[]> {
+  const data = await registryGet<{ commands?: { command: string; service: string }[] }>(
+    `/commands/search/${encodeURIComponent(prefix)}?limit=${limit}`
+  );
+  return data?.commands ?? [];
 }
 
 /** List command names for a service, optionally prefix-filtered. */
@@ -142,19 +127,11 @@ export async function listCommands(
   service: string,
   prefix = ""
 ): Promise<{ command: string; description: string | null }[]> {
-  const client = new Client({ connectionString: PG_DSN });
-  await client.connect();
-  try {
-    const { rows } = await client.query<{ command: string; description: string | null }>(
-      `SELECT command, description FROM mcp.command_registry
-       WHERE service = $1 AND command LIKE $2 || '%'
-       ORDER BY command`,
-      [service, prefix]
-    );
-    return rows;
-  } finally {
-    await client.end();
-  }
+  const data = await registryGet<{ commands?: { command: string; description: string | null }[] }>(
+    `/commands/${encodeURIComponent(service)}/commands`
+  );
+  const rows = data?.commands ?? [];
+  return prefix ? rows.filter((r) => r.command.startsWith(prefix)) : rows;
 }
 
 /** List flag names for a (service, command) pair from its param_schema. */

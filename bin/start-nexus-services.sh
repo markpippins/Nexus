@@ -86,8 +86,7 @@ ALL_SERVICES=(
     "execution-srv.service"    # port 3110 — execution observability REST API
     "harness-srv.service"      # port 3420 — generic execution harness (Tackle role context + Wind task context)
     "mcp-bridge.service"       # ports 3131-3134 — generic stdio-to-SSE bridge (knowledge/vision/peb/terrain MCPs)
-    "tools-aggregator.service" # port 3210 — unified MCP tool-discovery aggregator
-    "slash-command-mcp.service" # port 3220 — Phase-2 DSL MCP (command_lookup/execute/completions → aggregator)
+    "tools-aggregator.service" # port 3210 — unified MCP tool-discovery aggregator (hosts command-router namespace: command_lookup/execute/completions, folded in from slash-command-mcp per D-2026-08-16-002)
     "service-broker-mcp.service" # port 3112 — service-broker MCP over SSE (auth/token tools)
     "substance.service"        # port 3115 — Segment Sets API (FastAPI)
     "moleculer-search.service"  # port 4050 — Moleculer Search API (Google, registry)
@@ -169,8 +168,7 @@ SERVICE_PORTS=(
     ["execution-srv.service"]="3110"
     ["harness-srv.service"]="3420"
     ["mcp-bridge.service"]="3131"     # one of ports 3131-3134 — any bridge target's /health works
-    ["tools-aggregator.service"]="3210"
-    ["slash-command-mcp.service"]="3220"
+    ["tools-aggregator.service"]="3210"   # command-router namespace folded in (D-2026-08-16-002); :3220 retired
     ["service-broker-mcp.service"]="3112"
     ["nexus-control-edge.service"]="8082"
     ["nexus-broker.service"]="4080"

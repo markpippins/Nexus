@@ -1,22 +1,29 @@
 /**
- * slash-command-mcp — tool layer.
+ * tools-aggregator — command-router (folded in from slash-command-mcp,
+ * D-2026-08-16-002).
  *
- * Exposes exactly 3 MCP tools (house style: same shape as semantics-mcp):
+ * Serves the 3 Phase-2 DSL tools NATIVELY on the aggregator — no hop to a
+ * separate :3220 MCP:
  *
  *   1. command_lookup      — resolve a command line (or bare command) to its
  *                            registry metadata: description, params, protocol.
- *   2. command_execute     — parse + coerce + validate + dispatch via the
- *                            aggregator single hop.
+ *   2. command_execute     — parse + coerce + validate + dispatch through the
+ *                            aggregator's own tool registry (single hop).
  *   3. command_completions — suggest services, commands, and flags for a
  *                            partial DSL string.
  *
+ * The `mcp.command_registry` read-model lives in ./command-registry
+ * (aggregator-owned). Execution dispatches through the ToolDiscovery
+ * instance passed in — the same registry that serves /tools/call — so the
+ * router never opens its own client connections to the backends.
+ *
  * Errors are returned as structured { error, code } results, never thrown
- * as HTTP 500s (the index handler catches unexpected failures).
+ * as HTTP 500s.
  */
 
 import type { InputSchema } from "mcp-types";
-import { parseCommandLine, type ParsedCommand } from "./parser";
-import { coerceArgs, CoercionError } from "./coerce";
+import { parseCommandLine, type ParsedCommand } from "./command-parser";
+import { coerceArgs, CoercionError } from "./command-coerce";
 import {
   findCommand,
   resolveCommand,
@@ -24,15 +31,25 @@ import {
   listServices,
   listCommands,
   listFlags,
+  searchCommands,
   describeRow,
   type RegistryRow,
-} from "./registry";
+} from "./command-registry";
 
-import { dispatchToolCall, DispatchError } from "./executor";
+export interface CommandDispatch {
+  /** Dispatch a resolved, coerced tool call through the aggregator registry. */
+  (command: string, args: Record<string, any>): Promise<{
+    success: boolean;
+    result?: any;
+    error?: string;
+    service?: string;
+    tool?: string;
+  }>;
+}
 
-// ── Tool definitions (MCP tools/list) ──────────────────────────────
+// ── Tool definitions (MCP tools/list + aggregator /tools) ─────────
 
-export const toolDefinitions = [
+export const commandToolDefinitions = [
   {
     name: "command_lookup",
     description:
@@ -150,7 +167,7 @@ async function handleLookup(args: any) {
   }
 }
 
-async function handleExecute(args: any) {
+async function handleExecute(args: any, dispatch: CommandDispatch) {
   const commandLine: string = String(args.command || "").trim();
   const allowExtra = Boolean(args.allowExtra);
   if (!commandLine) {
@@ -209,16 +226,8 @@ async function handleExecute(args: any) {
       throw e;
     }
 
-    // Dispatch through the aggregator.
-    let response;
-    try {
-      response = await dispatchToolCall(parsed.command, coerced);
-    } catch (e: any) {
-      if (e instanceof DispatchError) {
-        return err("DISPATCH_ERROR", e.message);
-      }
-      throw e;
-    }
+    // Dispatch through the aggregator registry (single hop).
+    const response = await dispatch(parsed.command, coerced);
 
     return ok({
       service: matchedService,
@@ -230,8 +239,6 @@ async function handleExecute(args: any) {
         success: response.success,
         service: response.service,
         tool: response.tool,
-        requestId: response.requestId,
-        timestamp: response.timestamp,
       },
     });
   } catch (e: any) {
@@ -293,7 +300,6 @@ async function handleCompletions(args: any) {
       return ok({ services: services.slice(0, limit), stage: "service" });
     }
     // Fall back to command suggestions across all services for bare commands.
-    const { searchCommands } = await import("./registry");
     const matches = await searchCommands(parsed.command, limit);
     return ok({
       commands: matches.map((r) => ({ command: r.command, service: r.service })),
@@ -350,12 +356,16 @@ async function handleCompletions(args: any) {
 
 // ── Dispatcher ─────────────────────────────────────────────────────
 
-export async function handleToolCall(toolName: string, toolArgs: any): Promise<any> {
+export async function handleCommandToolCall(
+  toolName: string,
+  toolArgs: any,
+  dispatch: CommandDispatch
+): Promise<any> {
   switch (toolName) {
     case "command_lookup":
       return handleLookup(toolArgs || {});
     case "command_execute":
-      return handleExecute(toolArgs || {});
+      return handleExecute(toolArgs || {}, dispatch);
     case "command_completions":
       return handleCompletions(toolArgs || {});
     default:

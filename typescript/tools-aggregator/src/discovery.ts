@@ -110,16 +110,12 @@ const DEFAULT_SERVICES: MCPServiceConfig[] = [
     required: false,
     protocol: "jsonrpc",
   },
-  {
-    // Phase-2 DSL MCP (command_lookup / command_execute / command_completions
-    // over mcp.command_registry, executes via this aggregator). Plain
-    // JSON-RPC — pin `jsonrpc` (no REST /tools route; POST / is canonical).
-    name: "slash-command-mcp",
-    baseUrl: process.env.SLASH_COMMAND_MCP_URL || "http://localhost:3220",
-    required: false,
-    protocol: "jsonrpc",
-  },
   // Not in DEFAULT_SERVICES:
+  //   slash-command-mcp — folded INTO this aggregator (D-2026-08-16-002) as
+  //                     the command-router namespace (command_lookup /
+  //                     command_execute / command_completions, protocol
+  //                     `local`, no :3220 hop). Registered natively at
+  //                     startup via registerCommandRouter().
   //   role-memory-srv — not an MCP; it's the PG→Redis sync engine. The
   //                     `memory_*` tools are already exposed by tackle-mcp.
   //   tackle-prompt-bridge — not a tool server (prompts, not tools); the
@@ -683,6 +679,24 @@ export class ToolDiscovery {
    */
   getRegistry(): ToolRegistry {
     return this.registry;
+  }
+
+  /**
+   * Register a native (in-process) tool in the registry. Used for the
+   * command-router namespace (command_lookup / command_execute /
+   * command_completions, folded in from slash-command-mcp): these are served
+   * locally by the aggregator with protocol `local`, no remote hop.
+   */
+  registerNativeTool(tool: AggregatedTool): void {
+    this.registry.tools[tool.name] = tool;
+    const svc = this.registry.services[tool.service] || {
+      reachable: true,
+      lastUpdated: Date.now(),
+      toolCount: 0,
+    };
+    svc.toolCount++;
+    this.registry.services[tool.service] = svc;
+    this.registry.totalTools++;
   }
 
   /**

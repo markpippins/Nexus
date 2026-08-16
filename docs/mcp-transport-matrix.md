@@ -30,7 +30,7 @@ reached over the wire. Source of truth for Gap 2 of to-do `8e09a57f`
 | address-tts-mcp | 3105 | streamable HTTP (stateless POST /) | ❌ none | 3 | `POST /` |
 | semantics-mcp | 3161 | streamable HTTP (stateless POST /) | ❌ none | 77 | `POST /` |
 | assembly-mcp | 3113 | streamable HTTP (stateless POST /) | ❌ none | 25 | `POST /` |
-| slash-command-mcp | 3220 | streamable HTTP (stateless POST /) | ❌ none | 3 | `POST /` |
+| command-router (in tools-aggregator) | 3210 | native in-process (REST `/tools/call` + `/commands/*`) | ❌ none | 3 | `POST /tools/call` — `command_lookup` / `command_execute` / `command_completions` folded in from slash-command-mcp (D-2026-08-16-002; :3220 retired) |
 | tackle-mcp | 3400 | streamable HTTP (stateless POST /) | ❌ none | 42 | `POST /` |
 
 ### Other registered services (in `mcp.command_registry`, ports per config)

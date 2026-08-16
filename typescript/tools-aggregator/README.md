@@ -372,6 +372,24 @@ Error codes:
 
 3. Check aggregator logs for detailed error messages
 
+## Command Router (slash-command-mcp fold, D-2026-08-16-002)
+
+The aggregator also serves the DSL command tools natively — no separate
+slash-command-mcp service (:3220 retired). Service name `command-router`,
+protocol `local`:
+
+- `command_lookup` — resolve a command to its service/tool
+- `command_completions` — completions for a partial DSL line
+- `command_execute` — execute a DSL command (single hop through the
+  aggregator's own `mcp.command_registry` read-model)
+
+Registry read-model lives in `src/command-registry.ts`; parsing/coercion in
+`src/command-parser.ts` / `src/command-coerce.ts`; dispatch in
+`src/command-router.ts`. Direct REST clients can use the `/commands/*`
+namespace (`/commands/execute`, `/commands/search/:prefix`,
+`/commands/resolve/:command`, `/commands/:service/commands`) instead of
+JSON-RPC. See `docs/slash-command-mcp-retirement.md` for the full record.
+
 ## Docker
 
 To run the aggregator in Docker:

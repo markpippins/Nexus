@@ -1,9 +1,10 @@
 /**
- * slash-command-mcp — execution layer.
+ * slash-command-mcp — execution layer (pg-free adapter).
  *
- * Dispatches a resolved, coerced tool call through the tools-aggregator
- * single hop (POST /tools/call). The aggregator owns protocol routing
- * (jsonrpc / sse / rest) per-tool, so this server stays transport-agnostic.
+ * D-2026-08-16-002: dispatches a resolved, coerced tool call through the
+ * tools-aggregator command-router namespace (POST /commands/execute). The
+ * aggregator owns protocol routing (jsonrpc / sse / rest) per-tool, so this
+ * server stays transport-agnostic and never touches PostgreSQL.
  */
 
 import type { ToolCallResponse } from "mcp-types";
@@ -19,7 +20,7 @@ export class DispatchError extends Error {
 }
 
 /**
- * Dispatch a coerced call to the aggregator.
+ * Dispatch a coerced call to the aggregator command-router namespace.
  *
  * @param command tool name as registered (e.g. "nebula_list_agent_records")
  * @param args coerced, validated arguments
@@ -29,13 +30,13 @@ export async function dispatchToolCall(
   command: string,
   args: Record<string, any>
 ): Promise<ToolCallResponse> {
-  const endpoint = `${AGGREGATOR_URL.replace(/\/+$/, "")}/tools/call`;
+  const endpoint = `${AGGREGATOR_URL.replace(/\/+$/, "")}/commands/execute`;
   let res: Response;
   try {
     res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ name: command, arguments: args }),
+      body: JSON.stringify({ command, args, allowExtra: true }),
       signal: AbortSignal.timeout(60_000),
     });
   } catch (err: any) {
@@ -59,8 +60,8 @@ export async function dispatchToolCall(
     throw new DispatchError(`[${code}] ${message}`);
   }
 
-  if (data?.success === false) {
-    throw new DispatchError(data.error || "Tool call failed on backend");
+  if (data?.error) {
+    throw new DispatchError(data.error);
   }
 
   return data as ToolCallResponse;
