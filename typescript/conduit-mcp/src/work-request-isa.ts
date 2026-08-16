@@ -654,6 +654,17 @@ export interface WorkRequestDocument {
   postconditions: string[];
   /** Known failure modes and their expected handling */
   failure_modes?: string[];
+
+  /**
+   * Deliverable produced by this WorkRequest (D1): a first-class output
+   * path/kind for read-only/recon nodes. NEVER folded into the mutation
+   * surface — a recon node mutates nothing yet produces a doc/artifact.
+   */
+  deliverable?: string;
+
+  /** Plural form (D1 allows `outputs[]`); at most one of deliverable/outputs
+   * is used per document. */
+  outputs?: string[];
 }
 
 // ── Validation ───────────────────────────────────────────────────────────
@@ -794,6 +805,24 @@ export function validateWorkRequest(
   }
   if (!wr.ordered_steps || wr.ordered_steps.length === 0) {
     findings.push({ field: "ordered_steps", message: "WorkRequest must have at least one step." });
+  }
+
+  // D1: deliverable / outputs are optional first-class outputs. When present,
+  // validate their shape (non-empty string / non-empty string array) — never
+  // fold them into ordered_steps.
+  if (wr.deliverable !== undefined && (typeof wr.deliverable !== "string" || wr.deliverable.trim() === "")) {
+    findings.push({ field: "deliverable", message: "deliverable must be a non-empty string." });
+  }
+  if (wr.outputs !== undefined) {
+    if (!Array.isArray(wr.outputs) || wr.outputs.length === 0) {
+      findings.push({ field: "outputs", message: "outputs must be a non-empty string array." });
+    } else {
+      for (let i = 0; i < wr.outputs.length; i++) {
+        if (typeof wr.outputs[i] !== "string" || wr.outputs[i].trim() === "") {
+          findings.push({ field: `outputs[${i}]`, message: "outputs entries must be non-empty strings." });
+        }
+      }
+    }
   }
 
   for (let i = 0; i < wr.ordered_steps.length; i++) {

@@ -520,7 +520,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
           type: "object",
           properties: {
             type: { type: "string", description: "Intent type" },
-            inputs: { description: "Intent inputs (any)" },
+            inputs: { description: "Intent inputs — may carry `deliverable` (D1 first-class output path for recon nodes) or `outputs[]`" },
             objective: { type: "string", description: "Objective description" },
           },
           required: ["type", "objective"],

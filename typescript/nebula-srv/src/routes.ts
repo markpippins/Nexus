@@ -1040,7 +1040,7 @@ export function createRoutes(pool: Pool): Router {
   router.post('/requirements/:id/compile', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { stage1Only = false, createPlan = false, dryRun = false } = req.body;
+      const { stage1Only = false, createPlan = false, dryRun = false, deliverable } = req.body;
 
       // Fetch requirement with hierarchy context
       const { rows: [reqt] } = await pool.query(
@@ -1208,6 +1208,9 @@ export function createRoutes(pool: Pool): Router {
         registry_version: matchedEntry?.version || 'default',
         op_sequence: opSequence,
         files_affected: filesAffected,
+        // D1: first-class deliverable for read-only/recon nodes — NOT folded
+        // into files_affected (the mutation surface).
+        deliverable: typeof deliverable === 'string' && deliverable.trim() ? deliverable : null,
         dependencies,
         acceptance_criteria: acceptanceForPlan,
         idempotency_key: idempotencyKey,
@@ -1252,6 +1255,7 @@ export function createRoutes(pool: Pool): Router {
               acceptanceCriteria: acceptanceForPlan,
               filesAffected,
               dependencies,
+              deliverable: typeof deliverable === 'string' && deliverable.trim() ? deliverable : undefined,
             }),
           });
           const planResult = await planResponse.json() as any;

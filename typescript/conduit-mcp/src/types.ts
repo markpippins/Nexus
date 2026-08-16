@@ -22,6 +22,8 @@ export interface PlanCard {
   filesAffected?: string[];
   acceptanceCriteria?: string[];
   dependencies?: string[];
+  /** D1: first-class output path/kind for read-only/recon nodes. */
+  deliverable?: string;
   promptRef?: string; // prompt number this plan was spawned from
   priority?: number;
   /** Per-role ticket detail: role → { status, id, created_at, expires_at, objective } */
@@ -98,6 +100,8 @@ export interface ParsedPlan {
   filesAffected: string[];
   acceptanceCriteria: string[];
   dependencies: string[];
+  /** D1: first-class output path/kind for read-only/recon nodes. */
+  deliverable?: string;
 }
 
 // Agent heartbeat types (v034)

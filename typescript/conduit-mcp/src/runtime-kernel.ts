@@ -80,11 +80,22 @@ export interface WorkRequestState {
 // ── Compiler output (what the compiler is allowed to emit) ─────────
 // This is the contract boundary: NO execution fields allowed.
 
+/**
+ * Canonical compiler intent inputs (D1). `deliverable` / `outputs` are the
+ * first-class output path/kind for read-only/recon nodes — never folded into
+ * the mutation surface. Everything else is passed through opaquely.
+ */
+export interface CompilerIntentInputs {
+  deliverable?: string;
+  outputs?: string[];
+  [key: string]: unknown;
+}
+
 export interface CompilerOutput {
   wrId: string;
   intent: {
     type: string;
-    inputs: unknown;
+    inputs: CompilerIntentInputs;
     objective: string;
   };
   constraints: {
