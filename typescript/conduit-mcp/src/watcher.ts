@@ -34,6 +34,7 @@ import {
   releaseSessionTickets,
   createTicketIfMissing,
   checkpointWal,
+  getNewestCompileVerdictForPlan,
 } from "./db";
 import * as api from "./conduit-client";
 import { breakerRowToStatus } from "./watchers/cb-watcher";
@@ -325,6 +326,21 @@ export class PipelineWatcher {
 
       for (const plan of rows) {
         try {
+          // D5 gate — consult the newest compile verdict before bootstrapping.
+          // Newest-FAIL never gets a ticket; newest-PASS is release-eligible;
+          // no verdict = legacy unchanged. The plan-scoped lookup covers
+          // release-time re-parented verdicts (plan_id). The entity_key-scoped
+          // lookup (getNewestCompileVerdict) is the canonical D5 query and is
+          // exercised by the emission boundary once CP-9 wires plan↔entityKey.
+          const verdict = await getNewestCompileVerdictForPlan(plan.plan_number);
+          if (verdict?.verdict_type === "WR_COMPILE_FAIL") {
+            console.log(
+              `Auto-bootstrap blocked for plan ${plan.plan_number}: ` +
+              `newest compile verdict is WR_COMPILE_FAIL`
+            );
+            continue;
+          }
+
           const now = new Date().toISOString();
           const receiptId = crypto.randomUUID();
 

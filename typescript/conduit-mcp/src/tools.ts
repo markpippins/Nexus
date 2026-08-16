@@ -21,6 +21,8 @@ import {
   getAllEvents,
   selectNextRunnable,
   listWorkRequestStates,
+  insertCompileVerdict,
+  computeCompileVerdictId,
 } from "./db";
 import * as api from "./conduit-client";
 import {
@@ -285,6 +287,48 @@ export const toolDefinitions: MCPToolDefinition[] = [
         plan_id: { type: "string", description: 'Plan number (e.g. "0053")' },
       },
       required: ["plan_id"],
+    },
+  },
+  {
+    name: "issue_compile_verdict",
+    description:
+      "Record a WR compile verdict (WR_COMPILE_PASS|WR_COMPILE_FAIL) in " +
+      "vision.wr_compile_verdicts, keyed by the compile unit's entityKey (D3). " +
+      "Pre-release: never mutates WR/plan status. Idempotent — re-issuing the " +
+      "same verdict is a no-op (deterministic verdict_id).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        entity_key: {
+          type: "string",
+          description: "Compile-unit identity (D3 entityKey — emission boundary)",
+        },
+        verdict_type: {
+          type: "string",
+          description: "WR_COMPILE_PASS|WR_COMPILE_FAIL",
+        },
+        rule_version: {
+          type: "string",
+          description: "Verdict rule generation (deterministic)",
+        },
+        description: {
+          type: "string",
+          description: "Human-readable verdict rationale",
+        },
+        wr_id: {
+          type: "string",
+          description: "Optional WR row link (nullable: pure-compile mode)",
+        },
+        plan_id: {
+          type: "string",
+          description: "Optional plan link (re-parented at release)",
+        },
+        detected_at: {
+          type: "string",
+          description: "Optional compile event timestamp (ISO-8601)",
+        },
+      },
+      required: ["entity_key", "verdict_type", "rule_version", "description"],
     },
   },
   {
@@ -868,6 +912,50 @@ export function registerToolHandlers(
         plan_id: args.plan_id,
         count: receipts.length,
         receipts,
+      };
+    },
+    issue_compile_verdict: async (args: {
+      entity_key: string;
+      verdict_type: string;
+      rule_version: string;
+      description: string;
+      wr_id?: string;
+      plan_id?: string;
+      detected_at?: string;
+    }) => {
+      if (
+        args.verdict_type !== "WR_COMPILE_PASS" &&
+        args.verdict_type !== "WR_COMPILE_FAIL"
+      ) {
+        return {
+          issued: false,
+          error:
+            `verdict_type must be WR_COMPILE_PASS or WR_COMPILE_FAIL ` +
+            `(got ${args.verdict_type})`,
+          entity_key: args.entity_key,
+        };
+      }
+      const verdictId = computeCompileVerdictId(
+        args.verdict_type,
+        args.entity_key,
+        args.rule_version,
+        args.description,
+      );
+      await insertCompileVerdict({
+        verdict_id: verdictId,
+        entity_key: args.entity_key,
+        wr_id: args.wr_id ?? null,
+        plan_id: args.plan_id ?? null,
+        verdict_type: args.verdict_type as "WR_COMPILE_PASS" | "WR_COMPILE_FAIL",
+        rule_version: args.rule_version,
+        description: args.description,
+        detected_at: args.detected_at ?? null,
+      });
+      return {
+        issued: true,
+        verdict_id: verdictId,
+        entity_key: args.entity_key,
+        verdict_type: args.verdict_type,
       };
     },
     revise_plan: async (args: {

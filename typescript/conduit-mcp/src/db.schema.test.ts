@@ -17,7 +17,12 @@
 
 import { describe, test, expect, beforeAll, afterAll } from "vitest";
 import { Pool } from "pg";
-import { initDb } from "./db";
+import {
+  initDb,
+  insertCompileVerdict,
+  getNewestCompileVerdict,
+  getNewestCompileVerdictForPlan,
+} from "./db";
 
 const DSN = process.env.CONDUIT_PG_DSN || "postgresql://pguser:pgpass@localhost:5432/nexus";
 
@@ -206,7 +211,7 @@ describe("createSchema on fresh database", () => {
         `SELECT version FROM schema_version ORDER BY version`
       );
       expect(svAfterFirst.rows.map((r: any) => r.version).sort((a: number, b: number) => a - b))
-        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38]);
     } finally {
       await pool1.end();
     }
@@ -223,7 +228,7 @@ describe("createSchema on fresh database", () => {
       const versions = svAfterSecond.rows.map((r: any) => r.version);
       // Still exactly [1..35] — no duplicate rows from re-applying
       expect(versions.sort((a: number, b: number) => a - b))
-        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38]);
 
       // The v2 index should still exist (not re-created, just still there)
       const indexResult = await pool2.query(
@@ -251,7 +256,7 @@ describe("createSchema on fresh database", () => {
         `SELECT version FROM schema_version ORDER BY version`
       );
       expect(svBefore.rows.map((r: any) => r.version).sort((a: number, b: number) => a - b))
-        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38]);
     } finally {
       await poolV6.end();
     }
@@ -330,7 +335,7 @@ describe("createSchema on fresh database", () => {
       );
       // v6..v35 should all be re-applied from the v5 baseline (replay path)
       expect(svResult.rows.map((r: any) => r.version).sort((a: number, b: number) => a - b))
-        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38]);
 
       // deadline column exists on shared vision.tickets (createSchema DDL;
       // v6 replay is a no-op on fresh schemas)
@@ -655,7 +660,7 @@ describe("createSchema on fresh database", () => {
         `SELECT version FROM schema_version ORDER BY version`
       );
       expect(svResult.rows.map((r: any) => r.version))
-        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38]);
 
       // v7/v8: role_config CHECK constraint migrations are no-ops
       // (table replaced by config_bundle, tables removed 2026-08-07).
@@ -728,6 +733,95 @@ describe("createSchema on fresh database", () => {
       expect(tables).toContain("sessions");
       expect(tables).toContain("circuit_breaker");
     } finally {
+      await pool.end();
+    }
+  }, 30000);
+
+  // ── WR compile verdict store (R-A-2026-08-15-010 option c) ──────────
+  // vision.wr_compile_verdicts is created by v38. Behaviour lock: insert is
+  // idempotent, newest verdict wins the gate, re-parented verdicts resolve by
+  // plan_id, and UPDATE/DELETE are rejected by the immutability guard.
+  test("v38 wr_compile_verdicts: idempotent insert + newest-wins + re-parent + immutability", async () => {
+    const pool = await initDb();
+    const suite = `test:wr-verdict:${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      const ek = `${suite}:ek`;
+      const planId = `test-plan-${suite}`;
+
+      // AC2 — idempotent: same verdict twice → one row.
+      const pass = {
+        entity_key: ek,
+        verdict_type: "WR_COMPILE_PASS" as const,
+        rule_version: "1",
+        description: "idempotency probe",
+      };
+      await insertCompileVerdict(pass);
+      await insertCompileVerdict(pass);
+      const cnt = await adminPool.query(
+        `SELECT count(*)::int AS cnt FROM vision.wr_compile_verdicts WHERE entity_key = $1`,
+        [ek],
+      );
+      expect(cnt.rows[0].cnt).toBe(1);
+
+      // AC3 — newest wins: a later FAIL is returned over the earlier PASS.
+      await new Promise((r) => setTimeout(r, 10));
+      await insertCompileVerdict({
+        entity_key: ek,
+        verdict_type: "WR_COMPILE_FAIL",
+        rule_version: "1",
+        description: "later fail",
+      });
+      const newest = await getNewestCompileVerdict(ek);
+      expect(newest?.verdict_type).toBe("WR_COMPILE_FAIL");
+      expect(newest?.entity_key).toBe(ek);
+
+      // AC4 — re-parented verdict resolves by plan_id.
+      await insertCompileVerdict({
+        entity_key: `${suite}:ek2`,
+        plan_id: planId,
+        verdict_type: "WR_COMPILE_PASS",
+        rule_version: "1",
+        description: "re-parented at release",
+      });
+      const byPlan = await getNewestCompileVerdictForPlan(planId);
+      expect(byPlan?.plan_id).toBe(planId);
+      expect(byPlan?.verdict_type).toBe("WR_COMPILE_PASS");
+
+      // AC5 — immutability guard rejects UPDATE and DELETE.
+      await expect(
+        adminPool.query(
+          `UPDATE vision.wr_compile_verdicts SET description = 'mutated' WHERE entity_key = $1`,
+          [ek],
+        ),
+      ).rejects.toThrow(/immutable/);
+      await expect(
+        adminPool.query(
+          `DELETE FROM vision.wr_compile_verdicts WHERE entity_key = $1`,
+          [ek],
+        ),
+      ).rejects.toThrow(/immutable/);
+    } finally {
+      // vision.wr_compile_verdicts is shared (VISION_SCHEMA is not
+      // test-isolated) and append-only, so lift the guard, remove this
+      // suite's rows, and restore the guard.
+      try {
+        await adminPool.query(
+          `DROP TRIGGER IF EXISTS trg_wr_compile_verdicts_immutable ON vision.wr_compile_verdicts`,
+        );
+        await adminPool.query(
+          `DELETE FROM vision.wr_compile_verdicts WHERE entity_key LIKE $1`,
+          [`${suite}:%`],
+        );
+      } catch (e: any) {
+        console.warn("verdict test cleanup failed:", e?.message);
+      } finally {
+        await adminPool.query(
+          `CREATE TRIGGER trg_wr_compile_verdicts_immutable
+             BEFORE UPDATE OR DELETE ON vision.wr_compile_verdicts
+             FOR EACH ROW
+             EXECUTE FUNCTION vision.wr_compile_verdicts_immutable()`,
+        );
+      }
       await pool.end();
     }
   }, 30000);

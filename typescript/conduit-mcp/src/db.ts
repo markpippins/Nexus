@@ -2858,11 +2858,72 @@ const migrations: Migration[] = [
         ALTER TABLE ${VISION_SCHEMA}.work_requests
           ADD COLUMN IF NOT EXISTS entity_key TEXT
       `);
+      // The legacy ${PG_SCHEMA}.work_requests ("conduit" in production) is a
+      // pre-split table that does NOT exist on a fresh schema (the test
+      // harness runs initDb against an empty test schema). Guard with an
+      // existence check so this migration stays replay-safe — same pattern as
+      // the v6 step_outputs guard.
       await exec(`
-        ALTER TABLE ${PG_SCHEMA}.work_requests
-          ADD COLUMN IF NOT EXISTS entity_key TEXT
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = '${PG_SCHEMA}' AND table_name = 'work_requests'
+          ) THEN
+            ALTER TABLE ${PG_SCHEMA}.work_requests
+              ADD COLUMN IF NOT EXISTS entity_key TEXT;
+          END IF;
+        END $$;
       `);
       console.log("[migrations] v37: added entity_key to work_requests (vision + conduit)");
+    },
+  },
+  {
+    version: 38,
+    description: "Create vision.wr_compile_verdicts (R-A-2026-08-15-010 option c) — WR-scoped compile verdict store keyed by entityKey",
+    up: async (exec) => {
+      // D2/D5 (amended): WR_COMPILE_PASS/FAIL verdicts live in a dedicated,
+      // entityKey-keyed store — NOT vision.receipts (frozen, D-T19-2(d)) and
+      // NOT execution.receipts (request/attempt-scoped, ADR-006). The verdict
+      // exists pre-plan and pre-attempt; its identity is the compile unit
+      // (entityKey, D3). Insert-only: deterministic verdict_id + idempotent
+      // INSERT ... ON CONFLICT DO NOTHING. Immutability guard rejects
+      // UPDATE/DELETE (mirrors execution.receipts' immutable-evidence intent).
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ${VISION_SCHEMA}.wr_compile_verdicts (
+            verdict_id   TEXT PRIMARY KEY,          -- SHA256(type, entity_key, rule_version, description)
+            entity_key   TEXT NOT NULL,             -- compile-unit identity (D3)
+            wr_id        TEXT,                      -- WR row link when present (nullable: pure-compile mode)
+            plan_id      TEXT,                      -- re-parented at release via entityKey (D2 semantic)
+            verdict_type TEXT NOT NULL CHECK (verdict_type IN ('WR_COMPILE_PASS','WR_COMPILE_FAIL')),
+            rule_version TEXT NOT NULL,
+            description  TEXT NOT NULL,
+            detected_at  TIMESTAMPTZ,               -- compile event timestamp (deterministic)
+            created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_wr_compile_verdicts_entity_key
+            ON ${VISION_SCHEMA}.wr_compile_verdicts (entity_key, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_wr_compile_verdicts_wr_id
+            ON ${VISION_SCHEMA}.wr_compile_verdicts (wr_id);
+        CREATE INDEX IF NOT EXISTS idx_wr_compile_verdicts_plan
+            ON ${VISION_SCHEMA}.wr_compile_verdicts (plan_id);
+
+        -- Immutability guard — no UPDATE/DELETE on verdict rows.
+        CREATE OR REPLACE FUNCTION ${VISION_SCHEMA}.wr_compile_verdicts_immutable()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            RAISE EXCEPTION 'vision.wr_compile_verdicts is immutable: % not allowed on verdict rows', TG_OP;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        DROP TRIGGER IF EXISTS trg_wr_compile_verdicts_immutable ON ${VISION_SCHEMA}.wr_compile_verdicts;
+        CREATE TRIGGER trg_wr_compile_verdicts_immutable
+            BEFORE UPDATE OR DELETE ON ${VISION_SCHEMA}.wr_compile_verdicts
+            FOR EACH ROW
+            EXECUTE FUNCTION ${VISION_SCHEMA}.wr_compile_verdicts_immutable();
+      `);
+      console.log("[migrations] v38: created vision.wr_compile_verdicts (WR-scoped compile verdicts)");
     },
   },
 ];
@@ -3222,6 +3283,112 @@ export async function getLatestReceiptType(planId: string): Promise<string | nul
     { planId }
   );
   return row?.type ?? null;
+}
+
+// ── WR compile verdicts (R-A-2026-08-15-010 option c) ────────────────────
+// A pre-release WR_COMPILE_PASS/FAIL verdict, keyed by the compile unit's
+// entityKey (D3). Lives in vision.wr_compile_verdicts — NOT vision.receipts
+// (frozen legacy surface, D-T19-2(d)) and NOT execution.receipts
+// (request/attempt-scoped, ADR-006). Insert-only and idempotent.
+
+export type CompileVerdictType = "WR_COMPILE_PASS" | "WR_COMPILE_FAIL";
+
+export interface CompileVerdictRow {
+  verdict_id: string;
+  entity_key: string;
+  wr_id: string | null;
+  plan_id: string | null;
+  verdict_type: CompileVerdictType;
+  rule_version: string;
+  description: string;
+  detected_at: string | null;
+  created_at: string;
+}
+
+export interface CompileVerdictInput {
+  verdict_id?: string; // omitted → derived deterministically below
+  entity_key: string;
+  wr_id?: string | null;
+  plan_id?: string | null;
+  verdict_type: CompileVerdictType;
+  rule_version: string;
+  description: string;
+  detected_at?: string | null;
+}
+
+/**
+ * Deterministic verdict id — SHA256(type, entity_key, rule_version,
+ * description). Re-issuing the same verdict for the same compile unit yields
+ * the same id, so INSERT ... ON CONFLICT (verdict_id) DO NOTHING is naturally
+ * idempotent (the same pattern as peb.cir_violations, V106).
+ */
+export function computeCompileVerdictId(
+  verdictType: string,
+  entityKey: string,
+  ruleVersion: string,
+  description: string,
+): string {
+  return crypto
+    .createHash("sha256")
+    .update(verdictType)
+    .update("\u0000")
+    .update(entityKey)
+    .update("\u0000")
+    .update(ruleVersion)
+    .update("\u0000")
+    .update(description)
+    .digest("hex");
+}
+
+/** Insert a compile verdict. Idempotent on verdict_id (no duplicate rows). */
+export async function insertCompileVerdict(v: CompileVerdictInput): Promise<void> {
+  const verdictId =
+    v.verdict_id ??
+    computeCompileVerdictId(v.verdict_type, v.entity_key, v.rule_version, v.description);
+  await qRun(
+    `INSERT INTO ${VISION_SCHEMA}.wr_compile_verdicts
+       (verdict_id, entity_key, wr_id, plan_id, verdict_type, rule_version,
+        description, detected_at, created_at)
+     VALUES (@verdictId, @entityKey, @wrId, @planId, @verdictType, @ruleVersion,
+             @description, @detectedAt, now())
+     ON CONFLICT (verdict_id) DO NOTHING`,
+    {
+      verdictId,
+      entityKey: v.entity_key,
+      wrId: v.wr_id ?? null,
+      planId: v.plan_id ?? null,
+      verdictType: v.verdict_type,
+      ruleVersion: v.rule_version,
+      description: v.description,
+      detectedAt: v.detected_at ?? null,
+    },
+  );
+}
+
+/** Newest verdict for a compile unit (the D5 bootstrap gate query). */
+export async function getNewestCompileVerdict(
+  entityKey: string,
+): Promise<CompileVerdictRow | undefined> {
+  return qOne(
+    `SELECT * FROM ${VISION_SCHEMA}.wr_compile_verdicts
+     WHERE entity_key = @entityKey
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    { entityKey },
+  );
+}
+
+/** Newest verdict re-parented to a plan row (release-time link). */
+export async function getNewestCompileVerdictForPlan(
+  planId: string,
+): Promise<CompileVerdictRow | undefined> {
+  return qOne(
+    `SELECT * FROM ${VISION_SCHEMA}.wr_compile_verdicts
+     WHERE plan_id = @planId
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    { planId },
+  );
 }
 
 export async function getReceiptCount(): Promise<{ type: string; count: number }[]> {
