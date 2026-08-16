@@ -1,0 +1,361 @@
+#!/usr/bin/env python3
+"""
+Authority Matrix Validator — single-canonical-authority enforcement.
+
+Reads schemas/authority/authority-matrix.json (data) and verifies that every
+semantic domain has exactly one authoritative artifact on disk, that no
+semantic class is claimed by two authoritative files, and that every declared
+projection resolves to a real file (or is listed when it lives in the
+projections directory).
+
+This is the data-driven successor to the CIR-5 key-aliasing in
+tools/cir1/lint.py: instead of a hard-coded SEMANTIC_CLASSES map with coarse
+key aliases, the matrix declares, per domain, the canonical authority and its
+superseded/projected forms, and the validator enforces single authority from
+that declaration.
+
+Usage:
+    python tools/authority/check_authority.py            # report, exit 1 on violation
+    python tools/authority/check_authority.py --json     # structured JSON output
+    python tools/authority/check_authority.py --strict   # same (always blocking)
+
+Exit codes:
+    0 — all checks pass
+    1 — one or more violations found
+
+Failure classes:
+    no-authority         — a matrix domain has no resolvable canonical authority
+    duplicate-class      — a semantic class is claimed by >1 authoritative file
+    unlisted-projection  — a declared projection does not exist, or a file in
+                           schemas/projections/ is not declared as a projection
+"""
+
+import json
+import os
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+MATRIX_PATH = REPO_ROOT / "schemas" / "authority" / "authority-matrix.json"
+PROJECTIONS_DIR = REPO_ROOT / "schemas" / "projections"
+PROJECTION_MANIFEST = PROJECTIONS_DIR / "projection-manifest.jsonld"
+
+# ─── Path helpers ────────────────────────────────────────────────────────────
+
+def normalize(p):
+    """Strip a leading ./ and any surrounding whitespace for stable comparison."""
+    s = str(p).strip()
+    while s.startswith("./"):
+        s = s[2:]
+    return s
+
+
+def path_exists(rel):
+    return (REPO_ROOT / normalize(rel)).exists()
+
+
+# ─── CIR-SDM classification (mirrors tools/cir1/lint.py) ────────────────────
+
+def classify(path):
+    p = normalize(path)
+    if any(x in p for x in [
+        "node_modules", "__pycache__", ".git",
+        "package-lock.json", "package.json",
+        "/build/", "/target/", "/.angular/", "/.cache/",
+    ]):
+        return ("BUILD", None)
+    if p.endswith(".schema.json") or "/schema/" in p:
+        return ("SCHEMA", None)
+    if any(x in p for x in ["/vectors/", "/tests/", "/logs/", "/samples/", "/specimens/"]):
+        return ("DATA", None)
+    if "pgv.state_machine" in p:
+        return ("GOVERNANCE", "CANONICAL")
+    if "transition_ledger" in p:
+        return ("GOVERNANCE", "STATEFUL")
+    if p.startswith("go/wrp/ccnf-ref/") and not any(x in p for x in ["/vectors/", "/tests/"]):
+        return ("GOVERNANCE", "CANONICAL")
+    if p.startswith(".agents/"):
+        return ("GOVERNANCE", "ASPIRATIONAL")
+    if p.startswith(".tools/") or p.startswith(".github/"):
+        return ("GOVERNANCE", "CANONICAL")
+    if "/runtime/" in p or "/executor/" in p:
+        return ("RUNTIME", None)
+    return ("DATA", None)
+
+
+SUBTYPE_MODE = {
+    "CANONICAL": "AUTHORITATIVE",
+    "ASPIRATIONAL": "STRUCTURAL",
+    "STATEFUL": "DERIVATIONAL",
+}
+DOMAIN_MODE = {
+    "GOVERNANCE": None,
+    "RUNTIME": "STATEFUL",
+    "SCHEMA": "STRUCTURAL",
+    "DATA": "STRUCTURAL",
+    "BUILD": "STRUCTURAL",
+}
+
+
+def resolve_mode(domain, subtype):
+    if domain == "GOVERNANCE":
+        return SUBTYPE_MODE[subtype]
+    return DOMAIN_MODE[domain]
+
+
+# CIR-5 apply matrix — a semantic class is collected only for these scopes
+CIR5_APPLY = {
+    ("GOVERNANCE", "AUTHORITATIVE"): "STRICT",
+    ("GOVERNANCE", "STRUCTURAL"): "STRICT",
+    ("GOVERNANCE", "DERIVATIONAL"): "STRICT",
+    ("RUNTIME", "STATEFUL"): "STRICT",
+    ("SCHEMA", "STRUCTURAL"): "LIMITED",
+    ("DATA", "STRUCTURAL"): None,
+    ("BUILD", "STRUCTURAL"): None,
+}
+
+
+def _is_quarantined(obj):
+    if not isinstance(obj, dict):
+        return False
+    s = obj.get("status")
+    return isinstance(s, str) and (s.startswith("quarantined_CIR") or s.startswith("blocked_by_CIR"))
+
+
+# ─── Loading ────────────────────────────────────────────────────────────────
+
+def load_matrix(path=MATRIX_PATH):
+    with open(path) as fh:
+        return json.load(fh)
+
+
+def iter_json_files():
+    for p in sorted(REPO_ROOT.rglob("*.json")):
+        yield p
+
+
+# ─── Semantic-class index (mirrors CIR-5 collect, data-driven keys) ─────────
+
+def collect_semantic_classes(matrix, files):
+    """Return {semantic_class: [(rel_path, key), ...]} for all scoped, non-quarantined files."""
+    keys_by_class = matrix.get("semantic_class_keys", {})
+    index = {}
+    for p in files:
+        try:
+            data = json.loads(p.read_text())
+        except (json.JSONDecodeError, PermissionError, OSError):
+            continue
+        rel = normalize(p.relative_to(REPO_ROOT))
+        domain, subtype = classify(rel)
+        mode = resolve_mode(domain, subtype)
+        if CIR5_APPLY.get((domain, mode)) in (None, "MINIMAL"):
+            continue
+
+        def walk(obj):
+            if _is_quarantined(obj):
+                return
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    for cls, keys in keys_by_class.items():
+                        if k in keys:
+                            index.setdefault(cls, []).append((rel, k))
+                    walk(v)
+            elif isinstance(obj, list):
+                for v in obj:
+                    walk(v)
+
+        walk(data)
+    return index
+
+
+# ─── Checks ────────────────────────────────────────────────────────────────
+
+def check_registry(matrix):
+    """Structural self-consistency of the matrix itself."""
+    violations = []
+    canonical_by_path = {}
+    role_by_path = {}
+
+    authorities = matrix.get("authorities", [])
+    seen_domains = set()
+    for entry in authorities:
+        domain = entry.get("domain")
+        canonical = normalize(entry.get("canonical") or "")
+
+        # no-authority: a domain with no resolvable canonical
+        if not canonical:
+            violations.append({
+                "failure_class": "no-authority",
+                "domain": domain,
+                "detail": "domain has no canonical authority declared",
+            })
+            continue
+        if not path_exists(canonical):
+            violations.append({
+                "failure_class": "no-authority",
+                "domain": domain,
+                "detail": f"canonical authority does not exist on disk: {canonical}",
+            })
+
+        if domain in seen_domains:
+            violations.append({
+                "failure_class": "no-authority",
+                "domain": domain,
+                "detail": "duplicate domain entry in matrix",
+            })
+        seen_domains.add(domain)
+
+        canonical_by_path.setdefault(canonical, []).append(domain)
+        role_by_path.setdefault(canonical, "canonical")
+
+        for p in (entry.get("superseded") or []):
+            rp = normalize(p)
+            if not path_exists(rp):
+                violations.append({
+                    "failure_class": "no-authority",
+                    "domain": domain,
+                    "detail": f"superseded artifact does not exist on disk: {rp}",
+                })
+            # ambiguous-role: same path canonical in one domain, superseded in another
+            if role_by_path.get(rp) == "canonical":
+                violations.append({
+                    "failure_class": "unlisted-projection",
+                    "domain": domain,
+                    "detail": f"path is both canonical and superseded: {rp}",
+                })
+            role_by_path.setdefault(rp, "superseded")
+
+        for p in (entry.get("projections") or []):
+            rp = normalize(p)
+            if not path_exists(rp):
+                violations.append({
+                    "failure_class": "unlisted-projection",
+                    "domain": domain,
+                    "detail": f"projection does not exist on disk: {rp}",
+                })
+            if role_by_path.get(rp) == "canonical":
+                violations.append({
+                    "failure_class": "unlisted-projection",
+                    "domain": domain,
+                    "detail": f"path is both canonical and projection: {rp}",
+                })
+            role_by_path.setdefault(rp, "projection")
+
+    # duplicate-canonical: two domains claim the same canonical path
+    for path, domains in canonical_by_path.items():
+        if len(domains) > 1:
+            violations.append({
+                "failure_class": "no-authority",
+                "domain": ", ".join(domains),
+                "detail": f"canonical authority claimed by multiple domains: {path}",
+            })
+
+    return violations
+
+
+def superseded_paths(matrix):
+    out = set()
+    for entry in matrix.get("authorities", []):
+        for p in (entry.get("superseded") or []):
+            out.add(normalize(p))
+    return out
+
+
+def check_duplicate_class(matrix, index):
+    """duplicate-class: a semantic class claimed by >1 authoritative file."""
+    violations = []
+    superseded = superseded_paths(matrix)
+    for cls in sorted(index):
+        occurrences = index[cls]
+        authoritative = []
+        for rel, key in occurrences:
+            if rel in superseded:
+                continue
+            if any(t in rel for t in ("cache", "mirror", "quarantine", "CIR")):
+                continue
+            authoritative.append((rel, key))
+        files = sorted(set(rel for rel, _ in authoritative))
+        if len(files) > 1:
+            violations.append({
+                "failure_class": "duplicate-class",
+                "semantic_class": cls,
+                "detail": "semantic class claimed by multiple authoritative files: "
+                          + ", ".join(files),
+            })
+    return violations
+
+
+def check_unlisted_projection(matrix):
+    """unlisted-projection: files in schemas/projections/ not declared as a projection."""
+    violations = []
+    declared = set()
+    for entry in matrix.get("authorities", []):
+        for p in (entry.get("projections") or []):
+            declared.add(normalize(p))
+
+    if not PROJECTIONS_DIR.exists():
+        return violations
+
+    for p in sorted(PROJECTIONS_DIR.iterdir()):
+        if not p.is_file():
+            continue
+        rel = normalize(p.relative_to(REPO_ROOT))
+        if rel == normalize(PROJECTION_MANIFEST.relative_to(REPO_ROOT)):
+            continue  # the manifest is the registry, not a projection
+        if rel not in declared:
+            violations.append({
+                "failure_class": "unlisted-projection",
+                "domain": "(unlisted)",
+                "detail": f"file in schemas/projections/ is not declared as a projection: {rel}",
+            })
+    return violations
+
+
+def run_checks(matrix):
+    violations = []
+    violations += check_registry(matrix)
+    index = collect_semantic_classes(matrix, list(iter_json_files()))
+    violations += check_duplicate_class(matrix, index)
+    violations += check_unlisted_projection(matrix)
+    return violations
+
+
+# ─── Main ────────────────────────────────────────────────────────────────
+
+def main():
+    output_json = "--json" in sys.argv
+
+    try:
+        matrix = load_matrix()
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"[AUTHORITY] FAIL — cannot load matrix {MATRIX_PATH}: {exc}")
+        return 1
+
+    violations = run_checks(matrix)
+
+    if output_json:
+        print(json.dumps({
+            "status": "PASS" if not violations else "FAIL",
+            "matrix": str(MATRIX_PATH.relative_to(REPO_ROOT)),
+            "total_violations": len(violations),
+            "violations": violations,
+        }, indent=2))
+    else:
+        if not violations:
+            print("[AUTHORITY] PASS — single canonical authority per semantic domain")
+        else:
+            print("[AUTHORITY] FAIL — authority matrix violated:")
+            by_class = {}
+            for v in violations:
+                by_class.setdefault(v["failure_class"], []).append(v)
+            for fc in sorted(by_class):
+                print(f"\n  [{fc}] ({len(by_class[fc])} violation(s))")
+                for v in by_class[fc]:
+                    print(f"    {v.get('domain')}: {v['detail']}")
+            print(f"\n  Total: {len(violations)} violation(s)")
+
+    return 1 if violations else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

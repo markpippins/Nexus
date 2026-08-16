@@ -38,7 +38,9 @@ SCHEMA_STATE_KEYS = [
 ]
 
 SEMANTIC_CLASSES = {
-    "execution_state": ["execution_state", "mode", "state"],
+    # `mode` is intentionally NOT an execution_state key (see lint.py): in the WRP
+    # schema it is the 3-layer IR mode, not runtime state.
+    "execution_state": ["execution_state", "state"],
     "pipeline_intent": ["intent_source", "PIPELINE_INTENT"],
     "decision": ["decision", "result", "score"],
     "runtime_snapshot": ["snapshot", "snapshot_ref"],

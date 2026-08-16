@@ -1,7 +1,7 @@
 .PHONY: cir1 cir1-scan cir1-lint cir1-fix cir1-validate \
         cir2-lint cir2-validate cir3-lint cir3-validate cir4-lint cir4-validate \
         cir5-lint cir5-validate \
-        cir-arl cir-verify install-hooks \
+        cir-arl authority-check cir-verify install-hooks \
         test-db-setup test-db-reset test \
         mesh-test seed-guard-bootstrap seed-guard-test \
         apidocs-extract apidocs-gen apidocs-validate apidocs-regen \
@@ -75,6 +75,12 @@ cir5-validate:
 	@echo "[CIR-5] strict authority gate..."
 	@python3 tools/cir1/lint.py --cir5 --strict
 
+# ─── Authority matrix: single-canonical-authority validator ─────────────────
+
+authority-check:
+	@echo "[AUTHORITY] single-canonical-authority check..."
+	@python3 tools/authority/check_authority.py
+
 # ─── CIR v2: Anti-Recursion Linter ────────────────────────────────────────────
 
 cir-arl:
@@ -93,6 +99,7 @@ cir-verify:
 	@$(MAKE) cir3-lint
 	@$(MAKE) cir4-lint
 	@$(MAKE) cir5-lint
+	@$(MAKE) authority-check
 	@$(MAKE) cir-arl
 
 cir-validate:
@@ -102,6 +109,7 @@ cir-validate:
 	@$(MAKE) cir3-validate
 	@$(MAKE) cir4-validate
 	@$(MAKE) cir5-validate
+	@$(MAKE) authority-check
 	@$(MAKE) cir-arl
 
 # ─── Test database ────────────────────────────────────────────────────────────

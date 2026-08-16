@@ -1,5 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "$comment": "SUPERSEDED by schemas/wrp/work-request.schema.json (canonical WorkRequest IR). Retained as historical reference only; see schemas/authority/authority-matrix.json.",
+  "status": "quarantined_CIR5_superseded_by_wrp_schema",
   "title": "WorkRequest Directed Acyclic Cognitive Object",
   "type": "object",
   "required": [

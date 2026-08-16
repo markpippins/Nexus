@@ -54,7 +54,10 @@ SCHEMA_STATE_KEYS = [
 # ─── CIR-5: Single Canonical Authority Rule ──────────────────────────────────
 
 SEMANTIC_CLASSES = {
-    "execution_state": ["execution_state", "mode", "state"],
+    # `mode` is intentionally NOT an execution_state key: in the WRP schema it is
+    # the 3-layer IR mode (INTENT/BINDING/EXECUTION-BOUND), not runtime state.
+    # Its proper semantic class is assigned in the intent-vs-state split.
+    "execution_state": ["execution_state", "state"],
     "pipeline_intent": ["intent_source", "PIPELINE_INTENT"],
     "decision": ["decision", "result", "score"],
     "runtime_snapshot": ["snapshot", "snapshot_ref"],
