@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: nebula-srv — Nebula Knowledge-Graph API
-  version: 1.0.ca0e440b
+  version: 1.0.682a82a3
   description: 'Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge
     graph, and cross-references.
 
@@ -1109,8 +1109,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: CONDUIT — plan history & point-in-time queries (conduit + vision schemas) Reads from nebula.plans, vision.receipts,
-        vision.tickets via fully
+      summary: CONDUIT — plan history & point-in-time queries (conduit + vision schemas) Reads from nebula.plans, nebula.receipts_unified,
+        vision.tickets v
   /api/conduit/plans/{id}/history:
     get:
       tags:
@@ -5516,6 +5516,44 @@ paths:
         required: true
         schema:
           type: string
+  /api/role-leases/{role}/status:
+    get:
+      tags:
+      - role-leases
+      operationId: get_role_leases_role_status
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: GET /api/role-leases/:role/status — derived lease state for (role, channel) (D-2026-08-16-008 R1). NEVER_LEASED
+        / ACTIVE / REVOKED / EXPIRED
+      parameters:
+      - name: role
+        in: path
+        required: true
+        schema:
+          type: string
   /api/role-leases/consume:
     post:
       tags:
@@ -5611,6 +5649,38 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       summary: GET /api/role-leases/stale — ACTIVE leases past window/budget (for sweep)
+  /api/role-leases/sweep:
+    post:
+      tags:
+      - role-leases
+      operationId: post_role_leases_sweep
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'POST /api/role-leases/sweep — transition stale ACTIVE leases → EXPIRED (D-2026-08-16-007 R5). Idempotent;
+        non-destructive (never RELEASED — '
   /api/roles:
     get:
       tags:

@@ -5,7 +5,7 @@
 
 Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge graph, and cross-references.
 
-**226 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**228 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -39,7 +39,7 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | GET | `/api/candidates/:id` |  |
 | GET | `/api/cascade/subscriber-status` | cascade interactive-turn subscriber (the daemon that turns duality comments into agent turns). The subscriber tags its PG connection with application_name='cascade-interactive-turn'; when the daemon dies its socket closes and the backend disappears from pg_stat_activity. The duality-ui TopBar polls  |
 | GET | `/api/conduit/deleted-plans` | GET /api/conduit/deleted-plans — shortcut to find all soft-deleted plans |
-| GET | `/api/conduit/plans` | CONDUIT — plan history & point-in-time queries (conduit + vision schemas) Reads from nebula.plans, vision.receipts, vision.tickets via fully qualified table names (pool search_path=nebula). GET /api/conduit/plans — list all conduit plans, option to include soft-deleted Query params: includeDeleted ( |
+| GET | `/api/conduit/plans` | CONDUIT — plan history & point-in-time queries (conduit + vision schemas) Reads from nebula.plans, nebula.receipts_unified, vision.tickets via fully qualified table names (pool search_path=nebula). GET /api/conduit/plans — list all conduit plans, option to include soft-deleted Query params: includeD |
 | GET | `/api/conduit/plans/:id/history` | GET /api/conduit/plans/:id/history — full lifecycle history for one plan Returns plan metadata (even if deleted), all receipts, all tickets, linked sessions, token usage |
 | GET | `/api/conduit/plans/:id/receipts` | GET /api/conduit/plans/:id/receipts — receipts for a specific plan |
 | GET | `/api/conduit/plans/as-of` | GET /api/conduit/plans/as-of — point-in-time snapshot of plan states Query params: timestamp (ISO 8601, required), includeDeleted |
@@ -168,9 +168,11 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | GET | `/api/role-leases` | GET /api/role-leases — list role leases (filters: role, status) |
 | POST | `/api/role-leases/:id/renew` | POST /api/role-leases/:id/renew — renew an ACTIVE lease (window + budget) |
 | POST | `/api/role-leases/:id/revoke` | POST /api/role-leases/:id/revoke — release an ACTIVE role lease |
+| GET | `/api/role-leases/:role/status` | GET /api/role-leases/:role/status — derived lease state for (role, channel) (D-2026-08-16-008 R1). NEVER_LEASED / ACTIVE / REVOKED / EXPIRED. |
 | POST | `/api/role-leases/consume` | POST /api/role-leases/consume — increment consumed_units (all channels) Unified accounting: execution_worker, harness-srv, and interactive Freebuff all hit this one endpoint for lease consumption. When the budget is exhausted, the endpoint auto-revokes the lease and emits a type:lease-exhausted agen |
 | POST | `/api/role-leases/issue` | ROLE LEASES (RoleLeases / plan 1286) — session-level leases in tackle schema: a bounded window + budget under which a role on a channel may consume work. Mirrors execution.leases (per-request) at role scope. POST /api/role-leases/issue — issue an ACTIVE role lease |
 | GET | `/api/role-leases/stale` | GET /api/role-leases/stale — ACTIVE leases past window/budget (for sweep) |
+| POST | `/api/role-leases/sweep` | POST /api/role-leases/sweep — transition stale ACTIVE leases → EXPIRED (D-2026-08-16-007 R5). Idempotent; non-destructive (never RELEASED — that stays the explicit-revoke/auto-exhaust path). Each swept lease emits a type:drift-finding record so the operator sees it. Wired at nebula-srv startup + on  |
 | GET | `/api/roles` | ROLES GET /api/roles — list all roles (governance roles with capabilities) |
 | POST | `/api/roles` | POST /api/roles — create role metadata (Gap 2: nebula.roles create API) |
 | DELETE | `/api/roles/:id` | DELETE /api/roles/:id — remove role metadata (Gap 2). Accepts a UUID or a role name (architect review: previously UUID-only). Hard delete guarded: FK references from wind.titles / nebula.roles_history surface as 23503 → 409 with a hint instead of a raw PG error. |
@@ -244,6 +246,7 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
 
 
 
