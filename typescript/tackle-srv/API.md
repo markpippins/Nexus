@@ -5,7 +5,7 @@
 
 Tackle role memory and orchestration: AI config, sessions, roles, scheduler, memory, prompts, tool access, failure recovery, tasks, and logs.
 
-**77 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**83 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -37,8 +37,10 @@ Tackle role memory and orchestration: AI config, sessions, roles, scheduler, mem
 | POST | `/config/ai/seed-defaults` | Seed defaults |
 | POST | `/config/ai/test` | Test Invoke |
 | GET | `/config/ai/tool-access` |  |
+| POST | `/config/ai/tool-access` | POST /config/ai/tool-access — bulk-create allowlist rows for a role. Body: { role, tools: [{ mcp_id, tool_slug }] } or { role, tools: [tool_slug...] } (string entries are auto-wrapped with an empty mcp_id rollup). |
 | PATCH | `/config/ai/tool-access/:id` |  |
 | GET | `/config/ai/tool-access/:role` |  |
+| POST | `/config/ai/tool-access/seed` | POST /config/ai/tool-access/seed — bulk-populate a role's allowlist from a template role (default-deny: new roles start with zero tools). Body: { role, fromRole } |
 | GET | `/config/ai/validate` | Validate |
 | POST | `/config/ai/verify` |  |
 | GET | `/config/ai/verify/:sessionId` |  |
@@ -52,6 +54,8 @@ Tackle role memory and orchestration: AI config, sessions, roles, scheduler, mem
 | DELETE | `/logs` | DELETE /logs — clear all logs |
 | GET | `/logs` | GET /logs — query with optional filters |
 | POST | `/logs/emit` | POST /logs/emit — insert a single log entry |
+| DELETE | `/memory/assign` | DELETE /memory/assign — unassign a procedure card from a role by expiring the active assignment (bitemporal-preserving soft delete). Body or query: { role, slug } |
+| POST | `/memory/assign` | POST /memory/assign — assign procedure cards to a role. Body: { role, slugs: ["slug", ...] }. Writes tackle.role_memory, then triggers the PG→Redis refresh so the new assignments are live immediately. |
 | POST | `/memory/check-since` |  |
 | GET | `/memory/procedure/:slug` |  |
 | GET | `/memory/procedures/:role` |  |
@@ -73,6 +77,8 @@ Tackle role memory and orchestration: AI config, sessions, roles, scheduler, mem
 | POST | `/roles` |  |
 | DELETE | `/roles/:id` |  |
 | GET | `/roles/:id` |  |
+| POST | `/roles/provision` | POST /roles/provision — atomic role setup orchestrator (Gap 1). Collapses role identity + config bundle + persona + tool access + procedure cards + nebula.roles sync + assembly user into one transaction, then returns the readiness report. See db.provisionRole for the spec shape. |
+| GET | `/roles/readiness/:name` | GET /roles/readiness/:name — readiness checklist (must be registered BEFORE /:id so "readiness" isn't captured as an id). |
 | GET | `/scheduler` |  |
 | POST | `/scheduler` |  |
 | DELETE | `/scheduler/:id` |  |

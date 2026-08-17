@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: nebula-srv — Nebula Knowledge-Graph API
-  version: 1.0.e02e35a2
+  version: 1.0.28c99bf0
   description: 'Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge
     graph, and cross-references.
 
@@ -979,6 +979,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: /candidates alias — mirrors /harvest-candidates for Assembly UI
   /api/candidates/{id}:
     get:
       tags:
@@ -5641,7 +5642,74 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       summary: ROLES GET /api/roles — list all roles (governance roles with capabilities)
+    post:
+      tags:
+      - roles
+      operationId: post_roles
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'POST /api/roles — create role metadata (Gap 2: nebula.roles create API)'
   /api/roles/{id}:
+    delete:
+      tags:
+      - roles
+      operationId: delete_roles_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'DELETE /api/roles/:id — remove role metadata (Gap 2). Hard delete guarded: FK references from wind.titles
+        / nebula.roles_history surface as '
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
     get:
       tags:
       - roles
@@ -5672,6 +5740,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       summary: GET /api/roles/:id — single role
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags:
+      - roles
+      operationId: patch_roles_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: PATCH /api/roles/:id — update capabilities/visibility/description (Gap 2)
       parameters:
       - name: id
         in: path

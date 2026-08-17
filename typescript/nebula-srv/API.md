@@ -5,7 +5,7 @@
 
 Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge graph, and cross-references.
 
-**223 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**226 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -35,7 +35,7 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | POST | `/api/audit/:id/regenerate` | POST /api/audit/:id/regenerate — re-read this specific file from disk into DB |
 | GET | `/api/audit/graph` | GET /api/audit/graph — agent records as nodes, cross-references as edges ⚠ MUST be before /audit/:id to avoid Express matching 'graph' as a UUID |
 | POST | `/api/audit/sync` | POST /api/audit/sync — scan filesystem and upsert all audit files |
-| GET | `/api/candidates` |  |
+| GET | `/api/candidates` | /candidates alias — mirrors /harvest-candidates for Assembly UI |
 | GET | `/api/candidates/:id` |  |
 | GET | `/api/cascade/subscriber-status` | cascade interactive-turn subscriber (the daemon that turns duality comments into agent turns). The subscriber tags its PG connection with application_name='cascade-interactive-turn'; when the daemon dies its socket closes and the backend disappears from pg_stat_activity. The duality-ui TopBar polls  |
 | GET | `/api/conduit/deleted-plans` | GET /api/conduit/deleted-plans — shortcut to find all soft-deleted plans |
@@ -172,7 +172,10 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | POST | `/api/role-leases/issue` | ROLE LEASES (RoleLeases / plan 1286) — session-level leases in tackle schema: a bounded window + budget under which a role on a channel may consume work. Mirrors execution.leases (per-request) at role scope. POST /api/role-leases/issue — issue an ACTIVE role lease |
 | GET | `/api/role-leases/stale` | GET /api/role-leases/stale — ACTIVE leases past window/budget (for sweep) |
 | GET | `/api/roles` | ROLES GET /api/roles — list all roles (governance roles with capabilities) |
+| POST | `/api/roles` | POST /api/roles — create role metadata (Gap 2: nebula.roles create API) |
+| DELETE | `/api/roles/:id` | DELETE /api/roles/:id — remove role metadata (Gap 2). Hard delete guarded: FK references from wind.titles / nebula.roles_history surface as 23503 → 409 with a hint instead of a raw PG error. |
 | GET | `/api/roles/:id` | GET /api/roles/:id — single role |
+| PATCH | `/api/roles/:id` | PATCH /api/roles/:id — update capabilities/visibility/description (Gap 2) |
 | GET | `/api/search` | SEARCH (cross-entity full-text) GET /api/search?q=... |
 | POST | `/api/search/semantic` | SEMANTIC SEARCH POST /api/search/semantic — vector similarity search against knowledge graph Accepts a pre-embedded query vector (768-dim, matching nomic-embed-text) and returns similar entities from knowledge.graph_entity_embeddings. |
 | POST | `/api/seed` | POST /api/seed — seed default example data (Plan 0087, idempotent, atomic) |
