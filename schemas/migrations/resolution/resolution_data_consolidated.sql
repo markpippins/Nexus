@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 2aACSEkgIBkgkNgBgm7mE24c5VDcr0wXpz9BMJNWi3Xkjcn2tg3RCw1imjPa8FK
+\restrict 3kVOIJjFJMVYyWlpq1bOnh0tqvbJ2fOj6U7appftm17KHB9pqnfDm0c22wFyTfs
 
 -- Dumped from database version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
@@ -39,9 +39,282 @@ INSERT INTO resolution.concept (id, name, description, created_at, expired_at) V
 INSERT INTO resolution.concept (id, name, description, created_at, expired_at) VALUES ('513796b2-3c19-4559-8ab3-d749033d0464', 'Answer', 'One role''s response within an open question''s deliberation thread', '2026-08-13 02:45:20.536532+00', NULL);
 INSERT INTO resolution.concept (id, name, description, created_at, expired_at) VALUES ('be93554f-f720-4b6b-b011-7540d9b96e59', 'VerifiedStatement', 'A Verifier-compiled SOL IR fact, derived from one verified Answer', '2026-08-13 20:02:35.668635+00', NULL);
 INSERT INTO resolution.concept (id, name, description, created_at, expired_at) VALUES ('b6872d58-0f7a-41ce-bdf4-e8902957d647', 'WorkRequestEdge', 'A dependency edge between two WorkRequests -- parent is upstream/prerequisite, child is downstream/dependent', '2026-08-15 17:28:48.391495+00', NULL);
+INSERT INTO resolution.concept (id, name, description, created_at, expired_at) VALUES ('07635f6e-b2d5-4459-bce4-91b471f25efd', 'Proposition', 'A standing, coarser-grained probe/claim under investigation, composed of one or more Assertions', '2026-08-17 20:08:14.218904+00', NULL);
+INSERT INTO resolution.concept (id, name, description, created_at, expired_at) VALUES ('c94f564f-88cf-4f5c-a46b-ca723d4478a8', 'Assertion', 'A sharp, binary-provable claim -- structurally, an existing resolution.rule + its expression', '2026-08-17 20:08:14.218904+00', NULL);
+INSERT INTO resolution.concept (id, name, description, created_at, expired_at) VALUES ('84a66893-8be2-4df6-a8e8-a0b7869ee93b', 'PropositionAssertion', 'Links a Proposition to one of the Assertions (rules) that bear on it', '2026-08-17 20:08:14.58675+00', NULL);
 
 
 ALTER TABLE resolution.concept ENABLE TRIGGER ALL;
+
+--
+-- Data for Name: concept_attribute; Type: TABLE DATA; Schema: resolution; Owner: -
+--
+
+ALTER TABLE resolution.concept_attribute DISABLE TRIGGER ALL;
+
+INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'e95175e0-1f71-4858-9a82-0ea283baaa65', 'category', NULL, 'enum', false);
+INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('a23a2ee8-94cf-44e7-a557-a40e19514c99', 'e95175e0-1f71-4858-9a82-0ea283baaa65', 'status', NULL, 'enum', true);
+INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('5b88bbed-e14d-464c-bb7f-f3ec718b4948', '513796b2-3c19-4559-8ab3-d749033d0464', 'confidence', NULL, 'enum', false);
+INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('ba5ef765-dfb6-49dc-b061-ce7382d16fec', '513796b2-3c19-4559-8ab3-d749033d0464', 'role', NULL, 'text', false);
+INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('f395029e-9155-426d-873e-6e1fd282f260', '094b785c-82b4-44fc-b262-7e60bc85db6f', 'compilation_status', NULL, 'enum', true);
+INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('b4056429-6419-4c7b-a98b-c1382648085d', 'b6872d58-0f7a-41ce-bdf4-e8902957d647', 'edge_type', NULL, 'enum', false);
+INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('70f62acf-ced2-41fa-bf6c-e54549ad1c9b', 'd22cd236-6353-445e-9b48-bbb8880493df', 'business_status', NULL, 'enum', true);
+INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('80050047-9fd3-4470-83b8-288f69806859', 'efba776b-d731-4018-8610-a3e1af0bc3d3', 'status', NULL, 'enum', false);
+INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('02046989-5617-4faa-9d90-7bee609d0d35', '07635f6e-b2d5-4459-bce4-91b471f25efd', 'disposition', NULL, 'enum', true);
+
+
+ALTER TABLE resolution.concept_attribute ENABLE TRIGGER ALL;
+
+--
+-- Data for Name: concept_attribute_value; Type: TABLE DATA; Schema: resolution; Owner: -
+--
+
+ALTER TABLE resolution.concept_attribute_value DISABLE TRIGGER ALL;
+
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('a912a22f-1bc6-40d5-80fd-5ab60251867c', '8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'AMBIGUITY', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('77e25c7b-7be8-4bef-84ab-d068ef45ff5f', '8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'MISSING_INFO', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('aebc6790-8dfa-4691-b6f2-1afc9b31c1f3', '8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'CONFLICT', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('217a3212-f9f5-44bc-bfe4-7fdd5be26378', '8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'SCOPE', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('bdc60b92-d837-4f28-afef-d8d2cba6810e', '8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'DEPENDENCY', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('9df6a193-87bc-488f-8bad-0a4e4a8edb68', '8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'DUPLICATE_CANDIDATE', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('41757b62-4a68-4bf3-8160-a0b68716b6a2', '8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'WORK_COMPLETED', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('fd715903-800c-4761-8f8e-3bc8614c0820', '8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'NEEDS_SPEC', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('8b502a97-81b8-4dcf-83a7-e8ca66c86cc7', 'a23a2ee8-94cf-44e7-a557-a40e19514c99', 'OPEN', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('57cb4961-3ba3-4181-a059-2fdde629caaa', 'a23a2ee8-94cf-44e7-a557-a40e19514c99', 'IN_DELIBERATION', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('f0dbd831-ede3-4b3e-bc2b-2e2630b3b288', 'a23a2ee8-94cf-44e7-a557-a40e19514c99', 'RESOLVED', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('f9ab428f-3daf-4bae-9831-380d94907950', 'a23a2ee8-94cf-44e7-a557-a40e19514c99', 'WONT_FIX', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('b8e4c0e4-9b61-4cdf-8e97-d667e07d5f24', 'a23a2ee8-94cf-44e7-a557-a40e19514c99', 'DEFERRED', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('2f5ffe88-511f-4607-b482-029090bcfab1', '5b88bbed-e14d-464c-bb7f-f3ec718b4948', 'LOW', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('a2ef5a02-d6b9-4d83-81af-5b57a830d886', '5b88bbed-e14d-464c-bb7f-f3ec718b4948', 'MEDIUM', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('86046646-08e1-494a-96d8-b8d039f1f72b', '5b88bbed-e14d-464c-bb7f-f3ec718b4948', 'HIGH', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('9ef399e5-81b6-4328-b2ca-c14df840044a', 'f395029e-9155-426d-873e-6e1fd282f260', 'draft', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('46d5324b-5159-469e-b295-d2f98d75f4ef', 'f395029e-9155-426d-873e-6e1fd282f260', 'compiled', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('26f26a58-8391-48f3-8176-b3b873f36a59', 'f395029e-9155-426d-873e-6e1fd282f260', 'rejected', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('70fb20df-30e3-4c07-9eaf-7bfc132945fe', 'b4056429-6419-4c7b-a98b-c1382648085d', 'depends_on', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('a435675e-cfd7-4507-b717-23575efd5fb3', '70f62acf-ced2-41fa-bf6c-e54549ad1c9b', 'DRAFT', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('6512396a-5e71-4dc1-8516-f8489ecd8937', '70f62acf-ced2-41fa-bf6c-e54549ad1c9b', 'APPROVED', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('a6da4dd9-c92b-4a19-a650-980567a7cb83', '70f62acf-ced2-41fa-bf6c-e54549ad1c9b', 'DISPATCHED', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('09b20fc4-aa51-465c-ad3f-2319c3f7e381', '70f62acf-ced2-41fa-bf6c-e54549ad1c9b', 'COMPLETED', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('0cf9cf66-b0d4-47dd-a93c-264cb845f6e7', '70f62acf-ced2-41fa-bf6c-e54549ad1c9b', 'CANCELLED', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('b75cc10d-32c9-403a-8b64-cd1ca746ad0b', '80050047-9fd3-4470-83b8-288f69806859', 'draft', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('7ecd1481-57b8-4798-ad77-8feec550006d', '80050047-9fd3-4470-83b8-288f69806859', 'pending', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('1aae4891-7f0d-4b2c-a3e2-c2b280146f7c', '80050047-9fd3-4470-83b8-288f69806859', 'approved', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('d7485609-2c4a-4e99-b913-e10c03e052d0', '80050047-9fd3-4470-83b8-288f69806859', 'work_requested', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('f164fe8d-f4c5-42d4-99d3-75bf5df0e688', '80050047-9fd3-4470-83b8-288f69806859', 'completed', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('b04e06fa-d0df-4376-9071-625effec4181', '80050047-9fd3-4470-83b8-288f69806859', 'archived', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('39e2b178-97ca-481a-b331-059a2e5f410a', '02046989-5617-4faa-9d90-7bee609d0d35', 'Pending', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('8656c013-8b26-461b-aeab-8cb7ae5842cf', '02046989-5617-4faa-9d90-7bee609d0d35', 'Asserted', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('64271926-c6aa-42d0-bd98-8b076ee17458', '02046989-5617-4faa-9d90-7bee609d0d35', 'Disputed', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('0d93621f-ff92-418d-9d74-1cb69e6e5ee8', '02046989-5617-4faa-9d90-7bee609d0d35', 'Stale', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('f9dd0316-1a1c-4b25-9b46-b66f08c8ba8d', '02046989-5617-4faa-9d90-7bee609d0d35', 'Retracted', NULL);
+INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('d2eb7475-4998-4792-bdc1-ed93942454b1', '02046989-5617-4faa-9d90-7bee609d0d35', 'Rejected', NULL);
+
+
+ALTER TABLE resolution.concept_attribute_value ENABLE TRIGGER ALL;
+
+--
+-- Data for Name: concept_relationship; Type: TABLE DATA; Schema: resolution; Owner: -
+--
+
+ALTER TABLE resolution.concept_relationship DISABLE TRIGGER ALL;
+
+INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('8b8d93a6-47c4-49a4-b070-cd5d7b0a04c2', 'eb71fe83-b476-4197-af4e-eb76720ea5d7', 'dda27bb4-a994-4c56-8693-34bee69738c4', 'produces', NULL, NULL, '2026-08-12 04:36:32.377019+00', NULL);
+INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('fd4f8f53-8b6b-45ab-b7b6-1bcefe6053da', 'dda27bb4-a994-4c56-8693-34bee69738c4', '094b785c-82b4-44fc-b262-7e60bc85db6f', 'produces', NULL, NULL, '2026-08-12 04:36:32.377019+00', NULL);
+INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('b589bd8d-9a75-4355-81c7-19eeef4c875c', '094b785c-82b4-44fc-b262-7e60bc85db6f', '094b785c-82b4-44fc-b262-7e60bc85db6f', 'spawns', NULL, NULL, '2026-08-12 04:36:32.377019+00', NULL);
+INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('99613184-ee71-4a92-a54f-ea235e3f4581', '094b785c-82b4-44fc-b262-7e60bc85db6f', '5f2f4dea-9715-4104-b2d3-100abe72685e', 'member_of', 'green', NULL, '2026-08-12 04:36:32.377019+00', NULL);
+INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('c401da6f-85a7-4aa5-9e4e-ac880757ceb2', '5f2f4dea-9715-4104-b2d3-100abe72685e', 'efba776b-d731-4018-8610-a3e1af0bc3d3', 'transforms_into', 'green', NULL, '2026-08-12 04:36:32.377019+00', NULL);
+INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('d0588304-134f-4249-ba90-565edbe4de01', '094b785c-82b4-44fc-b262-7e60bc85db6f', 'efba776b-d731-4018-8610-a3e1af0bc3d3', 'transforms_into', 'green', NULL, '2026-08-12 04:36:32.377019+00', NULL);
+INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('cb4bbe3f-f347-466a-a2f0-3e843cf348a2', 'efba776b-d731-4018-8610-a3e1af0bc3d3', 'd22cd236-6353-445e-9b48-bbb8880493df', 'transforms_into', 'green', NULL, '2026-08-12 04:36:32.377019+00', NULL);
+INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('48679a01-7dab-497c-8edd-f01d363ff1f3', 'd22cd236-6353-445e-9b48-bbb8880493df', 'd22cd236-6353-445e-9b48-bbb8880493df', 'provenance_of', 'red', NULL, '2026-08-12 04:36:32.377019+00', NULL);
+INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('d3bd232c-f3c1-4176-bd50-ef4fdfbc77d7', '8be34f47-00d0-4bd7-8a5b-375a8f785882', 'fc9b393a-5269-47d8-95cb-61f1cef05d3e', 'basis_of', NULL, NULL, '2026-08-12 04:36:32.377019+00', NULL);
+INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('a6c49168-f1a1-464b-b5d6-eca955e5112f', 'fc9b393a-5269-47d8-95cb-61f1cef05d3e', 'e95175e0-1f71-4858-9a82-0ea283baaa65', 'basis_of', NULL, NULL, '2026-08-13 02:45:20.562291+00', NULL);
+INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('88893e8b-3f40-4a72-b6cf-47cbadfed531', 'e95175e0-1f71-4858-9a82-0ea283baaa65', '513796b2-3c19-4559-8ab3-d749033d0464', 'produces', NULL, NULL, '2026-08-13 02:45:20.562291+00', NULL);
+INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('fe03134e-7b46-4e59-a30b-94ce108d7525', '513796b2-3c19-4559-8ab3-d749033d0464', 'be93554f-f720-4b6b-b011-7540d9b96e59', 'produces', NULL, NULL, '2026-08-13 20:02:35.681746+00', NULL);
+INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('3bacfbc6-2272-4818-96eb-791c16b830cd', 'd22cd236-6353-445e-9b48-bbb8880493df', 'b6872d58-0f7a-41ce-bdf4-e8902957d647', 'has_dependency', NULL, NULL, '2026-08-15 17:28:48.405854+00', NULL);
+INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('646db3bd-e91f-4a33-8e11-80ba9ce4d34b', 'b6872d58-0f7a-41ce-bdf4-e8902957d647', 'd22cd236-6353-445e-9b48-bbb8880493df', 'depends_on', NULL, NULL, '2026-08-15 17:28:48.405854+00', NULL);
+
+
+ALTER TABLE resolution.concept_relationship ENABLE TRIGGER ALL;
+
+--
+-- Data for Name: concept_state_transition; Type: TABLE DATA; Schema: resolution; Owner: -
+--
+
+ALTER TABLE resolution.concept_state_transition DISABLE TRIGGER ALL;
+
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('efa6bf84-a52b-4f79-8784-e49a6dd82a14', 'e95175e0-1f71-4858-9a82-0ea283baaa65', '8b502a97-81b8-4dcf-83a7-e8ca66c86cc7', '57cb4961-3ba3-4181-a059-2fdde629caaa', 'OPEN_to_IN_DELIBERATION', NULL, '2026-08-13 02:45:20.544889+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('7b4a9766-f69b-4d96-9306-48392a67d14b', 'e95175e0-1f71-4858-9a82-0ea283baaa65', '8b502a97-81b8-4dcf-83a7-e8ca66c86cc7', 'f9ab428f-3daf-4bae-9831-380d94907950', 'OPEN_to_WONT_FIX', NULL, '2026-08-13 02:45:20.544889+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('fef7c2a1-81a1-46bf-934b-721236d66a17', 'e95175e0-1f71-4858-9a82-0ea283baaa65', '57cb4961-3ba3-4181-a059-2fdde629caaa', 'b8e4c0e4-9b61-4cdf-8e97-d667e07d5f24', 'IN_DELIBERATION_to_DEFERRED', NULL, '2026-08-13 02:45:20.544889+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('91e0e1ed-fa6a-4837-9142-c2f807fdbb94', 'e95175e0-1f71-4858-9a82-0ea283baaa65', '57cb4961-3ba3-4181-a059-2fdde629caaa', 'f0dbd831-ede3-4b3e-bc2b-2e2630b3b288', 'IN_DELIBERATION_to_RESOLVED', NULL, '2026-08-13 02:45:20.544889+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('4201c811-f0a5-4d99-b626-835c5fcf097e', 'e95175e0-1f71-4858-9a82-0ea283baaa65', '57cb4961-3ba3-4181-a059-2fdde629caaa', 'f9ab428f-3daf-4bae-9831-380d94907950', 'IN_DELIBERATION_to_WONT_FIX', NULL, '2026-08-13 02:45:20.544889+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('50cd4780-bb4d-4669-8bb1-e68c60f570ad', 'e95175e0-1f71-4858-9a82-0ea283baaa65', 'b8e4c0e4-9b61-4cdf-8e97-d667e07d5f24', '57cb4961-3ba3-4181-a059-2fdde629caaa', 'DEFERRED_to_IN_DELIBERATION', NULL, '2026-08-13 02:45:20.544889+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('f8e56af6-f0bf-4d8d-9f5a-40b613850828', 'd22cd236-6353-445e-9b48-bbb8880493df', 'a435675e-cfd7-4507-b717-23575efd5fb3', '6512396a-5e71-4dc1-8516-f8489ecd8937', 'DRAFT_to_APPROVED', NULL, '2026-08-15 17:28:48.620498+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('2642ab9b-c7b1-40ad-ba6f-49b5aae118a8', 'd22cd236-6353-445e-9b48-bbb8880493df', 'a435675e-cfd7-4507-b717-23575efd5fb3', '0cf9cf66-b0d4-47dd-a93c-264cb845f6e7', 'DRAFT_to_CANCELLED', NULL, '2026-08-15 17:28:48.620498+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('db7cb890-679c-43be-a614-fe68fbbf3dc6', 'd22cd236-6353-445e-9b48-bbb8880493df', '6512396a-5e71-4dc1-8516-f8489ecd8937', '0cf9cf66-b0d4-47dd-a93c-264cb845f6e7', 'APPROVED_to_CANCELLED', NULL, '2026-08-15 17:28:48.620498+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('f9389719-c826-4ee2-9ad2-aca56bb9076d', 'd22cd236-6353-445e-9b48-bbb8880493df', '6512396a-5e71-4dc1-8516-f8489ecd8937', 'a6da4dd9-c92b-4a19-a650-980567a7cb83', 'APPROVED_to_DISPATCHED', NULL, '2026-08-15 17:28:48.620498+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('c1e709b7-60e3-44a3-abee-cb842879d0b7', 'd22cd236-6353-445e-9b48-bbb8880493df', 'a6da4dd9-c92b-4a19-a650-980567a7cb83', '0cf9cf66-b0d4-47dd-a93c-264cb845f6e7', 'DISPATCHED_to_CANCELLED', NULL, '2026-08-15 17:28:48.620498+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('a0ea051a-462c-441a-8ef7-bb8fec144764', 'd22cd236-6353-445e-9b48-bbb8880493df', 'a6da4dd9-c92b-4a19-a650-980567a7cb83', '09b20fc4-aa51-465c-ad3f-2319c3f7e381', 'DISPATCHED_to_COMPLETED', NULL, '2026-08-15 17:28:48.620498+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('c3859362-8d25-495e-8360-b3d69239385d', '094b785c-82b4-44fc-b262-7e60bc85db6f', '9ef399e5-81b6-4328-b2ca-c14df840044a', '46d5324b-5159-469e-b295-d2f98d75f4ef', 'draft_to_compiled', NULL, '2026-08-15 23:14:07.274702+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('ad53dded-31f0-4414-aad8-4229ac37b589', '094b785c-82b4-44fc-b262-7e60bc85db6f', '9ef399e5-81b6-4328-b2ca-c14df840044a', '26f26a58-8391-48f3-8176-b3b873f36a59', 'draft_to_rejected', NULL, '2026-08-15 23:14:07.274702+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('1c279167-f775-490c-b5d9-0642834b55bb', '094b785c-82b4-44fc-b262-7e60bc85db6f', '26f26a58-8391-48f3-8176-b3b873f36a59', '9ef399e5-81b6-4328-b2ca-c14df840044a', 'rejected_to_draft', NULL, '2026-08-15 23:14:07.274702+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('81541103-eaff-4142-8834-14351907f180', '07635f6e-b2d5-4459-bce4-91b471f25efd', '39e2b178-97ca-481a-b331-059a2e5f410a', '8656c013-8b26-461b-aeab-8cb7ae5842cf', 'Pending_to_Asserted', NULL, '2026-08-17 20:08:14.579243+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('da7812ae-8540-4497-882e-58ae9a4c1ae3', '07635f6e-b2d5-4459-bce4-91b471f25efd', '39e2b178-97ca-481a-b331-059a2e5f410a', '64271926-c6aa-42d0-bd98-8b076ee17458', 'Pending_to_Disputed', NULL, '2026-08-17 20:08:14.579243+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('bee3209e-56a1-4871-84fe-c1449ebfa2fa', '07635f6e-b2d5-4459-bce4-91b471f25efd', '39e2b178-97ca-481a-b331-059a2e5f410a', 'd2eb7475-4998-4792-bdc1-ed93942454b1', 'Pending_to_Rejected', NULL, '2026-08-17 20:08:14.579243+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('edbd77da-c4ab-40a3-a39e-547fb3ee9296', '07635f6e-b2d5-4459-bce4-91b471f25efd', '8656c013-8b26-461b-aeab-8cb7ae5842cf', '64271926-c6aa-42d0-bd98-8b076ee17458', 'Asserted_to_Disputed', NULL, '2026-08-17 20:08:14.579243+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('77929ac1-cbe5-466e-8b06-e978e5f484e9', '07635f6e-b2d5-4459-bce4-91b471f25efd', '8656c013-8b26-461b-aeab-8cb7ae5842cf', 'f9dd0316-1a1c-4b25-9b46-b66f08c8ba8d', 'Asserted_to_Retracted', NULL, '2026-08-17 20:08:14.579243+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('75da4dc6-1d2b-4661-8850-0e7cd552ce3b', '07635f6e-b2d5-4459-bce4-91b471f25efd', '8656c013-8b26-461b-aeab-8cb7ae5842cf', '0d93621f-ff92-418d-9d74-1cb69e6e5ee8', 'Asserted_to_Stale', NULL, '2026-08-17 20:08:14.579243+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('10fee06a-51d0-4333-8f19-d467b0583843', '07635f6e-b2d5-4459-bce4-91b471f25efd', '64271926-c6aa-42d0-bd98-8b076ee17458', 'f9dd0316-1a1c-4b25-9b46-b66f08c8ba8d', 'Disputed_to_Retracted', NULL, '2026-08-17 20:08:14.579243+00', NULL);
+INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('6515babb-cebf-4c2f-a9fc-b8562dc152c9', '07635f6e-b2d5-4459-bce4-91b471f25efd', '0d93621f-ff92-418d-9d74-1cb69e6e5ee8', '39e2b178-97ca-481a-b331-059a2e5f410a', 'Stale_to_Pending', NULL, '2026-08-17 20:08:14.579243+00', NULL);
+
+
+ALTER TABLE resolution.concept_state_transition ENABLE TRIGGER ALL;
+
+--
+-- Data for Name: proposition; Type: TABLE DATA; Schema: resolution; Owner: -
+--
+
+ALTER TABLE resolution.proposition DISABLE TRIGGER ALL;
+
+INSERT INTO resolution.proposition (id, title, description, asset_concept_id, subject_entity_id, disposition_value_id, created_at, valid_from, valid_until, recorded_on_dt, recorded_until_dt) VALUES ('f1000000-0000-0000-0000-00000000f001', 'WorkRequest wr-mongo-wiring is healthy', 'Composed of two independent assertions: dependencies satisfied, and not cancelled.', 'd22cd236-6353-445e-9b48-bbb8880493df', '90000000-0000-0000-0000-000000000002', '8656c013-8b26-461b-aeab-8cb7ae5842cf', '2026-08-17 20:08:52.781482+00', '2026-08-17 20:08:52.781482+00', 'infinity', '2026-08-17 20:08:52.781482+00', 'infinity');
+
+
+ALTER TABLE resolution.proposition ENABLE TRIGGER ALL;
+
+--
+-- Data for Name: expression; Type: TABLE DATA; Schema: resolution; Owner: -
+--
+
+ALTER TABLE resolution.expression DISABLE TRIGGER ALL;
+
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('77777777-7777-7777-7777-777777777701', 'function_call', NULL, NULL, NULL, 'escalates_to', 'boolean', 'WorkRequest escalates_to Role(OnCall)', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('e1000000-0000-0000-0000-000000000001', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'exists related Answer', '88893e8b-3f40-4a72-b6cf-47cbadfed531', 'EXISTS', NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('e2000000-0000-0000-0000-000000000002', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'exists related VerifiedStatement', 'fe03134e-7b46-4e59-a30b-94ce108d7525', 'EXISTS', NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('e3000000-0000-0000-0000-000000000003', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'exists related Answer with confidence = HIGH', '88893e8b-3f40-4a72-b6cf-47cbadfed531', 'EXISTS', NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('e4000000-0000-0000-0000-000000000004', 'operator', '=', NULL, NULL, NULL, 'boolean', 'confidence = HIGH', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('e5000000-0000-0000-0000-000000000005', 'attribute_ref', NULL, NULL, '5b88bbed-e14d-464c-bb7f-f3ec718b4948', NULL, 'enum', 'Answer.confidence', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('e6000000-0000-0000-0000-000000000006', 'literal', NULL, 'HIGH', NULL, NULL, 'enum', '''HIGH''', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('e7000000-0000-0000-0000-000000000007', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'exists Answer: confidence=HIGH AND role=architect', '88893e8b-3f40-4a72-b6cf-47cbadfed531', 'EXISTS', NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('e8000000-0000-0000-0000-000000000008', 'operator', 'AND', NULL, NULL, NULL, 'boolean', 'confidence=HIGH AND role=architect', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('e0a00000-0000-0000-0000-00000000000a', 'operator', '=', NULL, NULL, NULL, 'boolean', 'role = architect', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('e0b00000-0000-0000-0000-00000000000b', 'attribute_ref', NULL, NULL, 'ba5ef765-dfb6-49dc-b061-ce7382d16fec', NULL, 'text', 'Answer.role', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('e0c00000-0000-0000-0000-00000000000c', 'literal', NULL, 'architect', NULL, NULL, 'text', '''architect''', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('e7100000-0000-0000-0000-000000000071', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'exists Answer: confidence=HIGH OR role=architect', '88893e8b-3f40-4a72-b6cf-47cbadfed531', 'EXISTS', NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('e8100000-0000-0000-0000-000000000081', 'operator', 'OR', NULL, NULL, NULL, 'boolean', 'confidence=HIGH OR role=architect', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('f0000000-0000-0000-0000-000000000001', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'all children have compilation_status = compiled', 'b589bd8d-9a75-4355-81c7-19eeef4c875c', 'ALL', NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('f0000000-0000-0000-0000-000000000002', 'operator', '=', NULL, NULL, NULL, 'boolean', 'compilation_status = compiled', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('f0000000-0000-0000-0000-000000000003', 'attribute_ref', NULL, NULL, 'f395029e-9155-426d-873e-6e1fd282f260', NULL, 'enum', 'Requirement.compilation_status', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('f0000000-0000-0000-0000-000000000004', 'literal', NULL, 'compiled', NULL, NULL, 'enum', '''compiled''', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('fa000000-0000-0000-0000-00000000000a', 'literal', NULL, 'sanity-check', NULL, NULL, 'text', 'sanity check leaf', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('c0000000-0000-0000-0000-000000000001', 'relationship_ref', NULL, NULL, NULL, NULL, 'integer', 'count of Answers', '88893e8b-3f40-4a72-b6cf-47cbadfed531', 'COUNT', NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('c0000000-0000-0000-0000-000000000002', 'literal', NULL, '2', NULL, NULL, 'integer', '2', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('c0000000-0000-0000-0000-000000000003', 'operator', '>=', NULL, NULL, NULL, 'boolean', 'answer count >= 2', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('d0000000-0000-0000-0000-000000000001', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'exists Answer role=architect (exact)', '88893e8b-3f40-4a72-b6cf-47cbadfed531', 'EXISTS', NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('d0000000-0000-0000-0000-000000000002', 'operator', '=', NULL, NULL, NULL, 'boolean', 'role = architect (exact)', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('d0000000-0000-0000-0000-000000000003', 'attribute_ref', NULL, NULL, 'ba5ef765-dfb6-49dc-b061-ce7382d16fec', NULL, 'text', 'Answer.role', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('d0000000-0000-0000-0000-000000000004', 'literal', NULL, 'architect', NULL, NULL, 'text', '''architect''', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('d0100000-0000-0000-0000-000000000011', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'exists Answer lower(role)=architect', '88893e8b-3f40-4a72-b6cf-47cbadfed531', 'EXISTS', NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('d0200000-0000-0000-0000-000000000021', 'operator', '=', NULL, NULL, NULL, 'boolean', 'lower(role) = architect', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('d0300000-0000-0000-0000-000000000031', 'function_call', NULL, NULL, NULL, 'lower', 'text', 'lower(Answer.role)', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('e9100000-0000-0000-0000-000000000092', 'literal', NULL, 'foo', NULL, NULL, 'text', NULL, NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('e9200000-0000-0000-0000-000000000093', 'literal', NULL, 'bar', NULL, NULL, 'text', NULL, NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('e9000000-0000-0000-0000-000000000091', 'function_call', NULL, NULL, NULL, 'concat', 'text', 'concat test', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('a1000000-0000-0000-0000-00000000a001', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'all dependency edges satisfied', '3bacfbc6-2272-4818-96eb-791c16b830cd', 'ALL', NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('a2000000-0000-0000-0000-00000000a002', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'exists a completed prerequisite', '646db3bd-e91f-4a33-8e11-80ba9ce4d34b', 'EXISTS', NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('a3000000-0000-0000-0000-00000000a003', 'operator', '=', NULL, NULL, NULL, 'boolean', 'business_status = COMPLETED', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('a4000000-0000-0000-0000-00000000a004', 'attribute_ref', NULL, NULL, '70f62acf-ced2-41fa-bf6c-e54549ad1c9b', NULL, 'enum', 'WorkRequest.business_status', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('a5000000-0000-0000-0000-00000000a005', 'literal', NULL, 'COMPLETED', NULL, NULL, 'enum', '''COMPLETED''', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('b1000000-0000-0000-0000-00000000b001', 'operator', '<>', NULL, NULL, NULL, 'boolean', 'compilation_status <> rejected', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('b2000000-0000-0000-0000-00000000b002', 'attribute_ref', NULL, NULL, 'f395029e-9155-426d-873e-6e1fd282f260', NULL, 'enum', 'Requirement.compilation_status', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('b3000000-0000-0000-0000-00000000b003', 'literal', NULL, 'rejected', NULL, NULL, 'enum', '''rejected''', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('c1000000-0000-0000-0000-00000000c001', 'operator', '<>', NULL, NULL, NULL, 'boolean', 'status <> draft', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('c2000000-0000-0000-0000-00000000c002', 'attribute_ref', NULL, NULL, '80050047-9fd3-4470-83b8-288f69806859', NULL, 'enum', 'ImplementationPlan.status', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('c3000000-0000-0000-0000-00000000c003', 'literal', NULL, 'draft', NULL, NULL, 'enum', '''draft''', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('d1000000-0000-0000-0000-00000000d001', 'operator', '<>', NULL, NULL, NULL, 'boolean', 'business_status <> CANCELLED', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('d2000000-0000-0000-0000-00000000d002', 'attribute_ref', NULL, NULL, '70f62acf-ced2-41fa-bf6c-e54549ad1c9b', NULL, 'enum', 'WorkRequest.business_status', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('d3000000-0000-0000-0000-00000000d003', 'literal', NULL, 'CANCELLED', NULL, NULL, 'enum', '''CANCELLED''', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('01000000-0000-0000-0000-000000000001', 'proposition_ref', NULL, NULL, NULL, NULL, 'text', 'disposition of "WorkRequest wr-mongo-wiring is healthy"', NULL, NULL, 'f1000000-0000-0000-0000-00000000f001');
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('02000000-0000-0000-0000-000000000002', 'literal', NULL, 'Asserted', NULL, NULL, 'text', '''Asserted''', NULL, NULL, NULL);
+INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier, referenced_proposition_id) VALUES ('03000000-0000-0000-0000-000000000003', 'operator', '=', NULL, NULL, NULL, 'boolean', 'proposition f1 disposition = Asserted', NULL, NULL, NULL);
+
+
+ALTER TABLE resolution.expression ENABLE TRIGGER ALL;
+
+--
+-- Data for Name: owning_subsystem; Type: TABLE DATA; Schema: resolution; Owner: -
+--
+
+ALTER TABLE resolution.owning_subsystem DISABLE TRIGGER ALL;
+
+INSERT INTO resolution.owning_subsystem (id, name, description) VALUES (1, 'nexus', NULL);
+INSERT INTO resolution.owning_subsystem (id, name, description) VALUES (2, 'nebula', NULL);
+INSERT INTO resolution.owning_subsystem (id, name, description) VALUES (3, 'tackle', NULL);
+INSERT INTO resolution.owning_subsystem (id, name, description) VALUES (4, 'wind', NULL);
+INSERT INTO resolution.owning_subsystem (id, name, description) VALUES (5, 'conduit', NULL);
+INSERT INTO resolution.owning_subsystem (id, name, description) VALUES (6, 'cascade', NULL);
+
+
+ALTER TABLE resolution.owning_subsystem ENABLE TRIGGER ALL;
+
+--
+-- Data for Name: representation; Type: TABLE DATA; Schema: resolution; Owner: -
+--
+
+ALTER TABLE resolution.representation DISABLE TRIGGER ALL;
+
+INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('a904bddb-49c7-467b-bd82-e2aad4ef4a02', '3c27e87d-cd91-41c9-a21e-c982d94c65c5', 'canonical_asset table', 'resolution', 'canonical_asset', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
+INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('d0242eb7-11a9-43a9-9d2a-6f7ef921a25e', 'eb71fe83-b476-4197-af4e-eb76720ea5d7', 'harvest table', 'resolution', 'harvest', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
+INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('73370e46-9ced-4830-905a-ed785d2e6e45', 'dda27bb4-a994-4c56-8693-34bee69738c4', 'candidate table', 'resolution', 'candidate', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
+INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('512853a3-b74b-4eda-8267-1960e9b8b7b1', '094b785c-82b4-44fc-b262-7e60bc85db6f', 'requirement table', 'resolution', 'requirement', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
+INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('3f28a82e-2453-49a9-8214-030205d92796', '5f2f4dea-9715-4104-b2d3-100abe72685e', 'specification table', 'resolution', 'specification', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
+INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('6c4cf312-16b7-4a57-82ca-123924ecab0b', 'efba776b-d731-4018-8610-a3e1af0bc3d3', 'implementation_plan table', 'resolution', 'implementation_plan', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
+INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('592c5fcf-d8e7-4f7f-bb92-31f415fb7cc3', 'd22cd236-6353-445e-9b48-bbb8880493df', 'work_request table', 'resolution', 'work_request', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
+INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('f6cd02ea-30ec-473d-9ab5-ca7f48b4c00a', '8be34f47-00d0-4bd7-8a5b-375a8f785882', 'observation table', 'resolution', 'observation', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
+INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('6efc2cee-6e9d-4728-9b56-b0dd885b439b', 'fc9b393a-5269-47d8-95cb-61f1cef05d3e', 'assessment table', 'resolution', 'assessment', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
+INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('538296cc-511e-47d8-9848-2d97d9b8ea73', 'e95175e0-1f71-4858-9a82-0ea283baaa65', 'open_question table', 'resolution', 'open_question', 2, NULL, NULL, '2026-08-13 02:45:20.56115+00', NULL);
+INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('6341ceaa-e991-4d74-aa2e-75e73f3b9406', '513796b2-3c19-4559-8ab3-d749033d0464', 'open_question_answer table', 'resolution', 'open_question_answer', 2, NULL, NULL, '2026-08-13 02:45:20.56115+00', NULL);
+INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('e35e1bc1-f53c-4d4c-a794-8639464b4b01', 'be93554f-f720-4b6b-b011-7540d9b96e59', 'verified_statement table', 'resolution', 'verified_statement', 2, NULL, NULL, '2026-08-13 20:02:35.673802+00', NULL);
+INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('a1000000-0000-0000-0000-000000000001', 'dda27bb4-a994-4c56-8693-34bee69738c4', 'harvest.candidates jsonb (embedded array, dropped)', 'nebula', 'harvests_history', 2, NULL, '{"column": "candidates", "status": "dropped in resolution schema"}', '2026-08-14 11:10:53.473277+00', NULL);
+INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('a2000000-0000-0000-0000-000000000002', 'efba776b-d731-4018-8610-a3e1af0bc3d3', 'WRP DAG node', 'conduit', 'wrp_dag_nodes', 5, NULL, '{"note": "external to resolution schema -- documented here for topology completeness, not physically joinable yet"}', '2026-08-14 11:10:53.476247+00', NULL);
+INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('7726b5cd-86c4-407b-988e-8168faee7a93', 'b6872d58-0f7a-41ce-bdf4-e8902957d647', 'work_request_edge table', 'resolution', 'work_request_edge', 2, NULL, NULL, '2026-08-15 17:28:48.394314+00', NULL);
+
+
+ALTER TABLE resolution.representation ENABLE TRIGGER ALL;
+
+--
+-- Data for Name: rule; Type: TABLE DATA; Schema: resolution; Owner: -
+--
+
+ALTER TABLE resolution.rule DISABLE TRIGGER ALL;
+
+INSERT INTO resolution.rule (id, name, rule_type, expression_id, severity, concept_id, concept_relationship_id, representation_id, notes, created_at, expired_at, state_transition_id) VALUES ('4cd4ea8e-c9a1-4c32-83e5-e09836ec83b7', 'open_question_resolve_requires_verified_statement', 'guard', 'e1000000-0000-0000-0000-000000000001', 'hard', NULL, NULL, NULL, 'EXISTS (SELECT 1 FROM open_question_answer a JOIN verified_statement vs ON vs.answer_id = a.id WHERE a.question_id = <this open_question''s id>)', '2026-08-13 03:05:05.390305+00', NULL, '91e0e1ed-fa6a-4837-9142-c2f807fdbb94');
+INSERT INTO resolution.rule (id, name, rule_type, expression_id, severity, concept_id, concept_relationship_id, representation_id, notes, created_at, expired_at, state_transition_id) VALUES ('8a382752-f902-4099-8fe2-ac9ef669b9ef', 'requirement_rollup_validity', 'invariant', 'f0000000-0000-0000-0000-000000000001', 'hard', '094b785c-82b4-44fc-b262-7e60bc85db6f', NULL, NULL, 'A parent requirement cannot be compilation_status=compiled while any child requirement (requirement.parent_id = this.id) is not compiled.', '2026-08-12 04:36:32.380304+00', NULL, NULL);
+INSERT INTO resolution.rule (id, name, rule_type, expression_id, severity, concept_id, concept_relationship_id, representation_id, notes, created_at, expired_at, state_transition_id) VALUES ('126a6421-8fc8-4154-a38b-beff552b33b4', 'work_request_dependencies_satisfied', 'guard', 'a1000000-0000-0000-0000-00000000a001', 'hard', NULL, NULL, NULL, 'A WorkRequest cannot move APPROVED -> DISPATCHED unless every dependency edge points at a COMPLETED prerequisite.', '2026-08-15 17:29:12.112854+00', NULL, 'f9389719-c826-4ee2-9ad2-aca56bb9076d');
+INSERT INTO resolution.rule (id, name, rule_type, expression_id, severity, concept_id, concept_relationship_id, representation_id, notes, created_at, expired_at, state_transition_id) VALUES ('9cb7da1d-1785-4a19-b295-d5f60e890fdf', 'requirement_member_of_specification_not_rejected', 'conditional', 'b1000000-0000-0000-0000-00000000b001', 'hard', NULL, '99613184-ee71-4a92-a54f-ea235e3f4581', NULL, 'A rejected requirement cannot become a member of a specification.', '2026-08-16 04:03:06.587685+00', NULL, NULL);
+INSERT INTO resolution.rule (id, name, rule_type, expression_id, severity, concept_id, concept_relationship_id, representation_id, notes, created_at, expired_at, state_transition_id) VALUES ('76ad3fa0-14f0-4580-8c88-b3f107fba53d', 'implementation_plan_representation_not_draft', 'conditional', 'c1000000-0000-0000-0000-00000000c001', 'hard', NULL, NULL, '6c4cf312-16b7-4a57-82ca-123924ecab0b', 'A plan still in draft has no business being treated as a real implementation_plan representation.', '2026-08-16 04:03:33.5002+00', NULL, NULL);
+INSERT INTO resolution.rule (id, name, rule_type, expression_id, severity, concept_id, concept_relationship_id, representation_id, notes, created_at, expired_at, state_transition_id) VALUES ('e0000000-0000-0000-0000-00000000e000', 'work_request_not_cancelled', 'invariant', 'd1000000-0000-0000-0000-00000000d001', 'hard', 'd22cd236-6353-445e-9b48-bbb8880493df', NULL, NULL, 'A healthy WorkRequest must not be cancelled.', '2026-08-17 20:08:52.77975+00', NULL, NULL);
+
+
+ALTER TABLE resolution.rule ENABLE TRIGGER ALL;
+
+--
+-- Data for Name: assertion_evaluation; Type: TABLE DATA; Schema: resolution; Owner: -
+--
+
+ALTER TABLE resolution.assertion_evaluation DISABLE TRIGGER ALL;
+
+INSERT INTO resolution.assertion_evaluation (id, proposition_id, rule_id, result, compiled_sql, evaluated_at) VALUES ('9c2f07e6-2c2a-4f02-87bc-714dd0da606c', 'f1000000-0000-0000-0000-00000000f001', '126a6421-8fc8-4154-a38b-beff552b33b4', true, 'NOT EXISTS (SELECT 1 FROM resolution.work_request_edge t_a100000000000000000000000000a001 WHERE t_a100000000000000000000000000a001.child_work_request_id = ''90000000-0000-0000-0000-000000000002'' AND NOT (EXISTS (SELECT 1 FROM resolution.work_request t_a200000000000000000000000000a002 WHERE t_a200000000000000000000000000a002.id = t_a100000000000000000000000000a001.parent_work_request_id AND ((t_a200000000000000000000000000a002.business_status = ''COMPLETED'')))))', '2026-08-17 20:09:00.344502+00');
+INSERT INTO resolution.assertion_evaluation (id, proposition_id, rule_id, result, compiled_sql, evaluated_at) VALUES ('549f5e34-1c4d-414f-99a3-a6be5b0046c9', 'f1000000-0000-0000-0000-00000000f001', 'e0000000-0000-0000-0000-00000000e000', true, '((SELECT business_status FROM resolution.work_request WHERE id = ''90000000-0000-0000-0000-000000000002'') <> ''CANCELLED'')', '2026-08-17 20:09:00.344502+00');
+INSERT INTO resolution.assertion_evaluation (id, proposition_id, rule_id, result, compiled_sql, evaluated_at) VALUES ('053cc3d3-0915-4bfb-b2ab-3ab0fca729a6', 'f1000000-0000-0000-0000-00000000f001', '126a6421-8fc8-4154-a38b-beff552b33b4', true, 'NOT EXISTS (SELECT 1 FROM resolution.work_request_edge t_a100000000000000000000000000a001 WHERE t_a100000000000000000000000000a001.child_work_request_id = ''90000000-0000-0000-0000-000000000002'' AND NOT (EXISTS (SELECT 1 FROM resolution.work_request t_a200000000000000000000000000a002 WHERE t_a200000000000000000000000000a002.id = t_a100000000000000000000000000a001.parent_work_request_id AND ((t_a200000000000000000000000000a002.business_status = ''COMPLETED'')))))', '2026-08-17 20:09:00.369814+00');
+INSERT INTO resolution.assertion_evaluation (id, proposition_id, rule_id, result, compiled_sql, evaluated_at) VALUES ('f8b2de00-d719-40ff-ae56-f2d3ce881578', 'f1000000-0000-0000-0000-00000000f001', 'e0000000-0000-0000-0000-00000000e000', false, '((SELECT business_status FROM resolution.work_request WHERE id = ''90000000-0000-0000-0000-000000000002'') <> ''CANCELLED'')', '2026-08-17 20:09:00.369814+00');
+INSERT INTO resolution.assertion_evaluation (id, proposition_id, rule_id, result, compiled_sql, evaluated_at) VALUES ('0321bc1d-1a45-461a-8762-57bbd117a5ab', 'f1000000-0000-0000-0000-00000000f001', '126a6421-8fc8-4154-a38b-beff552b33b4', true, 'NOT EXISTS (SELECT 1 FROM resolution.work_request_edge t_a100000000000000000000000000a001 WHERE t_a100000000000000000000000000a001.child_work_request_id = ''90000000-0000-0000-0000-000000000002'' AND NOT (EXISTS (SELECT 1 FROM resolution.work_request t_a200000000000000000000000000a002 WHERE t_a200000000000000000000000000a002.id = t_a100000000000000000000000000a001.parent_work_request_id AND ((t_a200000000000000000000000000a002.business_status = ''COMPLETED'')))))', '2026-08-17 20:09:14.297372+00');
+INSERT INTO resolution.assertion_evaluation (id, proposition_id, rule_id, result, compiled_sql, evaluated_at) VALUES ('441937c9-fa1d-4e2b-9d73-22f72f06be99', 'f1000000-0000-0000-0000-00000000f001', 'e0000000-0000-0000-0000-00000000e000', true, '((SELECT business_status FROM resolution.work_request WHERE id = ''90000000-0000-0000-0000-000000000002'') <> ''CANCELLED'')', '2026-08-17 20:09:14.297372+00');
+INSERT INTO resolution.assertion_evaluation (id, proposition_id, rule_id, result, compiled_sql, evaluated_at) VALUES ('5fe94585-7343-4e1f-9d24-0def196c6b88', 'f1000000-0000-0000-0000-00000000f001', '126a6421-8fc8-4154-a38b-beff552b33b4', true, 'NOT EXISTS (SELECT 1 FROM resolution.work_request_edge t_a100000000000000000000000000a001 WHERE t_a100000000000000000000000000a001.child_work_request_id = ''90000000-0000-0000-0000-000000000002'' AND NOT (EXISTS (SELECT 1 FROM resolution.work_request t_a200000000000000000000000000a002 WHERE t_a200000000000000000000000000a002.id = t_a100000000000000000000000000a001.parent_work_request_id AND ((t_a200000000000000000000000000a002.business_status = ''COMPLETED'')))))', '2026-08-17 20:09:58.441328+00');
+INSERT INTO resolution.assertion_evaluation (id, proposition_id, rule_id, result, compiled_sql, evaluated_at) VALUES ('c2dbccbd-3cda-4d8f-a0fa-939a1dc55ccd', 'f1000000-0000-0000-0000-00000000f001', 'e0000000-0000-0000-0000-00000000e000', false, '((SELECT business_status FROM resolution.work_request WHERE id = ''90000000-0000-0000-0000-000000000002'') <> ''CANCELLED'')', '2026-08-17 20:09:58.441328+00');
+INSERT INTO resolution.assertion_evaluation (id, proposition_id, rule_id, result, compiled_sql, evaluated_at) VALUES ('06fe5beb-7dcc-4794-afda-71bccbecec36', 'f1000000-0000-0000-0000-00000000f001', '126a6421-8fc8-4154-a38b-beff552b33b4', true, 'NOT EXISTS (SELECT 1 FROM resolution.work_request_edge t_a100000000000000000000000000a001 WHERE t_a100000000000000000000000000a001.child_work_request_id = ''90000000-0000-0000-0000-000000000002'' AND NOT (EXISTS (SELECT 1 FROM resolution.work_request t_a200000000000000000000000000a002 WHERE t_a200000000000000000000000000a002.id = t_a100000000000000000000000000a001.parent_work_request_id AND ((t_a200000000000000000000000000a002.business_status = ''COMPLETED'')))))', '2026-08-17 20:10:09.04772+00');
+INSERT INTO resolution.assertion_evaluation (id, proposition_id, rule_id, result, compiled_sql, evaluated_at) VALUES ('38ff5144-b35c-45a8-8190-28131efeed92', 'f1000000-0000-0000-0000-00000000f001', 'e0000000-0000-0000-0000-00000000e000', true, '((SELECT business_status FROM resolution.work_request WHERE id = ''90000000-0000-0000-0000-000000000002'') <> ''CANCELLED'')', '2026-08-17 20:10:09.04772+00');
+
+
+ALTER TABLE resolution.assertion_evaluation ENABLE TRIGGER ALL;
 
 --
 -- Data for Name: observation; Type: TABLE DATA; Schema: resolution; Owner: -
@@ -132,24 +405,6 @@ INSERT INTO resolution.candidate_source_chunk (candidate_id, chunk_id, "position
 ALTER TABLE resolution.candidate_source_chunk ENABLE TRIGGER ALL;
 
 --
--- Data for Name: concept_attribute; Type: TABLE DATA; Schema: resolution; Owner: -
---
-
-ALTER TABLE resolution.concept_attribute DISABLE TRIGGER ALL;
-
-INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'e95175e0-1f71-4858-9a82-0ea283baaa65', 'category', NULL, 'enum', false);
-INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('a23a2ee8-94cf-44e7-a557-a40e19514c99', 'e95175e0-1f71-4858-9a82-0ea283baaa65', 'status', NULL, 'enum', true);
-INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('5b88bbed-e14d-464c-bb7f-f3ec718b4948', '513796b2-3c19-4559-8ab3-d749033d0464', 'confidence', NULL, 'enum', false);
-INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('ba5ef765-dfb6-49dc-b061-ce7382d16fec', '513796b2-3c19-4559-8ab3-d749033d0464', 'role', NULL, 'text', false);
-INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('f395029e-9155-426d-873e-6e1fd282f260', '094b785c-82b4-44fc-b262-7e60bc85db6f', 'compilation_status', NULL, 'enum', true);
-INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('b4056429-6419-4c7b-a98b-c1382648085d', 'b6872d58-0f7a-41ce-bdf4-e8902957d647', 'edge_type', NULL, 'enum', false);
-INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('70f62acf-ced2-41fa-bf6c-e54549ad1c9b', 'd22cd236-6353-445e-9b48-bbb8880493df', 'business_status', NULL, 'enum', true);
-INSERT INTO resolution.concept_attribute (id, concept_id, name, description, value_type, is_state_attribute) VALUES ('80050047-9fd3-4470-83b8-288f69806859', 'efba776b-d731-4018-8610-a3e1af0bc3d3', 'status', NULL, 'enum', false);
-
-
-ALTER TABLE resolution.concept_attribute ENABLE TRIGGER ALL;
-
---
 -- Data for Name: concept_attribute_binding; Type: TABLE DATA; Schema: resolution; Owner: -
 --
 
@@ -160,74 +415,10 @@ INSERT INTO resolution.concept_attribute_binding (attribute_id, schema_name, tab
 INSERT INTO resolution.concept_attribute_binding (attribute_id, schema_name, table_name, column_name) VALUES ('f395029e-9155-426d-873e-6e1fd282f260', 'resolution', 'requirement', 'compilation_status');
 INSERT INTO resolution.concept_attribute_binding (attribute_id, schema_name, table_name, column_name) VALUES ('70f62acf-ced2-41fa-bf6c-e54549ad1c9b', 'resolution', 'work_request', 'business_status');
 INSERT INTO resolution.concept_attribute_binding (attribute_id, schema_name, table_name, column_name) VALUES ('80050047-9fd3-4470-83b8-288f69806859', 'resolution', 'implementation_plan', 'status');
+INSERT INTO resolution.concept_attribute_binding (attribute_id, schema_name, table_name, column_name) VALUES ('02046989-5617-4faa-9d90-7bee609d0d35', 'resolution', 'proposition', 'disposition_value_id');
 
 
 ALTER TABLE resolution.concept_attribute_binding ENABLE TRIGGER ALL;
-
---
--- Data for Name: concept_attribute_value; Type: TABLE DATA; Schema: resolution; Owner: -
---
-
-ALTER TABLE resolution.concept_attribute_value DISABLE TRIGGER ALL;
-
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('a912a22f-1bc6-40d5-80fd-5ab60251867c', '8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'AMBIGUITY', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('77e25c7b-7be8-4bef-84ab-d068ef45ff5f', '8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'MISSING_INFO', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('aebc6790-8dfa-4691-b6f2-1afc9b31c1f3', '8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'CONFLICT', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('217a3212-f9f5-44bc-bfe4-7fdd5be26378', '8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'SCOPE', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('bdc60b92-d837-4f28-afef-d8d2cba6810e', '8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'DEPENDENCY', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('9df6a193-87bc-488f-8bad-0a4e4a8edb68', '8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'DUPLICATE_CANDIDATE', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('41757b62-4a68-4bf3-8160-a0b68716b6a2', '8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'WORK_COMPLETED', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('fd715903-800c-4761-8f8e-3bc8614c0820', '8ff3de10-ff3b-48d8-914f-ea3e8c133dfa', 'NEEDS_SPEC', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('8b502a97-81b8-4dcf-83a7-e8ca66c86cc7', 'a23a2ee8-94cf-44e7-a557-a40e19514c99', 'OPEN', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('57cb4961-3ba3-4181-a059-2fdde629caaa', 'a23a2ee8-94cf-44e7-a557-a40e19514c99', 'IN_DELIBERATION', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('f0dbd831-ede3-4b3e-bc2b-2e2630b3b288', 'a23a2ee8-94cf-44e7-a557-a40e19514c99', 'RESOLVED', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('f9ab428f-3daf-4bae-9831-380d94907950', 'a23a2ee8-94cf-44e7-a557-a40e19514c99', 'WONT_FIX', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('b8e4c0e4-9b61-4cdf-8e97-d667e07d5f24', 'a23a2ee8-94cf-44e7-a557-a40e19514c99', 'DEFERRED', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('2f5ffe88-511f-4607-b482-029090bcfab1', '5b88bbed-e14d-464c-bb7f-f3ec718b4948', 'LOW', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('a2ef5a02-d6b9-4d83-81af-5b57a830d886', '5b88bbed-e14d-464c-bb7f-f3ec718b4948', 'MEDIUM', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('86046646-08e1-494a-96d8-b8d039f1f72b', '5b88bbed-e14d-464c-bb7f-f3ec718b4948', 'HIGH', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('9ef399e5-81b6-4328-b2ca-c14df840044a', 'f395029e-9155-426d-873e-6e1fd282f260', 'draft', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('46d5324b-5159-469e-b295-d2f98d75f4ef', 'f395029e-9155-426d-873e-6e1fd282f260', 'compiled', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('26f26a58-8391-48f3-8176-b3b873f36a59', 'f395029e-9155-426d-873e-6e1fd282f260', 'rejected', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('70fb20df-30e3-4c07-9eaf-7bfc132945fe', 'b4056429-6419-4c7b-a98b-c1382648085d', 'depends_on', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('a435675e-cfd7-4507-b717-23575efd5fb3', '70f62acf-ced2-41fa-bf6c-e54549ad1c9b', 'DRAFT', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('6512396a-5e71-4dc1-8516-f8489ecd8937', '70f62acf-ced2-41fa-bf6c-e54549ad1c9b', 'APPROVED', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('a6da4dd9-c92b-4a19-a650-980567a7cb83', '70f62acf-ced2-41fa-bf6c-e54549ad1c9b', 'DISPATCHED', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('09b20fc4-aa51-465c-ad3f-2319c3f7e381', '70f62acf-ced2-41fa-bf6c-e54549ad1c9b', 'COMPLETED', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('0cf9cf66-b0d4-47dd-a93c-264cb845f6e7', '70f62acf-ced2-41fa-bf6c-e54549ad1c9b', 'CANCELLED', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('b75cc10d-32c9-403a-8b64-cd1ca746ad0b', '80050047-9fd3-4470-83b8-288f69806859', 'draft', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('7ecd1481-57b8-4798-ad77-8feec550006d', '80050047-9fd3-4470-83b8-288f69806859', 'pending', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('1aae4891-7f0d-4b2c-a3e2-c2b280146f7c', '80050047-9fd3-4470-83b8-288f69806859', 'approved', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('d7485609-2c4a-4e99-b913-e10c03e052d0', '80050047-9fd3-4470-83b8-288f69806859', 'work_requested', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('f164fe8d-f4c5-42d4-99d3-75bf5df0e688', '80050047-9fd3-4470-83b8-288f69806859', 'completed', NULL);
-INSERT INTO resolution.concept_attribute_value (id, attribute_id, value, description) VALUES ('b04e06fa-d0df-4376-9071-625effec4181', '80050047-9fd3-4470-83b8-288f69806859', 'archived', NULL);
-
-
-ALTER TABLE resolution.concept_attribute_value ENABLE TRIGGER ALL;
-
---
--- Data for Name: concept_relationship; Type: TABLE DATA; Schema: resolution; Owner: -
---
-
-ALTER TABLE resolution.concept_relationship DISABLE TRIGGER ALL;
-
-INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('8b8d93a6-47c4-49a4-b070-cd5d7b0a04c2', 'eb71fe83-b476-4197-af4e-eb76720ea5d7', 'dda27bb4-a994-4c56-8693-34bee69738c4', 'produces', NULL, NULL, '2026-08-12 04:36:32.377019+00', NULL);
-INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('fd4f8f53-8b6b-45ab-b7b6-1bcefe6053da', 'dda27bb4-a994-4c56-8693-34bee69738c4', '094b785c-82b4-44fc-b262-7e60bc85db6f', 'produces', NULL, NULL, '2026-08-12 04:36:32.377019+00', NULL);
-INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('b589bd8d-9a75-4355-81c7-19eeef4c875c', '094b785c-82b4-44fc-b262-7e60bc85db6f', '094b785c-82b4-44fc-b262-7e60bc85db6f', 'spawns', NULL, NULL, '2026-08-12 04:36:32.377019+00', NULL);
-INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('99613184-ee71-4a92-a54f-ea235e3f4581', '094b785c-82b4-44fc-b262-7e60bc85db6f', '5f2f4dea-9715-4104-b2d3-100abe72685e', 'member_of', 'green', NULL, '2026-08-12 04:36:32.377019+00', NULL);
-INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('c401da6f-85a7-4aa5-9e4e-ac880757ceb2', '5f2f4dea-9715-4104-b2d3-100abe72685e', 'efba776b-d731-4018-8610-a3e1af0bc3d3', 'transforms_into', 'green', NULL, '2026-08-12 04:36:32.377019+00', NULL);
-INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('d0588304-134f-4249-ba90-565edbe4de01', '094b785c-82b4-44fc-b262-7e60bc85db6f', 'efba776b-d731-4018-8610-a3e1af0bc3d3', 'transforms_into', 'green', NULL, '2026-08-12 04:36:32.377019+00', NULL);
-INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('cb4bbe3f-f347-466a-a2f0-3e843cf348a2', 'efba776b-d731-4018-8610-a3e1af0bc3d3', 'd22cd236-6353-445e-9b48-bbb8880493df', 'transforms_into', 'green', NULL, '2026-08-12 04:36:32.377019+00', NULL);
-INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('48679a01-7dab-497c-8edd-f01d363ff1f3', 'd22cd236-6353-445e-9b48-bbb8880493df', 'd22cd236-6353-445e-9b48-bbb8880493df', 'provenance_of', 'red', NULL, '2026-08-12 04:36:32.377019+00', NULL);
-INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('d3bd232c-f3c1-4176-bd50-ef4fdfbc77d7', '8be34f47-00d0-4bd7-8a5b-375a8f785882', 'fc9b393a-5269-47d8-95cb-61f1cef05d3e', 'basis_of', NULL, NULL, '2026-08-12 04:36:32.377019+00', NULL);
-INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('a6c49168-f1a1-464b-b5d6-eca955e5112f', 'fc9b393a-5269-47d8-95cb-61f1cef05d3e', 'e95175e0-1f71-4858-9a82-0ea283baaa65', 'basis_of', NULL, NULL, '2026-08-13 02:45:20.562291+00', NULL);
-INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('88893e8b-3f40-4a72-b6cf-47cbadfed531', 'e95175e0-1f71-4858-9a82-0ea283baaa65', '513796b2-3c19-4559-8ab3-d749033d0464', 'produces', NULL, NULL, '2026-08-13 02:45:20.562291+00', NULL);
-INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('fe03134e-7b46-4e59-a30b-94ce108d7525', '513796b2-3c19-4559-8ab3-d749033d0464', 'be93554f-f720-4b6b-b011-7540d9b96e59', 'produces', NULL, NULL, '2026-08-13 20:02:35.681746+00', NULL);
-INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('3bacfbc6-2272-4818-96eb-791c16b830cd', 'd22cd236-6353-445e-9b48-bbb8880493df', 'b6872d58-0f7a-41ce-bdf4-e8902957d647', 'has_dependency', NULL, NULL, '2026-08-15 17:28:48.405854+00', NULL);
-INSERT INTO resolution.concept_relationship (id, from_concept_id, to_concept_id, relationship_type, path, notes, created_at, expired_at) VALUES ('646db3bd-e91f-4a33-8e11-80ba9ce4d34b', 'b6872d58-0f7a-41ce-bdf4-e8902957d647', 'd22cd236-6353-445e-9b48-bbb8880493df', 'depends_on', NULL, NULL, '2026-08-15 17:28:48.405854+00', NULL);
-
-
-ALTER TABLE resolution.concept_relationship ENABLE TRIGGER ALL;
 
 --
 -- Data for Name: concept_relationship_binding; Type: TABLE DATA; Schema: resolution; Owner: -
@@ -245,72 +436,6 @@ INSERT INTO resolution.concept_relationship_binding (concept_relationship_id, fr
 ALTER TABLE resolution.concept_relationship_binding ENABLE TRIGGER ALL;
 
 --
--- Data for Name: concept_state_transition; Type: TABLE DATA; Schema: resolution; Owner: -
---
-
-ALTER TABLE resolution.concept_state_transition DISABLE TRIGGER ALL;
-
-INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('efa6bf84-a52b-4f79-8784-e49a6dd82a14', 'e95175e0-1f71-4858-9a82-0ea283baaa65', '8b502a97-81b8-4dcf-83a7-e8ca66c86cc7', '57cb4961-3ba3-4181-a059-2fdde629caaa', 'OPEN_to_IN_DELIBERATION', NULL, '2026-08-13 02:45:20.544889+00', NULL);
-INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('7b4a9766-f69b-4d96-9306-48392a67d14b', 'e95175e0-1f71-4858-9a82-0ea283baaa65', '8b502a97-81b8-4dcf-83a7-e8ca66c86cc7', 'f9ab428f-3daf-4bae-9831-380d94907950', 'OPEN_to_WONT_FIX', NULL, '2026-08-13 02:45:20.544889+00', NULL);
-INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('fef7c2a1-81a1-46bf-934b-721236d66a17', 'e95175e0-1f71-4858-9a82-0ea283baaa65', '57cb4961-3ba3-4181-a059-2fdde629caaa', 'b8e4c0e4-9b61-4cdf-8e97-d667e07d5f24', 'IN_DELIBERATION_to_DEFERRED', NULL, '2026-08-13 02:45:20.544889+00', NULL);
-INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('91e0e1ed-fa6a-4837-9142-c2f807fdbb94', 'e95175e0-1f71-4858-9a82-0ea283baaa65', '57cb4961-3ba3-4181-a059-2fdde629caaa', 'f0dbd831-ede3-4b3e-bc2b-2e2630b3b288', 'IN_DELIBERATION_to_RESOLVED', NULL, '2026-08-13 02:45:20.544889+00', NULL);
-INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('4201c811-f0a5-4d99-b626-835c5fcf097e', 'e95175e0-1f71-4858-9a82-0ea283baaa65', '57cb4961-3ba3-4181-a059-2fdde629caaa', 'f9ab428f-3daf-4bae-9831-380d94907950', 'IN_DELIBERATION_to_WONT_FIX', NULL, '2026-08-13 02:45:20.544889+00', NULL);
-INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('50cd4780-bb4d-4669-8bb1-e68c60f570ad', 'e95175e0-1f71-4858-9a82-0ea283baaa65', 'b8e4c0e4-9b61-4cdf-8e97-d667e07d5f24', '57cb4961-3ba3-4181-a059-2fdde629caaa', 'DEFERRED_to_IN_DELIBERATION', NULL, '2026-08-13 02:45:20.544889+00', NULL);
-INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('f8e56af6-f0bf-4d8d-9f5a-40b613850828', 'd22cd236-6353-445e-9b48-bbb8880493df', 'a435675e-cfd7-4507-b717-23575efd5fb3', '6512396a-5e71-4dc1-8516-f8489ecd8937', 'DRAFT_to_APPROVED', NULL, '2026-08-15 17:28:48.620498+00', NULL);
-INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('2642ab9b-c7b1-40ad-ba6f-49b5aae118a8', 'd22cd236-6353-445e-9b48-bbb8880493df', 'a435675e-cfd7-4507-b717-23575efd5fb3', '0cf9cf66-b0d4-47dd-a93c-264cb845f6e7', 'DRAFT_to_CANCELLED', NULL, '2026-08-15 17:28:48.620498+00', NULL);
-INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('db7cb890-679c-43be-a614-fe68fbbf3dc6', 'd22cd236-6353-445e-9b48-bbb8880493df', '6512396a-5e71-4dc1-8516-f8489ecd8937', '0cf9cf66-b0d4-47dd-a93c-264cb845f6e7', 'APPROVED_to_CANCELLED', NULL, '2026-08-15 17:28:48.620498+00', NULL);
-INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('f9389719-c826-4ee2-9ad2-aca56bb9076d', 'd22cd236-6353-445e-9b48-bbb8880493df', '6512396a-5e71-4dc1-8516-f8489ecd8937', 'a6da4dd9-c92b-4a19-a650-980567a7cb83', 'APPROVED_to_DISPATCHED', NULL, '2026-08-15 17:28:48.620498+00', NULL);
-INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('c1e709b7-60e3-44a3-abee-cb842879d0b7', 'd22cd236-6353-445e-9b48-bbb8880493df', 'a6da4dd9-c92b-4a19-a650-980567a7cb83', '0cf9cf66-b0d4-47dd-a93c-264cb845f6e7', 'DISPATCHED_to_CANCELLED', NULL, '2026-08-15 17:28:48.620498+00', NULL);
-INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('a0ea051a-462c-441a-8ef7-bb8fec144764', 'd22cd236-6353-445e-9b48-bbb8880493df', 'a6da4dd9-c92b-4a19-a650-980567a7cb83', '09b20fc4-aa51-465c-ad3f-2319c3f7e381', 'DISPATCHED_to_COMPLETED', NULL, '2026-08-15 17:28:48.620498+00', NULL);
-INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('c3859362-8d25-495e-8360-b3d69239385d', '094b785c-82b4-44fc-b262-7e60bc85db6f', '9ef399e5-81b6-4328-b2ca-c14df840044a', '46d5324b-5159-469e-b295-d2f98d75f4ef', 'draft_to_compiled', NULL, '2026-08-15 23:14:07.274702+00', NULL);
-INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('ad53dded-31f0-4414-aad8-4229ac37b589', '094b785c-82b4-44fc-b262-7e60bc85db6f', '9ef399e5-81b6-4328-b2ca-c14df840044a', '26f26a58-8391-48f3-8176-b3b873f36a59', 'draft_to_rejected', NULL, '2026-08-15 23:14:07.274702+00', NULL);
-INSERT INTO resolution.concept_state_transition (id, concept_id, from_value_id, to_value_id, name, notes, created_at, expired_at) VALUES ('1c279167-f775-490c-b5d9-0642834b55bb', '094b785c-82b4-44fc-b262-7e60bc85db6f', '26f26a58-8391-48f3-8176-b3b873f36a59', '9ef399e5-81b6-4328-b2ca-c14df840044a', 'rejected_to_draft', NULL, '2026-08-15 23:14:07.274702+00', NULL);
-
-
-ALTER TABLE resolution.concept_state_transition ENABLE TRIGGER ALL;
-
---
--- Data for Name: owning_subsystem; Type: TABLE DATA; Schema: resolution; Owner: -
---
-
-ALTER TABLE resolution.owning_subsystem DISABLE TRIGGER ALL;
-
-INSERT INTO resolution.owning_subsystem (id, name, description) VALUES (1, 'nexus', NULL);
-INSERT INTO resolution.owning_subsystem (id, name, description) VALUES (2, 'nebula', NULL);
-INSERT INTO resolution.owning_subsystem (id, name, description) VALUES (3, 'tackle', NULL);
-INSERT INTO resolution.owning_subsystem (id, name, description) VALUES (4, 'wind', NULL);
-INSERT INTO resolution.owning_subsystem (id, name, description) VALUES (5, 'conduit', NULL);
-INSERT INTO resolution.owning_subsystem (id, name, description) VALUES (6, 'cascade', NULL);
-
-
-ALTER TABLE resolution.owning_subsystem ENABLE TRIGGER ALL;
-
---
--- Data for Name: representation; Type: TABLE DATA; Schema: resolution; Owner: -
---
-
-ALTER TABLE resolution.representation DISABLE TRIGGER ALL;
-
-INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('a904bddb-49c7-467b-bd82-e2aad4ef4a02', '3c27e87d-cd91-41c9-a21e-c982d94c65c5', 'canonical_asset table', 'resolution', 'canonical_asset', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
-INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('d0242eb7-11a9-43a9-9d2a-6f7ef921a25e', 'eb71fe83-b476-4197-af4e-eb76720ea5d7', 'harvest table', 'resolution', 'harvest', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
-INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('73370e46-9ced-4830-905a-ed785d2e6e45', 'dda27bb4-a994-4c56-8693-34bee69738c4', 'candidate table', 'resolution', 'candidate', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
-INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('512853a3-b74b-4eda-8267-1960e9b8b7b1', '094b785c-82b4-44fc-b262-7e60bc85db6f', 'requirement table', 'resolution', 'requirement', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
-INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('3f28a82e-2453-49a9-8214-030205d92796', '5f2f4dea-9715-4104-b2d3-100abe72685e', 'specification table', 'resolution', 'specification', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
-INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('6c4cf312-16b7-4a57-82ca-123924ecab0b', 'efba776b-d731-4018-8610-a3e1af0bc3d3', 'implementation_plan table', 'resolution', 'implementation_plan', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
-INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('592c5fcf-d8e7-4f7f-bb92-31f415fb7cc3', 'd22cd236-6353-445e-9b48-bbb8880493df', 'work_request table', 'resolution', 'work_request', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
-INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('f6cd02ea-30ec-473d-9ab5-ca7f48b4c00a', '8be34f47-00d0-4bd7-8a5b-375a8f785882', 'observation table', 'resolution', 'observation', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
-INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('6efc2cee-6e9d-4728-9b56-b0dd885b439b', 'fc9b393a-5269-47d8-95cb-61f1cef05d3e', 'assessment table', 'resolution', 'assessment', 2, NULL, NULL, '2026-08-12 04:36:32.372603+00', NULL);
-INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('538296cc-511e-47d8-9848-2d97d9b8ea73', 'e95175e0-1f71-4858-9a82-0ea283baaa65', 'open_question table', 'resolution', 'open_question', 2, NULL, NULL, '2026-08-13 02:45:20.56115+00', NULL);
-INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('6341ceaa-e991-4d74-aa2e-75e73f3b9406', '513796b2-3c19-4559-8ab3-d749033d0464', 'open_question_answer table', 'resolution', 'open_question_answer', 2, NULL, NULL, '2026-08-13 02:45:20.56115+00', NULL);
-INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('e35e1bc1-f53c-4d4c-a794-8639464b4b01', 'be93554f-f720-4b6b-b011-7540d9b96e59', 'verified_statement table', 'resolution', 'verified_statement', 2, NULL, NULL, '2026-08-13 20:02:35.673802+00', NULL);
-INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('a1000000-0000-0000-0000-000000000001', 'dda27bb4-a994-4c56-8693-34bee69738c4', 'harvest.candidates jsonb (embedded array, dropped)', 'nebula', 'harvests_history', 2, NULL, '{"column": "candidates", "status": "dropped in resolution schema"}', '2026-08-14 11:10:53.473277+00', NULL);
-INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('a2000000-0000-0000-0000-000000000002', 'efba776b-d731-4018-8610-a3e1af0bc3d3', 'WRP DAG node', 'conduit', 'wrp_dag_nodes', 5, NULL, '{"note": "external to resolution schema -- documented here for topology completeness, not physically joinable yet"}', '2026-08-14 11:10:53.476247+00', NULL);
-INSERT INTO resolution.representation (id, concept_id, label, schema_name, table_name, owning_subsystem_id, owner, raw_metadata, created_at, expired_at) VALUES ('7726b5cd-86c4-407b-988e-8168faee7a93', 'b6872d58-0f7a-41ce-bdf4-e8902957d647', 'work_request_edge table', 'resolution', 'work_request_edge', 2, NULL, NULL, '2026-08-15 17:28:48.394314+00', NULL);
-
-
-ALTER TABLE resolution.representation ENABLE TRIGGER ALL;
-
---
 -- Data for Name: consumer_operation; Type: TABLE DATA; Schema: resolution; Owner: -
 --
 
@@ -324,59 +449,6 @@ INSERT INTO resolution.consumer_operation (id, representation_id, consumer_name,
 
 
 ALTER TABLE resolution.consumer_operation ENABLE TRIGGER ALL;
-
---
--- Data for Name: expression; Type: TABLE DATA; Schema: resolution; Owner: -
---
-
-ALTER TABLE resolution.expression DISABLE TRIGGER ALL;
-
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('77777777-7777-7777-7777-777777777701', 'function_call', NULL, NULL, NULL, 'escalates_to', 'boolean', 'WorkRequest escalates_to Role(OnCall)', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('e1000000-0000-0000-0000-000000000001', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'exists related Answer', '88893e8b-3f40-4a72-b6cf-47cbadfed531', 'EXISTS');
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('e2000000-0000-0000-0000-000000000002', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'exists related VerifiedStatement', 'fe03134e-7b46-4e59-a30b-94ce108d7525', 'EXISTS');
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('e3000000-0000-0000-0000-000000000003', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'exists related Answer with confidence = HIGH', '88893e8b-3f40-4a72-b6cf-47cbadfed531', 'EXISTS');
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('e4000000-0000-0000-0000-000000000004', 'operator', '=', NULL, NULL, NULL, 'boolean', 'confidence = HIGH', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('e5000000-0000-0000-0000-000000000005', 'attribute_ref', NULL, NULL, '5b88bbed-e14d-464c-bb7f-f3ec718b4948', NULL, 'enum', 'Answer.confidence', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('e6000000-0000-0000-0000-000000000006', 'literal', NULL, 'HIGH', NULL, NULL, 'enum', '''HIGH''', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('e7000000-0000-0000-0000-000000000007', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'exists Answer: confidence=HIGH AND role=architect', '88893e8b-3f40-4a72-b6cf-47cbadfed531', 'EXISTS');
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('e8000000-0000-0000-0000-000000000008', 'operator', 'AND', NULL, NULL, NULL, 'boolean', 'confidence=HIGH AND role=architect', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('e0a00000-0000-0000-0000-00000000000a', 'operator', '=', NULL, NULL, NULL, 'boolean', 'role = architect', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('e0b00000-0000-0000-0000-00000000000b', 'attribute_ref', NULL, NULL, 'ba5ef765-dfb6-49dc-b061-ce7382d16fec', NULL, 'text', 'Answer.role', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('e0c00000-0000-0000-0000-00000000000c', 'literal', NULL, 'architect', NULL, NULL, 'text', '''architect''', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('e7100000-0000-0000-0000-000000000071', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'exists Answer: confidence=HIGH OR role=architect', '88893e8b-3f40-4a72-b6cf-47cbadfed531', 'EXISTS');
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('e8100000-0000-0000-0000-000000000081', 'operator', 'OR', NULL, NULL, NULL, 'boolean', 'confidence=HIGH OR role=architect', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('f0000000-0000-0000-0000-000000000001', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'all children have compilation_status = compiled', 'b589bd8d-9a75-4355-81c7-19eeef4c875c', 'ALL');
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('f0000000-0000-0000-0000-000000000002', 'operator', '=', NULL, NULL, NULL, 'boolean', 'compilation_status = compiled', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('f0000000-0000-0000-0000-000000000003', 'attribute_ref', NULL, NULL, 'f395029e-9155-426d-873e-6e1fd282f260', NULL, 'enum', 'Requirement.compilation_status', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('f0000000-0000-0000-0000-000000000004', 'literal', NULL, 'compiled', NULL, NULL, 'enum', '''compiled''', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('fa000000-0000-0000-0000-00000000000a', 'literal', NULL, 'sanity-check', NULL, NULL, 'text', 'sanity check leaf', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('c0000000-0000-0000-0000-000000000001', 'relationship_ref', NULL, NULL, NULL, NULL, 'integer', 'count of Answers', '88893e8b-3f40-4a72-b6cf-47cbadfed531', 'COUNT');
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('c0000000-0000-0000-0000-000000000002', 'literal', NULL, '2', NULL, NULL, 'integer', '2', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('c0000000-0000-0000-0000-000000000003', 'operator', '>=', NULL, NULL, NULL, 'boolean', 'answer count >= 2', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('d0000000-0000-0000-0000-000000000001', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'exists Answer role=architect (exact)', '88893e8b-3f40-4a72-b6cf-47cbadfed531', 'EXISTS');
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('d0000000-0000-0000-0000-000000000002', 'operator', '=', NULL, NULL, NULL, 'boolean', 'role = architect (exact)', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('d0000000-0000-0000-0000-000000000003', 'attribute_ref', NULL, NULL, 'ba5ef765-dfb6-49dc-b061-ce7382d16fec', NULL, 'text', 'Answer.role', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('d0000000-0000-0000-0000-000000000004', 'literal', NULL, 'architect', NULL, NULL, 'text', '''architect''', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('d0100000-0000-0000-0000-000000000011', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'exists Answer lower(role)=architect', '88893e8b-3f40-4a72-b6cf-47cbadfed531', 'EXISTS');
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('d0200000-0000-0000-0000-000000000021', 'operator', '=', NULL, NULL, NULL, 'boolean', 'lower(role) = architect', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('d0300000-0000-0000-0000-000000000031', 'function_call', NULL, NULL, NULL, 'lower', 'text', 'lower(Answer.role)', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('e9100000-0000-0000-0000-000000000092', 'literal', NULL, 'foo', NULL, NULL, 'text', NULL, NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('e9200000-0000-0000-0000-000000000093', 'literal', NULL, 'bar', NULL, NULL, 'text', NULL, NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('e9000000-0000-0000-0000-000000000091', 'function_call', NULL, NULL, NULL, 'concat', 'text', 'concat test', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('a1000000-0000-0000-0000-00000000a001', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'all dependency edges satisfied', '3bacfbc6-2272-4818-96eb-791c16b830cd', 'ALL');
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('a2000000-0000-0000-0000-00000000a002', 'relationship_ref', NULL, NULL, NULL, NULL, 'boolean', 'exists a completed prerequisite', '646db3bd-e91f-4a33-8e11-80ba9ce4d34b', 'EXISTS');
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('a3000000-0000-0000-0000-00000000a003', 'operator', '=', NULL, NULL, NULL, 'boolean', 'business_status = COMPLETED', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('a4000000-0000-0000-0000-00000000a004', 'attribute_ref', NULL, NULL, '70f62acf-ced2-41fa-bf6c-e54549ad1c9b', NULL, 'enum', 'WorkRequest.business_status', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('a5000000-0000-0000-0000-00000000a005', 'literal', NULL, 'COMPLETED', NULL, NULL, 'enum', '''COMPLETED''', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('b1000000-0000-0000-0000-00000000b001', 'operator', '<>', NULL, NULL, NULL, 'boolean', 'compilation_status <> rejected', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('b2000000-0000-0000-0000-00000000b002', 'attribute_ref', NULL, NULL, 'f395029e-9155-426d-873e-6e1fd282f260', NULL, 'enum', 'Requirement.compilation_status', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('b3000000-0000-0000-0000-00000000b003', 'literal', NULL, 'rejected', NULL, NULL, 'enum', '''rejected''', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('c1000000-0000-0000-0000-00000000c001', 'operator', '<>', NULL, NULL, NULL, 'boolean', 'status <> draft', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('c2000000-0000-0000-0000-00000000c002', 'attribute_ref', NULL, NULL, '80050047-9fd3-4470-83b8-288f69806859', NULL, 'enum', 'ImplementationPlan.status', NULL, NULL);
-INSERT INTO resolution.expression (id, kind, operator, literal_value, attribute_id, function_name, return_type, label, concept_relationship_id, quantifier) VALUES ('c3000000-0000-0000-0000-00000000c003', 'literal', NULL, 'draft', NULL, NULL, 'enum', '''draft''', NULL, NULL);
-
-
-ALTER TABLE resolution.expression ENABLE TRIGGER ALL;
 
 --
 -- Data for Name: expression_operand; Type: TABLE DATA; Schema: resolution; Owner: -
@@ -419,6 +491,10 @@ INSERT INTO resolution.expression_operand (parent_expression_id, child_expressio
 INSERT INTO resolution.expression_operand (parent_expression_id, child_expression_id, "position") VALUES ('b1000000-0000-0000-0000-00000000b001', 'b3000000-0000-0000-0000-00000000b003', 2);
 INSERT INTO resolution.expression_operand (parent_expression_id, child_expression_id, "position") VALUES ('c1000000-0000-0000-0000-00000000c001', 'c2000000-0000-0000-0000-00000000c002', 1);
 INSERT INTO resolution.expression_operand (parent_expression_id, child_expression_id, "position") VALUES ('c1000000-0000-0000-0000-00000000c001', 'c3000000-0000-0000-0000-00000000c003', 2);
+INSERT INTO resolution.expression_operand (parent_expression_id, child_expression_id, "position") VALUES ('d1000000-0000-0000-0000-00000000d001', 'd2000000-0000-0000-0000-00000000d002', 1);
+INSERT INTO resolution.expression_operand (parent_expression_id, child_expression_id, "position") VALUES ('d1000000-0000-0000-0000-00000000d001', 'd3000000-0000-0000-0000-00000000d003', 2);
+INSERT INTO resolution.expression_operand (parent_expression_id, child_expression_id, "position") VALUES ('03000000-0000-0000-0000-000000000003', '01000000-0000-0000-0000-000000000001', 1);
+INSERT INTO resolution.expression_operand (parent_expression_id, child_expression_id, "position") VALUES ('03000000-0000-0000-0000-000000000003', '02000000-0000-0000-0000-000000000002', 2);
 
 
 ALTER TABLE resolution.expression_operand ENABLE TRIGGER ALL;
@@ -544,6 +620,18 @@ INSERT INTO resolution.open_question_entity (open_question_id, asset_concept_id,
 ALTER TABLE resolution.open_question_entity ENABLE TRIGGER ALL;
 
 --
+-- Data for Name: proposition_assertion; Type: TABLE DATA; Schema: resolution; Owner: -
+--
+
+ALTER TABLE resolution.proposition_assertion DISABLE TRIGGER ALL;
+
+INSERT INTO resolution.proposition_assertion (proposition_id, rule_id, added_at) VALUES ('f1000000-0000-0000-0000-00000000f001', '126a6421-8fc8-4154-a38b-beff552b33b4', '2026-08-17 20:08:52.782755+00');
+INSERT INTO resolution.proposition_assertion (proposition_id, rule_id, added_at) VALUES ('f1000000-0000-0000-0000-00000000f001', 'e0000000-0000-0000-0000-00000000e000', '2026-08-17 20:08:52.782755+00');
+
+
+ALTER TABLE resolution.proposition_assertion ENABLE TRIGGER ALL;
+
+--
 -- Data for Name: representation_identity; Type: TABLE DATA; Schema: resolution; Owner: -
 --
 
@@ -584,21 +672,6 @@ INSERT INTO resolution.requirement_segment_set (requirement_id, segment_set_id, 
 ALTER TABLE resolution.requirement_segment_set ENABLE TRIGGER ALL;
 
 --
--- Data for Name: rule; Type: TABLE DATA; Schema: resolution; Owner: -
---
-
-ALTER TABLE resolution.rule DISABLE TRIGGER ALL;
-
-INSERT INTO resolution.rule (id, name, rule_type, expression_id, severity, concept_id, concept_relationship_id, representation_id, notes, created_at, expired_at, state_transition_id) VALUES ('4cd4ea8e-c9a1-4c32-83e5-e09836ec83b7', 'open_question_resolve_requires_verified_statement', 'guard', 'e1000000-0000-0000-0000-000000000001', 'hard', NULL, NULL, NULL, 'EXISTS (SELECT 1 FROM open_question_answer a JOIN verified_statement vs ON vs.answer_id = a.id WHERE a.question_id = <this open_question''s id>)', '2026-08-13 03:05:05.390305+00', NULL, '91e0e1ed-fa6a-4837-9142-c2f807fdbb94');
-INSERT INTO resolution.rule (id, name, rule_type, expression_id, severity, concept_id, concept_relationship_id, representation_id, notes, created_at, expired_at, state_transition_id) VALUES ('8a382752-f902-4099-8fe2-ac9ef669b9ef', 'requirement_rollup_validity', 'invariant', 'f0000000-0000-0000-0000-000000000001', 'hard', '094b785c-82b4-44fc-b262-7e60bc85db6f', NULL, NULL, 'A parent requirement cannot be compilation_status=compiled while any child requirement (requirement.parent_id = this.id) is not compiled.', '2026-08-12 04:36:32.380304+00', NULL, NULL);
-INSERT INTO resolution.rule (id, name, rule_type, expression_id, severity, concept_id, concept_relationship_id, representation_id, notes, created_at, expired_at, state_transition_id) VALUES ('126a6421-8fc8-4154-a38b-beff552b33b4', 'work_request_dependencies_satisfied', 'guard', 'a1000000-0000-0000-0000-00000000a001', 'hard', NULL, NULL, NULL, 'A WorkRequest cannot move APPROVED -> DISPATCHED unless every dependency edge points at a COMPLETED prerequisite.', '2026-08-15 17:29:12.112854+00', NULL, 'f9389719-c826-4ee2-9ad2-aca56bb9076d');
-INSERT INTO resolution.rule (id, name, rule_type, expression_id, severity, concept_id, concept_relationship_id, representation_id, notes, created_at, expired_at, state_transition_id) VALUES ('9cb7da1d-1785-4a19-b295-d5f60e890fdf', 'requirement_member_of_specification_not_rejected', 'conditional', 'b1000000-0000-0000-0000-00000000b001', 'hard', NULL, '99613184-ee71-4a92-a54f-ea235e3f4581', NULL, 'A rejected requirement cannot become a member of a specification.', '2026-08-16 04:03:06.587685+00', NULL, NULL);
-INSERT INTO resolution.rule (id, name, rule_type, expression_id, severity, concept_id, concept_relationship_id, representation_id, notes, created_at, expired_at, state_transition_id) VALUES ('76ad3fa0-14f0-4580-8c88-b3f107fba53d', 'implementation_plan_representation_not_draft', 'conditional', 'c1000000-0000-0000-0000-00000000c001', 'hard', NULL, NULL, '6c4cf312-16b7-4a57-82ca-123924ecab0b', 'A plan still in draft has no business being treated as a real implementation_plan representation.', '2026-08-16 04:03:33.5002+00', NULL, NULL);
-
-
-ALTER TABLE resolution.rule ENABLE TRIGGER ALL;
-
---
 -- Data for Name: specification_lineage; Type: TABLE DATA; Schema: resolution; Owner: -
 --
 
@@ -627,8 +700,8 @@ ALTER TABLE resolution.verified_statement ENABLE TRIGGER ALL;
 ALTER TABLE resolution.work_request DISABLE TRIGGER ALL;
 
 INSERT INTO resolution.work_request (id, asset_id, title, description, source_specification_id, source_requirement_id, business_status, intent, context, constraints, created_by, dco_json, legacy_id, plan_id, step_outputs, consumed_at, created_at, updated_at, valid_from, valid_until, recorded_on_dt, recorded_until_dt) VALUES ('70000000-0000-0000-0000-000000000001', NULL, 'Implement document store access layer', NULL, NULL, '55555555-5555-5555-5555-555555555502', 'DISPATCHED', 'Stand up MongoDB access per PLAN-0002, geo-replicated per specification revision 2.', '{}', '{}', NULL, NULL, NULL, 'PLAN-0002', '{}', NULL, '2026-08-14 11:19:17.805713+00', '2026-08-14 11:19:17.805713+00', '2026-08-14 11:19:17.805713+00', 'infinity', '2026-08-14 11:19:17.805713+00', 'infinity');
-INSERT INTO resolution.work_request (id, asset_id, title, description, source_specification_id, source_requirement_id, business_status, intent, context, constraints, created_by, dco_json, legacy_id, plan_id, step_outputs, consumed_at, created_at, updated_at, valid_from, valid_until, recorded_on_dt, recorded_until_dt) VALUES ('90000000-0000-0000-0000-000000000002', 'a9000000-0000-0000-0000-00000000a900', 'Wire access layer to MongoDB cluster (dependent)', NULL, NULL, NULL, 'APPROVED', 'Cannot dispatch until the cluster prerequisite is complete', '{}', '{}', NULL, NULL, NULL, NULL, '{}', NULL, '2026-08-15 17:29:12.114609+00', '2026-08-15 17:29:12.114609+00', '2026-08-15 17:29:12.114609+00', 'infinity', '2026-08-15 17:29:12.114609+00', 'infinity');
 INSERT INTO resolution.work_request (id, asset_id, title, description, source_specification_id, source_requirement_id, business_status, intent, context, constraints, created_by, dco_json, legacy_id, plan_id, step_outputs, consumed_at, created_at, updated_at, valid_from, valid_until, recorded_on_dt, recorded_until_dt) VALUES ('90000000-0000-0000-0000-000000000001', NULL, 'Provision MongoDB cluster (prerequisite)', NULL, NULL, NULL, 'COMPLETED', 'Stand up the replica set the access layer depends on', '{}', '{}', NULL, NULL, NULL, NULL, '{}', NULL, '2026-08-15 17:29:12.114609+00', '2026-08-15 17:29:12.114609+00', '2026-08-15 17:29:12.114609+00', 'infinity', '2026-08-15 17:29:12.114609+00', 'infinity');
+INSERT INTO resolution.work_request (id, asset_id, title, description, source_specification_id, source_requirement_id, business_status, intent, context, constraints, created_by, dco_json, legacy_id, plan_id, step_outputs, consumed_at, created_at, updated_at, valid_from, valid_until, recorded_on_dt, recorded_until_dt) VALUES ('90000000-0000-0000-0000-000000000002', 'a9000000-0000-0000-0000-00000000a900', 'Wire access layer to MongoDB cluster (dependent)', NULL, NULL, NULL, 'APPROVED', 'Cannot dispatch until the cluster prerequisite is complete', '{}', '{}', NULL, NULL, NULL, NULL, '{}', NULL, '2026-08-15 17:29:12.114609+00', '2026-08-15 17:29:12.114609+00', '2026-08-15 17:29:12.114609+00', 'infinity', '2026-08-15 17:29:12.114609+00', 'infinity');
 
 
 ALTER TABLE resolution.work_request ENABLE TRIGGER ALL;
@@ -648,5 +721,5 @@ ALTER TABLE resolution.work_request_edge ENABLE TRIGGER ALL;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 2aACSEkgIBkgkNgBgm7mE24c5VDcr0wXpz9BMJNWi3Xkjcn2tg3RCw1imjPa8FK
+\unrestrict 3kVOIJjFJMVYyWlpq1bOnh0tqvbJ2fOj6U7appftm17KHB9pqnfDm0c22wFyTfs
 

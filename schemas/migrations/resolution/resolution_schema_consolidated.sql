@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict jovuU5Y4QT6J9zJJPlHEaRlS0iEgtC8RVckSF7HUfl5iKpg8zE12aR0zfVoq5fh
+\restrict MnCv16CCtEZSNSnPflk0EFNZQUSVbCFqg0W21mqWcQWwYhBGFVJlaSDmdcGSTV2
 
 -- Dumped from database version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
@@ -284,50 +284,28 @@ BEGIN
 
     IF v_kind = 'literal' THEN
         RETURN quote_literal(v_literal);
-
     ELSIF v_kind = 'attribute_ref' THEN
         SELECT * INTO v_binding FROM resolution.concept_attribute_binding WHERE attribute_id = v_attr_id;
-        IF NOT FOUND THEN
-            RAISE EXCEPTION 'no concept_attribute_binding for attribute %', v_attr_id;
-        END IF;
+        IF NOT FOUND THEN RAISE EXCEPTION 'no concept_attribute_binding for attribute %', v_attr_id; END IF;
         RETURN format('%I.%I', current_alias, v_binding.column_name);
-
     ELSIF v_kind = 'relationship_ref' THEN
-        -- was: format('%I.id', current_alias) -- wrong whenever the next
-        -- hop's correlation column isn't the current table's own PK.
         RETURN resolution.compile_exists_chain(expr_id, resolution.correlation_ref(current_alias, expr_id));
-
+    ELSIF v_kind = 'proposition_ref' THEN
+        RETURN resolution.compile_proposition_ref(expr_id);
     ELSIF v_kind = 'function_call' THEN
         SELECT * INTO v_fn_binding FROM resolution.function_binding WHERE function_name = v_function_name;
-        IF NOT FOUND THEN
-            RAISE EXCEPTION 'no function_binding for function_name %', v_function_name;
-        END IF;
-
+        IF NOT FOUND THEN RAISE EXCEPTION 'no function_binding for function_name %', v_function_name; END IF;
         SELECT array_agg(resolution.compile_condition(eo.child_expression_id, current_alias) ORDER BY eo.position)
-        INTO v_args
-        FROM resolution.expression_operand eo WHERE eo.parent_expression_id = expr_id;
-
+        INTO v_args FROM resolution.expression_operand eo WHERE eo.parent_expression_id = expr_id;
         IF coalesce(array_length(v_args, 1), 0) <> v_fn_binding.arg_count THEN
-            RAISE EXCEPTION 'function % expects % arg(s), got %',
-                v_function_name, v_fn_binding.arg_count, coalesce(array_length(v_args, 1), 0);
+            RAISE EXCEPTION 'function % expects % arg(s), got %', v_function_name, v_fn_binding.arg_count, coalesce(array_length(v_args, 1), 0);
         END IF;
-
         RETURN format(v_fn_binding.sql_template, VARIADIC v_args);
-
     ELSIF v_kind = 'operator' THEN
-        SELECT child_expression_id INTO v_left_id  FROM resolution.expression_operand
-            WHERE parent_expression_id = expr_id AND position = 1;
-        SELECT child_expression_id INTO v_right_id FROM resolution.expression_operand
-            WHERE parent_expression_id = expr_id AND position = 2;
-        IF v_left_id IS NULL OR v_right_id IS NULL THEN
-            RAISE EXCEPTION 'operator node % missing an operand', expr_id;
-        END IF;
-        RETURN format('(%s %s %s)',
-            resolution.compile_condition(v_left_id, current_alias),
-            v_operator,
-            resolution.compile_condition(v_right_id, current_alias)
-        );
-
+        SELECT child_expression_id INTO v_left_id  FROM resolution.expression_operand WHERE parent_expression_id = expr_id AND position = 1;
+        SELECT child_expression_id INTO v_right_id FROM resolution.expression_operand WHERE parent_expression_id = expr_id AND position = 2;
+        IF v_left_id IS NULL OR v_right_id IS NULL THEN RAISE EXCEPTION 'operator node % missing an operand', expr_id; END IF;
+        RETURN format('(%s %s %s)', resolution.compile_condition(v_left_id, current_alias), v_operator, resolution.compile_condition(v_right_id, current_alias));
     ELSE
         RAISE EXCEPTION 'compile_condition does not support kind %', v_kind;
     END IF;
@@ -444,6 +422,28 @@ $$;
 
 
 --
+-- Name: compile_proposition_ref(uuid); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.compile_proposition_ref(expr_id uuid) RETURNS text
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_prop_id uuid;
+BEGIN
+    SELECT referenced_proposition_id INTO v_prop_id FROM resolution.expression WHERE id = expr_id;
+    IF v_prop_id IS NULL THEN
+        RAISE EXCEPTION 'proposition_ref node % has no referenced_proposition_id', expr_id;
+    END IF;
+    RETURN format(
+        '(SELECT cav.value FROM resolution.proposition p JOIN resolution.concept_attribute_value cav ON cav.id = p.disposition_value_id WHERE p.id = %L)',
+        v_prop_id
+    );
+END;
+$$;
+
+
+--
 -- Name: compile_root(uuid, text); Type: FUNCTION; Schema: resolution; Owner: -
 --
 
@@ -472,29 +472,18 @@ BEGIN
         ELSE
             RAISE EXCEPTION 'unknown quantifier %', v_quantifier;
         END IF;
-
     ELSIF v_kind = 'attribute_ref' THEN
         SELECT * INTO v_binding FROM resolution.concept_attribute_binding WHERE attribute_id = v_attr_id;
-        IF NOT FOUND THEN
-            RAISE EXCEPTION 'no concept_attribute_binding for attribute %', v_attr_id;
-        END IF;
-        RETURN format('(SELECT %I FROM %I.%I WHERE id = %s)',
-            v_binding.column_name, v_binding.schema_name, v_binding.table_name, literal_root_ref);
-
+        IF NOT FOUND THEN RAISE EXCEPTION 'no concept_attribute_binding for attribute %', v_attr_id; END IF;
+        RETURN format('(SELECT %I FROM %I.%I WHERE id = %s)', v_binding.column_name, v_binding.schema_name, v_binding.table_name, literal_root_ref);
+    ELSIF v_kind = 'proposition_ref' THEN
+        RETURN resolution.compile_proposition_ref(expr_id);
     ELSIF v_kind = 'operator' THEN
-        SELECT child_expression_id INTO v_left_id  FROM resolution.expression_operand
-            WHERE parent_expression_id = expr_id AND position = 1;
-        SELECT child_expression_id INTO v_right_id FROM resolution.expression_operand
-            WHERE parent_expression_id = expr_id AND position = 2;
-        RETURN format('(%s %s %s)',
-            resolution.compile_root(v_left_id, literal_root_ref),
-            v_operator,
-            resolution.compile_root(v_right_id, literal_root_ref)
-        );
-
+        SELECT child_expression_id INTO v_left_id  FROM resolution.expression_operand WHERE parent_expression_id = expr_id AND position = 1;
+        SELECT child_expression_id INTO v_right_id FROM resolution.expression_operand WHERE parent_expression_id = expr_id AND position = 2;
+        RETURN format('(%s %s %s)', resolution.compile_root(v_left_id, literal_root_ref), v_operator, resolution.compile_root(v_right_id, literal_root_ref));
     ELSIF v_kind = 'literal' THEN
         RETURN quote_literal(v_literal);
-
     ELSE
         RAISE EXCEPTION 'compile_root: unsupported root-level kind %', v_kind;
     END IF;
@@ -528,6 +517,64 @@ BEGIN
     END IF;
 
     RETURN format('%I.%I', current_alias, v_from_column);
+END;
+$$;
+
+
+--
+-- Name: evaluate_proposition(uuid); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.evaluate_proposition(p_proposition_id uuid) RETURNS TABLE(disposition text, all_passed boolean)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_subject_entity_id    uuid;
+    r                      RECORD;
+    v_result               boolean;
+    v_sql                  text;
+    v_all_passed           boolean := true;
+    v_disposition_value_id uuid;
+    v_disposition          text;
+BEGIN
+    SELECT subject_entity_id INTO v_subject_entity_id FROM resolution.proposition WHERE id = p_proposition_id;
+    IF v_subject_entity_id IS NULL THEN
+        RAISE EXCEPTION 'no proposition %', p_proposition_id;
+    END IF;
+
+    FOR r IN
+        SELECT pa.rule_id, rl.expression_id
+        FROM resolution.proposition_assertion pa
+        JOIN resolution.rule rl ON rl.id = pa.rule_id
+        WHERE pa.proposition_id = p_proposition_id
+    LOOP
+        IF r.expression_id IS NULL THEN
+            v_result := false;
+            v_sql := NULL;
+        ELSE
+            SELECT eg.result, eg.compiled_sql INTO v_result, v_sql
+            FROM resolution.evaluate_relationship_guard(r.expression_id, v_subject_entity_id) eg;
+        END IF;
+
+        INSERT INTO resolution.assertion_evaluation (proposition_id, rule_id, result, compiled_sql)
+        VALUES (p_proposition_id, r.rule_id, v_result, v_sql);
+
+        IF NOT v_result THEN
+            v_all_passed := false;
+        END IF;
+    END LOOP;
+
+    v_disposition := CASE WHEN v_all_passed THEN 'Asserted' ELSE 'Rejected' END;
+
+    SELECT cav.id INTO v_disposition_value_id
+    FROM resolution.concept_attribute_value cav
+    JOIN resolution.concept_attribute ca ON ca.id = cav.attribute_id AND ca.name = 'disposition'
+    JOIN resolution.concept c ON c.id = ca.concept_id AND c.name = 'Proposition'
+    WHERE cav.value = v_disposition;
+
+    UPDATE resolution.proposition SET disposition_value_id = v_disposition_value_id WHERE id = p_proposition_id;
+
+    RETURN QUERY SELECT v_disposition, v_all_passed;
 END;
 $$;
 
@@ -591,6 +638,20 @@ $_$;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: assertion_evaluation; Type: TABLE; Schema: resolution; Owner: -
+--
+
+CREATE TABLE resolution.assertion_evaluation (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    proposition_id uuid NOT NULL,
+    rule_id uuid NOT NULL,
+    result boolean NOT NULL,
+    compiled_sql text,
+    evaluated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
 
 --
 -- Name: assessment; Type: TABLE; Schema: resolution; Owner: -
@@ -826,8 +887,9 @@ CREATE TABLE resolution.expression (
     label text,
     concept_relationship_id uuid,
     quantifier text,
-    CONSTRAINT expression_kind_check CHECK ((kind = ANY (ARRAY['literal'::text, 'attribute_ref'::text, 'operator'::text, 'function_call'::text, 'relationship_ref'::text]))),
-    CONSTRAINT expression_kind_fields_check CHECK ((((kind = 'literal'::text) AND (literal_value IS NOT NULL) AND (attribute_id IS NULL) AND (function_name IS NULL) AND (concept_relationship_id IS NULL) AND (operator IS NULL)) OR ((kind = 'attribute_ref'::text) AND (attribute_id IS NOT NULL) AND (literal_value IS NULL) AND (function_name IS NULL) AND (concept_relationship_id IS NULL) AND (operator IS NULL)) OR ((kind = 'operator'::text) AND (operator IS NOT NULL) AND (attribute_id IS NULL) AND (literal_value IS NULL) AND (function_name IS NULL) AND (concept_relationship_id IS NULL)) OR ((kind = 'function_call'::text) AND (function_name IS NOT NULL) AND (attribute_id IS NULL) AND (literal_value IS NULL) AND (concept_relationship_id IS NULL) AND (operator IS NULL)) OR ((kind = 'relationship_ref'::text) AND (concept_relationship_id IS NOT NULL) AND (quantifier IS NOT NULL) AND (attribute_id IS NULL) AND (literal_value IS NULL) AND (function_name IS NULL) AND (operator IS NULL)))),
+    referenced_proposition_id uuid,
+    CONSTRAINT expression_kind_check CHECK ((kind = ANY (ARRAY['literal'::text, 'attribute_ref'::text, 'operator'::text, 'function_call'::text, 'relationship_ref'::text, 'proposition_ref'::text]))),
+    CONSTRAINT expression_kind_fields_check CHECK ((((kind = 'literal'::text) AND (literal_value IS NOT NULL) AND (attribute_id IS NULL) AND (function_name IS NULL) AND (concept_relationship_id IS NULL) AND (operator IS NULL) AND (referenced_proposition_id IS NULL)) OR ((kind = 'attribute_ref'::text) AND (attribute_id IS NOT NULL) AND (literal_value IS NULL) AND (function_name IS NULL) AND (concept_relationship_id IS NULL) AND (operator IS NULL) AND (referenced_proposition_id IS NULL)) OR ((kind = 'operator'::text) AND (operator IS NOT NULL) AND (attribute_id IS NULL) AND (literal_value IS NULL) AND (function_name IS NULL) AND (concept_relationship_id IS NULL) AND (referenced_proposition_id IS NULL)) OR ((kind = 'function_call'::text) AND (function_name IS NOT NULL) AND (attribute_id IS NULL) AND (literal_value IS NULL) AND (concept_relationship_id IS NULL) AND (operator IS NULL) AND (referenced_proposition_id IS NULL)) OR ((kind = 'relationship_ref'::text) AND (concept_relationship_id IS NOT NULL) AND (quantifier IS NOT NULL) AND (attribute_id IS NULL) AND (literal_value IS NULL) AND (function_name IS NULL) AND (operator IS NULL) AND (referenced_proposition_id IS NULL)) OR ((kind = 'proposition_ref'::text) AND (referenced_proposition_id IS NOT NULL) AND (attribute_id IS NULL) AND (literal_value IS NULL) AND (function_name IS NULL) AND (concept_relationship_id IS NULL) AND (operator IS NULL)))),
     CONSTRAINT expression_operator_whitelist_check CHECK (((operator IS NULL) OR (operator = ANY (ARRAY['='::text, '<>'::text, '>'::text, '<'::text, '>='::text, '<='::text, 'AND'::text, 'OR'::text])))),
     CONSTRAINT expression_quantifier_check CHECK (((quantifier IS NULL) OR (quantifier = ANY (ARRAY['EXISTS'::text, 'ALL'::text, 'COUNT'::text]))))
 );
@@ -1037,6 +1099,36 @@ CREATE TABLE resolution.owning_subsystem (
     id smallint NOT NULL,
     name text NOT NULL,
     description text
+);
+
+
+--
+-- Name: proposition; Type: TABLE; Schema: resolution; Owner: -
+--
+
+CREATE TABLE resolution.proposition (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    title text NOT NULL,
+    description text,
+    asset_concept_id uuid,
+    subject_entity_id uuid NOT NULL,
+    disposition_value_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    valid_from timestamp with time zone DEFAULT now() NOT NULL,
+    valid_until timestamp with time zone DEFAULT 'infinity'::timestamp with time zone NOT NULL,
+    recorded_on_dt timestamp with time zone DEFAULT now() NOT NULL,
+    recorded_until_dt timestamp with time zone DEFAULT 'infinity'::timestamp with time zone NOT NULL
+);
+
+
+--
+-- Name: proposition_assertion; Type: TABLE; Schema: resolution; Owner: -
+--
+
+CREATE TABLE resolution.proposition_assertion (
+    proposition_id uuid NOT NULL,
+    rule_id uuid NOT NULL,
+    added_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1277,6 +1369,14 @@ CREATE TABLE resolution.work_request_edge (
 --
 
 COMMENT ON TABLE resolution.work_request_edge IS 'Ported from vision.work_request_edges_history. parent = upstream/prerequisite, child = downstream/dependent, matching vision''s own work_request_dag traversal direction. Only ''depends_on'' is a confirmed edge_type from the DDL alone -- others may exist in production and are not invented here.';
+
+
+--
+-- Name: assertion_evaluation assertion_evaluation_pkey; Type: CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.assertion_evaluation
+    ADD CONSTRAINT assertion_evaluation_pkey PRIMARY KEY (id);
 
 
 --
@@ -1528,6 +1628,22 @@ ALTER TABLE ONLY resolution.owning_subsystem
 
 
 --
+-- Name: proposition_assertion proposition_assertion_pkey; Type: CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.proposition_assertion
+    ADD CONSTRAINT proposition_assertion_pkey PRIMARY KEY (proposition_id, rule_id);
+
+
+--
+-- Name: proposition proposition_pkey; Type: CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.proposition
+    ADD CONSTRAINT proposition_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: representation_identity representation_identity_pkey; Type: CONSTRAINT; Schema: resolution; Owner: -
 --
 
@@ -1624,6 +1740,13 @@ ALTER TABLE ONLY resolution.work_request
 
 
 --
+-- Name: idx_assertion_evaluation_proposition; Type: INDEX; Schema: resolution; Owner: -
+--
+
+CREATE INDEX idx_assertion_evaluation_proposition ON resolution.assertion_evaluation USING btree (proposition_id, evaluated_at DESC);
+
+
+--
 -- Name: idx_canonical_asset_active_canonical_asset_id; Type: INDEX; Schema: resolution; Owner: -
 --
 
@@ -1712,6 +1835,22 @@ CREATE UNIQUE INDEX one_state_attr_per_concept ON resolution.concept_attribute U
 --
 
 CREATE TRIGGER trg_expression_operand_acyclic BEFORE INSERT OR UPDATE ON resolution.expression_operand FOR EACH ROW EXECUTE FUNCTION resolution.check_expression_acyclic();
+
+
+--
+-- Name: assertion_evaluation assertion_evaluation_proposition_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.assertion_evaluation
+    ADD CONSTRAINT assertion_evaluation_proposition_id_fkey FOREIGN KEY (proposition_id) REFERENCES resolution.proposition(id);
+
+
+--
+-- Name: assertion_evaluation assertion_evaluation_rule_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.assertion_evaluation
+    ADD CONSTRAINT assertion_evaluation_rule_id_fkey FOREIGN KEY (rule_id) REFERENCES resolution.rule(id);
 
 
 --
@@ -1867,6 +2006,14 @@ ALTER TABLE ONLY resolution.expression_operand
 
 
 --
+-- Name: expression expression_referenced_proposition_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.expression
+    ADD CONSTRAINT expression_referenced_proposition_id_fkey FOREIGN KEY (referenced_proposition_id) REFERENCES resolution.proposition(id);
+
+
+--
 -- Name: harvest harvest_asset_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
 --
 
@@ -1968,6 +2115,38 @@ ALTER TABLE ONLY resolution.open_question_entity
 
 ALTER TABLE ONLY resolution.open_question
     ADD CONSTRAINT open_question_status_value_id_fkey FOREIGN KEY (status_value_id) REFERENCES resolution.concept_attribute_value(id);
+
+
+--
+-- Name: proposition_assertion proposition_assertion_proposition_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.proposition_assertion
+    ADD CONSTRAINT proposition_assertion_proposition_id_fkey FOREIGN KEY (proposition_id) REFERENCES resolution.proposition(id);
+
+
+--
+-- Name: proposition_assertion proposition_assertion_rule_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.proposition_assertion
+    ADD CONSTRAINT proposition_assertion_rule_id_fkey FOREIGN KEY (rule_id) REFERENCES resolution.rule(id);
+
+
+--
+-- Name: proposition proposition_asset_concept_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.proposition
+    ADD CONSTRAINT proposition_asset_concept_id_fkey FOREIGN KEY (asset_concept_id) REFERENCES resolution.concept(id);
+
+
+--
+-- Name: proposition proposition_disposition_value_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.proposition
+    ADD CONSTRAINT proposition_disposition_value_id_fkey FOREIGN KEY (disposition_value_id) REFERENCES resolution.concept_attribute_value(id);
 
 
 --
@@ -2214,5 +2393,5 @@ ALTER TABLE ONLY resolution.work_request
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jovuU5Y4QT6J9zJJPlHEaRlS0iEgtC8RVckSF7HUfl5iKpg8zE12aR0zfVoq5fh
+\unrestrict MnCv16CCtEZSNSnPflk0EFNZQUSVbCFqg0W21mqWcQWwYhBGFVJlaSDmdcGSTV2
 
