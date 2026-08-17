@@ -1457,6 +1457,34 @@ BEGIN
         '- Pipeline orchestration: state machine, receipts, tickets\n'
         '- All plan creation/promotion/state queries go through MCP tools\n'
         '- Never write .md files directly to nexus/graph/IMPLEMENTATION_PLANS/\n'
+        '- \`create_plan\` is DEPRECATED — create plans via \`nebula_create_plan\`\n'
+        '  (rover-mcp/nebula-mcp); conduit issues receipts + tickets automatically\n'
+        '- Read-only state: \`query_conduit_state\` (full pipeline state,\n'
+        '  \`plans.blocked\` for jams), \`query_nebula_backlog\`, \`query_nebula_systems\`\n'
+        '- Transport: Streamable HTTP — JSON-RPC to \`POST http://localhost:3100/\`\n'
+        '  (there is NO \`POST /tools/call\` route on 3100)\n'
+        '\n'
+        '### Nebula-mcp / rover-mcp (nebula-srv port 3101)\n'
+        '- Canonical database-first records and plans\n'
+        '- \`nebula_create_plan\` — create implementation plans (auto plan numbers,\n'
+        '  DB-canonical; never write .md first)\n'
+        '- \`nebula_list_agent_records\`, \`nebula_get_agent_record\`,\n'
+        '  \`nebula_create_agent_record\`, \`nebula_update_agent_record\`\n'
+        '- \`nebula_list_harvest_candidates\`, \`nebula_list_open_questions\`,\n'
+        '  \`nebula_list_cross_references\`, \`nebula_list_evidence_links\`\n'
+        '- REST fallback on :3101 (\`/api/agent-records\`, \`/api/harvest-candidates\`,\n'
+        '  \`/api/open-questions\`)\n'
+        '\n'
+        '### Knowledge-mcp (knowledge-srv port 3109)\n'
+        '- Read-only knowledge graph access (stdio MCP server, global opencode\n'
+        '  config; namespaced \`knowledge-mcp_*\` in opencode)\n'
+        '- Tools: \`knowledge_list_entities\`, \`knowledge_get_entity\`,\n'
+        '  \`knowledge_list_edges\`, \`knowledge_get_entity_relations\`,\n'
+        '  \`knowledge_list_cross_references\`, \`knowledge_list_migrations\`,\n'
+        '  \`knowledge_graph_summary\`, \`knowledge_semantic_search\`\n'
+        '- Semantic search covers 4 embed layers (kg / harvest / observation /\n'
+        '  agent) via pgvector + Ollama (nomic-embed-text)\n'
+        '- See \`knowledge-mcp-tools\` and \`investigation-resources\` cards for usage\n'
         '\n'
         '### Chat Server (port 3101)\n'
         '- Python: nexus/python/conduit/agent_chat.py\n'
@@ -1470,7 +1498,8 @@ BEGIN
         '\n'
         '### Health Check\n'
         '- GET /health returns server status, PID, pipeline state\n'
-        '- OrphanScan section: detects soft-deleted plans with stale .md files, and filesystem artifacts with no DB row',
+        '- OrphanScan section: detects soft-deleted plans with stale .md files, and filesystem artifacts with no DB row\n'
+        '',
         ARRAY['reference', 'config', 'server', 'mcp', 'chat'],
         ARRAY['mcp server', 'chat server', 'health check', 'port 3100', 'port 3101'],
         '{}'
@@ -1678,32 +1707,48 @@ BEGIN
         'You are investigating an inventory / baseline question (e.g. T01): what\n'
         'entities exist, what audit trail exists, or how is X linked to Y. Answer\n'
         'from the database-first resources below — not by scanning filesystem\n'
-        'directories.\n'
+        'directories. Prefer the MCP tool surface over raw REST where available.\n'
         '\n'
-        '## 1. Knowledge graph (knowledge-srv, port 3109)\n'
+        '## 1. Knowledge graph (knowledge-mcp → knowledge-srv :3109)\n'
         '\n'
-        'Serves the \`knowledge\` schema (knowledge.postgres: graph_entities,\n'
-        'graph_edges, graph_cross_references, graph_migrations).\n'
+        '\`knowledge-mcp\` (stdio MCP server, wired into the global opencode config)\n'
+        'proxies read-only SQL to knowledge-srv (:3109), which serves the\n'
+        '\`knowledge\` schema (graph_entities, graph_edges, graph_cross_references,\n'
+        'graph_migrations). Tools (namespaced \`knowledge-mcp_*\` in opencode):\n'
         '\n'
-        'REST endpoints (all GET):\n'
+        '- \`knowledge_graph_summary\` — entity/edge/cross-ref/migration counts.\n'
+        '  **Live state: 2380 entities, 3907 edges, 0 graph cross-refs, 19\n'
+        '  migrations.** Sections: work_requests (1932), plans (448), plus types,\n'
+        '  gaps_and_blockers, actors, rules, architectural_observations, decisions,\n'
+        '  topology, epistemic_types, state_machines, boundaries. Relation types:\n'
+        '  implements (1907), derived_from (1907), depends_on (93).\n'
+        '- \`knowledge_list_entities\` — list entities (filters: section, entity_type,\n'
+        '  status, search, limit/offset).\n'
+        '- \`knowledge_get_entity\` — one entity + full properties JSON.\n'
+        '- \`knowledge_list_edges\` — edges (filters: source/target section+id,\n'
+        '  relation_type).\n'
+        '- \`knowledge_get_entity_relations\` — inbound + outbound relations for an\n'
+        '  entity (section + entity_id).\n'
+        '- \`knowledge_list_cross_references\` — graph-level cross-reference maps.\n'
+        '- \`knowledge_list_migrations\` — import/embed migration history.\n'
+        '- \`knowledge_semantic_search\` — **unified cosine search** across four\n'
+        '  pgvector embed layers: \`kg\` (curated entities: work_requests, plans,\n'
+        '  actors), \`harvest\` (harvest candidates), \`observation\` (transcripts,\n'
+        '  session logs, audit docs), \`agent\` (agent records). Params: query,\n'
+        '  limit, layers (array), recordTypes (agent-layer filter), minSimilarity.\n'
+        '  Returns provenance labels (curated / harvested / observed / agent_record)\n'
+        '  so you can cite which layer a claim came from.\n'
         '\n'
-        '- \`/knowledge/summary\` — entity/edge/cross-ref counts by section and\n'
-        '  relation type. Live state: 2539 entities, 31 edges, 13 cross-refs,\n'
-        '  15 migrations. Sections include work_requests (1897), plans (419),\n'
-        '  types (41), gaps_and_blockers (41), actors (39), rules (32),\n'
-        '  architectural_observations (26), decisions (16), topology (13),\n'
-        '  epistemic_types (8), state_machines (4), boundaries (3).\n'
-        '- \`/knowledge/entities\` — all graph entities\n'
-        '- \`/knowledge/entities/:section/:entity_id\` — single entity\n'
-        '- \`/knowledge/entities/:section/:entity_id/relations\` — outgoing edges\n'
-        '- \`/knowledge/edges\` — all edges\n'
-        '- \`/knowledge/cross-references\` — graph-level cross-references\n'
-        '- \`/knowledge/migrations\` — migration history\n'
+        'REST equivalents on \`http://localhost:3109\` (all GET):\n'
+        '\`/knowledge/summary\`, \`/knowledge/entities\`,\n'
+        '\`/knowledge/entities/:section/:entity_id\`,\n'
+        '\`/knowledge/entities/:section/:entity_id/relations\`, \`/knowledge/edges\`,\n'
+        '\`/knowledge/cross-references\`, \`/knowledge/migrations\`.\n'
         '\n'
         '## 2. Canonical audit database (nebula agent records)\n'
         '\n'
         'The database is the ONLY canonical audit trail (filesystem audit dirs are\n'
-        'derived projections). Query via nebula-mcp tools:\n'
+        'derived projections). Query via nebula-mcp tools (rover-mcp):\n'
         '\n'
         '- \`nebula_list_agent_records\` — filters: role, type, tag(s) (AND\n'
         '  conjunction), search, createdAfter/createdBefore (ISO 8601), level,\n'
@@ -1737,16 +1782,52 @@ BEGIN
         '  kv:description_overlap\n'
         '\n'
         'The knowledge graph also exposes its own cross-refs via\n'
-        'knowledge-srv \`GET /knowledge/cross-references\`\n'
-        '(graph_cross_references — currently 13 links).\n'
+        '\`knowledge_list_cross_references\` (graph_cross_references — currently 0\n'
+        'links at graph level; use nebula.cross_references for the populated\n'
+        'plan/record/entity joins).\n'
+        '\n'
+        '## 4. Evidence links (nebula evidence_links)\n'
+        '\n'
+        'Links between knowledge-graph entities and harvested evidence:\n'
+        '\n'
+        '- \`nebula_list_evidence_links\` — filters: knowledgeEntityId, harvestId,\n'
+        '  candidateId, linkType, provenance, confidence range.\n'
+        '- \`nebula_create_evidence_link\` / \`nebula_get_evidence_link\` /\n'
+        '  \`nebula_delete_evidence_link\` / \`nebula_delete_evidence_links_by_entity\`.\n'
+        '\n'
+        'link_type taxonomy: supports, refines, instantiates, contradicts, supersedes,\n'
+        'mentions, informs, validates.\n'
+        'provenance: auto_ingestor, manual, reconciler, llm_extracted, migration.\n'
+        '\n'
+        '## 5. Harvest candidates & open questions (nebula)\n'
+        '\n'
+        '- \`nebula_list_harvest_candidates\` — candidates with status (pending /\n'
+        '  promoted / useful / superseded), implementationNotes, completed flag,\n'
+        '  harvestId, system/subsystem/feature links.\n'
+        '- \`nebula_list_open_questions\` / \`nebula_list_question_answers\` — open\n'
+        '  questions (blocking flags, answered_by) and multi-role answers.\n'
+        '- \`nebula_list_harvests\` / \`nebula_get_harvest\` — harvest pipeline outputs.\n'
+        '\n'
+        '## Recommended investigation sequence\n'
+        '\n'
+        '1. \`knowledge_semantic_search\` on the topic (all layers) to find what exists.\n'
+        '2. \`knowledge_graph_summary\` to orient, then \`knowledge_list_entities\` /\n'
+        '   \`knowledge_get_entity\` on the relevant section(s).\n'
+        '3. Expand via \`knowledge_list_edges\` / \`knowledge_get_entity_relations\`.\n'
+        '4. Join to nebula: \`nebula_list_cross_references\` (plans ↔ records ↔\n'
+        '   entities), \`nebula_list_evidence_links\` (support/contradiction), then\n'
+        '   \`nebula_list_agent_records\` for the underlying records.\n'
+        '5. Cross-check candidates/open questions if the topic maps to harvest intent.\n'
         '\n'
         '## Anti-patterns\n'
         '\n'
         '- Do not read audit/ or IMPLEMENTATION_PLANS/ markdown as operational\n'
         '  state; query the DB via nebula-mcp.\n'
-        '- Do not guess rel_type strings; use the taxonomy above.\n'
+        '- Do not guess rel_type / link_type strings; use the taxonomies above.\n'
         '- When a question says "who/what references X", start from\n'
         '  nebula.cross_references and expand via relations.\n'
+        '- Do not claim you "used the knowledge graph" when you only listed a\n'
+        '  server''s metadata — say which KG surfaces you actually queried.\n'
         '',
         ARRAY['investigation', 'knowledge-graph', 'audit', 'cross-references', 'database-first', 't01'],
         ARRAY['investigation', 'knowledge graph', 'audit database', 'cross-refs', 'what entities exist', 'what changed', 'linked to', 'baseline', 'inventory', 't01'],
@@ -1755,7 +1836,7 @@ BEGIN
     ON CONFLICT (slug) DO NOTHING
     RETURNING id INTO v_memory_id;
     IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['analyst', 'devops', 'engineer', 'engineer-ii', 'topologist'];
+        v_roles := ARRAY['analyst', 'devops', 'engineer', 'engineer-ii', 'planner', 'topologist'];
         FOREACH v_role IN ARRAY v_roles LOOP
             INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
             VALUES (v_memory_id, v_role, NOW(), NULL);
@@ -1836,7 +1917,7 @@ BEGIN
     ON CONFLICT (slug) DO NOTHING
     RETURNING id INTO v_memory_id;
     IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['analyst', 'architect', 'inspector', 'operator'];
+        v_roles := ARRAY['analyst', 'architect', 'inspector', 'operator', 'planner'];
         FOREACH v_role IN ARRAY v_roles LOOP
             INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
             VALUES (v_memory_id, v_role, NOW(), NULL);
@@ -2727,6 +2808,93 @@ BEGIN
     RETURNING id INTO v_memory_id;
     IF v_memory_id IS NOT NULL THEN
         v_roles := ARRAY['analyst', 'architect', 'builder', 'critic', 'engineer', 'inspector', 'planner', 'reviewer'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 44. Knowledge-MCP Tool Reference (knowledge graph, read-only)
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'knowledge-mcp-tools',
+        'Knowledge-MCP Tool Reference (knowledge graph, read-only)',
+        'Catalog of the 8 knowledge-mcp tools (entities, edges, cross-refs, semantic search) — read-only KG access via knowledge-srv :3109.',
+        '# Knowledge-MCP Tool Reference (knowledge graph, read-only)\n'
+        '\n'
+        '## When to use this card\n'
+        '\n'
+        'Any task that needs to know what exists, how entities relate, what is\n'
+        'already known, or what evidence supports a claim. All knowledge-mcp tools\n'
+        'are READ-ONLY (knowledge-srv :3109); writes go through nebula-mcp instead.\n'
+        '\n'
+        '## Server wiring\n'
+        '\n'
+        '- \`knowledge-mcp\` = stdio MCP server (dist/index.js) → REST proxy of\n'
+        '  knowledge-srv \`http://localhost:3109\` (env \`KNOWLEDGE_SRV_URL\`).\n'
+        '- Registered in the global opencode config, so tools are namespaced\n'
+        '  \`knowledge-mcp_*\` (e.g. \`knowledge-mcp_knowledge_semantic_search\`).\n'
+        '- Backend schema: \`knowledge.graph_entities\`, \`knowledge.graph_edges\`,\n'
+        '  \`knowledge.graph_cross_references\`, \`knowledge.graph_migrations\`,\n'
+        '  plus four pgvector embed layers.\n'
+        '\n'
+        '## Tool catalog (8)\n'
+        '\n'
+        '| Tool | Purpose | Key args |\n'
+        '|------|---------|----------|\n'
+        '| \`knowledge_list_entities\` | List entities, filterable | section, entity_type, status, search, limit (≤500), offset |\n'
+        '| \`knowledge_get_entity\` | One entity + full properties JSON | section, entity_id |\n'
+        '| \`knowledge_list_edges\` | List edges, filterable | source_section/id, target_section/id, relation_type, limit |\n'
+        '| \`knowledge_get_entity_relations\` | Inbound + outbound relations | section, entity_id |\n'
+        '| \`knowledge_list_cross_references\` | Graph-level cross-ref maps | map_name, source_section, target_id |\n'
+        '| \`knowledge_list_migrations\` | Import/embed migration history | limit |\n'
+        '| \`knowledge_graph_summary\` | Counts: entities by section, edges by relation type, migrations | — |\n'
+        '| \`knowledge_semantic_search\` | Unified cosine search over 4 embed layers | query, limit, layers, recordTypes, minSimilarity |\n'
+        '\n'
+        '## knowledge_semantic_search details\n'
+        '\n'
+        '- Layers: \`kg\` (curated: work_requests, plans, actors),\n'
+        '  \`harvest\` (harvest candidates), \`observation\` (transcripts, session\n'
+        '  logs, audit docs), \`agent\` (agent records). Omit \`layers\` to search all.\n'
+        '- \`recordTypes\` (agent layer only): report, engineering_log,\n'
+        '  architecture_note, prompt, assessment, analysis, response, inspection,\n'
+        '  decision — omit \`inspection\` to suppress noise.\n'
+        '- \`minSimilarity\` (0–1): similarity floor, e.g. 0.55.\n'
+        '- Returns merged results with provenance labels (curated / harvested /\n'
+        '  observed / agent_record) — cite the layer in your findings.\n'
+        '- Runs \`nexus/bin/unified_semantic_search.py\` with the rover venv python;\n'
+        '  requires Ollama running with \`nomic-embed-text\` (verified available).\n'
+        '\n'
+        '## Typical sequence\n'
+        '\n'
+        '1. \`knowledge_semantic_search\` — topic-wide recall.\n'
+        '2. \`knowledge_graph_summary\` — orientation (sections, relation types).\n'
+        '3. \`knowledge_list_entities\` (filter section) → \`knowledge_get_entity\`.\n'
+        '4. \`knowledge_list_edges\` / \`knowledge_get_entity_relations\` — expand.\n'
+        '5. \`knowledge_list_cross_references\` — graph maps; then\n'
+        '   \`nebula_list_cross_references\` for plan/record/entity joins.\n'
+        '6. Corroborate with \`nebula_list_evidence_links\` and\n'
+        '   \`nebula_list_agent_records\`.\n'
+        '\n'
+        '## Anti-patterns\n'
+        '\n'
+        '- Do NOT use these tools to write — they are read-only by design.\n'
+        '- Do NOT treat \`knowledge_list_*\` output as canonical audit state; that\n'
+        '  lives in nebula (agent records, cross_references, evidence_links).\n'
+        '- Do NOT fabricate provenance — report which layer returned a result.\n'
+        '- Knowledge Steward owns writes to knowledge.graph_*; all other roles\n'
+        '  are read-only (see knowledge-graph-pipeline card for the write path).\n'
+        '',
+        ARRAY['reference', 'knowledge-graph', 'kg', 'semantic-search', 'tools', 'appendix'],
+        ARRAY['knowledge graph', 'semantic search', 'knowledge-mcp', 'kg tools', 'cross references', 'knowledge_list', 'knowledge_semantic_search', 'investigate what exists'],
+        ARRAY['knowledge_list_entities', 'knowledge_get_entity', 'knowledge_list_edges', 'knowledge_get_entity_relations', 'knowledge_list_cross_references', 'knowledge_list_migrations', 'knowledge_graph_summary', 'knowledge_semantic_search']
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY['analyst', 'planner'];
         FOREACH v_role IN ARRAY v_roles LOOP
             INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
             VALUES (v_memory_id, v_role, NOW(), NULL);
