@@ -7593,6 +7593,136 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
     }
   });
 
+  // ── Role row → API JSON (mirrors the GET /roles mapping) ──────────
+  const roleToJson = (r: any) => ({
+    id: r.id,
+    name: r.name,
+    displayName: r.display_name,
+    description: r.description,
+    ownsDomains: r.owns_domains,
+    canGreenlight: r.can_greenlight,
+    canCreateQuestions: r.can_create_questions,
+    canCreateAgendas: r.can_create_agendas,
+    canResolveQuestions: r.can_resolve_questions,
+    canVerifyWorkRequests: r.can_verify_work_requests,
+    maxOpenQuestions: r.max_open_questions,
+    requiresApprovalFrom: r.requires_approval_from,
+    cronEnabled: r.cron_enabled,
+    cronExpression: r.cron_expression,
+    cronDescription: r.cron_description,
+    escalatesTo: r.escalates_to,
+    escalationTriggers: r.escalation_triggers,
+    levelFilterPrimary: r.level_filter_primary,
+    levelFilterAllowed: r.level_filter_allowed,
+    visibilityScope: r.visibility_scope,
+    createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+    updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
+  });
+
+  // POST /api/roles — create role metadata (Gap 2: nebula.roles create API)
+  router.post('/roles', async (req: Request, res: Response) => {
+    try {
+      const b = req.body || {};
+      if (!b.name || !b.displayName) {
+        return res.status(400).json({ error: 'name and displayName are required' });
+      }
+      if (!/^[a-z_]+$/.test(b.name)) {
+        return res.status(400).json({ error: 'name must match ^[a-z_]+$ (lowercase letters and underscores)' });
+      }
+      const { rows: [role] } = await pool.query(
+        `INSERT INTO nebula.roles (
+           name, display_name, description, owns_domains,
+           can_greenlight, can_create_questions, can_create_agendas,
+           can_resolve_questions, can_verify_work_requests,
+           max_open_questions, requires_approval_from,
+           cron_enabled, cron_expression, cron_description,
+           escalates_to, escalation_triggers,
+           level_filter_primary, level_filter_allowed, visibility_scope
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+         RETURNING *`,
+        [
+          b.name, b.displayName, b.description ?? null, b.ownsDomains ?? [],
+          b.canGreenlight ?? false, b.canCreateQuestions ?? false, b.canCreateAgendas ?? false,
+          b.canResolveQuestions ?? false, b.canVerifyWorkRequests ?? false,
+          b.maxOpenQuestions ?? null, b.requiresApprovalFrom ?? [],
+          b.cronEnabled ?? false, b.cronExpression ?? null, b.cronDescription ?? null,
+          b.escalatesTo ?? [], b.escalationTriggers ?? [],
+          b.levelFilterPrimary ?? 'level <= 2', b.levelFilterAllowed ?? 'level <= 3',
+          b.visibilityScope ?? ['planner', 'all'],
+        ]
+      );
+      res.status(201).json(roleToJson(role));
+    } catch (err: any) {
+      if (err.code === '23505') {
+        return res.status(409).json({ error: `Role '${req.body?.name}' already exists in nebula.roles` });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PATCH /api/roles/:id — update capabilities/visibility/description (Gap 2)
+  router.patch('/roles/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const b = req.body || {};
+      if (b.name !== undefined && !/^[a-z_]+$/.test(b.name)) {
+        return res.status(400).json({ error: 'name must match ^[a-z_]+$ (lowercase letters and underscores)' });
+      }
+      const sets: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      const fieldMap: [string, string][] = [
+        ['name', 'name'], ['displayName', 'display_name'], ['description', 'description'],
+        ['ownsDomains', 'owns_domains'], ['canGreenlight', 'can_greenlight'],
+        ['canCreateQuestions', 'can_create_questions'], ['canCreateAgendas', 'can_create_agendas'],
+        ['canResolveQuestions', 'can_resolve_questions'], ['canVerifyWorkRequests', 'can_verify_work_requests'],
+        ['maxOpenQuestions', 'max_open_questions'], ['requiresApprovalFrom', 'requires_approval_from'],
+        ['cronEnabled', 'cron_enabled'], ['cronExpression', 'cron_expression'],
+        ['cronDescription', 'cron_description'], ['escalatesTo', 'escalates_to'],
+        ['escalationTriggers', 'escalation_triggers'], ['levelFilterPrimary', 'level_filter_primary'],
+        ['levelFilterAllowed', 'level_filter_allowed'], ['visibilityScope', 'visibility_scope'],
+      ];
+      for (const [camel, col] of fieldMap) {
+        if (b[camel] !== undefined) {
+          sets.push(`${col} = $${i++}`);
+          vals.push(Array.isArray(b[camel]) ? b[camel] : b[camel]);
+        }
+      }
+      if (sets.length === 0) return res.json({ ok: true });
+      vals.push(id);
+      const { rows: [role] } = await pool.query(
+        `UPDATE nebula.roles SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`,
+        vals
+      );
+      if (!role) return res.status(404).json({ error: 'Role not found' });
+      res.json(roleToJson(role));
+    } catch (err: any) {
+      if (err.code === '23505') {
+        return res.status(409).json({ error: 'Role name already exists in nebula.roles' });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/roles/:id — remove role metadata (Gap 2).
+  // Hard delete guarded: FK references from wind.titles / nebula.roles_history
+  // surface as 23503 → 409 with a hint instead of a raw PG error.
+  router.delete('/roles/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rowCount } = await pool.query('DELETE FROM nebula.roles WHERE id = $1', [id]);
+      if (rowCount === 0) return res.status(404).json({ error: 'Role not found' });
+      res.json({ ok: true, id });
+    } catch (err: any) {
+      if (err.code === '23503') {
+        return res.status(409).json({
+          error: 'Role is referenced by other rows (e.g. wind titles) — expire it in nebula.roles_history instead of hard-deleting',
+        });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ════════════════════════════════════════════════════════════════
   //  INTENT RECORDS
   // ════════════════════════════════════════════════════════════════

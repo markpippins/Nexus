@@ -1870,6 +1870,393 @@ export async function updateToolAccess(
   return qOne("SELECT id, role, mcp_id, tool_slug FROM role_tool_access WHERE id = @id", { id });
 }
 
+// ── Role Provisioning (architect gap analysis 2026-08-17) ────────────
+//
+// Implements the missing API pieces from the architect's "Role Provisioning
+// Gap Analysis": bulk tool-access create/seed, procedure-card assignment
+// via tackle.role_memory, a per-role readiness check, and an atomic
+// POST /roles/provision orchestrator that collapses the 4-6 manual API
+// calls into one and keeps tackle.roles ↔ nebula.roles in sync.
+
+/**
+ * Bulk-create tool-access allowlist rows for a role (default-deny positive
+ * allowlist). Each entry is { mcp_id, tool_slug }. Duplicate (role, tool_slug)
+ * rows are skipped (UNIQUE constraint). Returns the number of rows created.
+ */
+export async function createToolAccess(
+  role: string,
+  tools: { mcp_id: string; tool_slug: string }[],
+): Promise<number> {
+  if (tools.length === 0) return 0;
+  const clean = tools.filter((t) => t && t.tool_slug);
+  if (clean.length === 0) return 0;
+  const result = await q(
+    `INSERT INTO role_tool_access (role, mcp_id, tool_slug)
+     SELECT role, mcp_id, tool_slug
+     FROM unnest(@roles::text[], @mcps::text[], @slugs::text[]) AS t(role, mcp_id, tool_slug)
+     ON CONFLICT DO NOTHING
+     RETURNING id`,
+    {
+      roles: clean.map(() => role),
+      mcps: clean.map((t) => t.mcp_id || ""),
+      slugs: clean.map((t) => t.tool_slug),
+    }
+  );
+  return result.rows.length;
+}
+
+/**
+ * Seed a role's tool allowlist from a template role (copy all rows).
+ * Returns the number of rows copied. Default-deny: a new role starts with
+ * zero tools, so provisioning generally seeds from an existing role.
+ */
+export async function seedToolAccess(role: string, fromRole: string): Promise<number> {
+  const result = await q(
+    `INSERT INTO role_tool_access (role, mcp_id, tool_slug)
+     SELECT @role, mcp_id, tool_slug
+     FROM role_tool_access
+     WHERE role = @fromRole
+     ON CONFLICT DO NOTHING
+     RETURNING id`,
+    { role, fromRole }
+  );
+  return result.rows.length;
+}
+
+/** Resolve a procedure card's UUID by slug (tackle.memory). */
+export async function getMemoryIdBySlug(slug: string): Promise<string | undefined> {
+  const row = await qOne("SELECT id FROM memory WHERE slug = @slug", { slug });
+  return row?.id;
+}
+
+/**
+ * Assign procedure cards to a role (tackle.role_memory). Active (unexpired)
+ * assignments are left untouched. Returns the number of assignments made.
+ */
+export async function assignProcedures(role: string, slugs: string[]): Promise<number> {
+  let assigned = 0;
+  for (const slug of slugs) {
+    const memoryId = await getMemoryIdBySlug(slug);
+    if (!memoryId) continue;
+    const r = await q(
+      `INSERT INTO role_memory (memory_id, role, as_of_dt, expiration_dt)
+       SELECT @memoryId, @role, NOW(), NULL
+       WHERE NOT EXISTS (
+         SELECT 1 FROM role_memory
+         WHERE role = @role AND memory_id = @memoryId AND expiration_dt IS NULL
+       )
+       RETURNING id`,
+      { memoryId, role }
+    );
+    assigned += r.rows.length;
+  }
+  return assigned;
+}
+
+/**
+ * Unassign a procedure card from a role by expiring the active assignment
+ * (bitemporal-preserving soft delete — history is retained). Returns true if
+ * an active assignment was expired.
+ */
+export async function unassignProcedure(role: string, slug: string): Promise<boolean> {
+  const memoryId = await getMemoryIdBySlug(slug);
+  if (!memoryId) return false;
+  const r = await qRun(
+    `UPDATE role_memory SET expiration_dt = NOW()
+     WHERE role = @role AND memory_id = @memoryId AND expiration_dt IS NULL`,
+    { role, memoryId }
+  );
+  return r > 0;
+}
+
+// ── Role readiness (Gap 6) ──────────────────────────────────────────
+
+function titleCaseProvision(s: string): string {
+  return s.split(/[_-]+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
+export interface ReadinessPiece {
+  key: string;
+  label: string;
+  required: boolean;
+  present: boolean;
+  detail: string;
+}
+
+export interface RoleReadiness {
+  role: string;
+  ready: boolean;
+  requiredPresent: number;
+  requiredTotal: number;
+  pieces: ReadinessPiece[];
+}
+
+/**
+ * Readiness check for a role across all ten participation pieces from the
+ * architect's gap analysis. Cross-schema reads (nebula.roles, assembly.users)
+ * degrade to a per-piece error detail instead of failing the whole check.
+ */
+export async function getRoleReadiness(name: string): Promise<RoleReadiness> {
+  const pieces: ReadinessPiece[] = [];
+  const add = (key: string, label: string, required: boolean, present: boolean, detail = "") =>
+    pieces.push({ key, label, required, present, detail });
+
+  const safe = async (
+    key: string, label: string, required: boolean,
+    sql: string, params: Record<string, any>,
+    presentOf: (row: any) => boolean, detailOf?: (row: any) => string,
+  ) => {
+    try {
+      const row = await qOne(sql, params);
+      add(key, label, required, presentOf(row), detailOf ? detailOf(row) : "");
+    } catch (e: any) {
+      add(key, label, required, false, `check error: ${e.message}`);
+    }
+  };
+
+  await safe("identity", "tackle.roles identity", true,
+    "SELECT 1 AS p FROM roles WHERE name = @name", { name }, (r) => !!r);
+  await safe("ai_config", "AI config bundle", true,
+    "SELECT count(*)::int AS c FROM config_bundle WHERE role = @name", { name },
+    (r) => (r?.c || 0) > 0, (r) => `${r?.c || 0} bundle(s)`);
+  await safe("persona", "Persona prompt (opencode-persona)", true,
+    "SELECT 1 AS p FROM prompts WHERE role = @name AND slug = 'opencode-persona' LIMIT 1", { name }, (r) => !!r);
+  await safe("tool_access", "Tool access allowlist", true,
+    "SELECT count(*)::int AS c FROM role_tool_access WHERE role = @name", { name },
+    (r) => (r?.c || 0) > 0, (r) => `${r?.c || 0} tool(s)`);
+  await safe("procedures", "Procedure cards", true,
+    "SELECT count(*)::int AS c FROM role_memory WHERE role = @name AND expiration_dt IS NULL", { name },
+    (r) => (r?.c || 0) > 0, (r) => `${r?.c || 0} card(s)`);
+  await safe("nebula_roles", "nebula.roles metadata", true,
+    "SELECT 1 AS p FROM nebula.roles WHERE name = @name", { name }, (r) => !!r);
+  await safe("lease", "Role lease (active)", false,
+    "SELECT 1 AS p FROM role_leases WHERE role = @name AND status = 'ACTIVE' LIMIT 1", { name }, (r) => !!r);
+  await safe("assembly_user", "Assembly user", true,
+    "SELECT 1 AS p FROM assembly.users WHERE alias = @name", { name }, (r) => !!r);
+  await safe("scheduler", "Scheduler entry", false,
+    "SELECT count(*)::int AS c FROM agent_scheduler WHERE role = @name", { name },
+    (r) => (r?.c || 0) > 0, (r) => `${r?.c || 0} entry/ies`);
+  await safe("task", "Task definition", false,
+    "SELECT count(*)::int AS c FROM tasks WHERE role = @name", { name },
+    (r) => (r?.c || 0) > 0, (r) => `${r?.c || 0} task(s)`);
+
+  const required = pieces.filter((p) => p.required);
+  const requiredPresent = required.filter((p) => p.present).length;
+  return {
+    role: name,
+    ready: requiredPresent === required.length,
+    requiredPresent,
+    requiredTotal: required.length,
+    pieces,
+  };
+}
+
+// ── Atomic role provisioning (Gap 1 + Gap 7) ────────────────────────
+
+export interface ProvisionSpec {
+  name: string;
+  description?: string;
+  displayName?: string;
+  // config bundle
+  modelId?: string;
+  providerId?: string;
+  harnessId?: string;
+  bundle?: Partial<ConfigBundleRow>;
+  // persona prompt
+  persona?: { body_md: string; title?: string; slug?: string };
+  // tool access
+  tools?: (string | { mcp_id: string; tool_slug: string })[];
+  toolTemplateRole?: string;
+  // procedure cards
+  procedures?: string[];
+  procedureTemplateRole?: string;
+  // nebula.roles metadata (dual-registry sync)
+  nebula?: Record<string, any>;
+  // assembly user
+  createAssemblyUser?: boolean;
+  assemblyEmail?: string;
+}
+
+/**
+ * Atomic "create role" orchestrator. Collapses the 4-6 manual API calls
+ * into one transaction across tackle.roles / tackle.config_bundle /
+ * tackle.prompts / tackle.role_tool_access / tackle.role_memory /
+ * nebula.roles / assembly.users. Any failure rolls back the whole role.
+ */
+export async function provisionRole(spec: ProvisionSpec): Promise<{
+  role: string;
+  steps: string[];
+}> {
+  return withTransaction(async (client) => {
+    const now = new Date().toISOString();
+    const name = spec.name;
+    const steps: string[] = [];
+
+    // 1. tackle.roles identity
+    await client.query(
+      `INSERT INTO tackle.roles (name, description, created_at, updated_at)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (name) DO UPDATE
+       SET description = EXCLUDED.description, updated_at = EXCLUDED.updated_at`,
+      [name, spec.description ?? "", now, now]
+    );
+    steps.push("role_identity");
+
+    // 2. config bundle (verified-model gate trigger applies on insert)
+    if (spec.modelId) {
+      const m = await client.query("SELECT id FROM tackle.models WHERE id = $1", [spec.modelId]);
+      if (m.rows.length === 0) {
+        throw new Error(`Model '${spec.modelId}' not found in tackle.models`);
+      }
+      const bundleId = `bundle-${name}-default`;
+      await client.query(
+        `INSERT INTO tackle.config_bundle
+           (id, name, role, model_id, provider_id, harness_id, priority,
+            invocation_mode, command, endpoint_url, timeout_ms, is_active,
+            metadata, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,1,$12,$13,$14)
+         ON CONFLICT (id) DO UPDATE
+         SET name = EXCLUDED.name, role = EXCLUDED.role, model_id = EXCLUDED.model_id,
+             provider_id = EXCLUDED.provider_id, harness_id = EXCLUDED.harness_id,
+             priority = EXCLUDED.priority, invocation_mode = EXCLUDED.invocation_mode,
+             command = EXCLUDED.command, endpoint_url = EXCLUDED.endpoint_url,
+             timeout_ms = EXCLUDED.timeout_ms, metadata = EXCLUDED.metadata,
+             updated_at = EXCLUDED.updated_at`,
+        [bundleId, spec.bundle?.name || `${name}-default`, name, spec.modelId,
+         spec.providerId ?? null, spec.harnessId ?? null, spec.bundle?.priority ?? 0,
+         spec.bundle?.invocation_mode ?? "CLI", spec.bundle?.command ?? null,
+         spec.bundle?.endpoint_url ?? null, spec.bundle?.timeout_ms ?? null,
+         spec.bundle?.metadata ?? "{}", now, now]
+      );
+      steps.push("config_bundle");
+    }
+
+    // 3. persona prompt
+    if (spec.persona?.body_md) {
+      const slug = spec.persona.slug || "opencode-persona";
+      const latest = await client.query(
+        "SELECT version FROM tackle.prompts WHERE role = $1 AND slug = $2 ORDER BY version DESC LIMIT 1",
+        [name, slug]
+      );
+      const version = (latest.rows[0]?.version ?? 0) + 1;
+      await client.query(
+        `INSERT INTO tackle.prompts (role, slug, version, title, body_md, parameter_schema, tags)
+         VALUES ($1,$2,$3,$4,$5,'{}'::jsonb,'{}'::text[])
+         ON CONFLICT (role, slug, version) DO UPDATE
+         SET title = EXCLUDED.title, body_md = EXCLUDED.body_md, updated_at = NOW()`,
+        [name, slug, version, spec.persona.title || `${name} persona`, spec.persona.body_md]
+      );
+      steps.push("persona_prompt");
+    }
+
+    // 4. tool access allowlist
+    if (spec.tools && spec.tools.length > 0) {
+      const tools = spec.tools.map((t) =>
+        typeof t === "string" ? { mcp_id: "", tool_slug: t } : t
+      );
+      const r = await client.query(
+        `INSERT INTO tackle.role_tool_access (role, mcp_id, tool_slug)
+         SELECT $1, mcp_id, tool_slug
+         FROM unnest($2::text[], $3::text[]) AS t(mcp_id, tool_slug)
+         ON CONFLICT DO NOTHING`,
+        [name, tools.map((t) => t.mcp_id || ""), tools.map((t) => t.tool_slug)]
+      );
+      steps.push(`tool_access(${r.rowCount ?? 0})`);
+    }
+    if (spec.toolTemplateRole) {
+      const r = await client.query(
+        `INSERT INTO tackle.role_tool_access (role, mcp_id, tool_slug)
+         SELECT $1, mcp_id, tool_slug FROM tackle.role_tool_access WHERE role = $2
+         ON CONFLICT DO NOTHING`,
+        [name, spec.toolTemplateRole]
+      );
+      steps.push(`tool_access_seed(${r.rowCount ?? 0})`);
+    }
+
+    // 5. procedure cards
+    if (spec.procedures && spec.procedures.length > 0) {
+      for (const slug of spec.procedures) {
+        await client.query(
+          `INSERT INTO tackle.role_memory (memory_id, role, as_of_dt, expiration_dt)
+           SELECT m.id, $1, NOW(), NULL FROM tackle.memory m WHERE m.slug = $2
+           AND NOT EXISTS (
+             SELECT 1 FROM tackle.role_memory rm
+             WHERE rm.role = $1 AND rm.memory_id = m.id AND rm.expiration_dt IS NULL
+           )`,
+          [name, slug]
+        );
+      }
+      steps.push(`procedures(${spec.procedures.length})`);
+    }
+    if (spec.procedureTemplateRole) {
+      const r = await client.query(
+        `INSERT INTO tackle.role_memory (memory_id, role, as_of_dt, expiration_dt)
+         SELECT rm.memory_id, $1, NOW(), NULL FROM tackle.role_memory rm
+         WHERE rm.role = $2 AND rm.expiration_dt IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM tackle.role_memory x
+           WHERE x.role = $1 AND x.memory_id = rm.memory_id AND x.expiration_dt IS NULL
+         )`,
+        [name, spec.procedureTemplateRole]
+      );
+      steps.push(`procedures_seed(${r.rowCount ?? 0})`);
+    }
+
+    // 6. nebula.roles dual-registry sync (Gap 7)
+    const nb = spec.nebula || {};
+    const displayName = spec.displayName || titleCaseProvision(name);
+    await client.query(
+      `INSERT INTO nebula.roles
+         (name, display_name, description, owns_domains,
+          can_greenlight, can_create_questions, can_create_agendas,
+          can_resolve_questions, can_verify_work_requests,
+          max_open_questions, requires_approval_from,
+          cron_enabled, cron_expression, cron_description,
+          escalates_to, escalation_triggers,
+          level_filter_primary, level_filter_allowed, visibility_scope)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+       ON CONFLICT (name) DO UPDATE
+       SET display_name = EXCLUDED.display_name, description = EXCLUDED.description,
+           owns_domains = EXCLUDED.owns_domains, can_greenlight = EXCLUDED.can_greenlight,
+           can_create_questions = EXCLUDED.can_create_questions,
+           can_create_agendas = EXCLUDED.can_create_agendas,
+           can_resolve_questions = EXCLUDED.can_resolve_questions,
+           can_verify_work_requests = EXCLUDED.can_verify_work_requests,
+           max_open_questions = EXCLUDED.max_open_questions,
+           requires_approval_from = EXCLUDED.requires_approval_from,
+           cron_enabled = EXCLUDED.cron_enabled, cron_expression = EXCLUDED.cron_expression,
+           cron_description = EXCLUDED.cron_description, escalates_to = EXCLUDED.escalates_to,
+           escalation_triggers = EXCLUDED.escalation_triggers,
+           level_filter_primary = EXCLUDED.level_filter_primary,
+           level_filter_allowed = EXCLUDED.level_filter_allowed,
+           visibility_scope = EXCLUDED.visibility_scope, updated_at = NOW()`,
+      [name, displayName, spec.description ?? null, nb.ownsDomains ?? [],
+       nb.canGreenlight ?? false, nb.canCreateQuestions ?? false, nb.canCreateAgendas ?? false,
+       nb.canResolveQuestions ?? false, nb.canVerifyWorkRequests ?? false,
+       nb.maxOpenQuestions ?? null, nb.requiresApprovalFrom ?? [],
+       nb.cronEnabled ?? false, nb.cronExpression ?? null, nb.cronDescription ?? null,
+       nb.escalatesTo ?? [], nb.escalationTriggers ?? [],
+       nb.levelFilterPrimary ?? "level <= 2", nb.levelFilterAllowed ?? "level <= 3",
+       nb.visibilityScope ?? ["planner", "all"]]
+    );
+    steps.push("nebula_roles_sync");
+
+    // 7. assembly user (posting identity)
+    if (spec.createAssemblyUser) {
+      const email = spec.assemblyEmail || `${name}@nexus.local`;
+      await client.query(
+        `INSERT INTO assembly.users (id, alias, email, password, avatar_url, admin)
+         VALUES (gen_random_uuid(), $1, $2, 'changeme', NULL, false)
+         ON CONFLICT (alias) DO NOTHING`,
+        [name, email]
+      );
+      steps.push("assembly_user");
+    }
+
+    return { role: name, steps };
+  });
+}
+
 // ── Tasks (extend) ──────────────────────────────────────────────────
 
 export async function upsertTackleTask(data: {
