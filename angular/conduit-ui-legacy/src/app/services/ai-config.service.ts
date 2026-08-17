@@ -1,7 +1,7 @@
 import { Injectable, signal, Inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap, concat, EMPTY } from 'rxjs';
-import { last } from 'rxjs/operators';
+import { last, map } from 'rxjs/operators';
 import { API_BASE_URL } from './api-config';
 
 export interface AIProvider {
@@ -127,6 +127,15 @@ export class AIConfigService {
         }
       }
     } catch { /* ignore */ }
+  }
+
+  /** Fetch all known role names (tackle-srv GET /roles) — drives the
+   *  AI-config dialog's dynamic role list (Gap 5: was hardcoded to
+   *  planner/builder/reviewer/critic, so new roles never appeared). */
+  fetchRoles(): Observable<string[]> {
+    return this.http.get<{ roles: { name: string }[] }>(`${this.api}/roles`).pipe(
+      map(r => (r.roles ?? []).map(x => x.name)),
+    );
   }
 
   /** Fetch the full AI config snapshot. */

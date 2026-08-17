@@ -7704,13 +7704,17 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
     }
   });
 
-  // DELETE /api/roles/:id — remove role metadata (Gap 2).
-  // Hard delete guarded: FK references from wind.titles / nebula.roles_history
-  // surface as 23503 → 409 with a hint instead of a raw PG error.
+  // DELETE /api/roles/:id — remove role metadata (Gap 2). Accepts a UUID or
+  // a role name (architect review: previously UUID-only). Hard delete guarded:
+  // FK references from wind.titles / nebula.roles_history surface as 23503 →
+  // 409 with a hint instead of a raw PG error.
   router.delete('/roles/:id', async (req: Request, res: Response) => {
     try {
-      const { id } = req.params;
-      const { rowCount } = await pool.query('DELETE FROM nebula.roles WHERE id = $1', [id]);
+      const id = String(req.params.id);
+      const target = isUuid(id) ? id : null;
+      const { rowCount } = target
+        ? await pool.query('DELETE FROM nebula.roles WHERE id = $1', [id])
+        : await pool.query('DELETE FROM nebula.roles WHERE name = $1', [id]);
       if (rowCount === 0) return res.status(404).json({ error: 'Role not found' });
       res.json({ ok: true, id });
     } catch (err: any) {

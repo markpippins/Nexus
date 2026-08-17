@@ -12,6 +12,8 @@ const CONDUIT_MCP_PORT = 3100;
 const CONDUIT_MCP_HOST = 'localhost';
 const CONDUIT_SRV_PORT = 3104;
 const CONDUIT_SRV_HOST = 'localhost';
+const TACKLE_SRV_PORT = 3410;
+const TACKLE_SRV_HOST = 'localhost';
 
 const DIST_DIR = path.join(__dirname, 'dist', 'conduit-ui', 'browser');
 
@@ -23,6 +25,13 @@ const API_PREFIXES = [
   '/sessions', '/health',
   '/plans', '/circuit-breaker', '/conduit', '/agents',
   '/tickets',
+];
+
+// Routes proxied to tackle-srv (3410) — AI config registry (providers/harnesses/
+// models/roles/prompts/tool-access) + role provisioning. Checked BEFORE
+// SRV_PREFIXES so /config/ai wins over the /config → conduit-srv rule.
+const TACKLE_PREFIXES = [
+  '/config/ai', '/roles', '/memory', '/prompts',
 ];
 
 // Routes proxied to conduit-srv (3104) — pure-DB REST (extracted from conduit-mcp)
@@ -58,6 +67,10 @@ function isSrvPath(urlPath) {
   return SRV_PREFIXES.some(prefix => urlPath === prefix || urlPath.startsWith(prefix + '/'));
 }
 
+function isTacklePath(urlPath) {
+  return TACKLE_PREFIXES.some(prefix => urlPath === prefix || urlPath.startsWith(prefix + '/'));
+}
+
 function serveStatic(res, filePath) {
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME_TYPES[ext] || 'application/octet-stream';
@@ -88,6 +101,10 @@ function proxyToMcp(req, res) {
 
 function proxyToSrv(req, res) {
   proxyTo(req, res, CONDUIT_SRV_HOST, CONDUIT_SRV_PORT);
+}
+
+function proxyToTackle(req, res) {
+  proxyTo(req, res, TACKLE_SRV_HOST, TACKLE_SRV_PORT);
 }
 
 function proxyTo(req, res, host, port) {
@@ -134,6 +151,10 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (isTacklePath(urlPath)) {
+    return proxyToTackle(req, res);
+  }
+
   if (isSrvPath(urlPath)) {
     return proxyToSrv(req, res);
   }
@@ -154,5 +175,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`[conduit-ui-legacy] Server running on http://0.0.0.0:${PORT}`);
   console.log(`[conduit-ui-legacy] Proxying MCP routes to ${CONDUIT_MCP_HOST}:${CONDUIT_MCP_PORT}`);
   console.log(`[conduit-ui-legacy] Proxying REST routes to ${CONDUIT_SRV_HOST}:${CONDUIT_SRV_PORT}`);
+  console.log(`[conduit-ui-legacy] Proxying tackle routes to ${TACKLE_SRV_HOST}:${TACKLE_SRV_PORT}`);
 });
 
