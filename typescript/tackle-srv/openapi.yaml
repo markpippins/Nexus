@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: tackle-srv — Tackle Role Memory + Agent Orchestration
-  version: 1.0.93c006c2
+  version: 1.0.ecbf9d12
   description: 'Tackle role memory and orchestration: AI config, sessions, roles, scheduler, memory, prompts, tool access,
     failure recovery, tasks, and logs.
 
@@ -53,6 +53,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Full snapshot
   /config/ai/bundle:
     post:
       tags:
@@ -184,6 +185,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Config Bundles
   /config/ai/bundles/{role}:
     get:
       tags:
@@ -386,6 +388,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Harnesses
   /config/ai/import:
     post:
       tags:
@@ -416,6 +419,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Import full snapshot
   /config/ai/model:
     post:
       tags:
@@ -547,6 +551,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Models
   /config/ai/provider:
     post:
       tags:
@@ -678,6 +683,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Providers
   /config/ai/resolve/{role}:
     get:
       tags:
@@ -708,6 +714,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Resolved Config
       parameters:
       - name: role
         in: path
@@ -845,6 +852,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Role Configs
   /config/ai/seed-defaults:
     post:
       tags:
@@ -875,6 +883,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Seed defaults
   /config/ai/test:
     post:
       tags:
@@ -905,6 +914,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Test Invoke
   /config/ai/tool-access:
     get:
       tags:
@@ -1037,6 +1047,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Validate
   /config/ai/verify:
     post:
       tags:
@@ -1192,6 +1203,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Health
   /health/history:
     get:
       tags:
@@ -1639,6 +1651,42 @@ paths:
                 $ref: '#/components/schemas/Error'
       summary: POST /projections — create new projection config
   /projections/{id}:
+    delete:
+      tags:
+      - projections
+      operationId: delete_projections_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: DELETE /projections/:id — delete a projection config
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
     get:
       tags:
       - projections

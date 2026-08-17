@@ -6,6 +6,7 @@ import {
   getProjection,
   createProjection,
   updateProjection,
+  deleteProjection,
   getPersonaForRole,
   getProceduresForRole,
 } from "../db";
@@ -276,6 +277,25 @@ projectionsRouter.put("/:id", async (req, res) => {
       res.status(409).json({ error: `Projection name '${req.body?.name}' already exists` });
       return;
     }
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /projections/:id — delete a projection config
+projectionsRouter.delete("/:id", async (req, res) => {
+  try {
+    const existing = await getProjection(req.params.id);
+    if (!existing) {
+      res.status(404).json({ error: "Projection not found" });
+      return;
+    }
+    const deleted = await deleteProjection(req.params.id);
+    if (!deleted) {
+      res.status(404).json({ error: "Projection not found" });
+      return;
+    }
+    res.json({ deleted: true, id: req.params.id, name: existing.name });
+  } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
 });

@@ -2720,6 +2720,15 @@ export async function updateProjection(id: string, updates: Record<string, any>)
   );
 }
 
+/** Delete a projection config by id. Returns true if a row was removed. */
+export async function deleteProjection(id: string): Promise<boolean> {
+  const changes = await qRun(
+    `DELETE FROM tackle.projection_configs WHERE id = @id`,
+    { id }
+  );
+  return changes > 0;
+}
+
 /** Get the latest opencode-persona body for a role from tackle.prompts. */
 export async function getPersonaForRole(role: string): Promise<string | null> {
   const row = await qOne(

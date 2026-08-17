@@ -5,46 +5,46 @@
 
 Tackle role memory and orchestration: AI config, sessions, roles, scheduler, memory, prompts, tool access, failure recovery, tasks, and logs.
 
-**76 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**77 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/config/ai` |  |
+| GET | `/config/ai` | Full snapshot |
 | POST | `/config/ai/bundle` |  |
 | DELETE | `/config/ai/bundle/:id` |  |
 | GET | `/config/ai/bundle/:id` |  |
-| GET | `/config/ai/bundles` |  |
+| GET | `/config/ai/bundles` | Config Bundles |
 | GET | `/config/ai/bundles/:role` |  |
 | POST | `/config/ai/bundles/:role` |  |
 | POST | `/config/ai/harness` |  |
 | DELETE | `/config/ai/harness/:id` |  |
 | GET | `/config/ai/harness/:id` |  |
-| GET | `/config/ai/harnesses` |  |
-| POST | `/config/ai/import` |  |
+| GET | `/config/ai/harnesses` | Harnesses |
+| POST | `/config/ai/import` | Import full snapshot |
 | POST | `/config/ai/model` |  |
 | DELETE | `/config/ai/model/:id` |  |
 | GET | `/config/ai/model/:id` |  |
-| GET | `/config/ai/models` |  |
+| GET | `/config/ai/models` | Models |
 | POST | `/config/ai/provider` |  |
 | DELETE | `/config/ai/provider/:id` |  |
 | GET | `/config/ai/provider/:id` |  |
-| GET | `/config/ai/providers` |  |
-| GET | `/config/ai/resolve/:role` |  |
+| GET | `/config/ai/providers` | Providers |
+| GET | `/config/ai/resolve/:role` | Resolved Config |
 | POST | `/config/ai/role` |  |
 | DELETE | `/config/ai/role/:role` |  |
 | GET | `/config/ai/role/:role` |  |
-| GET | `/config/ai/roles` |  |
-| POST | `/config/ai/seed-defaults` |  |
-| POST | `/config/ai/test` |  |
+| GET | `/config/ai/roles` | Role Configs |
+| POST | `/config/ai/seed-defaults` | Seed defaults |
+| POST | `/config/ai/test` | Test Invoke |
 | GET | `/config/ai/tool-access` |  |
 | PATCH | `/config/ai/tool-access/:id` |  |
 | GET | `/config/ai/tool-access/:role` |  |
-| GET | `/config/ai/validate` |  |
+| GET | `/config/ai/validate` | Validate |
 | POST | `/config/ai/verify` |  |
 | GET | `/config/ai/verify/:sessionId` |  |
 | GET | `/config/failure-recovery` |  |
 | POST | `/config/failure-recovery` |  |
-| GET | `/health` |  |
+| GET | `/health` | Health |
 | GET | `/health/history` | GET /health/history — time-series metrics |
 | GET | `/health/metrics` | GET /health/metrics — current snapshot with full details |
 | POST | `/health/simulate-load` | POST /health/simulate-load — no-op stub (live server has no load simulation) |
@@ -59,6 +59,7 @@ Tackle role memory and orchestration: AI config, sessions, roles, scheduler, mem
 | GET | `/memory/role-updates` |  |
 | GET | `/projections` | Routes GET /projections — list all projection configs |
 | POST | `/projections` | POST /projections — create new projection config |
+| DELETE | `/projections/:id` | DELETE /projections/:id — delete a projection config |
 | GET | `/projections/:id` | GET /projections/:id — get single projection config |
 | PUT | `/projections/:id` | PUT /projections/:id — update projection config |
 | POST | `/projections/:id/render` | POST /projections/:id/render — render a single projection |
