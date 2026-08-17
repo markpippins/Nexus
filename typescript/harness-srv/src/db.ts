@@ -9,7 +9,7 @@
 import { Pool } from "pg";
 import Redis from "ioredis";
 import { opencodeModelId, opencodeProviderFromConfig } from "./model";
-import { decideConfigAdmission, type ConfigAdmission } from "./admission";
+import { decideConfigAdmission, decideRoleGovernance, type ConfigAdmission, type RoleGovernanceAdmission } from "./admission";
 
 const pool = new Pool({
   host: process.env.PG_HOST || "localhost",
@@ -307,6 +307,46 @@ export async function resolveRoleModel(role: string): Promise<ResolvedModelConfi
 export type LeaseDerivedState = "NEVER_LEASED" | "ACTIVE" | "REVOKED" | "EXPIRED";
 
 /**
+ * D-2026-08-16-009 (R6): capability-proof admission from the governance store.
+ *
+ * nebula.roles is a bitemporal view — it only returns rows whose recorded
+ * interval AND validity window are current. Classification order:
+ *   1. current         — in nebula.roles → capability check (owns_domains).
+ *   2. expired         — in roles_history but not the current view → validity
+ *                        window not current (expired or not yet active).
+ *   3. runtime_persona — in tackle.roles (runtime plane) but not a governance
+ *                        role → admitted here; its capability proof is the
+ *                        runtime config_bundle, gated by config admission.
+ *   4. missing         — no canonical key anywhere → denied.
+ */
+export async function checkRoleGovernance(role: string): Promise<RoleGovernanceAdmission> {
+  const current = await pool.query(
+    `SELECT owns_domains FROM nebula.roles WHERE name = $1`,
+    [role]
+  );
+  if (current.rows.length > 0) {
+    return decideRoleGovernance({
+      kind: "current",
+      owns_domains: current.rows[0].owns_domains,
+    });
+  }
+  const history = await pool.query(
+    `SELECT 1 FROM nebula.roles_history WHERE name = $1 LIMIT 1`,
+    [role]
+  );
+  if (history.rows.length > 0) {
+    return decideRoleGovernance({ kind: "expired" });
+  }
+  const persona = await pool.query(
+    `SELECT 1 FROM tackle.roles WHERE name = $1 LIMIT 1`,
+    [role]
+  );
+  return decideRoleGovernance(
+    persona.rows.length > 0 ? { kind: "runtime_persona" } : { kind: "missing" }
+  );
+}
+
+/**
  * D-2026-08-16-008 (R1): derived lease state for a role from
  * tackle.role_leases — NEVER_LEASED / ACTIVE / REVOKED / EXPIRED.
  */
@@ -329,6 +369,17 @@ export async function checkRoleLeaseState(role: string): Promise<LeaseDerivedSta
 }
 
 export async function checkConfigAdmission(role: string): Promise<ConfigAdmission> {
+  // 1. Governance capability-proof (D-2026-08-16-009 R6): canonical role
+  //    key + active validity window + capability proof BEFORE runtime
+  //    admission. Denials: ROLE_MISSING / ROLE_EXPIRED /
+  //    CAPABILITY_INSUFFICIENT. A runtime persona (tackle.roles, absent from
+  //    nebula.roles) is admitted here; its capability proof is the runtime
+  //    config_bundle checked in step 2.
+  const governance = await checkRoleGovernance(role);
+  if (!governance.valid) return governance;
+
+  // 2. Runtime config admission (NO_CONFIG / ROLE_REVOKED /
+  //    CONFIG_INVALIDATED).
   const result = await pool.query(
     `SELECT is_active,
             (valid_from IS NOT NULL AND valid_from > NOW()) AS not_yet_valid,
@@ -340,7 +391,7 @@ export async function checkConfigAdmission(role: string): Promise<ConfigAdmissio
   const config = decideConfigAdmission(result.rows as any[]);
   if (!config.valid) return config;
 
-  // D-2026-08-16-008 (R2): lease-derived revocation gates admission. An
+  // 3. D-2026-08-16-008 (R2): lease-derived revocation gates admission. An
   // explicitly-revoked lease (released_at set) is a governance signal — deny
   // new work with ROLE_REVOKED. NEVER_LEASED stays advisory (warn-and-
   // proceed); lease quota remains worker-pool-only (D-007).

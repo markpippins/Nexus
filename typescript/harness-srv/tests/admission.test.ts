@@ -16,7 +16,7 @@
  * Usage: npx tsx tests/admission.test.ts
  */
 
-import { decideConfigAdmission, ADMISSION_OUTCOME, ConfigBundleSnapshot } from "../src/admission";
+import { decideConfigAdmission, decideRoleGovernance, ADMISSION_OUTCOME, ConfigBundleSnapshot } from "../src/admission";
 
 let passed = 0;
 let failed = 0;
@@ -42,6 +42,9 @@ console.log("== outcome vocabulary ==");
   assert(ADMISSION_OUTCOME.CONFIG_INVALIDATED === "CONFIG_INVALIDATED", "CONFIG_INVALIDATED present");
   assert(ADMISSION_OUTCOME.NO_CONFIG === "NO_CONFIG", "NO_CONFIG present");
   assert(ADMISSION_OUTCOME.LEASE_EXPIRED === "LEASE_EXPIRED", "LEASE_EXPIRED (worker-pool vocabulary) present");
+  assert(ADMISSION_OUTCOME.ROLE_MISSING === "ROLE_MISSING", "ROLE_MISSING present");
+  assert(ADMISSION_OUTCOME.ROLE_EXPIRED === "ROLE_EXPIRED", "ROLE_EXPIRED present");
+  assert(ADMISSION_OUTCOME.CAPABILITY_INSUFFICIENT === "CAPABILITY_INSUFFICIENT", "CAPABILITY_INSUFFICIENT present");
 }
 
 console.log("== no config ==");
@@ -80,6 +83,36 @@ console.log("== allowed ==");
 {
   const a = decideConfigAdmission([bundle({ is_active: 0 }), bundle({ expired: true }), bundle()]);
   assert(a.valid === true, "one valid bundle among revoked/invalidated → allowed");
+}
+
+console.log("== governance (D-009 R6 capability-proof) ==");
+{
+  const a = decideRoleGovernance({ kind: "missing" });
+  assert(a.valid === false, "missing role → denied");
+  if (!a.valid) assert(a.outcome === "ROLE_MISSING", "outcome = ROLE_MISSING");
+}
+{
+  const a = decideRoleGovernance({ kind: "runtime_persona" });
+  assert(a.valid === true, "runtime persona (absent from governance store) → allowed");
+}
+{
+  const a = decideRoleGovernance({ kind: "expired" });
+  assert(a.valid === false, "expired role → denied");
+  if (!a.valid) assert(a.outcome === "ROLE_EXPIRED", "outcome = ROLE_EXPIRED");
+}
+{
+  const a = decideRoleGovernance({ kind: "current", owns_domains: null });
+  assert(a.valid === false, "null owns_domains → denied");
+  if (!a.valid) assert(a.outcome === "CAPABILITY_INSUFFICIENT", "null owns_domains → CAPABILITY_INSUFFICIENT");
+}
+{
+  const a = decideRoleGovernance({ kind: "current", owns_domains: [] });
+  assert(a.valid === false, "empty owns_domains → denied");
+  if (!a.valid) assert(a.outcome === "CAPABILITY_INSUFFICIENT", "empty owns_domains → CAPABILITY_INSUFFICIENT");
+}
+{
+  const a = decideRoleGovernance({ kind: "current", owns_domains: ["execution"] });
+  assert(a.valid === true, "current role with capabilities → allowed");
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
