@@ -1,5 +1,6 @@
 package com.aibizarchitect.nexus.v1.spring.serviceregistry.controller;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,7 +19,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.client.ServicesConsoleClient;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceConfiguration;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceDependency;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.SystemServices;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceConfigurationRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceDependencyRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.SystemServicesRepository;
 
 @RestController
 @RequestMapping("/api/v1/services")
@@ -28,10 +35,19 @@ public class ServiceController {
 
     private final ServicesConsoleClient client;
     private final ServiceRepository serviceRepository;
+    private final ServiceConfigurationRepository serviceConfigurationRepository;
+    private final ServiceDependencyRepository serviceDependencyRepository;
+    private final SystemServicesRepository systemServicesRepository;
 
-    public ServiceController(ServicesConsoleClient client, ServiceRepository serviceRepository) {
+    public ServiceController(ServicesConsoleClient client, ServiceRepository serviceRepository,
+            ServiceConfigurationRepository serviceConfigurationRepository,
+            ServiceDependencyRepository serviceDependencyRepository,
+            SystemServicesRepository systemServicesRepository) {
         this.client = client;
         this.serviceRepository = serviceRepository;
+        this.serviceConfigurationRepository = serviceConfigurationRepository;
+        this.serviceDependencyRepository = serviceDependencyRepository;
+        this.systemServicesRepository = systemServicesRepository;
     }
 
     @GetMapping
@@ -152,6 +168,7 @@ public class ServiceController {
     }
 
     @DeleteMapping("/{id}")
+    @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<Void> deleteService(@PathVariable Long id) {
         log.info("Deleting service with ID: {}", id);
 
@@ -159,6 +176,43 @@ public class ServiceController {
         if (serviceOpt.isEmpty()) {
             log.warn("Service with ID {} not found", id);
             return ResponseEntity.notFound().build();
+        }
+
+        Service service = serviceOpt.get();
+
+        // T27: clear uncascaded FK dependents before the hard delete.
+        // registry.services is referenced by service_configs, service_dependencies
+        // (both directions), system_services, and the self-FK parent_service_id.
+        // Deployments cascade via the entity's orphanRemoval mapping.
+
+        // 1. Promote children to top-level (avoid cascade-deleting whole subtrees)
+        List<Service> subModules = serviceRepository.findByParentService_Id(id);
+        if (!subModules.isEmpty()) {
+            for (Service child : subModules) {
+                child.setParentService(null);
+            }
+            serviceRepository.saveAll(subModules);
+            log.info("Promoted {} sub-module(s) of service {} to top-level", subModules.size(), id);
+        }
+
+        // 2. Service configurations
+        List<ServiceConfiguration> configs = serviceConfigurationRepository.findByServiceId(id);
+        if (!configs.isEmpty()) {
+            serviceConfigurationRepository.deleteAll(configs);
+        }
+
+        // 3. Service dependencies in both directions
+        List<ServiceDependency> deps = new ArrayList<>();
+        deps.addAll(serviceDependencyRepository.findByServiceId(id));
+        deps.addAll(serviceDependencyRepository.findByTargetServiceId(id));
+        if (!deps.isEmpty()) {
+            serviceDependencyRepository.deleteAll(deps);
+        }
+
+        // 4. System-service mappings
+        List<SystemServices> systemMappings = systemServicesRepository.findByServiceId(id);
+        if (!systemMappings.isEmpty()) {
+            systemServicesRepository.deleteAll(systemMappings);
         }
 
         serviceRepository.deleteById(id);

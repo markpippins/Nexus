@@ -1,5 +1,6 @@
 package com.aibizarchitect.nexus.v1.spring.serviceregistry.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -11,7 +12,13 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceConfiguration;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceDependency;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.SystemServices;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceConfigurationRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceDependencyRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.SystemServicesRepository;
 
 /**
  * Service implementing cache-aside pattern for Service entity operations.
@@ -30,11 +37,20 @@ public class ServiceCacheService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final ServiceRepository serviceRepository;
+    private final ServiceConfigurationRepository serviceConfigurationRepository;
+    private final ServiceDependencyRepository serviceDependencyRepository;
+    private final SystemServicesRepository systemServicesRepository;
 
     public ServiceCacheService(@Nullable RedisTemplate<String, Object> redisTemplate,
-            ServiceRepository serviceRepository) {
+            ServiceRepository serviceRepository,
+            ServiceConfigurationRepository serviceConfigurationRepository,
+            ServiceDependencyRepository serviceDependencyRepository,
+            SystemServicesRepository systemServicesRepository) {
         this.redisTemplate = redisTemplate;
         this.serviceRepository = serviceRepository;
+        this.serviceConfigurationRepository = serviceConfigurationRepository;
+        this.serviceDependencyRepository = serviceDependencyRepository;
+        this.systemServicesRepository = systemServicesRepository;
         if (redisTemplate == null) {
             log.warn("Redis is not available - ServiceCacheService will operate without caching");
         }
@@ -163,11 +179,38 @@ public class ServiceCacheService {
 
     /**
      * Delete service and evict from cache.
+     * Clears uncascaded FK dependents (configs, dependencies, system mappings)
+     * and promotes children to top-level before the hard delete (T27).
      */
     @Transactional
     public void deleteService(Long id) {
         Optional<com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service> service = serviceRepository.findById(id);
         service.ifPresent(s -> {
+            // Promote child services to top-level (self-FK parent_service_id)
+            List<com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service> subModules = serviceRepository
+                    .findByParentService_Id(id);
+            if (!subModules.isEmpty()) {
+                subModules.forEach(child -> child.setParentService(null));
+                serviceRepository.saveAll(subModules);
+            }
+            // Service configurations (uncascaded FK)
+            List<ServiceConfiguration> configs = serviceConfigurationRepository.findByServiceId(id);
+            if (!configs.isEmpty()) {
+                serviceConfigurationRepository.deleteAll(configs);
+            }
+            // Dependencies in both directions
+            List<ServiceDependency> deps = new ArrayList<>();
+            deps.addAll(serviceDependencyRepository.findByServiceId(id));
+            deps.addAll(serviceDependencyRepository.findByTargetServiceId(id));
+            if (!deps.isEmpty()) {
+                serviceDependencyRepository.deleteAll(deps);
+            }
+            // System-service mappings
+            List<SystemServices> systemMappings = systemServicesRepository.findByServiceId(id);
+            if (!systemMappings.isEmpty()) {
+                systemServicesRepository.deleteAll(systemMappings);
+            }
+
             serviceRepository.deleteById(id);
             evictService(s);
             invalidateAllServicesCache();

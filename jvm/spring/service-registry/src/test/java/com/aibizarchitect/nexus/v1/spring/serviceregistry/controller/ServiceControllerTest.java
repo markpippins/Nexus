@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -34,7 +36,12 @@ import com.aibizarchitect.nexus.v1.spring.serviceregistry.config.TestJpaConfig;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.controller.ServiceController;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Framework;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceConfiguration;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceDependency;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceConfigurationRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceDependencyRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.SystemServicesRepository;
 
 @WebMvcTest(ServiceController.class)
 @Import(TestJpaConfig.class)
@@ -48,6 +55,15 @@ class ServiceControllerTest {
 
     @MockBean
     private ServiceRepository serviceRepository;
+
+    @MockBean
+    private ServiceConfigurationRepository serviceConfigurationRepository;
+
+    @MockBean
+    private ServiceDependencyRepository serviceDependencyRepository;
+
+    @MockBean
+    private SystemServicesRepository systemServicesRepository;
 
     private Service testService;
     private Framework testFramework;
@@ -216,6 +232,49 @@ class ServiceControllerTest {
 
         mockMvc.perform(delete("/api/v1/services/1"))
                 .andExpect(status().isNoContent());
+
+        verify(serviceRepository).deleteById(1L);
+    }
+
+    @Test
+    void deleteService_WithDependents_ClearsUncascadedFKsBeforeDelete() throws Exception {
+        // T27 regression: DELETE /api/v1/services/{id} previously 500'd with an FK
+        // violation on service_configs.service_id (and would have on
+        // service_dependencies, system_services, and the parent_service_id self-FK).
+        Service child = new Service();
+        child.setId(2L);
+        child.setName("Child Service");
+        child.setParentService(testService);
+
+        ServiceConfiguration config = new ServiceConfiguration();
+        config.setId(10L);
+
+        ServiceDependency dep = new ServiceDependency();
+        dep.setId(20L);
+
+        ServiceDependency dep2 = new ServiceDependency();
+        dep2.setId(21L);
+
+        when(serviceRepository.findById(1L)).thenReturn(Optional.of(testService));
+        when(serviceRepository.findByParentService_Id(1L)).thenReturn(List.of(child));
+        when(serviceConfigurationRepository.findByServiceId(1L)).thenReturn(List.of(config));
+        when(serviceDependencyRepository.findByServiceId(1L)).thenReturn(List.of(dep));
+        when(serviceDependencyRepository.findByTargetServiceId(1L)).thenReturn(List.of(dep2));
+        when(systemServicesRepository.findByServiceId(1L)).thenReturn(List.of(new com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.SystemServices()));
+        doNothing().when(serviceRepository).deleteById(1L);
+
+        mockMvc.perform(delete("/api/v1/services/1"))
+                .andExpect(status().isNoContent());
+
+        // Order: children promoted → configs cleared → dependencies (both
+        // directions) cleared → system mappings cleared → service deleted
+        var inOrder = inOrder(serviceRepository, serviceConfigurationRepository,
+                serviceDependencyRepository, systemServicesRepository);
+        inOrder.verify(serviceRepository).saveAll(List.of(child));
+        inOrder.verify(serviceConfigurationRepository).deleteAll(List.of(config));
+        inOrder.verify(serviceDependencyRepository).deleteAll(List.of(dep, dep2));
+        inOrder.verify(systemServicesRepository).deleteAll(org.mockito.ArgumentMatchers.anyList());
+        inOrder.verify(serviceRepository).deleteById(1L);
     }
 
     @Test
