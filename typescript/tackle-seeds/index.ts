@@ -2900,6 +2900,79 @@ BEGIN
             VALUES (v_memory_id, v_role, NOW(), NULL);
         END LOOP;
     END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 45. Decision Cards (ask-user vocabulary)
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'decision-cards',
+        'Decision Cards (ask-user vocabulary)',
+        'When to emit interactive decision cards in Assembly threads (checkbox multi-select, radio single-choice, Other free-text) and how to parse the **Agreed selection:** reply.',
+        '## Procedure\n'
+        'Decision cards are the Assembly analogue of the CLI \`ask_user\` contract: interactive markdown blocks you emit in a thread (or comment) so the user can answer with a structured click instead of free prose. The Assembly UI renders them; the user''s selection is written back as a durable \`**Agreed selection:**\` reply you can parse deterministically.\n'
+        '\n'
+        '### When to emit\n'
+        'Use a decision card when the question has a **bounded set of choices** and the answer changes what you do next:\n'
+        '- single decision between options -> radio single-choice\n'
+        '- pick any subset -> checkbox multi-select\n'
+        '- approval / sign-off gates, branch decisions, plan acceptance, option A/B/C, "how should I proceed"\n'
+        '\n'
+        'Do NOT use a card for open-ended questions (ask in prose), or when the answer is obvious (just proceed). If the user replies in prose instead of clicking, treat the prose as the answer - the card is a convenience, never a blocker.\n'
+        '\n'
+        '### Syntax to emit\n'
+        'Checkbox (multi-select) block - one \`- [ ]\` line per option:\n'
+        '\`\`\`\n'
+        'Which of these should I include?\n'
+        '- [ ] option one\n'
+        '- [ ] option two\n'
+        '- [ ] option three\n'
+        '\`\`\`\n'
+        '\n'
+        'Radio (single-choice) block - \`- ( )\` lines; pre-select with \`- (x)\` if one is the default:\n'
+        '\`\`\`\n'
+        'How should we proceed?\n'
+        '- ( ) Option A\n'
+        '- ( ) Option B\n'
+        '- (x) Option C (default)\n'
+        '\`\`\`\n'
+        '\n'
+        '"Other" escape hatch - any option line whose label starts with **Other** (case-insensitive) opens a free-text field when selected; the typed value lands in the reply as \`Other: <text>\`:\n'
+        '\`\`\`\n'
+        '- ( ) Option A\n'
+        '- ( ) Other\n'
+        '\`\`\`\n'
+        '\n'
+        'Rules:\n'
+        '- Keep one decision per card; keep options short.\n'
+        '- A block is interactive only if EVERY line in it is a choice line - never mix prose into a choice block (use a blank line to separate prose from the list).\n'
+        '- The \`[ ]\`/\`[x]\` and \`( )\`/\`(x)\` markers must come right after \`- \` or \`* \` at the start of the line.\n'
+        '\n'
+        '### How to read the reply\n'
+        'After the user submits, the UI posts a reply beginning with \`**Agreed selection:**\` that mirrors the final visual state of the card:\n'
+        '- checkbox: \`- [x] option\` = agreed, \`- [ ] option\` = not agreed\n'
+        '- radio: \`- (x) option\` = the single choice; all others stay \`- ( )\`\n'
+        '- Other text: appended to the chosen line as \`Other: <text>\`\n'
+        '\n'
+        'Parse the block after the header; treat \`[x]\`/\`(x)\` lines as the answer. A radio card yields exactly one \`(x)\` line. If the reply contains no \`[x]\`/\`(x)\` lines, the user submitted no selection - ask again or fall back.\n'
+        '\n'
+        '### Fallbacks\n'
+        '- Card UI unavailable (plain markdown in a non-interactive client): the card renders as ordinary list text - still readable; the user can reply with prose.\n'
+        '- User replies in prose instead of clicking: treat the prose as the answer.\n'
+        '- No selection made: re-ask with a tighter card or proceed with the default.',
+        ARRAY['decision', 'ask-user', 'interactive', 'assembly', 'choice', 'agreement'],
+        ARRAY['decision needed', 'bounded choice', 'approval gate', 'branch decision', 'ask user', 'offer options', 'choose one', 'select', 'how should I proceed'],
+        '{}'
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY['analyst', 'architect', 'builder', 'critic', 'devops', 'engineer', 'engineer-ii', 'inspector', 'planner', 'reviewer', 'topologist'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
     RAISE NOTICE 'Memory procedures seeded.';
 END $$;`;
 }

@@ -1,5 +1,5 @@
 {
-  "card_count": 44,
+  "card_count": 45,
   "cards": [
     {
       "body_md": "## Agent Config Role Definition\n\nEach agent role .md file (in .opencode/agents/) MUST include a message block in its frontmatter:\n\n```yaml\n---\nassumes_role: <role>\nmessage:\n  inbox_query:\n    - tags contain \"to:<role>\"\n    - tags contain \"status:open\"\n  record_types: [list of valid record types for this role]\n  auto_present: true\n  enrich_context: true\n---\n```\n\n### Fields\n- assumes_role: The role this agent config activates (engineer, architect, planner, etc.)\n- inbox_query: Tag filters for inbox querying\n- record_types: Valid agent record types this role may write\n- auto_present: Whether to surface inbox items on every turn start\n- enrich_context: Whether to load linked system/subsystem/plan data on boot\n\n### Valid record_type values\nreport, analysis, assessment, inspection, prompt, response, engineering_log, architecture_note, decision",
@@ -176,6 +176,46 @@
         "turn boundary",
         "perceptual cycle",
         "reconciliation"
+      ]
+    },
+    {
+      "body_md": "## Procedure\nDecision cards are the Assembly analogue of the CLI `ask_user` contract: interactive markdown blocks you emit in a thread (or comment) so the user can answer with a structured click instead of free prose. The Assembly UI renders them; the user's selection is written back as a durable `**Agreed selection:**` reply you can parse deterministically.\n\n### When to emit\nUse a decision card when the question has a **bounded set of choices** and the answer changes what you do next:\n- single decision between options -> radio single-choice\n- pick any subset -> checkbox multi-select\n- approval / sign-off gates, branch decisions, plan acceptance, option A/B/C, \"how should I proceed\"\n\nDo NOT use a card for open-ended questions (ask in prose), or when the answer is obvious (just proceed). If the user replies in prose instead of clicking, treat the prose as the answer - the card is a convenience, never a blocker.\n\n### Syntax to emit\nCheckbox (multi-select) block - one `- [ ]` line per option:\n```\nWhich of these should I include?\n- [ ] option one\n- [ ] option two\n- [ ] option three\n```\n\nRadio (single-choice) block - `- ( )` lines; pre-select with `- (x)` if one is the default:\n```\nHow should we proceed?\n- ( ) Option A\n- ( ) Option B\n- (x) Option C (default)\n```\n\n\"Other\" escape hatch - any option line whose label starts with **Other** (case-insensitive) opens a free-text field when selected; the typed value lands in the reply as `Other: <text>`:\n```\n- ( ) Option A\n- ( ) Other\n```\n\nRules:\n- Keep one decision per card; keep options short.\n- A block is interactive only if EVERY line in it is a choice line - never mix prose into a choice block (use a blank line to separate prose from the list).\n- The `[ ]`/`[x]` and `( )`/`(x)` markers must come right after `- ` or `* ` at the start of the line.\n\n### How to read the reply\nAfter the user submits, the UI posts a reply beginning with `**Agreed selection:**` that mirrors the final visual state of the card:\n- checkbox: `- [x] option` = agreed, `- [ ] option` = not agreed\n- radio: `- (x) option` = the single choice; all others stay `- ( )`\n- Other text: appended to the chosen line as `Other: <text>`\n\nParse the block after the header; treat `[x]`/`(x)` lines as the answer. A radio card yields exactly one `(x)` line. If the reply contains no `[x]`/`(x)` lines, the user submitted no selection - ask again or fall back.\n\n### Fallbacks\n- Card UI unavailable (plain markdown in a non-interactive client): the card renders as ordinary list text - still readable; the user can reply with prose.\n- User replies in prose instead of clicking: treat the prose as the answer.\n- No selection made: re-ask with a tighter card or proceed with the default.",
+      "mcp_tools": [],
+      "roles": [
+        "analyst",
+        "architect",
+        "builder",
+        "critic",
+        "devops",
+        "engineer",
+        "engineer-ii",
+        "inspector",
+        "planner",
+        "reviewer",
+        "topologist"
+      ],
+      "sha256": "78004cf43324305899fdf87d325b43c37e4d39fd751e505ba9a3c61b17806b07",
+      "slug": "decision-cards",
+      "summary": "When to emit interactive decision cards in Assembly threads (checkbox multi-select, radio single-choice, Other free-text) and how to parse the **Agreed selection:** reply.",
+      "tags": [
+        "decision",
+        "ask-user",
+        "interactive",
+        "assembly",
+        "choice",
+        "agreement"
+      ],
+      "title": "Decision Cards (ask-user vocabulary)",
+      "triggers": [
+        "decision needed",
+        "bounded choice",
+        "approval gate",
+        "branch decision",
+        "ask user",
+        "offer options",
+        "choose one",
+        "select",
+        "how should I proceed"
       ]
     },
     {
@@ -1492,6 +1532,6 @@
       ]
     }
   ],
-  "role_count": 345,
+  "role_count": 356,
   "schema": "tackle"
 }
