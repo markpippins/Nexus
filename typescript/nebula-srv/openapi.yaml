@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: nebula-srv — Nebula Knowledge-Graph API
-  version: 1.0.28c99bf0
+  version: 1.0.ca0e440b
   description: 'Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge
     graph, and cross-references.
 
@@ -5702,8 +5702,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: 'DELETE /api/roles/:id — remove role metadata (Gap 2). Hard delete guarded: FK references from wind.titles
-        / nebula.roles_history surface as '
+      summary: 'DELETE /api/roles/:id — remove role metadata (Gap 2). Accepts a UUID or a role name (architect review: previously
+        UUID-only). Hard delete gu'
       parameters:
       - name: id
         in: path

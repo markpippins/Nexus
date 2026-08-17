@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: tackle-prompt-sync-srv — Prompt + Task Registry Sync
-  version: 1.0.27d7c849
+  version: 1.0.ac230a8e
   description: 'Reads prompt templates and active tasks from PostgreSQL and populates the Redis prompt:* / task:* caches for
     live agents.
 
@@ -47,6 +47,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Health check
   /prompt/{role}/{slug}:
     get:
       tags:

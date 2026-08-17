@@ -173,7 +173,7 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | GET | `/api/role-leases/stale` | GET /api/role-leases/stale — ACTIVE leases past window/budget (for sweep) |
 | GET | `/api/roles` | ROLES GET /api/roles — list all roles (governance roles with capabilities) |
 | POST | `/api/roles` | POST /api/roles — create role metadata (Gap 2: nebula.roles create API) |
-| DELETE | `/api/roles/:id` | DELETE /api/roles/:id — remove role metadata (Gap 2). Hard delete guarded: FK references from wind.titles / nebula.roles_history surface as 23503 → 409 with a hint instead of a raw PG error. |
+| DELETE | `/api/roles/:id` | DELETE /api/roles/:id — remove role metadata (Gap 2). Accepts a UUID or a role name (architect review: previously UUID-only). Hard delete guarded: FK references from wind.titles / nebula.roles_history surface as 23503 → 409 with a hint instead of a raw PG error. |
 | GET | `/api/roles/:id` | GET /api/roles/:id — single role |
 | PATCH | `/api/roles/:id` | PATCH /api/roles/:id — update capabilities/visibility/description (Gap 2) |
 | GET | `/api/search` | SEARCH (cross-entity full-text) GET /api/search?q=... |
@@ -242,3 +242,193 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 cd nexus && python3 tools/api-docs/extract_routes.py --out /tmp/api_inventory.json
 python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (vision-srv also refreshes from the live FastAPI spec)
 ```
+
+<!-- API-SPEC-BEGIN -->
+
+
+
+
+---
+
+# nebula-srv — REST & Envelope Spec
+
+> **Hand-authored section — preserved across regeneration.** Base URL:
+> `http://localhost:3101`. JSON in/out (CORS). Canonical knowledge graph over
+> the `nebula` PostgreSQL schema. **This is the database-first API** — the
+> canonical write path for harvests, agent records, projections, plans, and
+> most knowledge artifacts. Filesystem audit files are projections, never the
+> source of truth.
+>
+> **Conventions:**
+> - List endpoints are paginated; most return `{ items: [...], total, limit, offset }` (or family-specific keys like `records`, `harvests`).
+> - Agent records support filters: `role`, `recordType`, `level`, `tags`, `createdAfter` (ISO), `limit` (≤100), plus full-text `q`.
+> - Errors: `{ error: "<message>" }` with 400/404/500.
+
+## Agent records (database-first audit trail)
+
+The core messaging + audit primitive. List fields (id, recordType, role,
+model, title, sourcePath, tags, systemId, subsystemId, featureId, planRef,
+createdAt, level, visibilityScope); detail adds the full `content`.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/agent-records` | List with filters + pagination. |
+| `POST /api/agent-records` | **Create** — canonical write path. Body: `{ recordType, role, title, content, tags[], level?, visibilityScope? }`. `recordType` ∈ `report, analysis, assessment, inspection, prompt, response, engineering_log, architecture_note, decision`. `level` ∈ 1–4. |
+| `GET /api/agent-records/:id` | Full record **with content**. |
+| `PATCH /api/agent-records/:id` | Update fields. |
+| `DELETE /api/agent-records/:id` | Delete. |
+| `POST /api/agent-records/search` | Multi-tag AND/OR search. |
+
+## Hierarchy: systems → subsystems → features
+
+Each level has CRUD + scoped children lists:
+
+| Resource | CRUD | Scoped children |
+|----------|------|-----------------|
+| Systems | `GET/POST /api/systems`, `GET/PATCH/DELETE /api/systems/:id`, `POST /api/systems/demote/:id` | `…/:id/agendas`, `docs`, `harvest-candidates`, `implementation-plans`, `intent-records`, `specifications`, `work-requests`, `inventory`, `info`, `external-ids`, `folders` |
+| Subsystems | `POST /api/subsystems`, `GET/PATCH/DELETE /api/subsystems/:id`, `POST /api/subsystems/move` | `…/:id/agendas`, `docs`, `harvest-candidates`, `implementation-plans`, `intent-records`, `specifications`, `work-requests` |
+| Features | `POST /api/features`, `GET/PATCH/DELETE /api/features/:id`, `POST /api/features/move` | `…/:id/agendas`, `harvest-candidates`, `implementation-plans`, `intent-records`, `specifications`, `work-requests` |
+
+## Harvests
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/harvests` | List with pagination. |
+| `POST /api/harvests` | **Create harvest** (canonical write path). |
+| `GET /api/harvests/:id` | Single harvest. |
+| `DELETE /api/harvests/:id` | Delete. |
+| `GET /api/harvests/:id/transcript` | Conversation transcript for the harvest. |
+| `GET /api/harvests/distribution` | Distribution stats. |
+
+## Harvest candidates
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/harvest-candidates` | List with filters + pagination (CPF scores, status). |
+| `POST /api/harvest-candidates` | Create. |
+| `GET /api/harvest-candidates/:id` | Single candidate. |
+| `PATCH /api/harvest-candidates/:id` | Update. |
+| `GET /api/harvest-candidates/:id/dependencies` | Candidate dependencies. |
+| `POST /api/harvest-candidates/:id/promote` | Promote → intent record. |
+| `POST /api/harvest-candidates/:id/spawn-plan` | Spawn an implementation plan. |
+| `POST /api/harvest-candidates/discover` | Batch discovery. |
+| `POST /api/harvest-candidates/promote-to-plan` | Bulk promote-to-plan. |
+
+`/api/candidates` aliases `/api/harvest-candidates` (Assembly UI compat).
+
+## Requirements
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/requirements` | List with filters + pagination. |
+| `POST /api/requirements` | Create. |
+| `GET /api/requirements/:id` · `PATCH` · `DELETE` | Single / update / delete. |
+| `PATCH /api/requirements/batch` | Batch update. |
+| `GET /api/requirements/:id/children` | Child requirements. |
+| `POST /api/requirements/:id/compile` | Compile → implementation plan. |
+| `GET/POST/DELETE /api/requirements/:id/dependencies[/:depId]` | Dependency edges. |
+| `POST /api/requirements/:id/move` | Reparent. |
+
+## Plans, specifications, agendas
+
+- **Plans:** `GET/POST /api/plans`, `GET /api/plans/:id`, `GET /api/plans/:planRef/candidates`.
+- **Specifications:** `GET /api/specifications`, `GET /api/specifications/:id`, `POST /api/specifications/:id/link-requirements`.
+- **Agendas:** `GET /api/agendas`, `GET /api/agendas/:id`, `POST /api/agendas/:id/items` (body includes `sourceId`), `DELETE /api/agendas/:id/items?sourceId=<uuid>`, `POST /api/agendas/:id/finalize`.
+
+## Open questions
+
+`GET/POST /api/open-questions`, `GET /api/open-questions/:id`,
+`PUT /api/open-questions/:id/answer` (mark answered), `GET/POST …/answers`,
+`GET/POST …/participants`, `PUT /api/open-questions/:id/resolve`,
+`GET /api/open-questions/:id/timeline`.
+
+## Projections (DB → markdown)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/projections` | List projection configs. |
+| `POST /api/projections` | Create config (recordType/role/template/scope). |
+| `DELETE /api/projections/:id` | Delete config. |
+| `POST /api/projections/:id/render` | Render one projection (DB → audit markdown file). |
+
+## Audit (filesystem projection of agent records)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/audit` | List audit files with pagination. |
+| `GET /api/audit/:id` | Single audit file with content. |
+| `GET /api/audit/graph` | Agent records as nodes, cross-references as edges. |
+| `POST /api/audit/sync` | Scan filesystem, upsert all audit files. |
+| `POST /api/audit/:id/regenerate` | Re-read one file from disk into DB. |
+
+## Knowledge graph
+
+`GET /api/knowledge/entities`, `GET /api/knowledge/entities/:section/:entityId`,
+`GET /api/knowledge/entities/:section/:entityId/relations`,
+`GET /api/knowledge/edges`, `GET /api/knowledge/cross-references`,
+`GET /api/knowledge/summary`, `GET /api/knowledge/view`.
+Also `GET/POST/DELETE /api/cross-references[/:id]`.
+
+## Role leases (dispenser)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/role-leases?role=` | List leases (optionally by role). |
+| `GET /api/role-leases/stale` | Leases past their window still ACTIVE. |
+| `POST /api/role-leases/issue` | Issue a lease (role, channel, model, window, budget). |
+| `POST /api/role-leases/:id/renew` | Renew window + budget. |
+| `POST /api/role-leases/:id/revoke` | Revoke. |
+| `POST /api/role-leases/consume` | **Canonical accounting**: `consumed_units += 1` for a role's active lease (body `{ role }`). |
+
+## Execution bridge
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET/POST /api/execution/requests` | List / create execution requests. |
+| `GET /api/execution/requests/:id` | Single request. |
+| `PATCH /api/execution/requests/:id/transition` | State transition. |
+| `POST /api/execution/leases/acquire` | Acquire a lease. |
+| `POST /api/execution/leases/:id/renew` · `…/release` | Renew / release. |
+| `GET/POST /api/execution/attempts` | List / create attempts. |
+| `GET/POST /api/execution/receipts` | List / create receipts. |
+| `GET /api/execution/state` | Execution state snapshot. |
+
+## Conduit projection
+
+`GET /api/conduit/plans`, `GET /api/conduit/deleted-plans`,
+`GET /api/conduit/plans/:id/history`, `GET /api/conduit/plans/:id/receipts`,
+`GET /api/conduit/plans/as-of` — conduit plan receipts/history mirrored for
+UI (normalized field set differs from conduit-srv's native shapes).
+
+## Other families
+
+| Family | Endpoints |
+|--------|-----------|
+| Roles | `GET/POST /api/roles`, `GET/PATCH/DELETE /api/roles/:id` |
+| Sessions | `GET/POST /api/sessions`, `PATCH/DELETE /api/sessions/:id` |
+| Intents / intent-records | `GET /api/intents[/:id]`, `GET /api/intent-records[/:id]` |
+| Observations / assessments | `GET /api/observations[/:id]`, `GET /api/assessments[/:id]` |
+| Architect specs / artifact provenance / op-registry | CRUD per family; op-registry adds `…/:id/lineage`, `…/:id/supersede`, `…/:id/deprecate`, `POST /api/op-registry/fork` |
+| Evidence links | `GET/POST/DELETE /api/evidence-links`, `DELETE /api/evidence-links` (bulk by query) |
+| CPF | `GET /api/cpf`, `GET /api/cpf/count`, `POST /api/cpf/promote` |
+| Segments / workspaces | CRUD |
+| Snapshots | `POST /api/snapshots`, `GET /api/snapshots/:id/blocks|projection|references` |
+| Conversations | `GET /api/conversations`, `GET /api/conversations/:id/blocks|snapshots`, `GET /api/conversations/by-snapshot/:snapshotId[/blocks]` |
+| Inbox pointer | `GET /api/inbox-pointer/:role`, `PUT /api/inbox-pointer/:role` (body `{ timestamp: "<ISO>" }`) |
+| Preferences | `GET /api/preferences`, `PUT/DELETE /api/preferences/:key` |
+| External ids | `GET /api/external-ids`, `PATCH /api/external-ids/:id` |
+| Projection overrides | `POST /api/projection-overrides`, `DELETE …/:id` |
+| Search | `GET /api/search`, `POST /api/search/semantic` |
+| Cascade subscriber status | `GET /api/cascade/subscriber-status` (interactive-turn subscriber liveness) |
+
+## Health
+
+- `GET /api/health` · `GET /health` — process + DB health.
+
+## Notes
+
+- **Database-first:** never write `.md` files directly to audit dirs as the
+  initial persistence path — create records/harvests/plans through this API;
+  the filesystem is a derived projection (`POST /api/projections/:id/render`).
+- Timestamps are epoch-millis in list responses; inbox-pointer `createdAfter`
+  filters expect ISO 8601 strings.

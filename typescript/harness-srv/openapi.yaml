@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: harness-srv — Generic Execution Harness
-  version: 1.0.ef50c6b0
+  version: 1.0.f4e80554
   description: 'Merges Tackle role context (prompt + tool ACL + procedure cards) with Wind task context (inputs + acceptance
     criteria) and invokes an agent via the configured harness.
 
@@ -47,6 +47,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: GET /health
   /resolve-context:
     post:
       tags:
