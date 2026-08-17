@@ -304,6 +304,30 @@ export async function resolveRoleModel(role: string): Promise<ResolvedModelConfi
  *   - ROLE_REVOKED        — bundles exist but all is_active=0
  *   - CONFIG_INVALIDATED  — active bundles but none within valid_from/valid_to
  */
+export type LeaseDerivedState = "NEVER_LEASED" | "ACTIVE" | "REVOKED" | "EXPIRED";
+
+/**
+ * D-2026-08-16-008 (R1): derived lease state for a role from
+ * tackle.role_leases — NEVER_LEASED / ACTIVE / REVOKED / EXPIRED.
+ */
+export async function checkRoleLeaseState(role: string): Promise<LeaseDerivedState> {
+  const result = await pool.query(
+    `SELECT status, released_at, window_end, expires_at
+     FROM tackle.role_leases
+     WHERE role = $1
+     ORDER BY created_at DESC LIMIT 1`,
+    [role]
+  );
+  if (result.rows.length === 0) return "NEVER_LEASED";
+  const last = result.rows[0];
+  if (last.status === "ACTIVE") {
+    const pastWindow = new Date(last.expires_at || last.window_end) < new Date();
+    return pastWindow ? "EXPIRED" : "ACTIVE";
+  }
+  if (last.status === "RELEASED" && last.released_at) return "REVOKED";
+  return "EXPIRED";
+}
+
 export async function checkConfigAdmission(role: string): Promise<ConfigAdmission> {
   const result = await pool.query(
     `SELECT is_active,
@@ -313,7 +337,25 @@ export async function checkConfigAdmission(role: string): Promise<ConfigAdmissio
      WHERE role = $1`,
     [role]
   );
-  return decideConfigAdmission(result.rows as any[]);
+  const config = decideConfigAdmission(result.rows as any[]);
+  if (!config.valid) return config;
+
+  // D-2026-08-16-008 (R2): lease-derived revocation gates admission. An
+  // explicitly-revoked lease (released_at set) is a governance signal — deny
+  // new work with ROLE_REVOKED. NEVER_LEASED stays advisory (warn-and-
+  // proceed); lease quota remains worker-pool-only (D-007).
+  const leaseState = await checkRoleLeaseState(role);
+  if (leaseState === "REVOKED") {
+    return {
+      valid: false,
+      outcome: "ROLE_REVOKED",
+      message: "role lease revoked — issue a new lease to resume work",
+    };
+  }
+  if (leaseState === "NEVER_LEASED") {
+    console.warn(`[admission] role ${role} is NEVER_LEASED — advisory (warn-and-proceed)`);
+  }
+  return { valid: true };
 }
 
 /**

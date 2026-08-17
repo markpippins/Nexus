@@ -53,6 +53,17 @@ try {
 // ── Migrations + Start ─────────────────────────────────────────────
 let server: ReturnType<typeof app.listen> | undefined;
 
+// D-2026-08-16-007 (R5): sweep stale ACTIVE role leases → EXPIRED on start
+// and periodically. Non-destructive (never RELEASED mid-session).
+function sweepRoleLeases() {
+  fetch(`http://localhost:${PORT}/api/role-leases/sweep`, { method: 'POST' })
+    .then((r) => r.json())
+    .then((body: any) => {
+      if (body && body.swept > 0) console.log(`[role-leases] swept ${body.swept} stale lease(s)`);
+    })
+    .catch((err: any) => console.warn('[role-leases] sweep failed:', err.message));
+}
+
 async function start() {
   try {
     await runMigrations(pool);
@@ -63,6 +74,8 @@ async function start() {
   }
   server = app.listen(PORT, () => {
     console.log(`nebula-srv listening on http://localhost:${PORT}`);
+    sweepRoleLeases();
+    setInterval(sweepRoleLeases, 10 * 60 * 1000).unref();
   });
 
   // Handle listen-time errors (e.g. EADDRINUSE) cleanly so a port conflict

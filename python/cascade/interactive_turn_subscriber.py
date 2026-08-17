@@ -265,7 +265,7 @@ def _close_watch(pg_conn: Any, watch_id: str, reason: str) -> None:
 def _consume_lease(role: str) -> None:
     """POST /api/role-leases/consume on nebula (best-effort)."""
     try:
-        body = json.dumps({"role": role}).encode()
+        body = json.dumps({"role": role, "channel": "interactive"}).encode()
         req = urllib.request.Request(
             f"{NEBULA_URL}/api/role-leases/consume",
             data=body,

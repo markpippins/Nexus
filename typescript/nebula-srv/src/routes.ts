@@ -6861,14 +6861,16 @@ export function createRoutes(pool: Pool): Router {
         return;
       }
 
-      // One ACTIVE lease per role at a time (mirrors execution lease rule)
+      // D-2026-08-16-007 (R2): one ACTIVE lease per (role, channel).
+      // Different channels do not conflict.
+      const leaseChannel = channel || 'interactive';
       const { rows: existing } = await client.query(
-        "SELECT id FROM tackle.role_leases WHERE role = $1 AND status = 'ACTIVE'",
-        [role]
+        "SELECT id FROM tackle.role_leases WHERE role = $1 AND channel = $2 AND status = 'ACTIVE'",
+        [role, leaseChannel]
       );
       if (existing.length > 0) {
         await client.query('ROLLBACK');
-        res.status(409).json({ error: 'Active role lease already exists', existingLeaseId: existing[0].id });
+        res.status(409).json({ error: 'Active role lease already exists for this channel', existingLeaseId: existing[0].id });
         return;
       }
 
@@ -6887,7 +6889,7 @@ export function createRoutes(pool: Pool): Router {
         `INSERT INTO tackle.role_leases
            (role, channel, model, window_end, budget_units, expires_at)
          VALUES ($1, $2, $3, $4, $5, $4) RETURNING *`,
-        [role, channel || 'interactive', model || null, windowEndTs, budgetUnits ?? null]
+        [role, leaseChannel, model || null, windowEndTs, budgetUnits ?? null]
       );
       await client.query('COMMIT');
       res.status(201).json(lease);
@@ -6959,10 +6961,30 @@ export function createRoutes(pool: Pool): Router {
         return;
       }
       const { rows: [updated] } = await client.query(
-        "UPDATE tackle.role_leases SET status = 'RELEASED', released_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *",
+        "UPDATE tackle.role_leases SET status = 'RELEASED', released_at = NOW(), release_reason = 'revoked', updated_at = NOW() WHERE id = $1 RETURNING *",
         [id]
       );
       await client.query('COMMIT');
+      // D-2026-08-16-008 (R3): emit type:lease-revoked on explicit revoke.
+      // Deduped on the ACTIVE → RELEASED transition — the pre-check above
+      // 400s any non-ACTIVE lease before reaching this point.
+      const revokeId = randomUUID();
+      const now = new Date().toISOString();
+      pool.query(
+        `INSERT INTO nebula.agent_records_history (id, record_type, role, title, content, tags, created_at, recorded_on_dt, model)
+         VALUES ($1::uuid, 'report', $2, $3, $4, $5, $6, $6, $7)`,
+        [
+          revokeId,
+          'architect',
+          `Role lease revoked: ${updated.role} (${updated.channel || 'unknown'})`,
+          `## Role lease revoked\n\n- **Role:** ${updated.role}\n- **Channel:** ${updated.channel || 'unknown'}\n- **Model:** ${updated.model || 'unknown'}\n- **Lease ID:** ${updated.id}\n- **Released at:** ${now}\n\nExplicit revoke (D-008 R3). The authorization envelope is withdrawn; history preserved.`,
+          ['type:lease-revoked', 'to:architect', 'to:engineer', `role:${updated.role}`],
+          now,
+          updated.model || null
+        ]
+      ).catch(() => { /* best-effort — don't fail the response */ });
+      // D-009 R4: targeted procedure-index cache invalidation (no broad flush)
+      bsRedis.invalidateRoleMemory(updated.role).catch(() => {});
       res.json(updated);
     } catch (err: any) {
       await client.query('ROLLBACK');
@@ -6975,11 +6997,12 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/role-leases — list role leases (filters: role, status)
   router.get('/role-leases', async (req: Request, res: Response) => {
     try {
-      const { role, status, limit } = req.query as Record<string, string | undefined>;
+      const { role, status, channel, limit } = req.query as Record<string, string | undefined>;
       const conds: string[] = [];
       const vals: any[] = [];
       if (role) { vals.push(role); conds.push(`role = $${vals.length}`); }
       if (status) { vals.push(status); conds.push(`status = $${vals.length}`); }
+      if (channel) { vals.push(channel); conds.push(`channel = $${vals.length}`); }
       const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
       const { rows } = await pool.query(
         `SELECT * FROM tackle.role_leases ${where} ORDER BY created_at DESC LIMIT $${vals.length + 1}`,
@@ -7040,6 +7063,97 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // POST /api/role-leases/sweep — transition stale ACTIVE leases → EXPIRED
+  // (D-2026-08-16-007 R5). Idempotent; non-destructive (never RELEASED — that
+  // stays the explicit-revoke/auto-exhaust path). Each swept lease emits a
+  // type:drift-finding record so the operator sees it. Wired at nebula-srv
+  // startup + on a periodic interval in index.ts.
+  router.post('/role-leases/sweep', async (_req: Request, res: Response) => {
+    try {
+      const { rows: stale } = await pool.query(
+        `SELECT * FROM tackle.role_leases
+         WHERE status = 'ACTIVE'
+           AND expires_at < NOW()
+         ORDER BY expires_at ASC`
+      );
+      const swept: any[] = [];
+      for (const lease of stale) {
+        const { rows: [updated] } = await pool.query(
+          `UPDATE tackle.role_leases
+           SET status = 'EXPIRED', release_reason = 'expired', updated_at = NOW()
+           WHERE id = $1 AND status = 'ACTIVE'
+           RETURNING *`,
+          [lease.id]
+        );
+        if (updated) {
+          swept.push(updated);
+          const sweepId = randomUUID();
+          const now = new Date().toISOString();
+          pool.query(
+            `INSERT INTO nebula.agent_records_history (id, record_type, role, title, content, tags, created_at, recorded_on_dt, model)
+             VALUES ($1::uuid, 'report', $2, $3, $4, $5, $6, $6, $7)`,
+            [
+              sweepId,
+              'engineer',
+              `Stale role lease swept: ${lease.role} (${lease.channel})`,
+              `## Stale role lease swept (D-007 R5)\n\n- **Role:** ${lease.role}\n- **Channel:** ${lease.channel}\n- **Lease ID:** ${lease.id}\n- **Window end:** ${lease.window_end}\n- **Model:** ${lease.model || 'unknown'}\n\nTransitioned ACTIVE → EXPIRED (window exceeded). No work was revoked mid-session; EXPIRED marks the lease as past its window for the worker-pool gate.`,
+              ['type:drift-finding', 'to:engineer', 'to:architect', 'domain:role-leases'],
+              now,
+              lease.model || null
+            ]
+          ).catch(() => { /* best-effort — don't fail the sweep */ });
+          // D-009 R4: targeted procedure-index cache invalidation
+          bsRedis.invalidateRoleMemory(lease.role).catch(() => {});
+        }
+      }
+      res.json({ swept: swept.length, items: swept });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/role-leases/:role/status — derived lease state for (role, channel)
+  // (D-2026-08-16-008 R1). NEVER_LEASED / ACTIVE / REVOKED / EXPIRED.
+  router.get('/role-leases/:role/status', async (req: Request, res: Response) => {
+    try {
+      const { role } = req.params;
+      const { channel } = req.query as Record<string, string | undefined>;
+      const keyCond = channel ? 'role = $1 AND channel = $2' : 'role = $1';
+      const keyVals = channel ? [role, channel] : [role];
+      const { rows } = await pool.query(
+        `SELECT id, status, released_at, release_reason, window_end, expires_at, channel, model
+         FROM tackle.role_leases
+         WHERE ${keyCond}
+         ORDER BY created_at DESC LIMIT 1`,
+        keyVals
+      );
+      if (rows.length === 0) {
+        res.json({ state: 'NEVER_LEASED', lastLease: null });
+        return;
+      }
+      const last = rows[0];
+      let state: string;
+      if (last.status === 'ACTIVE') {
+        const pastWindow = new Date(last.expires_at || last.window_end) < new Date();
+        state = pastWindow ? 'EXPIRED' : 'ACTIVE';
+      } else if (last.status === 'RELEASED' && last.released_at) {
+        state = 'REVOKED';
+      } else {
+        state = 'EXPIRED';
+      }
+      res.json({
+        state,
+        lastLease: {
+          status: last.status,
+          released_at: last.released_at,
+          release_reason: last.release_reason,
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // POST /api/role-leases/consume — increment consumed_units (all channels)
   //
   // Unified accounting: execution_worker, harness-srv, and interactive
@@ -7048,14 +7162,22 @@ export function createRoutes(pool: Pool): Router {
   // a type:lease-exhausted agent record so the operator is notified.
   router.post('/role-leases/consume', async (req: Request, res: Response) => {
     try {
-      const { role } = req.body;
+      const { role, channel } = req.body;
       if (!role) return res.status(400).json({ error: 'role is required' });
+      // D-2026-08-16-007 (R3): scope consumption to (role, channel) when the
+      // caller names a channel. When omitted, fall back to matching any ACTIVE
+      // lease for the role (backward-compatible with the {role}-only callers —
+      // execution_worker, harness-srv, and the wr-conf-002 conformance suite).
+      const where = channel
+        ? `WHERE role = $1 AND channel = $2 AND status = 'ACTIVE'`
+        : `WHERE role = $1 AND status = 'ACTIVE'`;
+      const params = channel ? [role, channel] : [role];
       const { rows } = await pool.query(
         `UPDATE tackle.role_leases
          SET consumed_units = consumed_units + 1, updated_at = NOW()
-         WHERE role = $1 AND status = 'ACTIVE'
+         ${where}
          RETURNING id, consumed_units, budget_units, window_end, channel, model`,
-        [role]
+        params
       );
       if (rows.length === 0) {
         return res.status(404).json({ error: `No ACTIVE lease for role '${role}'` });
@@ -7072,7 +7194,7 @@ export function createRoutes(pool: Pool): Router {
         // collapsing the wr-conf-002 spam (4+ records in ~40s) to a single
         // record per (role, lease) exhaustion episode.
         const revoked = await pool.query(
-          `UPDATE tackle.role_leases SET status = 'RELEASED', updated_at = NOW()
+          `UPDATE tackle.role_leases SET status = 'RELEASED', released_at = NOW(), release_reason = 'exhausted', updated_at = NOW()
            WHERE id = $1 AND status = 'ACTIVE' RETURNING id`,
           [lease.id]
         );
@@ -7102,6 +7224,8 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
               lease.model || null
             ]
           ).catch(() => { /* best-effort — don't fail the response */ });
+          // D-009 R4: targeted procedure-index cache invalidation
+          bsRedis.invalidateRoleMemory(lease.role).catch(() => {});
         }
       }
 

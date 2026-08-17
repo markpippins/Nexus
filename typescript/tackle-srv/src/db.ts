@@ -320,14 +320,31 @@ async function createSchema(
       acquired_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       expires_at      TIMESTAMPTZ NOT NULL,
       released_at     TIMESTAMPTZ,
+      release_reason  TEXT
+                      CHECK (release_reason IN ('revoked','exhausted','expired')),
       created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
 
+  // D-2026-08-16-008 (R4): release_reason — additive, non-destructive.
+  // Idempotent for tables created before the column existed.
   await exec(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_role_leases_active_per_role
-      ON ${TACKLE_SCHEMA}.role_leases (role)
+    ALTER TABLE ${TACKLE_SCHEMA}.role_leases
+      ADD COLUMN IF NOT EXISTS release_reason TEXT
+      CHECK (release_reason IN ('revoked','exhausted','expired'))
+  `);
+
+  // D-2026-08-16-007 (R1): ACTIVE uniqueness is per (role, channel) — a role
+  // may hold one ACTIVE lease per channel concurrently. Drop the old
+  // per-role index and recreate it on (role, channel). Additive/reversible;
+  // no data migration required.
+  await exec(`
+    DROP INDEX IF EXISTS ${TACKLE_SCHEMA}.idx_role_leases_active_per_role
+  `);
+  await exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_role_leases_active_per_role_channel
+      ON ${TACKLE_SCHEMA}.role_leases (role, channel)
       WHERE status = 'ACTIVE'
   `);
   await exec(`

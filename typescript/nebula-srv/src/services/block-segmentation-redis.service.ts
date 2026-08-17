@@ -149,6 +149,29 @@ export async function getAllInboxPointers(): Promise<Record<string, string | nul
   return result;
 }
 
+// ── Role Memory Invalidation (D-2026-08-16-009 R4) ───────────────
+
+const KEY_ROLE_INDEX = (role: string) => `mem:idx:${role}`;
+
+/**
+ * Invalidate a role's procedure-card index (targeted, no broad flush).
+ *
+ * D-2026-08-16-009 R4: on a role lifecycle change (revoke / expire /
+ * exhaustion) the role's cached procedure index is invalidated so the next
+ * turn re-reads from role-memory-srv. Only the single `mem:idx:{role}` key
+ * is deleted — shared `mem:proc:{slug}` cards and other roles' indices are
+ * untouched.
+ */
+export async function invalidateRoleMemory(role: string): Promise<void> {
+  if (!redis) return;
+  try {
+    await redis.del(KEY_ROLE_INDEX(role));
+  } catch (err: any) {
+    // Non-fatal — role-memory-srv repopulates on its next sync.
+    console.warn('[redis] role-memory invalidation failed:', err.message);
+  }
+}
+
 // ── Session Cache (volatile per-conversation context) ────────────
 
 /** Fields stored in the session hash. */
