@@ -5,7 +5,8 @@ Stores the last-seen receipt (recorded_on_dt, id) in the
 ``conduit.bridge_checkpoint`` table so the bridge is restartable
 and ordering-safe across restarts.  Singleton row (id=1).
 
-Receipts live in ``vision.receipts`` (not ``conduit.receipts``). The cursor
+Receipts are read from ``nebula.receipts_unified`` (conduit-lineage
+``execution.receipts`` UNION frozen ``vision.receipts``; V110/V111). The cursor
 uses ``recorded_on_dt`` (TIMESTAMPTZ) as the primary ordering key and
 ``id`` (TEXT PK) as tiebreaker. Composite PG comparison::
 

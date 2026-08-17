@@ -89,7 +89,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(
         description="Conduit → Kernel bridge daemon. "
-                    "Syncs receipts from vision.receipts to the WRP Kernel Runtime."
+                    "Syncs receipts from nebula.receipts_unified to the WRP Kernel Runtime."
     )
     parser.add_argument(
         "--interval", type=int, default=int(os.environ.get("POLL_INTERVAL", "30")),
