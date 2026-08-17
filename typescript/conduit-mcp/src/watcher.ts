@@ -312,13 +312,13 @@ export class PipelineWatcher {
 
     try {
       // Find plans in nebula.implementation_plans with status='pending'
-      // that have NO receipts in vision.receipts
+      // that have NO receipts in nebula.receipts_unified
       const { rows } = await db.query(
         `SELECT p.plan_number, p.title
          FROM nebula.implementation_plans p
          WHERE p.status = 'pending'
            AND NOT EXISTS (
-             SELECT 1 FROM vision.receipts r
+             SELECT 1 FROM nebula.receipts_unified r
              WHERE r.plan_id = p.plan_number
            )
          ORDER BY p.created_at ASC

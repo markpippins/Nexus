@@ -6375,7 +6375,7 @@ export function createRoutes(pool: Pool): Router {
 
   // ═══════════════════════════════════════════════════════════════════
   //  CONDUIT — plan history & point-in-time queries (conduit + vision schemas)
-  //  Reads from nebula.plans, vision.receipts, vision.tickets
+  //  Reads from nebula.plans, nebula.receipts_unified, vision.tickets
   //  via fully qualified table names (pool search_path=nebula).
   // ═══════════════════════════════════════════════════════════════════
 
@@ -6398,7 +6398,7 @@ export function createRoutes(pool: Pool): Router {
         // We query the plans table and join with receipts to derive historical state
         sql = `SELECT p.*,
           (
-            SELECT r.type FROM vision.receipts r
+            SELECT r.type FROM nebula.receipts_unified r
             WHERE r.plan_id = p.id
               AND r.created_at <= $${i}
             ORDER BY r.created_at DESC LIMIT 1
@@ -6412,7 +6412,7 @@ export function createRoutes(pool: Pool): Router {
           sql += ` AND p.deleted = 0`;
         }
         if (statusFilter) {
-          sql += ` AND (SELECT r.type FROM vision.receipts r
+          sql += ` AND (SELECT r.type FROM nebula.receipts_unified r
             WHERE r.plan_id = p.id
               AND r.created_at <= $1    -- $1 is asOf
             ORDER BY r.created_at DESC LIMIT 1) = $${i}`;
@@ -6455,12 +6455,12 @@ export function createRoutes(pool: Pool): Router {
       const { rows } = await pool.query(
         `SELECT p.*,
           (
-            SELECT r.type FROM vision.receipts r
+            SELECT r.type FROM nebula.receipts_unified r
             WHERE r.plan_id = p.id AND r.created_at <= $1
             ORDER BY r.created_at DESC LIMIT 1
           ) AS derived_status_at_time,
           (
-            SELECT r.created_at FROM vision.receipts r
+            SELECT r.created_at FROM nebula.receipts_unified r
             WHERE r.plan_id = p.id AND r.created_at <= $1
             ORDER BY r.created_at DESC LIMIT 1
           ) AS last_receipt_at_time
@@ -6491,7 +6491,7 @@ export function createRoutes(pool: Pool): Router {
 
       // All receipts in chronological order
       const { rows: receipts } = await pool.query(
-        'SELECT * FROM vision.receipts WHERE plan_id = $1 ORDER BY created_at ASC',
+        'SELECT * FROM nebula.receipts_unified WHERE plan_id = $1 ORDER BY created_at ASC',
         [id]
       );
 
@@ -6503,13 +6503,13 @@ export function createRoutes(pool: Pool): Router {
 
       // Token usage summary
       const { rows: [tokenUsage] } = await pool.query(
-        'SELECT COALESCE(SUM(tokens_used), 0) AS total_tokens, COUNT(*) AS receipt_count FROM vision.receipts WHERE plan_id = $1',
+        'SELECT COALESCE(SUM(tokens_used), 0) AS total_tokens, COUNT(*) AS receipt_count FROM nebula.receipts_unified WHERE plan_id = $1',
         [id]
       );
 
       // Sessions that worked on this plan
       const { rows: sessions } = await pool.query(
-        'SELECT s.id, s.agent_role, s.start_iso, s.end_iso, s.model, s.exit_code, s.workflow_id FROM conduit.sessions s WHERE s.id IN (SELECT DISTINCT r.session_id FROM vision.receipts r WHERE r.plan_id = $1 AND r.session_id IS NOT NULL) ORDER BY s.start_iso ASC',
+        'SELECT s.id, s.agent_role, s.start_iso, s.end_iso, s.model, s.exit_code, s.workflow_id FROM conduit.sessions s WHERE s.id IN (SELECT DISTINCT r.session_id FROM nebula.receipts_unified r WHERE r.plan_id = $1 AND r.session_id IS NOT NULL) ORDER BY s.start_iso ASC',
         [id]
       );
 
@@ -6530,7 +6530,7 @@ export function createRoutes(pool: Pool): Router {
     try {
       const { id } = req.params;
       const { rows } = await pool.query(
-        'SELECT * FROM vision.receipts WHERE plan_id = $1 ORDER BY created_at ASC',
+        'SELECT * FROM nebula.receipts_unified WHERE plan_id = $1 ORDER BY created_at ASC',
         [id]
       );
       res.json({ planId: id, receipts: rows, count: rows.length });

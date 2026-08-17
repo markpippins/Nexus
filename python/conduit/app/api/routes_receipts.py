@@ -53,7 +53,7 @@ def get_plan_receipts(plan_id: str):
 
     with db._get_connection() as conn:
         cursor = conn.execute(
-            "SELECT * FROM vision.receipts WHERE plan_id = %s ORDER BY created_at ASC",
+            "SELECT * FROM nebula.receipts_unified WHERE plan_id = %s ORDER BY created_at ASC",
             (plan_id,),
         )
         rows = cursor.dict_fetchall()
@@ -87,7 +87,7 @@ def get_receipts_raw(plan_id: str):
 
     with db._get_connection() as conn:
         cursor = conn.execute(
-            "SELECT * FROM vision.receipts WHERE plan_id = %s ORDER BY created_at ASC",
+            "SELECT * FROM nebula.receipts_unified WHERE plan_id = %s ORDER BY created_at ASC",
             (plan_id,),
         )
         rows = cursor.dict_fetchall()
@@ -103,7 +103,7 @@ def get_latest_receipt_type(plan_id: str):
 
     with db._get_connection() as conn:
         row = conn.execute(
-            "SELECT type FROM vision.receipts WHERE plan_id = %s ORDER BY created_at DESC LIMIT 1",
+            "SELECT type FROM nebula.receipts_unified WHERE plan_id = %s ORDER BY created_at DESC LIMIT 1",
             (plan_id,),
         ).dict_fetchone()
 

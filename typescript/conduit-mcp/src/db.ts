@@ -3268,7 +3268,7 @@ export async function insertReceipt(r: ReceiptRow): Promise<void> {
 
 export async function getReceiptsForPlan(planId: string): Promise<ReceiptRow[]> {
   return qAll(
-    `SELECT * FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId ORDER BY created_at ASC`,
+    `SELECT * FROM nebula.receipts_unified WHERE plan_id = @planId ORDER BY created_at ASC`,
     { planId }
   );
 }
@@ -3300,7 +3300,7 @@ export async function getPlanReceipts(planId: string): Promise<Array<{
 
 export async function getLatestReceiptType(planId: string): Promise<string | null> {
   const row = await qOne(
-    `SELECT type FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId ORDER BY created_at DESC LIMIT 1`,
+    `SELECT type FROM nebula.receipts_unified WHERE plan_id = @planId ORDER BY created_at DESC LIMIT 1`,
     { planId }
   );
   return row?.type ?? null;
@@ -3515,7 +3515,7 @@ export async function getCompileVerdictStats(): Promise<CompileVerdictStats> {
 
 export async function getReceiptCount(): Promise<{ type: string; count: number }[]> {
   return qAll(
-    `SELECT type, COUNT(*) as count FROM ${VISION_SCHEMA}.receipts GROUP BY type`
+    `SELECT type, COUNT(*) as count FROM nebula.receipts_unified GROUP BY type`
   );
 }
 
@@ -3983,7 +3983,7 @@ export interface TicketRow {
 
 async function _isPlanTerminal(planId: string): Promise<boolean> {
   const row = await qOne(
-    `SELECT type FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId
+    `SELECT type FROM nebula.receipts_unified WHERE plan_id = @planId
      ORDER BY created_at DESC LIMIT 1`,
     { planId }
   );
@@ -4871,12 +4871,12 @@ export async function listWorkRequestStates(filters?: {
 export async function listReceiptsByPlan(planId: string, asOf?: string): Promise<any[]> {
   if (asOf) {
     return qAll(
-      `SELECT * FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId AND created_at <= @asOf ORDER BY created_at ASC`,
+      `SELECT * FROM nebula.receipts_unified WHERE plan_id = @planId AND created_at <= @asOf ORDER BY created_at ASC`,
       { planId, asOf }
     );
   }
   return qAll(
-    `SELECT * FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId ORDER BY created_at ASC`,
+    `SELECT * FROM nebula.receipts_unified WHERE plan_id = @planId ORDER BY created_at ASC`,
     { planId }
   );
 }
@@ -4888,7 +4888,7 @@ export async function getTokenUsageByPlan(planId: string): Promise<{
 }> {
   const row = await qOne(
     `SELECT COALESCE(SUM(tokens_used), 0) as total_tokens, COUNT(*) as receipts
-    FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId`,
+    FROM nebula.receipts_unified WHERE plan_id = @planId`,
     { planId }
   );
   return { plan_id: planId, total_tokens: row?.total_tokens ?? 0, receipts: row?.receipts ?? 0 };
@@ -4899,7 +4899,7 @@ export async function getTokenUsageByRole(role: string): Promise<{
 }> {
   const row = await qOne(
     `SELECT COALESCE(SUM(tokens_used), 0) as total_tokens, COUNT(*) as receipts
-    FROM ${VISION_SCHEMA}.receipts WHERE agent_role = @role`,
+    FROM nebula.receipts_unified WHERE agent_role = @role`,
     { role }
   );
   return { role, total_tokens: row?.total_tokens ?? 0, receipts: row?.receipts ?? 0 };
