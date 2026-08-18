@@ -35,6 +35,7 @@ const CONDUIT_MCP_URL = (process.env.CONDUIT_MCP_URL || "http://localhost:3100")
 const KNOWN_EXECUTORS = new Set([
   "planner", "builder", "reviewer", "analyst",
   "critic", "inspector", "architect", "engineer", "engineer-ii", "devops", "topologist", "leased-builder",
+  "tester",
   "watchdog",
 ]);
 

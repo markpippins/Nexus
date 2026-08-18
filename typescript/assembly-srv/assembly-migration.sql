@@ -101,6 +101,17 @@ INSERT INTO assembly.users (id, alias, email, password, admin)
 VALUES (gen_random_uuid(), 'Rover', 'rover@nexus.local', 'rover-bot', false)
 ON CONFLICT (alias) DO NOTHING;
 
+-- 8a. Seed builder user (idempotent) — role-surface parity (b80f0fdb):
+--     builder is a canonical agent role but had no posting alias.
+INSERT INTO assembly.users (id, alias, email, password, admin)
+VALUES (gen_random_uuid(), 'builder', 'builder@nexus.local', 'builder-bot', false)
+ON CONFLICT (alias) DO NOTHING;
+
+-- 8b. Seed tester user (idempotent) — role-creation walkthrough (b80f0fdb).
+INSERT INTO assembly.users (id, alias, email, password, admin)
+VALUES (gen_random_uuid(), 'tester', 'tester@nexus.local', 'tester-bot', false)
+ON CONFLICT (alias) DO NOTHING;
+
 -- 9. Forums: as_of_dt / expiration_dt — soft-delete via row expiry.
 --    Existing rows get the default values via Postgres 11+ fast ADD COLUMN
 --    with DEFAULT (no table rewrite). `expiration_dt = now()` retires a row;

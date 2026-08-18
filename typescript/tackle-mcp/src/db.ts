@@ -628,7 +628,12 @@ const DEFAULT_ROLES: { name: string; description: string }[] = [
   { name: "critic", description: "Adversarial evaluator — surfaces risks, contradictions, and blind spots" },
   { name: "analyst", description: "Gap and triage analyst — identifies missing coverage, classifies incidents" },
   { name: "inspector", description: "Compliance auditor — verifies invariants, issues violation reports" },
+  { name: "auditor", description: "Audit and compliance reviewer — verifies records, constraints, and drift; issues inspection findings" },
+  { name: "epistemologist", description: "Epistemic governance — tracks knowledge stratification, role boundaries, and cross-role divergence" },
+  { name: "operator", description: "Pipeline and platform operator — monitors pipeline state, investigates stuck plans and drift, keeps operational surfaces healthy" },
+  { name: "sysadmin", description: "Infrastructure health governance — systemd-timer cycles, service health, incident reporting; runs standalone" },
   { name: "test", description: "Internal test harness role — used for test invoke sessions and ad-hoc agent runs" },
+  { name: "tester", description: "Walkthrough role (b80f0fdb) — full-surface demonstration of the role-creation runbook" },
   { name: "leased-builder", description: "Interactive-channel implementation executor — bounded role lease (RoleLeases, plan 1286): consumes from the READY pool under a window+budget lease, mirroring builder with a mandatory time limit" },
 ];
 

@@ -101,7 +101,7 @@ BEGIN
     ON CONFLICT (slug) DO NOTHING
     RETURNING id INTO v_memory_id;
     IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['analyst', 'architect', 'builder', 'critic', 'devops', 'engineer', 'engineer-ii', 'inspector', 'planner', 'reviewer', 'topologist'];
+        v_roles := ARRAY['analyst', 'architect', 'builder', 'critic', 'devops', 'engineer', 'engineer-ii', 'inspector', 'planner', 'reviewer', 'sysadmin', 'tester', 'topologist'];
         FOREACH v_role IN ARRAY v_roles LOOP
             INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
             VALUES (v_memory_id, v_role, NOW(), NULL);
@@ -2739,7 +2739,7 @@ BEGIN
     ON CONFLICT (slug) DO NOTHING
     RETURNING id INTO v_memory_id;
     IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['devops'];
+        v_roles := ARRAY['devops', 'sysadmin'];
         FOREACH v_role IN ARRAY v_roles LOOP
             INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
             VALUES (v_memory_id, v_role, NOW(), NULL);
@@ -2967,7 +2967,50 @@ BEGIN
     ON CONFLICT (slug) DO NOTHING
     RETURNING id INTO v_memory_id;
     IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['analyst', 'architect', 'builder', 'critic', 'devops', 'engineer', 'engineer-ii', 'inspector', 'planner', 'reviewer', 'topologist'];
+        v_roles := ARRAY['analyst', 'architect', 'builder', 'critic', 'devops', 'engineer', 'engineer-ii', 'inspector', 'planner', 'reviewer', 'tester', 'topologist'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 46. Role Creation (deterministic runbook)
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'role-creation',
+        'Role Creation (deterministic runbook)',
+        'One source-of-truth edit (config/roles/roles.json) plus generated artifacts registers a role across every surface; bin/verify-roles.py proves end-to-end coverage.',
+        '## Procedure\n'
+        'Adding a new role to the system is deterministic: edit the canonical expectations file, emit the artifacts, and verify with the end-to-end check. No undocumented parallel hand-edits.\n'
+        '\n'
+        '### 1. Canonical edit\n'
+        'Add the role to \`nexus/config/roles/roles.json\` under \`roles\` — the key must match the name inserted into \`tackle.roles\`. Inherit \`roleDefaults\` unless the role is special (test/alias roles override surfaces to false).\n'
+        '\n'
+        '### 2. Emit artifacts\n'
+        'For a full agent role, create/update:\n'
+        '- **tackle.roles row** — via the seed arrays (\`tackle-mcp/src/db.ts\` DEFAULT_ROLES, \`conduit-mcp/src/db.ts\` migration defaultRoles) or a migration; the live DB is canonical.\n'
+        '- **Persona prompt** — \`tackle.prompts\` row (role, slug \`opencode-persona\`, version 1) in \`schemas/migrations/tackle/\` (pattern: \`sysadmin_persona_v1.sql\`); apply to the live DB.\n'
+        '- **Harness agent file** — \`config/harnesses/opencode/agents/<role>.md\` (frontmatter: assumes_role, permissions; pattern: \`sysadmin.md\`).\n'
+        '- **Procedure cards** — add the role to the role lists of the relevant \`tackle.memory\` cards (tackle.role_memory assignments); then regenerate the seed: \`python3 bin/regenerate_memory_seed.py --verify\`.\n'
+        '- **Assembly alias** — \`assembly.users\` row with alias = role name (pattern: builder seed in \`assembly-migration.sql\`).\n'
+        '- **nebula role CHECK** — new \`typescript/nebula-srv/migrations/0NN-allow-<role>.sql\` mirroring \`052-allow-sysadmin-dba-role.sql\`; apply + replicate to Strontium.\n'
+        '- **Governance** — add to \`harness-srv/src/governance.ts\` KNOWN_EXECUTORS only if the role issues receipts.\n'
+        '\n'
+        '### 3. Verify\n'
+        'Run \`python3 bin/verify-roles.py\` — it checks every expected surface for every registered role (persona, procedure cards, assembly alias, harness file, nebula CHECK, governance). Exit 0 = all covered. Fix FAILs before closing.\n'
+        '\n'
+        '### 4. Close\n'
+        'Post the walkthrough evidence on the role-creation thread and record an engineering log. Surface the new role to the architect for allowlist ratification if the case/naming deviates from convention.',
+        ARRAY['role', 'runbook', 'bootstrap', 'onboarding', 'deterministic'],
+        ARRAY['add a role', 'new role', 'create role', 'role creation', 'register role', 'onboard role'],
+        '{}'
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY['architect', 'devops', 'engineer', 'engineer-ii'];
         FOREACH v_role IN ARRAY v_roles LOOP
             INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
             VALUES (v_memory_id, v_role, NOW(), NULL);

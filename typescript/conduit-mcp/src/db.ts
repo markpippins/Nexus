@@ -2067,7 +2067,12 @@ const migrations: Migration[] = [
         { name: "critic", desc: "Adversarial evaluator — surfaces risks, contradictions, and blind spots" },
         { name: "analyst", desc: "Gap and triage analyst — identifies missing coverage, classifies incidents" },
         { name: "inspector", desc: "Compliance auditor — verifies invariants, issues violation reports" },
+        { name: "auditor", desc: "Audit and compliance reviewer — verifies records, constraints, and drift; issues inspection findings" },
+        { name: "epistemologist", desc: "Epistemic governance — tracks knowledge stratification, role boundaries, and cross-role divergence" },
+        { name: "operator", desc: "Pipeline and platform operator — monitors pipeline state, investigates stuck plans and drift, keeps operational surfaces healthy" },
+        { name: "sysadmin", desc: "Infrastructure health governance — systemd-timer cycles, service health, incident reporting; runs standalone" },
         { name: "test", desc: "Internal test harness role — used for test invoke sessions and ad-hoc agent runs" },
+        { name: "tester", desc: "Walkthrough role (b80f0fdb) — full-surface demonstration of the role-creation runbook" },
       ];
       for (const r of defaultRoles) {
         await exec(

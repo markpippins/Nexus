@@ -1,5 +1,5 @@
 {
-  "card_count": 45,
+  "card_count": 46,
   "cards": [
     {
       "body_md": "## Agent Config Role Definition\n\nEach agent role .md file (in .opencode/agents/) MUST include a message block in its frontmatter:\n\n```yaml\n---\nassumes_role: <role>\nmessage:\n  inbox_query:\n    - tags contain \"to:<role>\"\n    - tags contain \"status:open\"\n  record_types: [list of valid record types for this role]\n  auto_present: true\n  enrich_context: true\n---\n```\n\n### Fields\n- assumes_role: The role this agent config activates (engineer, architect, planner, etc.)\n- inbox_query: Tag filters for inbox querying\n- record_types: Valid agent record types this role may write\n- auto_present: Whether to surface inbox items on every turn start\n- enrich_context: Whether to load linked system/subsystem/plan data on boot\n\n### Valid record_type values\nreport, analysis, assessment, inspection, prompt, response, engineering_log, architecture_note, decision",
@@ -192,6 +192,7 @@
         "inspector",
         "planner",
         "reviewer",
+        "tester",
         "topologist"
       ],
       "sha256": "78004cf43324305899fdf87d325b43c37e4d39fd751e505ba9a3c61b17806b07",
@@ -226,7 +227,8 @@
         "nebula_list_agent_records"
       ],
       "roles": [
-        "devops"
+        "devops",
+        "sysadmin"
       ],
       "sha256": "866ae5b2743ec1980a64198cd3384fa355eab6922611f6689bb37257e2c4d4d1",
       "slug": "devops-operations-conventions",
@@ -908,6 +910,8 @@
         "inspector",
         "planner",
         "reviewer",
+        "sysadmin",
+        "tester",
         "topologist"
       ],
       "sha256": "1ffb2d1f09b684fb80ab4f87a4c9dbdd42681612c649fc863d0d49ac2f2a718c",
@@ -1157,6 +1161,35 @@
         "after completing",
         "propose",
         "follow-up"
+      ]
+    },
+    {
+      "body_md": "## Procedure\nAdding a new role to the system is deterministic: edit the canonical expectations file, emit the artifacts, and verify with the end-to-end check. No undocumented parallel hand-edits.\n\n### 1. Canonical edit\nAdd the role to `nexus/config/roles/roles.json` under `roles` \u2014 the key must match the name inserted into `tackle.roles`. Inherit `roleDefaults` unless the role is special (test/alias roles override surfaces to false).\n\n### 2. Emit artifacts\nFor a full agent role, create/update:\n- **tackle.roles row** \u2014 via the seed arrays (`tackle-mcp/src/db.ts` DEFAULT_ROLES, `conduit-mcp/src/db.ts` migration defaultRoles) or a migration; the live DB is canonical.\n- **Persona prompt** \u2014 `tackle.prompts` row (role, slug `opencode-persona`, version 1) in `schemas/migrations/tackle/` (pattern: `sysadmin_persona_v1.sql`); apply to the live DB.\n- **Harness agent file** \u2014 `config/harnesses/opencode/agents/<role>.md` (frontmatter: assumes_role, permissions; pattern: `sysadmin.md`).\n- **Procedure cards** \u2014 add the role to the role lists of the relevant `tackle.memory` cards (tackle.role_memory assignments); then regenerate the seed: `python3 bin/regenerate_memory_seed.py --verify`.\n- **Assembly alias** \u2014 `assembly.users` row with alias = role name (pattern: builder seed in `assembly-migration.sql`).\n- **nebula role CHECK** \u2014 new `typescript/nebula-srv/migrations/0NN-allow-<role>.sql` mirroring `052-allow-sysadmin-dba-role.sql`; apply + replicate to Strontium.\n- **Governance** \u2014 add to `harness-srv/src/governance.ts` KNOWN_EXECUTORS only if the role issues receipts.\n\n### 3. Verify\nRun `python3 bin/verify-roles.py` \u2014 it checks every expected surface for every registered role (persona, procedure cards, assembly alias, harness file, nebula CHECK, governance). Exit 0 = all covered. Fix FAILs before closing.\n\n### 4. Close\nPost the walkthrough evidence on the role-creation thread and record an engineering log. Surface the new role to the architect for allowlist ratification if the case/naming deviates from convention.",
+      "mcp_tools": [],
+      "roles": [
+        "architect",
+        "devops",
+        "engineer",
+        "engineer-ii"
+      ],
+      "sha256": "edd50e9ef86df0d1895438fe9fd78d0de0b03d14de1c114eb0a18e4ef0ae281f",
+      "slug": "role-creation",
+      "summary": "One source-of-truth edit (config/roles/roles.json) plus generated artifacts registers a role across every surface; bin/verify-roles.py proves end-to-end coverage.",
+      "tags": [
+        "role",
+        "runbook",
+        "bootstrap",
+        "onboarding",
+        "deterministic"
+      ],
+      "title": "Role Creation (deterministic runbook)",
+      "triggers": [
+        "add a role",
+        "new role",
+        "create role",
+        "role creation",
+        "register role",
+        "onboard role"
       ]
     },
     {
@@ -1532,6 +1565,6 @@
       ]
     }
   ],
-  "role_count": 356,
+  "role_count": 364,
   "schema": "tackle"
 }
