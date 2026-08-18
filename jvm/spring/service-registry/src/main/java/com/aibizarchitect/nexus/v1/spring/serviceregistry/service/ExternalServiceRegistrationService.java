@@ -10,16 +10,22 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Deployment;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.EnvironmentType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Framework;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkLanguage;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkVendor;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Server;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceConfiguration;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceType;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.DeploymentRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.EnvironmentTypeRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkTypeRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkLanguageRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkVendorRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServerRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceConfigurationRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceTypeRepository;
@@ -37,6 +43,10 @@ public class ExternalServiceRegistrationService {
     private final FrameworkVendorRepository frameworkVendorRepository;
     private final ServiceTypeRepository serviceTypeRepository;
     private final ServiceConfigurationRepository serviceConfigurationRepository;
+    // Plan 1291 (registration → deployment bridge):
+    private final ServerRepository serverRepository;
+    private final DeploymentRepository deploymentRepository;
+    private final EnvironmentTypeRepository environmentTypeRepository;
 
     public ExternalServiceRegistrationService(ServiceRepository serviceRepository,
                                                FrameworkRepository frameworkRepository,
@@ -44,7 +54,10 @@ public class ExternalServiceRegistrationService {
                                                FrameworkLanguageRepository frameworkLanguageRepository,
                                                FrameworkVendorRepository frameworkVendorRepository,
                                                ServiceTypeRepository serviceTypeRepository,
-                                               ServiceConfigurationRepository serviceConfigurationRepository) {
+                                               ServiceConfigurationRepository serviceConfigurationRepository,
+                                               ServerRepository serverRepository,
+                                               DeploymentRepository deploymentRepository,
+                                               EnvironmentTypeRepository environmentTypeRepository) {
         this.serviceRepository = serviceRepository;
         this.frameworkRepository = frameworkRepository;
         this.frameworkTypeRepository = frameworkTypeRepository;
@@ -52,6 +65,9 @@ public class ExternalServiceRegistrationService {
         this.frameworkVendorRepository = frameworkVendorRepository;
         this.serviceTypeRepository = serviceTypeRepository;
         this.serviceConfigurationRepository = serviceConfigurationRepository;
+        this.serverRepository = serverRepository;
+        this.deploymentRepository = deploymentRepository;
+        this.environmentTypeRepository = environmentTypeRepository;
     }
 
     @Transactional
@@ -139,6 +155,12 @@ public class ExternalServiceRegistrationService {
         service = serviceRepository.save(service);
         log.debug("Service saved with ID: {}", service.getId());
 
+        // Plan 1291 (registration → deployment bridge): when the registration
+        // names a server (by id or hostname), upsert a Deployment row linking
+        // Service → Server so the registry knows which machine the service runs
+        // on and the health scheduler can probe the remote host (not localhost).
+        bridgeToDeployment(service, registration);
+
         if (registration.getOperations() != null && !registration.getOperations().isEmpty()) {
             log.debug("Storing {} operations for service: {}", registration.getOperations().size(), service.getName());
             storeOperations(service, registration.getOperations());
@@ -169,6 +191,72 @@ public class ExternalServiceRegistrationService {
         log.info("Successfully registered service: {} with ID: {}", service.getName(), service.getId());
 
         return service;
+    }
+
+    /**
+     * Plan 1291 (registration → deployment bridge): auto-create/update the
+     * Deployment row linking a registered Service to its Server.
+     *
+     * Backward compatible: registration without serverId/hostname is
+     * Service-only (no-op here). An unresolvable server is logged and the
+     * registration proceeds Service-only — never a hard failure.
+     */
+    private void bridgeToDeployment(
+            com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service service,
+            ExternalServiceRegistration registration) {
+        boolean hasServerId = registration.getServerId() != null;
+        boolean hasHostname = registration.getHostname() != null && !registration.getHostname().isBlank();
+        if (!hasServerId && !hasHostname) {
+            log.debug("Registration '{}' has no serverId/hostname — Service-only (no deployment bridge)",
+                    service.getName());
+            return;
+        }
+
+        Optional<Server> serverOpt = hasServerId
+                ? serverRepository.findById(registration.getServerId())
+                : serverRepository.findByHostname(registration.getHostname());
+
+        if (serverOpt.isEmpty()) {
+            log.warn("Registration '{}' supplied {} that resolves to no Server — registering Service only",
+                    service.getName(),
+                    hasServerId ? "serverId=" + registration.getServerId() : "hostname=" + registration.getHostname());
+            return;
+        }
+
+        Server server = serverOpt.get();
+        Optional<Deployment> existing = deploymentRepository
+                .findFirstByService_IdAndServer_Id(service.getId(), server.getId());
+        Deployment deployment = existing.orElseGet(Deployment::new);
+
+        deployment.setService(service);
+        deployment.setServer(server);
+        if (deployment.getEnvironment() == null) {
+            // DataInitializer convention: deployment environment = server environment
+            EnvironmentType env = server.getEnvironmentType();
+            if (env == null) {
+                env = environmentTypeRepository.findById(1L).orElse(null); // "Development"
+            }
+            deployment.setEnvironment(env);
+        }
+        if (registration.getVersion() != null) {
+            deployment.setVersion(registration.getVersion());
+        }
+        Integer port = registration.getPort() != null ? registration.getPort() : service.getDefaultPort();
+        if (port != null) {
+            deployment.setPort(port);
+        }
+        deployment.setStatus("RUNNING");
+        deployment.setActiveFlag(true);
+        if (deployment.getHealthStatus() == null) {
+            deployment.setHealthStatus("UNKNOWN");
+        }
+        // healthCheckUrl intentionally left null — DeploymentHealthScheduler
+        // resolveHealthUrl() constructs http://{server.hostname}:{port}/health
+        // (remote host, not localhost).
+
+        deploymentRepository.save(deployment);
+        log.info("Bridged registration '{}' to deployment on server '{}' (deploymentId={})",
+                service.getName(), server.getHostname(), deployment.getId());
     }
 
     private void storeDependencies(com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service service,

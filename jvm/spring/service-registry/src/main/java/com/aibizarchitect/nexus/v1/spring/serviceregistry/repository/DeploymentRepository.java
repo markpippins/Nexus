@@ -1,6 +1,7 @@
 package com.aibizarchitect.nexus.v1.spring.serviceregistry.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -20,6 +21,10 @@ public interface DeploymentRepository extends JpaRepository<Deployment, Long> {
     List<Deployment> findByEnvironment(EnvironmentType environment);
     List<Deployment> findByEnvironment_Id(Long environmentId);
     List<Deployment> findByServiceAndEnvironment(Service service, EnvironmentType environment);
+
+    // Plan 1291 (registration → deployment bridge): upsert lookup — one
+    // deployment row per (service, server) for self-registered services.
+    Optional<Deployment> findFirstByService_IdAndServer_Id(Long serviceId, Long serverId);
 
     org.springframework.data.domain.Page<Deployment> findByService(Service service, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Deployment> findByService_Id(Long serviceId, org.springframework.data.domain.Pageable pageable);
