@@ -275,6 +275,12 @@ def test_06_plan_in_envelope(test_role):
     assert plan.get("plan_version"), f"plan missing plan_version: {plan}"
     assert "/" in plan.get("model", ""), \
         f"model must be provider-qualified: {plan.get('model')}"
+    # P1 item 8 — role-memory readiness is part of the plan. The synthetic
+    # test role has no procedure index → degraded (visible, not silent).
+    rm = plan.get("role_memory", {})
+    assert rm.get("status") in ("ok", "degraded"), f"role_memory={rm}"
+    assert "procedure_count" in rm, f"role_memory missing procedure_count: {rm}"
+    assert "role_index_count" in rm
 
     terminal = _poll_terminal(data["job_id"], timeout_s=30)
     job_plan = terminal.get("plan", {})

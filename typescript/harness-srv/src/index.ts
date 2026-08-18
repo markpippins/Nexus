@@ -196,6 +196,77 @@ function setJobState(
   });
 }
 
+// ── Role-memory readiness (P1 item 8) ──────────────────────────────
+// The role-memory Redis cache must not silently resolve to zero procedure
+// cards. This probe makes cache freshness/count part of the execution-plan
+// admission: an empty/stale cache or a missing role index marks the plan
+// degraded (visible in the plan + warn-logged) rather than silently
+// proceeding. POST /refresh on role-memory-srv is the repair action.
+
+const ROLE_MEMORY_URL = process.env.ROLE_MEMORY_URL || "http://localhost:3500";
+
+interface RoleMemoryReadiness {
+  status: "ok" | "degraded" | "unavailable";
+  last_updated: string | null;
+  procedure_count: number;
+  role_index_count: number;
+  role_index_present: boolean;
+  stale: boolean;
+  reason?: string;
+}
+
+async function checkRoleMemoryReadiness(role: string): Promise<RoleMemoryReadiness> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    let resp: Response;
+    try {
+      resp = await fetch(`${ROLE_MEMORY_URL}/health`, { signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!resp.ok) {
+      return {
+        status: "unavailable", last_updated: null, procedure_count: 0,
+        role_index_count: 0, role_index_present: false, stale: true,
+        reason: `role-memory /health HTTP ${resp.status}`,
+      };
+    }
+    const health = await resp.json() as any;
+
+    let role_index_present = false;
+    try {
+      const idxResp = await fetch(
+        `${ROLE_MEMORY_URL}/procedures/${encodeURIComponent(role)}`
+      );
+      if (idxResp.ok) {
+        const idx = await idxResp.json();
+        role_index_present = Array.isArray(idx) && idx.length > 0;
+      }
+    } catch { /* index probe best-effort */ }
+
+    const stale = Boolean(health.stale);
+    const degraded = stale || health.status === "degraded" || !role_index_present;
+    return {
+      status: degraded ? "degraded" : "ok",
+      last_updated: health.lastUpdated ?? health.last_updated ?? null,
+      procedure_count: health.procedureCount ?? health.procedure_count ?? 0,
+      role_index_count: health.roleIndexCount ?? health.role_index_count ?? 0,
+      role_index_present,
+      stale,
+      reason: degraded
+        ? (!role_index_present ? `role index for '${role}' missing/empty` : "role-memory cache stale/degraded")
+        : undefined,
+    };
+  } catch {
+    return {
+      status: "unavailable", last_updated: null, procedure_count: 0,
+      role_index_count: 0, role_index_present: false, stale: true,
+      reason: "role-memory unreachable",
+    };
+  }
+}
+
 function jobEnvelope(job: HarnessJob): Record<string, unknown> {
   return {
     job_id: job.jobId,
@@ -798,11 +869,22 @@ app.post("/run-direct", async (req, res) => {
     const effectiveModel = modelOverride || modelConfig.opencode_model_id;
     const invocationMode = modelConfig.invocation_mode;
 
+    // ── P1 item 8 — role-memory readiness is part of admission ─────
+    // Probe the role-memory cache; a stale/empty cache or a missing role
+    // index marks the plan degraded (visible + warn-logged) instead of
+    // silently resolving to zero procedure cards.
+    const roleMemory = await checkRoleMemoryReadiness(role);
+    if (roleMemory.status !== "ok") {
+      await log(
+        "warn",
+        `run-direct job=${jobId} role=${role} — role-memory ${roleMemory.status}: ${roleMemory.reason ?? ""}`
+      );
+    }
+
     // Versioned execution plan — a stable fingerprint of the resolved plan
     // (provider-qualified model, harness, invocation mode, fallback ladder,
-    // and prompt). Consumers record plan_version so a stale/unqualified
-    // override or a plan change is detectable. prompt version is the prompt
-    // content hash; procedure-index + ACL versions attach in item 8.
+    // prompt, and role-memory readiness). Consumers record plan_version so a
+    // stale/unqualified override or a plan change is detectable.
     const planVersion = createHash("sha256")
       .update(JSON.stringify({
         model: effectiveModel,
@@ -814,6 +896,11 @@ app.post("/run-direct", async (req, res) => {
           provider: f.provider_id,
         })),
         prompt_sha: createHash("sha256").update(prompt).digest("hex"),
+        role_memory: {
+          status: roleMemory.status,
+          last_updated: roleMemory.last_updated,
+          role_index_present: roleMemory.role_index_present,
+        },
       }))
       .digest("hex")
       .slice(0, 16);
@@ -827,6 +914,15 @@ app.post("/run-direct", async (req, res) => {
         model: f.model_identifier,
         provider_type: f.provider_type,
       })),
+      role_memory: {
+        status: roleMemory.status,
+        last_updated: roleMemory.last_updated,
+        procedure_count: roleMemory.procedure_count,
+        role_index_count: roleMemory.role_index_count,
+        role_index_present: roleMemory.role_index_present,
+        stale: roleMemory.stale,
+        reason: roleMemory.reason ?? null,
+      },
       resolved_by: "tackle",
     };
 

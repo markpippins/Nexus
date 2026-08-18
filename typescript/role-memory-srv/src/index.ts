@@ -1,6 +1,6 @@
 import express from "express";
 import { initDb } from "./db";
-import { initRedis, closeRedis, getRedis, META_UPDATED_KEY, PROC_KEY, IDX_KEY } from "./redis";
+import { initRedis, closeRedis, getRedis, countKeys, KEY_PREFIX, META_UPDATED_KEY, PROC_KEY, IDX_KEY } from "./redis";
 import { syncAll } from "./sync";
 
 const PORT = parseInt(process.env.MEMORY_SRV_PORT || "3500", 10);
@@ -21,19 +21,51 @@ process.on('uncaughtException', (err: Error & { code?: string }) => {
 const app = express();
 app.use(express.json());
 
-// ── Health check ────────────────────────────────────────────────────
+// ── Health check (P1 item 8 — explicit role-memory readiness) ──────
+// Reports Redis connectivity, last sync timestamp, procedure count,
+// role-index count, and a stale/degraded flag so harness admission can
+// detect an empty/stale cache instead of silently resolving zero cards.
+// POST /refresh remains the repair action.
+
+const STALE_THRESHOLD_MS = 60 * 60 * 1000; // 1h — a cache older than this is stale
 
 app.get("/health", async (_req, res) => {
   try {
     const redis = getRedis();
+    await redis.ping(); // Redis connectivity probe
     const lastUpdated = await redis.get(META_UPDATED_KEY);
+    const [procedureCount, roleIndexCount] = await Promise.all([
+      countKeys(`${KEY_PREFIX}proc:*`),
+      countKeys(`${KEY_PREFIX}idx:*`),
+    ]);
+
+    const lastUpdatedMs = lastUpdated ? Date.parse(lastUpdated) : 0;
+    const stale =
+      !lastUpdated ||
+      procedureCount === 0 ||
+      roleIndexCount === 0 ||
+      Date.now() - lastUpdatedMs > STALE_THRESHOLD_MS;
+
     res.json({
-      status: "ok",
+      status: stale ? "degraded" : "ok",
+      redis: "connected",
       lastUpdated: lastUpdated || null,
+      procedureCount,
+      roleIndexCount,
+      stale,
+      staleThresholdMs: STALE_THRESHOLD_MS,
       uptime: process.uptime(),
     });
   } catch (err: any) {
-    res.status(503).json({ status: "error", message: err.message });
+    res.status(503).json({
+      status: "error",
+      redis: "unreachable",
+      lastUpdated: null,
+      procedureCount: 0,
+      roleIndexCount: 0,
+      stale: true,
+      message: err.message,
+    });
   }
 });
 
