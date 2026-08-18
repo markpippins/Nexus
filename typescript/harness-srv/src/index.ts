@@ -18,6 +18,7 @@ import { resolveContext, resolveRoleModel, emitEvent, pool, redis, checkConfigAd
 import { ADMISSION_OUTCOME } from "./admission";
 import { execFile, spawn } from "child_process";
 import { promisify } from "util";
+import type { ServerResponse } from "http";
 import { writeFile, readFile, unlink, mkdir, appendFile } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
@@ -45,6 +46,169 @@ interface TrackedSession {
 }
 
 const activeSessions = new Map<string, TrackedSession>();
+
+// ── Async job registry (P1 item 6) ──────────────────────────────────
+// POST /run-direct { async: true } → 202 { job_id, state } immediately;
+// the job runs in the background and its lifecycle is observable via
+// GET /jobs/:jobId (status + partial output) and GET /jobs/:jobId/events
+// (replayable SSE). OpenCode's `--format json` event stream is translated
+// ONCE here, at the boundary, into typed envelopes (text.delta / thinking)
+// so no other consumer needs to know the opencode wire format. Partial
+// output and exact exit/timeout/error metadata are preserved on the job.
+
+type HarnessJobState =
+  | "accepted" | "running" | "completed" | "failed" | "timed_out" | "cancelled";
+
+interface HarnessJobEvent {
+  seq: number;
+  type:
+    | "job.accepted" | "job.started" | "text.delta" | "thinking"
+    | "job.completed" | "job.failed" | "job.timed_out" | "job.cancelled";
+  ts: number;
+  payload: Record<string, unknown>;
+}
+
+interface HarnessJob {
+  jobId: string;
+  role: string;
+  model: string | null;
+  harnessId: string;
+  state: HarnessJobState;
+  startedAt: number;
+  finishedAt: number | null;
+  exitCode: number | null;
+  stdout: string;      // raw accumulated stream (partial while running)
+  stderr: string;
+  durationMs: number | null;
+  promptFile: string;
+  events: HarnessJobEvent[];
+  sseClients: Set<ServerResponse>;
+  pid: number | null;  // child pid for interrupt (set by executeOpencode)
+  interrupted: boolean; // set by POST /jobs/:id/interrupt — SIGTERM race guard
+}
+
+const jobs = new Map<string, HarnessJob>();
+
+function registerJob(opts: {
+  jobId: string;
+  role: string;
+  model: string | null;
+  harnessId: string;
+  promptFile: string;
+}): HarnessJob {
+  const job: HarnessJob = {
+    jobId: opts.jobId,
+    role: opts.role,
+    model: opts.model,
+    harnessId: opts.harnessId,
+    state: "accepted",
+    startedAt: Date.now(),
+    finishedAt: null,
+    exitCode: null,
+    stdout: "",
+    stderr: "",
+    durationMs: null,
+    promptFile: opts.promptFile,
+    events: [],
+    sseClients: new Set(),
+    pid: null,
+    interrupted: false,
+  };
+  // Evict oldest TERMINAL jobs beyond the cap so the in-memory registry
+  // (status/events replay) does not grow unbounded.
+  if (jobs.size >= 300) {
+    const terminal = Array.from(jobs.values())
+      .filter((j) => j.state !== "accepted" && j.state !== "running")
+      .sort((a, b) => a.finishedAt! - b.finishedAt!);
+    while (jobs.size >= 300 && terminal.length > 0) {
+      const oldest = terminal.shift();
+      if (oldest) jobs.delete(oldest.jobId);
+    }
+  }
+  jobs.set(opts.jobId, job);
+  pushJobEvent(opts.jobId, "job.accepted", {
+    role: opts.role,
+    model: opts.model,
+    harness_id: opts.harnessId,
+  });
+  return job;
+}
+
+function pushJobEvent(
+  jobId: string,
+  type: HarnessJobEvent["type"],
+  payload: Record<string, unknown>
+): void {
+  const job = jobs.get(jobId);
+  if (!job) return;
+  const ev: HarnessJobEvent = {
+    seq: job.events.length + 1,
+    type,
+    ts: Date.now(),
+    payload,
+  };
+  job.events.push(ev);
+  const frame = `event: ${type}\ndata: ${JSON.stringify({
+    seq: ev.seq,
+    type,
+    jobId,
+    payload,
+    ts: new Date(ev.ts).toISOString(),
+  })}\n\n`;
+  for (const client of job.sseClients) {
+    try { client.write(frame); } catch { /* socket gone */ }
+  }
+}
+
+function setJobState(
+  jobId: string,
+  state: HarnessJobState,
+  extra: Partial<Pick<HarnessJob, "exitCode" | "stderr">> = {}
+): void {
+  const job = jobs.get(jobId);
+  if (!job) return;
+  // Forward transitions only: a terminal job is never rewritten (a late
+  // runner callback cannot regress an already-cancelled/interrupted job).
+  if (state !== "accepted" && state !== "running" && job.state !== "accepted" && job.state !== "running") {
+    return;
+  }
+  job.state = state;
+  if (extra.exitCode !== undefined) job.exitCode = extra.exitCode;
+  if (extra.stderr !== undefined) job.stderr = extra.stderr;
+  if (state !== "accepted" && state !== "running") {
+    job.finishedAt = Date.now();
+    job.durationMs = job.finishedAt - job.startedAt;
+    // Terminal — drop SSE subscribers.
+    for (const client of job.sseClients) {
+      try { client.end(); } catch { /* noop */ }
+    }
+    job.sseClients.clear();
+  }
+  pushJobEvent(jobId, `job.${state}` as HarnessJobEvent["type"], {
+    exit_code: job.exitCode,
+    duration_ms: job.durationMs,
+    stdout_preview: job.stdout.slice(-500),
+    stderr_preview: job.stderr.slice(0, 500),
+  });
+}
+
+function jobEnvelope(job: HarnessJob): Record<string, unknown> {
+  return {
+    job_id: job.jobId,
+    state: job.state,
+    role: job.role,
+    model: job.model,
+    harness_id: job.harnessId,
+    exit_code: job.exitCode,
+    stdout: job.stdout,
+    stderr: job.stderr,
+    partial: job.state === "accepted" || job.state === "running",
+    duration_ms: job.durationMs,
+    started_at: new Date(job.startedAt).toISOString(),
+    finished_at: job.finishedAt ? new Date(job.finishedAt).toISOString() : null,
+    event_count: job.events.length,
+  };
+}
 
 function startWatchdog(): void {
   setInterval(async () => {
@@ -529,9 +693,16 @@ app.post("/resolve-context", async (req, res) => {
  *   agent?: string         — agent name override (for opencode)
  *   timeout_ms?: number    — execution timeout (default: 300000 = 5 min)
  *   channel?: string       — invocation channel (default: "duality")
+ *   async?: boolean        — async contract: return 202 {job_id, state}
+ *                            immediately and run in the background
+ *                            (P1 item 6). Observable via GET /jobs/:jobId
+ *                            (status + partial output), GET /jobs/:jobId/events
+ *                            (replayable SSE), POST /jobs/:jobId/interrupt.
  *
- * Returns:
+ * Sync returns:
  *   { job_id, role, exit_code, stdout, stderr, duration_ms, prompt_preview }
+ * Async returns 202:
+ *   { job_id, state: "accepted", role, model, harness_id, events }
  */
 app.post("/run-direct", async (req, res) => {
   const jobId = uuidv4();
@@ -546,6 +717,7 @@ app.post("/run-direct", async (req, res) => {
       agent,
       timeout_ms = 600_000,
       channel = "duality",
+      async: asyncMode = false,
     } = req.body;
 
     if (!role) {
@@ -626,6 +798,27 @@ app.post("/run-direct", async (req, res) => {
 
     await log("info", `run-direct job=${jobId} role=${role} model=${effectiveModel ?? "(harness default)"} channel=${channel}`);
 
+    // Write prompt to temp file (shared by sync + async paths)
+    await mkdir(PROMPT_DIR, { recursive: true });
+    const promptFile = join(PROMPT_DIR, `${jobId}.md`);
+    await writeFile(promptFile, prompt, "utf-8");
+
+    // Register for watchdog + async job registry (status/events/interrupt)
+    activeSessions.set(jobId, {
+      jobId,
+      role,
+      model: effectiveModel,
+      startedAt: startTime,
+      promptFile,
+    });
+    registerJob({
+      jobId,
+      role,
+      model: effectiveModel ?? null,
+      harnessId,
+      promptFile,
+    });
+
     // 1. Emit harness.started event
     const startedEventId = await emitEvent({
       event_type: "harness.started",
@@ -636,80 +829,126 @@ app.post("/run-direct", async (req, res) => {
       actor_type: "system",
     });
 
-    // 2. Write prompt to temp file
-    await mkdir(PROMPT_DIR, { recursive: true });
-    const promptFile = join(PROMPT_DIR, `${jobId}.md`);
-    await writeFile(promptFile, prompt, "utf-8");
-
-    // 3. Register for watchdog
-    activeSessions.set(jobId, {
-      jobId,
+    const execParams: HarnessExecParams = {
+      harness_id: harnessId,
+      prompt_file: promptFile,
+      work_dir: effectiveWorkDir,
+      agent: effectiveAgent,
       role,
       model: effectiveModel,
-      startedAt: startTime,
-      promptFile,
-    });
+      model_identifier: modelConfig.model_identifier,
+      timeout_ms,
+      onEvent: (type, payload) => {
+        // P1 item 6 — translate the opencode JSON stream ONCE here into the
+        // same typed envelopes the duality SSE stream carries: reasoning →
+        // thinking, text → text.delta. Consumers of /jobs/:id/events never
+        // parse the opencode wire format.
+        pushJobEvent(
+          jobId,
+          type === "reasoning" ? "thinking" : "text.delta",
+          { text: payload.text }
+        );
+      },
+    };
 
-    // 4. Execute via harness
-    let exitCode = 0;
-    let stdout = "";
-    let stderr = "";
+    const runJob = async (): Promise<void> => {
+      setJobState(jobId, "running");
+      const interruptedBeforeStart = jobs.get(jobId)?.interrupted;
+      if (interruptedBeforeStart) return; // cancelled by interrupt before spawn
+      let exitCode = 0;
+      let stdout = "";
+      let stderr = "";
+      try {
+        const result = await executeHarness(execParams);
+        stdout = result.stdout;
+        stderr = result.stderr;
+        exitCode = result.exitCode;
+      } catch (execError: any) {
+        exitCode = execError.exitCode || 1;
+        stdout = execError.stdout || "";
+        stderr = execError.stderr || execError.message;
+      } finally {
+        activeSessions.delete(jobId);
+      }
 
-    try {
-      const result = await executeHarness({
-        harness_id: harnessId,
-        prompt_file: promptFile,
-        work_dir: effectiveWorkDir,
-        agent: effectiveAgent,
-        role,
-        model: effectiveModel,
-        model_identifier: modelConfig.model_identifier,
-        timeout_ms,
+      // Preserve partial output + exact exit/timeout metadata on the job.
+      const job = jobs.get(jobId);
+      if (job) {
+        job.stdout = stdout;
+        job.stderr = stderr;
+        job.exitCode = exitCode;
+      }
+
+      await unlink(promptFile).catch(() => {});
+
+      // Terminal state — an interrupted job is cancelled, a timeout
+      // (exit 124 / timeout marker) is reported honestly as timed_out,
+      // signal-kills otherwise fail with the marker.
+      if (jobs.get(jobId)?.interrupted) {
+        setJobState(jobId, "cancelled", {
+          exitCode: 137,
+          stderr: "interrupted by user request",
+        });
+        return;
+      }
+      let state: HarnessJobState = exitCode === 0 ? "completed" : "failed";
+      if (exitCode === 124 || /timeout after/i.test(stderr)) state = "timed_out";
+      setJobState(jobId, state, { exitCode, stderr });
+
+      // 5. Emit harness.completed/failed event
+      await emitEvent({
+        event_type: exitCode === 0 ? "harness.completed" : "harness.failed",
+        source: `harness-srv.run-direct.${channel}`,
+        aggregate_type: "harness_job",
+        aggregate_id: jobId,
+        payload: {
+          role,
+          channel,
+          exit_code: exitCode,
+          duration_ms: Date.now() - startTime,
+          stdout_preview: stdout.slice(0, 500),
+          stderr_preview: stderr.slice(0, 500),
+        },
+        actor_type: "system",
+        causation_id: startedEventId,
+        caused_by_event_type: "harness.started",
       });
-      stdout = result.stdout;
-      stderr = result.stderr;
-      exitCode = result.exitCode;
-    } catch (execError: any) {
-      exitCode = execError.exitCode || 1;
-      stdout = execError.stdout || "";
-      stderr = execError.stderr || execError.message;
-    } finally {
-      activeSessions.delete(jobId);
+
+      await log(
+        exitCode === 0 ? "info" : "warn",
+        `run-direct job=${jobId} role=${role} exit=${exitCode} duration_ms=${Date.now() - startTime}`
+      );
+    };
+
+    // ── Async contract (P1 item 6): 202 { job_id, state } immediately ──
+    if (asyncMode) {
+      void runJob().catch(async (err: any) => {
+        await log("error", `run-direct async job=${jobId} failed: ${err.message}`);
+        setJobState(jobId, "failed", {
+          exitCode: 1,
+          stderr: err.message,
+        });
+      });
+      return res.status(202).json({
+        job_id: jobId,
+        state: "accepted",
+        role,
+        model: effectiveModel || null,
+        harness_id: harnessId,
+        events: { started: startedEventId },
+      });
     }
 
-    await unlink(promptFile).catch(() => {});
-
-    // 5. Emit harness.completed event
-    await emitEvent({
-      event_type: exitCode === 0 ? "harness.completed" : "harness.failed",
-      source: `harness-srv.run-direct.${channel}`,
-      aggregate_type: "harness_job",
-      aggregate_id: jobId,
-      payload: {
-        role,
-        channel,
-        exit_code: exitCode,
-        duration_ms: Date.now() - startTime,
-        stdout_preview: stdout.slice(0, 500),
-        stderr_preview: stderr.slice(0, 500),
-      },
-      actor_type: "system",
-      causation_id: startedEventId,
-      caused_by_event_type: "harness.started",
-    });
-
-    await log(
-      exitCode === 0 ? "info" : "warn",
-      `run-direct job=${jobId} role=${role} exit=${exitCode} duration_ms=${Date.now() - startTime}`
-    );
-
+    // ── Sync contract (default, backward compatible) ──
+    await runJob();
+    const job = jobs.get(jobId);
     res.json({
       job_id: jobId,
       role,
-      exit_code: exitCode,
-      stdout,
-      stderr,
-      duration_ms: Date.now() - startTime,
+      exit_code: job?.exitCode ?? 1,
+      stdout: job?.stdout ?? "",
+      stderr: job?.stderr ?? "",
+      duration_ms: job?.durationMs ?? Date.now() - startTime,
       prompt_preview: prompt.slice(0, 300) + (prompt.length > 300 ? "..." : ""),
       harness_id: harnessId,
       model: effectiveModel || null,
@@ -731,6 +970,122 @@ app.post("/run-direct", async (req, res) => {
       duration_ms: Date.now() - startTime,
     });
   }
+});
+
+// ── GET /jobs/:jobId — job status + partial output (P1 item 6) ─────
+// The async contract's read path: state envelope with the RAW accumulated
+// stdout (partial while running — preserved on timeout/failure), stderr,
+// and exact exit/timeout metadata. 404 for unknown jobs.
+app.get("/jobs/:jobId", (req, res) => {
+  const job = jobs.get(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ error: "job not found", job_id: req.params.jobId });
+  }
+  res.json({ job: jobEnvelope(job) });
+});
+
+// ── GET /jobs/:jobId/events?after=<seq> — replayable SSE job stream ──
+// Typed envelopes translated once at the boundary from the opencode JSON
+// event stream: job.accepted, job.started, text.delta, thinking, and the
+// terminal job.completed / job.failed / job.timed_out / job.cancelled.
+// Replays seq > after on connect, then follows live (same cursor semantics
+// as the duality session stream). 15s heartbeats.
+app.get("/jobs/:jobId/events", (req, res) => {
+  const job = jobs.get(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ error: "job not found", job_id: req.params.jobId });
+  }
+
+  let after = 0;
+  if (req.query.after !== undefined && req.query.after !== "") {
+    after = Number(req.query.after);
+    if (!Number.isInteger(after) || after < 0) {
+      return res.status(400).json({ error: "after must be a non-negative integer sequence" });
+    }
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+  req.socket.setTimeout(0);
+  res.setTimeout(0);
+
+  let closed = false;
+  const send = (event: string, data: Record<string, unknown>) => {
+    if (!closed) {
+      try { res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); } catch { /* noop */ }
+    }
+  };
+
+  // Replay backlog (seq > after), then mark the client live.
+  let replayed = 0;
+  let lastSeq = after;
+  for (const ev of job.events) {
+    if (ev.seq <= after) continue;
+    send(ev.type, {
+      seq: ev.seq,
+      type: ev.type,
+      jobId: job.jobId,
+      payload: ev.payload,
+      ts: new Date(ev.ts).toISOString(),
+    });
+    lastSeq = Math.max(lastSeq, ev.seq);
+    replayed++;
+  }
+  send("connected", {
+    jobId: job.jobId,
+    state: job.state,
+    after: after || null,
+    seq: job.events.length,
+    replayed,
+  });
+  job.sseClients.add(res);
+
+  const heartbeat = setInterval(() => {
+    send("heartbeat", { jobId: job.jobId, seq: lastSeq });
+  }, 15_000);
+
+  const cleanup = () => {
+    if (closed) return;
+    closed = true;
+    clearInterval(heartbeat);
+    job.sseClients.delete(res);
+  };
+  req.on("close", cleanup);
+  res.on("error", cleanup);
+});
+
+// ── POST /jobs/:jobId/interrupt — SIGTERM the child, cancel the job ──
+// The async contract's cancellation path: kills the opencode child by PID
+// (same mechanism as the runaway watchdog) and marks the job cancelled so
+// the subscriber can surface the interrupt instead of a timeout.
+app.post("/jobs/:jobId/interrupt", async (req, res) => {
+  const job = jobs.get(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ error: "job not found", job_id: req.params.jobId });
+  }
+  if (job.state !== "accepted" && job.state !== "running") {
+    return res.json({ job: jobEnvelope(job), note: "job already terminal" });
+  }
+  job.interrupted = true;
+  if (job.pid) {
+    try {
+      process.kill(job.pid, "SIGTERM");
+      await log("info", `interrupt: SIGTERM sent to pid=${job.pid} job=${job.jobId.slice(0, 8)}`);
+    } catch {
+      // Process already dead — the close handler will mark the job.
+    }
+  } else {
+    // No child pid (e.g. still resolving) — mark cancelled directly; the
+    // runner's interrupted guard prevents a later running/terminal override.
+    setJobState(job.jobId, "cancelled", {
+      exitCode: 137,
+      stderr: "interrupted by user request",
+    });
+  }
+  res.json({ job: jobEnvelope(job) });
 });
 
 // ── GET /health ─────────────────────────────────────────────────────
@@ -768,6 +1123,10 @@ interface HarnessExecParams {
   model?: string; // opencode --model value (from tackle config_bundle)
   model_identifier?: string; // bare model_identifier (for binary=ollama)
   timeout_ms: number;
+  /** P1 item 6 — translate the executor's stream once, at the boundary,
+   *  into typed envelopes ("text" → text.delta, "reasoning" → thinking).
+   *  Called for every parsed stream event as it arrives. */
+  onEvent?: (type: "text" | "reasoning", payload: { text: string }) => void;
 }
 
 interface HarnessExecResult {
@@ -888,7 +1247,7 @@ async function executeOpencode(
   params: HarnessExecParams,
   promptContent: string
 ): Promise<HarnessExecResult> {
-  const { prompt_file, work_dir, agent, role, model, timeout_ms } = params;
+  const { prompt_file, work_dir, agent, role, model, timeout_ms, onEvent } = params;
   const opencodeBin = process.env.OPENCODE_BIN || "opencode";
   // Extract jobId from prompt filename (${jobId}.md) for watchdog PID tracking
   const jobId = prompt_file.split("/").pop()?.replace(".md", "") || "";
@@ -937,18 +1296,59 @@ async function executeOpencode(
     }
 
     // Register PID for runaway watchdog (direct SIGTERM instead of pkill -f)
+    // and for the async job contract's POST /jobs/:id/interrupt.
     if (jobId) {
       const session = activeSessions.get(jobId);
       if (session) {
         session.pid = child.pid;
         log("info", `opencode pid=${child.pid} registered for watchdog (job=${jobId.slice(0, 8)})`);
       }
+      const job = jobs.get(jobId);
+      if (job) {
+        job.pid = child.pid ?? null;
+      }
     }
 
     let stdout = '';
     let stderr = '';
     let timedOut = false;
-    child.stdout?.on('data', (data: Buffer) => { stdout += data.toString(); });
+    // ── Stream translation (P1 item 6) ───────────────────────────
+    // opencode --format json emits a JSON-lines stream; translate each
+    // envelope ONCE here into typed events (text → text.delta, reasoning →
+    // thinking) so downstream consumers (SSE /jobs/:id/events, the duality
+    // subscriber) never parse opencode's wire format themselves. Lines can
+    // span chunks, so a partial line buffer is kept.
+    let lineBuf = '';
+    const emitParsed = () => {
+      if (!onEvent) return;
+      const lines = (lineBuf + '').split('\n');
+      lineBuf = lines.pop() ?? ''; // last element may be incomplete
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('{')) continue;
+        try {
+          const ev = JSON.parse(trimmed) as any;
+          if (ev?.type === 'text' || ev?.type === 'reasoning') {
+            const part = ev.part ?? {};
+            const text =
+              typeof part?.text === 'string'
+                ? part.text
+                : typeof ev.text === 'string'
+                  ? ev.text
+                  : '';
+            if (text.trim()) {
+              onEvent(ev.type, { text });
+            }
+          }
+        } catch { /* non-JSON line — skip */ }
+      }
+    };
+    child.stdout?.on('data', (data: Buffer) => {
+      const chunk = data.toString();
+      stdout += chunk;
+      lineBuf += chunk;
+      emitParsed();
+    });
     child.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
 
     const timer = setTimeout(() => {

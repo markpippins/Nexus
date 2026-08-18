@@ -651,13 +651,16 @@ def _invoke_agent_harness(
     model: str | None,
     timeout_ms: int = 600_000,
 ) -> dict[str, Any]:
-    """Invoke an agent via harness-srv POST /run-direct.
+    """Invoke an agent via harness-srv's async job contract (P1 item 6).
 
-    This is the OpenCode path — ephemeral execution that needs full
-    context reconstruction. The prompt should already contain the
-    assembled Assembly thread + participant identities + SOL facts.
+    POST /run-direct { async: true } returns 202 {job_id, state} and the
+    job runs in the background; the subscriber polls GET /jobs/:jobId until
+    terminal and reads the envelope — which preserves the RAW accumulated
+    stdout (partial output on timeout/failure) and exact exit/timeout
+    metadata. This replaces the old blocking-only contract: the subscriber
+    no longer holds an HTTP connection open for the whole run.
 
-    Returns { exit_code, stdout, stderr }.
+    Returns { exit_code, stdout, stderr, trace, job_id }.
     """
     body = json.dumps({
         "role": role,
@@ -665,6 +668,7 @@ def _invoke_agent_harness(
         **({"model": model} if model else {}),
         "timeout_ms": timeout_ms,
         "channel": "duality",
+        "async": True,
     }).encode()
 
     req = urllib.request.Request(
@@ -673,28 +677,33 @@ def _invoke_agent_harness(
         headers={"Content-Type": "application/json"},
         method="POST",
     )
+
+    def _result(data: dict[str, Any]) -> dict[str, Any]:
+        raw = data.get("stdout", "") or ""
+        return {
+            "exit_code": data.get("exit_code", 0),
+            # opencode --format json emits a JSON-lines event stream;
+            # reduce it to the assistant's text so the conversation
+            # response is readable rather than raw event envelopes.
+            "stdout": _extract_opencode_text(raw),
+            # Keep the reasoning trace ("agent thinking") for the UI —
+            # extracted from the RAW stream, not the reduced stdout.
+            "trace": _extract_opencode_trace(raw),
+            "stderr": data.get("stderr", ""),
+            "job_id": data.get("job_id"),
+        }
+
     try:
-        with urllib.request.urlopen(req, timeout=timeout_ms // 1000 + 30) as resp:
-            data = json.loads(resp.read())
-            if data.get("error"):
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            accepted = json.loads(resp.read())
+        job_id = accepted.get("job_id")
+        if not job_id or resp.status != 202:
+            if accepted.get("error"):
                 return {
-                    "exit_code": 1,
-                    "stdout": "",
-                    "stderr": data["error"],
-                    "job_id": data.get("job_id"),
+                    "exit_code": 1, "stdout": "", "stderr": accepted["error"],
+                    "job_id": job_id,
                 }
-            return {
-                "exit_code": data.get("exit_code", 0),
-                # opencode --format json emits a JSON-lines event stream;
-                # reduce it to the assistant's text so the conversation
-                # response is readable rather than raw event envelopes.
-                "stdout": _extract_opencode_text(data.get("stdout", "")),
-                # Keep the reasoning trace ("agent thinking") for the UI —
-                # extracted from the RAW stream, not the reduced stdout.
-                "trace": _extract_opencode_trace(data.get("stdout", "")),
-                "stderr": data.get("stderr", ""),
-                "job_id": data.get("job_id"),
-            }
+            return _result(accepted)  # sync-shaped response (older server)
     except urllib.error.HTTPError as e:
         # 4xx/5xx from harness-srv: urllib raises before reading the body,
         # so the real reason (e.g. 'No active config_bundle found for role X')
@@ -710,14 +719,53 @@ def _invoke_agent_harness(
         _log("Harness invocation failed for %s (HTTP %s): %s",
              role, e.code, str(detail))
         return {
-            "exit_code": 1,
-            "stdout": "",
-            "stderr": str(detail)[:500],
+            "exit_code": 1, "stdout": "", "stderr": str(detail)[:500],
             "job_id": job_id,
         }
     except Exception as e:
         _log("Harness invocation failed for %s: %s", role, e)
         return {"exit_code": 1, "stdout": "", "stderr": str(e)}
+
+    # ── Poll the job envelope until terminal (or the deadline) ──────
+    deadline = time.time() + (timeout_ms / 1000) + 60  # 60s grace for start
+    last_envelope: dict[str, Any] = {}
+    terminal_states = {"completed", "failed", "timed_out", "cancelled"}
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(
+                f"{HARNESS_SRV_URL}/jobs/{job_id}", timeout=30
+            ) as resp:
+                last_envelope = (json.loads(resp.read()) or {}).get("job", {})
+        except Exception as e:
+            _log("Job %s poll failed: %s", str(job_id)[:8], e)
+            time.sleep(1.0)
+            continue
+        state = last_envelope.get("state", "")
+        if state in terminal_states:
+            if state == "cancelled":
+                return {
+                    "exit_code": 137,
+                    "stdout": _extract_opencode_text(last_envelope.get("stdout", "") or ""),
+                    "trace": _extract_opencode_trace(last_envelope.get("stdout", "") or ""),
+                    "stderr": last_envelope.get("stderr") or "interrupted by user request",
+                    "job_id": job_id,
+                }
+            return _result(last_envelope)
+        time.sleep(1.0)
+
+    # Deadline exceeded — the job never reached terminal. Report honestly
+    # as a timeout (exit 124) and preserve the partial output produced so
+    # far (P1 item 6: partial output + exact exit metadata).
+    _log("Job %s did not finish within %sms — reporting timeout",
+         str(job_id)[:8], timeout_ms)
+    partial = last_envelope.get("stdout", "") or ""
+    return {
+        "exit_code": 124,
+        "stdout": _extract_opencode_text(partial),
+        "trace": _extract_opencode_trace(partial),
+        "stderr": f"harness job {job_id} did not finish within {timeout_ms}ms — partial output below",
+        "job_id": job_id,
+    }
 
 
 async def _emit_turn_requested(
