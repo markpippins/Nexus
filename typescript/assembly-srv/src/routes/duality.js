@@ -146,3 +146,97 @@ dualityRouter.get('/watches/:threadId', async (req, res, next) => {
     res.json(result.rows);
   } catch (err) { next(err); }
 });
+
+// ── Turn/job state envelope (P0-1 item 3) ──────────────────────────────
+// Server-side turn state so the UI renders the turn lifecycle instead of
+// inferring it from comment count. Rows are written by the interactive-turn
+// subscriber (duality.session_turns); this route is the read path.
+
+/** GET /api/duality/turns?threadId=X[&limit=N][&state=...]
+ *  — turn state envelopes for a thread, newest first.
+ *
+ *  Each envelope: { id (turn_id), thread_id, role, execution_backend, state,
+ *  request_comment_id, response_comment_id, subscriber_id, job_id,
+ *  execution_plan_version, failure_detail, *_at timestamps }.
+ *
+ *  The optional state filter (accepted|running|completed|failed|timed_out|
+ *  cancelled) lets the UI ask specifically for the in-flight turn.
+ */
+dualityRouter.get('/turns', async (req, res, next) => {
+  try {
+    const { threadId, limit, state } = req.query;
+    if (!threadId) {
+      throw new BadRequestError('threadId query param is required');
+    }
+    const params = [threadId];
+    let stateClause = '';
+    if (state) {
+      const allowed = ['accepted', 'running', 'completed', 'failed', 'timed_out', 'cancelled'];
+      if (!allowed.includes(String(state))) {
+        throw new BadRequestError(`state must be one of: ${allowed.join(', ')}`);
+      }
+      params.push(String(state));
+      stateClause = ` AND state = $${params.length}`;
+    }
+    const lim = Math.min(Math.max(Number(limit) || 10, 1), 100);
+    params.push(lim);
+    const result = await pool.query(
+      `SELECT id, thread_id, watch_id, role, execution_backend, state,
+              request_comment_id, response_comment_id, subscriber_id, job_id,
+              execution_plan_version, failure_detail,
+              created_at, updated_at, accepted_at, running_at, completed_at,
+              failed_at, timed_out_at, cancelled_at
+       FROM duality.session_turns
+       WHERE thread_id = $1${stateClause}
+       ORDER BY created_at DESC
+       LIMIT $${params.length}`,
+      params
+    );
+    res.json({ turns: result.rows });
+  } catch (err) { next(err); }
+});
+
+/** GET /api/duality/turns/latest?threadId=X — the most recent turn envelope
+ *  for a thread (any state), so the UI has a single in-flight/terminal
+ *  state to render without paging. */
+dualityRouter.get('/turns/latest', async (req, res, next) => {
+  try {
+    const { threadId } = req.query;
+    if (!threadId) {
+      throw new BadRequestError('threadId query param is required');
+    }
+    const result = await pool.query(
+      `SELECT id, thread_id, watch_id, role, execution_backend, state,
+              request_comment_id, response_comment_id, subscriber_id, job_id,
+              execution_plan_version, failure_detail,
+              created_at, updated_at, accepted_at, running_at, completed_at,
+              failed_at, timed_out_at, cancelled_at
+       FROM duality.session_turns
+       WHERE thread_id = $1
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [threadId]
+    );
+    res.json({ turn: result.rows[0] ?? null });
+  } catch (err) { next(err); }
+});
+
+/** GET /api/duality/turns/:turnId — a single turn envelope. */
+dualityRouter.get('/turns/:turnId', async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, thread_id, watch_id, role, execution_backend, state,
+              request_comment_id, response_comment_id, subscriber_id, job_id,
+              execution_plan_version, failure_detail,
+              created_at, updated_at, accepted_at, running_at, completed_at,
+              failed_at, timed_out_at, cancelled_at
+       FROM duality.session_turns
+       WHERE id = $1`,
+      [req.params.turnId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'turn not found' });
+    }
+    res.json({ turn: result.rows[0] });
+  } catch (err) { next(err); }
+});

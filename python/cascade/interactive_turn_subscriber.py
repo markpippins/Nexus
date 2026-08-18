@@ -262,6 +262,99 @@ def _close_watch(pg_conn: Any, watch_id: str, reason: str) -> None:
     _log("Watch %s closed: %s", watch_id[:8], reason)
 
 
+# ═══════════════════════════════════════════════════════════════════════
+#  Turn/job state envelope (P0-1 item 3)
+# ═══════════════════════════════════════════════════════════════════════
+# One durable row per turn in duality.session_turns, keyed by turn_id,
+# transitioning accepted → running → completed | failed | timed_out |
+# cancelled. The UI renders this server-side state instead of inferring
+# turn lifecycle from comment count. Rows are never deleted.
+
+_TURN_STATE_COLUMNS = {
+    "accepted": "accepted_at",
+    "running": "running_at",
+    "completed": "completed_at",
+    "failed": "failed_at",
+    "timed_out": "timed_out_at",
+    "cancelled": "cancelled_at",
+}
+
+
+def _create_turn(
+    pg_conn: Any,
+    thread_id: str,
+    watch_id: str,
+    role: str,
+    backend: str,
+    request_comment_id: str | None,
+    execution_plan_version: str | None = None,
+) -> str:
+    """Create a turn row in 'accepted' state. Returns turn_id."""
+    with pg_conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO duality.session_turns
+                 (thread_id, watch_id, role, execution_backend, state,
+                  request_comment_id, subscriber_id, execution_plan_version,
+                  accepted_at, created_at, updated_at)
+               VALUES (%s::uuid, %s::uuid, %s, %s, 'accepted',
+                       %s::uuid, 'cascade-interactive-turn', %s,
+                       now(), now(), now())
+               RETURNING id""",
+            (thread_id, watch_id, role, backend,
+             request_comment_id, execution_plan_version),
+        )
+        turn_id = cur.fetchone()[0]
+    pg_conn.commit()
+    _log("Turn %s created (thread=%s role=%s backend=%s state=accepted)",
+         str(turn_id)[:8], str(thread_id)[:8], role, backend)
+    return str(turn_id)
+
+
+def _set_turn_state(
+    pg_conn: Any,
+    turn_id: str,
+    state: str,
+    failure_detail: str | None = None,
+    response_comment_id: str | None = None,
+    job_id: str | None = None,
+    execution_plan_version: str | None = None,
+) -> None:
+    """Transition a turn to a new state, stamping its *_at timestamp.
+
+    Only forward transitions are applied (a completed turn is never
+    rewritten to running): the state column is guarded so a stale event
+    cannot regress an already-terminal turn.
+    """
+    from_column = _TURN_STATE_COLUMNS.get(state)
+    if not from_column:
+        _log("Turn %s: unknown state %r — ignoring", turn_id[:8], state)
+        return
+    sets = ["state = %s", f"{from_column} = now()", "updated_at = now()"]
+    params: list[Any] = [state]
+    if failure_detail is not None:
+        sets.append("failure_detail = %s")
+        params.append(failure_detail[:2000])
+    if response_comment_id is not None:
+        sets.append("response_comment_id = %s")
+        params.append(response_comment_id)
+    if job_id is not None:
+        sets.append("job_id = %s")
+        params.append(job_id)
+    if execution_plan_version is not None:
+        sets.append("execution_plan_version = %s")
+        params.append(execution_plan_version)
+    with pg_conn.cursor() as cur:
+        cur.execute(
+            f"""UPDATE duality.session_turns
+               SET {', '.join(sets)}
+               WHERE id = %s::uuid
+                 AND state = ANY(ARRAY['accepted','running']::text[])""",
+            params + [turn_id],
+        )
+    pg_conn.commit()
+    _log("Turn %s → %s", turn_id[:8], state)
+
+
 def _consume_lease(role: str) -> None:
     """POST /api/role-leases/consume on nebula (best-effort)."""
     try:
@@ -752,6 +845,7 @@ async def handle_comment_created(
     thread_id = normalized["thread_id"]
     comment_role = normalized["comment_role"]
     forum_slug = normalized["forum_slug"]
+    request_comment_id = normalized.get("comment_id") or None
 
     # ── Guard: never process system-level comments (error reports, etc).
     # These are posted by the subscriber itself when an agent fails;
@@ -800,6 +894,16 @@ async def handle_comment_created(
 
         # ── Invoke the agent (backend dispatch) ──────────────────
         backend = watch.get("execution_backend", "operator")
+        plan_version = lease.get("model") if lease else None
+
+        # ── Turn envelope (P0-1 item 3) ──────────────────────────
+        # Create the turn in 'accepted' state up front so the UI sees the
+        # request has been picked up (rather than inferring from a comment
+        # count). The terminal transition is written at each outcome below.
+        turn_id = _create_turn(
+            pg_conn, thread_id, watch_id, watch_role, backend,
+            request_comment_id, execution_plan_version=plan_version,
+        )
 
         # ── Leased-mode gate (R1 hard stop, pre-invocation) ──────
         # 'freebuff' is the LEASED interactive path: an agent must have
@@ -827,6 +931,7 @@ async def handle_comment_created(
                 f"[system] Agent {watch_role} encountered an error: {reason}",
                 "system",
             )
+            _set_turn_state(pg_conn, turn_id, "failed", failure_detail=reason)
             _touch_watch_activity(pg_conn, watch_id)
             continue
 
@@ -835,6 +940,8 @@ async def handle_comment_created(
             # The session polls Assembly directly (duality-ui polling loop).
             # We do NOT bump turn_count here — the session owns its own
             # accounting. Lease consumption also handled by the session.
+            # The turn stays 'accepted': the freebuff session owns the
+            # reply, so the subscriber cannot observe completion.
             await _emit_turn_requested(nc, thread_id, watch_role, comment_role)
             continue
 
@@ -846,18 +953,20 @@ async def handle_comment_created(
             # operator: incremental — just the new comment, session has context
             prompt = _build_incremental_context(pg_conn, thread_id, watch_role, comment_role)
 
+        _set_turn_state(pg_conn, turn_id, "running",
+                        execution_plan_version=plan_version)
         _log("Invoking %s via %s backend...", watch_role, backend)
         if backend == "harness":
             result = _invoke_agent_harness(
                 role=watch_role,
                 prompt=prompt,
-                model=lease.get("model") if lease else None,
+                model=plan_version,
             )
         else:
             result = _invoke_agent_operator(
                 role=watch_role,
                 prompt=prompt,
-                model=lease.get("model") if lease else None,
+                model=plan_version,
             )
 
         stdout = result.get("stdout", "") or ""
@@ -876,6 +985,15 @@ async def handle_comment_created(
                 f"[system] Agent {watch_role} encountered an error: {detail}",
                 "system",
             )
+            # Distinguish a timeout (harness exit 124 / 'timeout after' in
+            # stderr) from a plain failure so the envelope carries the
+            # honest terminal state.
+            if exit_code == 124 or "timeout" in (stderr or "").lower():
+                _set_turn_state(pg_conn, turn_id, "timed_out",
+                                failure_detail=detail, job_id=result.get("job_id"))
+            else:
+                _set_turn_state(pg_conn, turn_id, "failed",
+                                failure_detail=detail, job_id=result.get("job_id"))
             _bump_turn_count(pg_conn, watch_id)
             continue
 
@@ -895,12 +1013,19 @@ async def handle_comment_created(
 
         # 5. Post agent response
         response_preview = stdout[:3000]
-        comment_id = _post_assembly_comment(
+        response_comment_id = _post_assembly_comment(
             thread_id, response_preview, watch_role,
             model=lease.get("model") if lease else None,
         )
-        if comment_id:
-            _log("Posted response as comment %s", comment_id[:8])
+        if response_comment_id:
+            _log("Posted response as comment %s", response_comment_id[:8])
+
+        # 5.5. Turn envelope: mark the turn completed with the response
+        #      comment id so the UI can link request → response.
+        _set_turn_state(pg_conn, turn_id, "completed",
+                        response_comment_id=response_comment_id,
+                        job_id=result.get("job_id"),
+                        execution_plan_version=plan_version)
 
         # 6. Re-check coordinator with the actual response.
         #    Harness (cloud executor) needs no role lease — it launches

@@ -460,6 +460,41 @@ class TestAc0SchemaSmoke(unittest.TestCase):
         )
         self.assertIsNotNone(forum_id, "duality-sessions forum must exist")
 
+    def test_duality_session_turns_table_exists(self):
+        """The duality.session_turns turn-envelope table (V112) must exist
+        with the expected columns and state CHECK (P0-1 item 3)."""
+        rows = _db_rows(
+            "SELECT column_name, data_type "
+            "FROM information_schema.columns "
+            "WHERE table_schema = 'duality' AND table_name = 'session_turns' "
+            "ORDER BY ordinal_position"
+        )
+        cols = {r[0] for r in rows}
+        required = {
+            "id", "thread_id", "watch_id", "role", "execution_backend",
+            "state", "request_comment_id", "response_comment_id",
+            "subscriber_id", "job_id", "execution_plan_version",
+            "failure_detail", "accepted_at", "running_at", "completed_at",
+            "failed_at", "timed_out_at", "cancelled_at",
+        }
+        missing = required - cols
+        self.assertFalse(missing, f"session_turns missing columns: {missing}")
+
+    def test_session_turns_state_check_constraint(self):
+        """The state column must allow the full envelope vocabulary."""
+        rows = _db_rows(
+            "SELECT pg_get_constraintdef(oid) "
+            "FROM pg_constraint "
+            "WHERE conrelid = 'duality.session_turns'::regclass "
+            "  AND conname LIKE '%state%'"
+        )
+        self.assertTrue(rows, "session_turns.state CHECK constraint must exist")
+        constraint_def = rows[0][0] or ""
+        for val in ("accepted", "running", "completed", "failed",
+                    "timed_out", "cancelled"):
+            self.assertIn(val, constraint_def,
+                          f"CHECK must include '{val}'")
+
 
 # ═══════════════════════════════════════════════════════════════════════
 #  Module-level cleanup
