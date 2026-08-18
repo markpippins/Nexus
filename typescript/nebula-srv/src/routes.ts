@@ -2617,6 +2617,7 @@ export function createRoutes(pool: Pool): Router {
       const level = req.query.level as string | undefined;
       const visibilityScope = req.query.visibilityScope as string | undefined;
       const tag = req.query.tag as string | undefined;
+      const search = req.query.search as string | undefined;
       const sort = (req.query.sort as string) || 'created_at';
       const { offset, limit, page, pageSize } = parsePagination(req.query);
 
@@ -2625,9 +2626,14 @@ export function createRoutes(pool: Pool): Router {
         return res.status(400).json({ error: `sort must be one of: ${validSorts.join(', ')}` });
       }
 
+      // NOTE: candidate_count is computed LIVE from harvest_candidates (correlated
+      // subquery), NOT from the stored harvests.total_candidates column — that column
+      // was stale (only 75/1566 candidate-bearing harvests had it set).
+      const liveCandidateCount = `(SELECT count(*) FROM nebula.harvest_candidates c WHERE c.harvest_id = h.id)`;
+
       // Compute analytics via docklang for sortable metrics
       const sortExpr: Record<string, string> = {
-        candidate_count: 'COALESCE(h.total_candidates, 0)',
+        candidate_count: liveCandidateCount,
         code_blocks:      "COALESCE((h.docklang #>> '{stats,by_type,code}')\n::int, 0)",
         turns:            'COALESCE(jsonb_array_length(h.docklang -> \'discourse_units\'), 0)',
         block_density:    "CASE WHEN jsonb_array_length(h.docklang -> 'discourse_units') > 0 THEN (h.docklang #>> '{stats,total_blocks}')::numeric / jsonb_array_length(h.docklang -> 'discourse_units') ELSE 0 END",
@@ -2659,6 +2665,13 @@ export function createRoutes(pool: Pool): Router {
       if (level) { clauses.push(`h.level = $${pi++}`); params.push(parseInt(level)); filterParams.push(parseInt(level)); }
       if (visibilityScope) { clauses.push(`h.visibility_scope = $${pi++}`); params.push(visibilityScope); filterParams.push(visibilityScope); }
       if (tag) { clauses.push(`$${pi++} = ANY(h.tags)`); params.push(tag); filterParams.push(tag); }
+      if (search) {
+        // Concatenate the searchable fields into ONE string and match it with a
+        // single placeholder — the count-query renumbering below assumes each
+        // clause has exactly one placeholder.
+        clauses.push(`(COALESCE(h.source_filename, '') || ' ' || COALESCE(h.source_path, '') || ' ' || COALESCE(h.model, '')) ILIKE '%' || $${pi} || '%'`);
+        params.push(search); filterParams.push(search); pi++;
+      }
       const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
 
       // Count-query WHERE: renumber clause placeholders to start at $1 (each clause has
@@ -2687,7 +2700,7 @@ export function createRoutes(pool: Pool): Router {
                ${sort === 'tag_frequency' ? "(SELECT COALESCE(sum(freq), 0) FROM (SELECT count(*) AS freq FROM nebula.harvests h2, unnest(h2.tags) AS t WHERE t = ANY(s.tags) GROUP BY t) sub) AS tag_frequency" : '0::bigint AS tag_frequency'}
         FROM (
           SELECT h.id, h.source_path, h.source_filename, h.model,
-                 h.total_candidates, h.tags, h.metadata, h.created_at,
+                 ${liveCandidateCount} AS total_candidates, h.tags, h.metadata, h.created_at,
                  h.level, h.visibility_scope,
                  h.source_hash, h.file_size, h.version, h.run_metadata,
                  h.docklang
