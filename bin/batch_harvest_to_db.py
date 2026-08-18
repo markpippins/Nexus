@@ -226,11 +226,11 @@ def process_transcript(html_path: Path) -> bool:
     return True
 
 
-def find_unharvested(limit: int) -> list[Path]:
+def find_unharvested(limit: int, chats_dir: Path = CHATS_DIR) -> list[Path]:
     """Find the N largest unharvested HTML files, by recency (mtime)."""
     harvested = get_harvested_filenames()
     html_files = sorted(
-        [f for f in CHATS_DIR.glob("*.html") if f.name not in harvested],
+        [f for f in chats_dir.glob("*.html") if f.name not in harvested],
         key=lambda f: f.stat().st_mtime,   # most recent first
         reverse=True,
     )
@@ -248,19 +248,23 @@ def main():
     parser = argparse.ArgumentParser(description="Batch harvest chat HTMLs to DB")
     parser.add_argument("--dry-run", action="store_true", help="Discover unharvested files but don't process")
     parser.add_argument("--limit", type=int, default=5, help="Max transcripts to process (default: 5)")
+    parser.add_argument("--chats-dir", type=str, default=str(CHATS_DIR),
+                        help="Directory to scan for HTML transcripts (default: /home/codex/dev/chats; "
+                             "point at /home/codex/dev/chats-quarantined to reprocess quarantined files)")
     parser.add_argument("file", nargs="*", help="Specific filenames to process (by title, .html optional)")
     args = parser.parse_args()
+    chats_dir = Path(args.chats_dir)
 
     if args.file:
         targets = []
         for f in args.file:
-            p = CHATS_DIR / (f if f.endswith(".html") else f + ".html")
+            p = chats_dir / (f if f.endswith(".html") else f + ".html")
             if p.exists():
                 targets.append(p)
             else:
                 log.error("File not found: %s", p)
     else:
-        targets = find_unharvested(args.limit)
+        targets = find_unharvested(args.limit, chats_dir=chats_dir)
 
     if args.dry_run:
         log.info("DRY RUN — would process:")
