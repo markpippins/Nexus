@@ -85,6 +85,8 @@ public class ExternalServiceRegistrationService {
 
         service.setName(registration.getServiceName());
         service.setDescription("External service registered via API");
+        // T25 1.2: provenance marker — this path creates/updates runtime entries.
+        service.setOrigin("register");
         service.setVersion(registration.getVersion());
         service.setHealthCheckPath(registration.getHealthCheck());
         service.setApiBasePath(registration.getEndpoint());

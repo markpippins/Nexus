@@ -74,6 +74,12 @@ public class Service {
     @Column(name = "active_flag")
     private Boolean activeFlag = true;
 
+    // T25 1.2 (R-A-2026-08-15-008): provenance marker — seed (declarative catalog)
+    // vs register (runtime-created via POST /api/v1/registry/register). The sync
+    // job never overwrites catalog metadata of origin='seed' rows.
+    @Column(name = "origin", length = 20)
+    private String origin = "seed";
+
     @Column
     private LocalDateTime createdAt;
 
@@ -205,6 +211,14 @@ public class Service {
 
     public void setActiveFlag(Boolean activeFlag) {
         this.activeFlag = activeFlag;
+    }
+
+    public String getOrigin() {
+        return origin;
+    }
+
+    public void setOrigin(String origin) {
+        this.origin = origin;
     }
 
     public LocalDateTime getCreatedAt() {
