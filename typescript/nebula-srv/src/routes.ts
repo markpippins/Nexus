@@ -1836,8 +1836,11 @@ export function createRoutes(pool: Pool): Router {
         try {
           // Generate plan_number: MAX + 1, zero-padded to 4 digits
           const { rows: [maxRow] } = await pool.query(
+            // Only numeric plan_numbers participate in MAX+1 generation; non-numeric
+            // rows (e.g. wrconf010-9202bb09 test plans) would break the ::int cast.
             `SELECT MAX(NULLIF(regexp_replace(plan_number, '^0+', ''), '')::int) AS max_id
-             FROM nebula.implementation_plans`
+             FROM nebula.implementation_plans
+             WHERE plan_number ~ '^[0-9]+$'`
           );
           const nextId = String((maxRow?.max_id || 0) + 1).padStart(4, '0');
           const fileName = `${slug}-v${nextId}.md`;
