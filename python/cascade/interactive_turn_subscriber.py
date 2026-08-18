@@ -69,10 +69,6 @@ DATABASE_URL = os.getenv(
     "postgres://pguser:pgpass@localhost:5432/nexus",
 )
 NATS_URL = os.getenv("NATS_URL", "nats://localhost:4222")
-NATS_SUBJECT = os.getenv(
-    "INTERACTIVE_NATS_SUBJECT",
-    "nexus.duality.v1.conversation.>",
-)
 
 HARNESS_SRV_URL = os.getenv("HARNESS_SRV_URL", "http://localhost:3420")
 ASSEMBLY_URL = os.getenv("ASSEMBLY_URL", "http://localhost:3107")
@@ -1406,33 +1402,25 @@ async def _handle_session_event(
 
 
 # ═══════════════════════════════════════════════════════════════════════
-#  NATS subscriber
+#  Main loop
 # ═══════════════════════════════════════════════════════════════════════
-
-def _is_comment_created(data: dict[str, Any], subject: str) -> bool:
-    """True when this event is assembly.comment.created.
-
-    Matches both kernel transition subjects
-    (``nexus.kernel.v1.transition.assembly.comment.created``) and
-    duality conversation subjects
-    (``nexus.duality.v1.conversation.assembly.comment.created``).
-    """
-    if subject.endswith("assembly.comment.created"):
-        return True
-    return False
-
+# NATS is publish-only after P2 item 9: the subscriber emits
+# conversation.turn.requested for freebuff sessions but no longer SUBSCRIBES
+# to assembly.comment.created — that was the legacy transport, and the single
+# dispatch ingress is the durable duality_session_events stream. Removing the
+# subscription eliminates the duplicate PG+NATS delivery path (items 5/10).
 
 async def run_interactive_turn_subscriber() -> None:  # noqa: C901
-    """Main loop: connect NATS + DB, subscribe, process comment events.
+    """Main loop: connect NATS + DB, LISTEN for session events, dispatch turns.
 
-    Two event sources:
-    1. PostgreSQL LISTEN on ``duality_session_events`` — the durable event
-       stream is the dispatch source (P2 item 9). The /messages endpoint
-       writes a comment.created envelope first and the V113 AFTER INSERT
-       trigger NOTIFYs this channel; the Assembly comment is a projection,
-       not the transport.
-    2. NATS on ``nexus.duality.v1.conversation.>`` — future duality-specific
-       events and turn.requested replies from freebuff sessions.
+    One event source:
+    PostgreSQL LISTEN on ``duality_session_events`` — the durable event
+    stream is the dispatch source (P2 item 9). The /messages endpoint
+    writes a comment.created envelope first and the V113 AFTER INSERT
+    trigger NOTIFYs this channel; the Assembly comment is a projection,
+    not the transport. NATS is publish-only (conversation.turn.requested
+    for freebuff sessions); the legacy assembly.comment.created subscription
+    was removed so there is no second ingress to double-deliver (item 5/10).
     """
     try:
         import psycopg2
@@ -1471,37 +1459,12 @@ async def run_interactive_turn_subscriber() -> None:  # noqa: C901
     _log("Listening on PostgreSQL channel '%s' for session events",
          _PG_LISTEN_CHANNEL)
 
-    # ── Connect to NATS (for duality conversation events + publishing) ──
+    # ── Connect to NATS (publish-only: conversation.turn.requested) ──
     _log("Connecting to NATS at %s...", NATS_URL)
     nc = await nats.connect(NATS_URL, name="interactive_turn_subscriber")
-    _log("NATS connected")
+    _log("NATS connected (publish-only)")
 
     processed_count = 0
-
-    # ── NATS message handler (duality conversation events) ──
-    async def on_nats_message(msg: Any) -> None:
-        nonlocal processed_count
-
-        try:
-            data: dict[str, Any] = json.loads(msg.data.decode())
-            _log("Received NATS event on %s", msg.subject)
-
-            if not _is_comment_created(data, msg.subject):
-                return
-
-            await handle_comment_created(nc, pg_conn, data)
-            processed_count += 1
-
-        except json.JSONDecodeError as e:
-            _log("Invalid JSON: %s", e)
-        except Exception as e:
-            _log("Error processing NATS message: %s", e)
-            import traceback
-            _log(traceback.format_exc())
-
-    # ── Subscribe to NATS ──
-    sub = await nc.subscribe(NATS_SUBJECT, cb=on_nats_message)
-    _log("Subscribed to NATS %s", NATS_SUBJECT)
     _log("Forum: %s | Harness: %s", FORUM_SLUG, HARNESS_SRV_URL)
 
     # ── PG notification polling loop ──
@@ -1555,7 +1518,6 @@ async def run_interactive_turn_subscriber() -> None:  # noqa: C901
             await pg_task
         except asyncio.CancelledError:
             pass
-        await sub.unsubscribe()
         await nc.drain()
         cur.close()
         pg_conn.close()
@@ -1576,8 +1538,7 @@ def main() -> None:
             pass
 
     _log("Starting Interactive Turn Subscriber...")
-    _log("NATS: %s | Subject: %s | Harness: %s",
-         NATS_URL, NATS_SUBJECT, HARNESS_SRV_URL)
+    _log("NATS: %s (publish-only) | Harness: %s", NATS_URL, HARNESS_SRV_URL)
     try:
         loop.run_until_complete(run_interactive_turn_subscriber())
     except KeyboardInterrupt:

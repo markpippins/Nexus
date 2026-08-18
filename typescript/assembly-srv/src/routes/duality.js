@@ -41,6 +41,9 @@ dualityRouter.post('/watches', async (req, res, next) => {
     if (!threadId || !forumSlug || !role) {
       throw new BadRequestError('threadId, forumSlug, and role are required');
     }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(threadId))) {
+      throw new BadRequestError('threadId must be a UUID');
+    }
     if (leaseId !== undefined && leaseId !== null
         && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(leaseId))) {
       throw new BadRequestError('leaseId must be a UUID');

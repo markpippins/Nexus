@@ -67,6 +67,7 @@ if _NEXUS_PYTHON not in sys.path:
 
 DSN = os.environ.get("CONDUIT_PG_DSN", "postgresql://pguser:pgpass@localhost:5432/nexus")
 ASSEMBLY_URL = os.environ.get("ASSEMBLY_URL", "http://localhost:3107")
+NATS_URL = os.environ.get("NATS_URL", "nats://localhost:4222")
 FORUM_SLUG = "duality-sessions"
 
 TEST_WATCH_ROLE = "architect"
@@ -380,6 +381,89 @@ def test_04_provider_failure_produces_failed_turn():
     finally:
         _teardown(thread_id)
         _db_exec("DELETE FROM tackle.roles WHERE name = %s", (role,))
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  AC5 — Duplicate PG+NATS delivery collapses to one turn
+# ═══════════════════════════════════════════════════════════════════════
+
+def _publish_nats(subject: str, payload: dict) -> None:
+    """Publish one message to NATS (synchronous wrapper around nats-py)."""
+    import asyncio
+
+    async def _pub() -> None:
+        import nats
+        nc = await nats.connect(NATS_URL)
+        await nc.publish(subject, json.dumps(payload).encode())
+        await nc.flush()
+        await nc.close()
+
+    asyncio.run(_pub())
+
+
+@_skip_if_ci
+def test_05_duplicate_pg_nats_delivery_single_turn():
+    # P2 item 10: duplicate PG+NATS delivery must collapse to ONE turn. The
+    # legacy NATS assembly.comment.created ingress was removed (single ingress
+    # = duality_session_events), so publishing the old subject dispatches
+    # nothing while the event stream dispatches once — no double-delivery.
+    thread_id, _poster = _setup_thread_and_watch(role=TEST_WATCH_ROLE, backend="freebuff")
+    try:
+        # Legacy NATS ingress — must NOT dispatch (removed after P2 item 9).
+        _publish_nats(
+            "nexus.duality.v1.conversation.assembly.comment.created",
+            {
+                "event_type": "assembly.comment.created",
+                "aggregate_id": str(uuid.uuid4()),
+                "payload": {
+                    "thread_id": thread_id,
+                    "comment_id": str(uuid.uuid4()),
+                    "forum_slug": FORUM_SLUG,
+                    "role": TEST_POSTER_ROLE,
+                },
+            },
+        )
+        # Canonical event-stream ingress — dispatches once.
+        _insert_comment_event(thread_id, TEST_POSTER_ROLE, f"comment:{uuid.uuid4()}")
+
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            count = _db_scalar(
+                "SELECT count(*) FROM duality.session_turns WHERE thread_id = %s::uuid",
+                (thread_id,),
+            )
+            if count and count >= 1:
+                time.sleep(1.5)  # let any (wrong) duplicate materialize
+                break
+            time.sleep(0.3)
+
+        count = _db_scalar(
+            "SELECT count(*) FROM duality.session_turns WHERE thread_id = %s::uuid",
+            (thread_id,),
+        )
+        assert count == 1, \
+            f"PG event + NATS duplicate must produce exactly 1 turn, got {count}"
+    finally:
+        _teardown(thread_id)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  AC6 — Watch POST malformed threadId → clean 400 (not raw 500)
+# ═══════════════════════════════════════════════════════════════════════
+
+@_skip_if_ci
+def test_06_watch_post_malformed_threadid_400_not_500():
+    # A malformed (non-UUID) threadId must be rejected with a clean 400 and a
+    # surfaceable message — not a raw 500 from a PostgreSQL UUID cast error.
+    status, data = _http_post("/api/duality/watches", {
+        "threadId": "not-a-uuid",
+        "forumSlug": FORUM_SLUG,
+        "role": TEST_WATCH_ROLE,
+    })
+    assert status == 400, f"malformed threadId must 400 (not 500), got {status}: {data}"
+    assert data.get("error"), f"400 must carry a surfaceable error body: {data}"
+    assert "threadId" in str(data.get("error", "")), \
+        f"error must name the offending field: {data}"
 
 
 # ═══════════════════════════════════════════════════════════════════════
