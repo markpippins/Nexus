@@ -249,3 +249,35 @@ def test_04_sync_contract_still_blocks(test_role):
     assert "exit_code" in data, f"sync result shape missing exit_code: {data}"
     assert "stdout" in data
     assert "job_id" in data
+
+
+@_skip_if_ci
+def test_05_unqualified_override_rejected(test_role):
+    # P1 item 7 — a bare/stale model override must not bypass the canonical
+    # Tackle resolver (provider-qualified ids only).
+    status, data = _post("/run-direct", {
+        "role": test_role,
+        "prompt": "Reply with the single word OK.",
+        "model": "big-pickle",  # bare — no provider prefix
+    })
+    assert status == 400, f"expected 400, got {status}: {data}"
+    assert "unqualified model override" in data.get("error", ""), f"payload={data}"
+
+
+@_skip_if_ci
+def test_06_plan_in_envelope(test_role):
+    # P1 item 7 — the 202 accept + terminal envelope carry the Tackle-
+    # resolved versioned execution plan.
+    status, data = _submit_async(test_role, "Reply with the single word OK.")
+    assert status == 202
+    plan = data.get("plan", {})
+    assert plan.get("resolved_by") == "tackle", f"plan={plan}"
+    assert plan.get("plan_version"), f"plan missing plan_version: {plan}"
+    assert "/" in plan.get("model", ""), \
+        f"model must be provider-qualified: {plan.get('model')}"
+
+    terminal = _poll_terminal(data["job_id"], timeout_s=30)
+    job_plan = terminal.get("plan", {})
+    assert job_plan.get("resolved_by") == "tackle", f"job plan={job_plan}"
+    assert job_plan.get("plan_version") == plan.get("plan_version"), \
+        f"job envelope plan version differs: {job_plan}"

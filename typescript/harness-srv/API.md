@@ -5,11 +5,14 @@
 
 Merges Tackle role context (prompt + tool ACL + procedure cards) with Wind task context (inputs + acceptance criteria) and invokes an agent via the configured harness.
 
-**5 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**8 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | GET /health |
+| GET | `/jobs/:jobId` | GET /jobs/:jobId — job status + partial output (P1 item 6) The async contract's read path: state envelope with the RAW accumulated stdout (partial while running — preserved on timeout/failure), stderr, and exact exit/timeout metadata. 404 for unknown jobs. |
+| GET | `/jobs/:jobId/events` | GET /jobs/:jobId/events?after=<seq> — replayable SSE job stream Typed envelopes translated once at the boundary from the opencode JSON event stream: job.accepted, job.started, text.delta, thinking, and the terminal job.completed / job.failed / job.timed_out / job.cancelled. Replays seq > after on co |
+| POST | `/jobs/:jobId/interrupt` | POST /jobs/:jobId/interrupt — SIGTERM the child, cancel the job The async contract's cancellation path: kills the opencode child by PID (same mechanism as the runaway watchdog) and marks the job cancelled so the subscriber can surface the interrupt instead of a timeout. |
 | POST | `/resolve-context` |  |
 | POST | `/run` |  |
 | POST | `/run-direct` |  |
@@ -23,6 +26,7 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
 
 
 

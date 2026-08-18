@@ -18,6 +18,7 @@ import { resolveContext, resolveRoleModel, emitEvent, pool, redis, checkConfigAd
 import { ADMISSION_OUTCOME } from "./admission";
 import { execFile, spawn } from "child_process";
 import { promisify } from "util";
+import { createHash } from "crypto";
 import type { ServerResponse } from "http";
 import { writeFile, readFile, unlink, mkdir, appendFile } from "fs/promises";
 import { join } from "path";
@@ -85,6 +86,7 @@ interface HarnessJob {
   sseClients: Set<ServerResponse>;
   pid: number | null;  // child pid for interrupt (set by executeOpencode)
   interrupted: boolean; // set by POST /jobs/:id/interrupt — SIGTERM race guard
+  plan: Record<string, unknown> | null; // P1 item 7 — versioned execution plan
 }
 
 const jobs = new Map<string, HarnessJob>();
@@ -95,6 +97,7 @@ function registerJob(opts: {
   model: string | null;
   harnessId: string;
   promptFile: string;
+  plan?: Record<string, unknown> | null;
 }): HarnessJob {
   const job: HarnessJob = {
     jobId: opts.jobId,
@@ -113,6 +116,7 @@ function registerJob(opts: {
     sseClients: new Set(),
     pid: null,
     interrupted: false,
+    plan: opts.plan ?? null,
   };
   // Evict oldest TERMINAL jobs beyond the cap so the in-memory registry
   // (status/events replay) does not grow unbounded.
@@ -199,6 +203,7 @@ function jobEnvelope(job: HarnessJob): Record<string, unknown> {
     role: job.role,
     model: job.model,
     harness_id: job.harnessId,
+    plan: job.plan,
     exit_code: job.exitCode,
     stdout: job.stdout,
     stderr: job.stderr,
@@ -775,11 +780,55 @@ app.post("/run-direct", async (req, res) => {
     }
 
     const harnessId = modelConfig.harness_id;
-    // Explicit modelOverride values are passed through as-is: callers must
-    // supply an opencode-formatted id (e.g. `opencode/big-pickle`). Otherwise
-    // the canonical opencode_model_id from resolveRoleModel is used.
+    // ── P1 item 7: Tackle is the single model/execution-plan authority ──
+    // An explicit override must be provider-qualified (<provider>/<model>) —
+    // a bare or stale value (e.g. a lease `model` column) must NOT bypass the
+    // canonical Tackle-resolved wire id. Otherwise the canonical
+    // opencode_model_id from resolveRoleModel is used.
+    if (modelOverride && !String(modelOverride).includes("/")) {
+      await log(
+        "warn",
+        `run-direct job=${jobId} role=${role} — rejecting unqualified model override '${modelOverride}'`
+      );
+      return res.status(400).json({
+        job_id: jobId,
+        error: `unqualified model override '${modelOverride}' — must be provider-qualified (<provider>/<model>)`,
+      });
+    }
     const effectiveModel = modelOverride || modelConfig.opencode_model_id;
     const invocationMode = modelConfig.invocation_mode;
+
+    // Versioned execution plan — a stable fingerprint of the resolved plan
+    // (provider-qualified model, harness, invocation mode, fallback ladder,
+    // and prompt). Consumers record plan_version so a stale/unqualified
+    // override or a plan change is detectable. prompt version is the prompt
+    // content hash; procedure-index + ACL versions attach in item 8.
+    const planVersion = createHash("sha256")
+      .update(JSON.stringify({
+        model: effectiveModel,
+        harness_id: harnessId,
+        invocation_mode: invocationMode,
+        fallbacks: modelConfig.fallback_models.map((f: any) => ({
+          priority: f.priority,
+          model: f.model_identifier,
+          provider: f.provider_id,
+        })),
+        prompt_sha: createHash("sha256").update(prompt).digest("hex"),
+      }))
+      .digest("hex")
+      .slice(0, 16);
+    const plan = {
+      plan_version: planVersion,
+      model: effectiveModel,
+      harness_id: harnessId,
+      invocation_mode: invocationMode,
+      fallback_policy: modelConfig.fallback_models.map((f: any) => ({
+        priority: f.priority,
+        model: f.model_identifier,
+        provider_type: f.provider_type,
+      })),
+      resolved_by: "tackle",
+    };
 
     // ── Interactive-hosted guard ─────────────────────────────────
     // invocation_mode is a column on tackle.config_bundle (not on
@@ -817,6 +866,7 @@ app.post("/run-direct", async (req, res) => {
       model: effectiveModel ?? null,
       harnessId,
       promptFile,
+      plan,
     });
 
     // 1. Emit harness.started event
@@ -935,6 +985,7 @@ app.post("/run-direct", async (req, res) => {
         role,
         model: effectiveModel || null,
         harness_id: harnessId,
+        plan,
         events: { started: startedEventId },
       });
     }
@@ -952,6 +1003,7 @@ app.post("/run-direct", async (req, res) => {
       prompt_preview: prompt.slice(0, 300) + (prompt.length > 300 ? "..." : ""),
       harness_id: harnessId,
       model: effectiveModel || null,
+      plan,
       events: { started: startedEventId },
     });
   } catch (error: any) {

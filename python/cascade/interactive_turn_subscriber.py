@@ -680,6 +680,7 @@ def _invoke_agent_harness(
 
     def _result(data: dict[str, Any]) -> dict[str, Any]:
         raw = data.get("stdout", "") or ""
+        plan = data.get("plan") or {}
         return {
             "exit_code": data.get("exit_code", 0),
             # opencode --format json emits a JSON-lines event stream;
@@ -691,6 +692,8 @@ def _invoke_agent_harness(
             "trace": _extract_opencode_trace(raw),
             "stderr": data.get("stderr", ""),
             "job_id": data.get("job_id"),
+            # P1 item 7 — the Tackle-resolved versioned execution plan.
+            "plan_version": plan.get("plan_version"),
         }
 
     try:
@@ -1100,6 +1103,12 @@ async def handle_comment_created(
         # ── Invoke the agent (backend dispatch) ──────────────────
         backend = watch.get("execution_backend", "operator")
         plan_version = lease.get("model") if lease else None
+        # P1 item 7: for the harness (ephemeral opencode) backend the
+        # Tackle-resolved execution plan is authoritative — the lease model
+        # is a Freebuff concept and must NOT be stamped as the plan (a stale
+        # or bare lease model would bypass the canonical resolver). The
+        # resolved plan version is filled in from the harness result below.
+        initial_plan = None if backend == "harness" else plan_version
 
         # ── Turn envelope (P0-1 item 3) ──────────────────────────
         # Create the turn in 'accepted' state up front so the UI sees the
@@ -1107,7 +1116,7 @@ async def handle_comment_created(
         # count). The terminal transition is written at each outcome below.
         turn_id = _create_turn(
             pg_conn, thread_id, watch_id, watch_role, backend,
-            request_comment_id, execution_plan_version=plan_version,
+            request_comment_id, execution_plan_version=initial_plan,
         )
 
         # ── Leased-mode gate (R1 hard stop, pre-invocation) ──────
@@ -1160,13 +1169,14 @@ async def handle_comment_created(
             prompt = _build_incremental_context(pg_conn, thread_id, watch_role, comment_role)
 
         _set_turn_state(pg_conn, turn_id, "running",
-                        execution_plan_version=plan_version)
+                        execution_plan_version=initial_plan)
         _log("Invoking %s via %s backend...", watch_role, backend)
         if backend == "harness":
+            # No model override — harness-srv resolves the canonical Tackle
+            # execution plan (P1 item 7).
             result = _invoke_agent_harness(
                 role=watch_role,
                 prompt=prompt,
-                model=plan_version,
             )
         else:
             result = _invoke_agent_operator(
@@ -1197,10 +1207,12 @@ async def handle_comment_created(
             # honest terminal state.
             if exit_code == 124 or "timeout" in (stderr or "").lower():
                 _set_turn_state(pg_conn, turn_id, "timed_out",
-                                failure_detail=detail, job_id=result.get("job_id"))
+                                failure_detail=detail, job_id=result.get("job_id"),
+                                execution_plan_version=result.get("plan_version"))
             else:
                 _set_turn_state(pg_conn, turn_id, "failed",
-                                failure_detail=detail, job_id=result.get("job_id"))
+                                failure_detail=detail, job_id=result.get("job_id"),
+                                execution_plan_version=result.get("plan_version"))
             _bump_turn_count(pg_conn, watch_id)
             continue
 
@@ -1234,7 +1246,7 @@ async def handle_comment_created(
         _set_turn_state(pg_conn, turn_id, "completed",
                         response_comment_id=response_comment_id,
                         job_id=result.get("job_id"),
-                        execution_plan_version=plan_version)
+                        execution_plan_version=result.get("plan_version"))
 
         # 6. Re-check coordinator with the actual response.
         #    Harness (cloud executor) needs no role lease — it launches
