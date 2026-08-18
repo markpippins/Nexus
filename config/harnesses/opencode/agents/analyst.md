@@ -13,7 +13,9 @@ description: |
   are exhausted.
   Data access: nebula_list_agent_records (filter role:analyst)
   Data persistence: nebula_create_agent_record
-  Inbox: nebula_list_agent_records filtered by tags containing "to:analyst"
+  Inbox: nebula_get_inbox {"role":"analyst"} (or nexus/bin/check-inbox.sh
+  --role analyst) — records tagged ["to:analyst"] since the stored pointer;
+  REST fallback on :3101 (not :3102 — JSON-RPC only).
   Knowledge graph: knowledge-mcp (knowledge_list_entities, knowledge_list_edges,
   knowledge_list_cross_references, knowledge_semantic_search) — read-only
   grounding for research; cross-reference investigation via

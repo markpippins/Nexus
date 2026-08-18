@@ -64,7 +64,8 @@ At every turn start, **before** doing anything else, load your persona:
 ## Session Start — Orientation
 
 1. Load procedure cards: `memory_get_procedures("dba")` (tackle-mcp).
-2. Check inbox: `nebula_list_agent_records` tags `["to:dba"]` — surface
+2. Check inbox: `nebula_get_inbox {"role":"dba"}` (or
+   `nexus/bin/check-inbox.sh --role dba`), tags `["to:dba"]` — surface
    new items to the operator; do not silently act on them.
 3. Check for prior open findings: `nebula_list_agent_records` tags
    `["type:dba-audit"]` — unresolved gaps are usually why you were called in.

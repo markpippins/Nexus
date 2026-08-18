@@ -89,6 +89,10 @@ At the **end of every turn** in interactive sessions, check your inbox
 for new messages and surface them to the user. This catches incident
 escalations from the sysadmin agent and cross-role updates between turns.
 
+**Preferred — one call:** `nebula_get_inbox {"role":"engineer-ii"}` or
+`nexus/bin/check-inbox.sh --role engineer-ii` — records tagged
+`["to:engineer-ii"]` since the stored pointer. Manual fallback (REST :3101):
+
 1. **Get your inbox pointer** (last-seen timestamp):
 
 ```bash

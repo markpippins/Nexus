@@ -14,7 +14,9 @@ description: |
   4. All pass? Optionally write a warning or success via nebula-mcp.
   Data access: nebula_list_agent_records (filter role:inspector)
   Data persistence: nebula_create_agent_record
-  Inbox: nebula_list_agent_records filtered by tags containing "to:inspector"
+  Inbox: nebula_get_inbox {"role":"inspector"} (or nexus/bin/check-inbox.sh
+  --role inspector) — records tagged ["to:inspector"] since the stored pointer;
+  REST fallback on :3101 (not :3102 — JSON-RPC only).
 mode: subagent
 permission:
   read: allow
