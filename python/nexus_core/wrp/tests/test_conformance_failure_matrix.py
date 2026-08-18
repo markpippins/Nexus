@@ -67,6 +67,7 @@ if _NEXUS_PYTHON not in sys.path:
 
 DSN = os.environ.get("CONDUIT_PG_DSN", "postgresql://pguser:pgpass@localhost:5432/nexus")
 ASSEMBLY_URL = os.environ.get("ASSEMBLY_URL", "http://localhost:3107")
+NEBULA_URL = os.environ.get("NEBULA_URL", "http://localhost:3101")
 NATS_URL = os.environ.get("NATS_URL", "nats://localhost:4222")
 FORUM_SLUG = "duality-sessions"
 
@@ -120,6 +121,18 @@ def _http_post(path: str, body: dict):
     )
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.status, json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        try:
+            return e.code, json.loads(e.read().decode("utf-8", "replace"))
+        except Exception:
+            return e.code, {"error": str(e)}
+
+
+def _http_get(url: str):
+    """GET an absolute URL, return (status, json)."""
+    try:
+        with urllib.request.urlopen(url, timeout=15) as resp:
             return resp.status, json.loads(resp.read())
     except urllib.error.HTTPError as e:
         try:
@@ -464,6 +477,79 @@ def test_06_watch_post_malformed_threadid_400_not_500():
     assert data.get("error"), f"400 must carry a surfaceable error body: {data}"
     assert "threadId" in str(data.get("error", "")), \
         f"error must name the offending field: {data}"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  AC7 — Subscriber-down must be DETECTABLE (liveness probe)
+# ═══════════════════════════════════════════════════════════════════════
+
+@_skip_if_ci
+def test_07_subscriber_liveness_probe_observable():
+    # "Subscriber down" is not a silent state: the liveness probe
+    # (nebula-srv /api/cascade/subscriber-status) reads pg_stat_activity for
+    # the daemon's tagged connection, so the no-response diagnostics can tell
+    # the user a response is impossible BEFORE they wait out the timer.
+    status, data = _http_get(f"{NEBULA_URL}/api/cascade/subscriber-status")
+    assert status == 200, f"subscriber-status must 200, got {status}: {data}"
+    assert "up" in data, f"probe must expose `up`: {data}"
+    # The subscriber daemon is running in this environment.
+    assert data.get("up") is True, f"subscriber should be up: {data}"
+    assert data.get("backendPid") is not None, \
+        f"probe must expose backendPid: {data}"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  AC8 — No-response diagnostics substrate is observable (bounded)
+# ═══════════════════════════════════════════════════════════════════════
+
+@_skip_if_ci
+def test_08_no_response_diagnostics_substrate():
+    # No-response diagnostics (duality-ui surfaceTimeoutDiagnostics) consume
+    # the watch status + latest turn envelope. After a message is posted both
+    # must be observable, so a stuck turn is DETECTABLE within the bounded
+    # no-response interval — never a silent orphan.
+    thread_id, poster_id = _setup_thread_and_watch(role=TEST_WATCH_ROLE, backend="freebuff")
+    try:
+        status, data = _http_post(f"/api/duality/sessions/{thread_id}/messages", {
+            "body": "hello",
+            "postedById": poster_id,
+            "role": "user",
+            "model": "freebuff/deepseek-v4-flash",
+        })
+        assert status == 201, f"messages POST must 201, got {status}: {data}"
+
+        # Wait for the subscriber to create the turn envelope.
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            count = _db_scalar(
+                "SELECT count(*) FROM duality.session_turns WHERE thread_id = %s::uuid",
+                (thread_id,),
+            )
+            if count and count >= 1:
+                break
+            time.sleep(0.3)
+
+        # 1. Latest turn envelope — the no-response timer reads this to tell
+        #    "still running" vs "failed" and to compute the stuck interval.
+        status, turns = _http_get(
+            f"{ASSEMBLY_URL}/api/duality/turns/latest?threadId={thread_id}"
+        )
+        assert status == 200, f"turns/latest must 200, got {status}: {turns}"
+        turn = turns.get("turn")
+        assert turn is not None, f"turn envelope must be observable: {turns}"
+        assert turn.get("state") in ("accepted", "running", "completed", "failed",
+                                     "timed_out", "cancelled"), f"turn={turn}"
+        assert turn.get("accepted_at") or turn.get("created_at"), \
+            f"turn must carry a timestamp for the bounded-interval check: {turn}"
+
+        # 2. Watch status — surfaceTimeoutDiagnostics reads this to report
+        #    closed/paused/active (subscriber stuck) vs no-watch.
+        status, watches = _http_get(f"{ASSEMBLY_URL}/api/duality/watches/{thread_id}")
+        assert status == 200, f"watches must 200, got {status}: {watches}"
+        assert any(w.get("role") == TEST_WATCH_ROLE for w in watches), \
+            f"watch for {TEST_WATCH_ROLE} must be observable: {watches}"
+    finally:
+        _teardown(thread_id)
 
 
 # ═══════════════════════════════════════════════════════════════════════
