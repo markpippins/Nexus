@@ -649,7 +649,7 @@ def _compose_failure_detail(
 def _invoke_agent_harness(
     role: str,
     prompt: str,
-    model: str | None,
+    model: str | None = None,
     timeout_ms: int = 600_000,
 ) -> dict[str, Any]:
     """Invoke an agent via harness-srv's async job contract (P1 item 6).
