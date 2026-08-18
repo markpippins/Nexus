@@ -221,6 +221,8 @@ namespace com.aibizarchitect.nexus.v1.serviceregistry {
     repositoryUrl?: string;
     version?: string;
     status?: string;
+    /** Provenance of the catalog row — "seed" (V10 default/backfill) or "register" (runtime registration). T25 1.2 (R-A-2026-08-15-008). */
+    origin?: "seed" | "register" = "seed";
     activeFlag?: boolean = true;
     createdAt?: utcDateTime;
     updatedAt?: utcDateTime;
@@ -270,6 +272,44 @@ namespace com.aibizarchitect.nexus.v1.serviceregistry {
   model ServiceDependency {
     id: int64;
     name: string;
+  }
+
+  // ========================================================================
+  // External Registration — maps to JVM dto.ExternalServiceRegistration
+  // (POST /api/v1/registry/register, T25 1.2)
+  // ========================================================================
+
+  model HostedServiceInfo {
+    serviceName: string;
+    operations?: string[];
+    framework?: string;
+    status?: string;
+    type?: string;
+    endpoint?: string;
+    healthCheck?: string;
+  }
+
+  model ExternalServiceRegistration {
+    serviceName: string;
+    operations?: string[];
+    endpoint?: string;
+    healthCheck?: string;
+    metadata?: Record<unknown>;
+    framework?: string;
+    version?: string;
+    port?: int32;
+    dependencies?: string[];
+    hostedServices?: HostedServiceInfo[];
+    /** Plan 1291 bridge: optional server identity (serverId or hostname) */
+    serverId?: int64;
+    hostname?: string;
+  }
+
+  model RegistrationResponse {
+    success: boolean;
+    message: string;
+    serviceName: string;
+    serviceId: int64;
   }
 
   // ========================================================================

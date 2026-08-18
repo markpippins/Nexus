@@ -414,4 +414,63 @@ namespace com.aibizarchitect.nexus.v1.topology {
     isActive?: boolean;
     description?: string;
   }
+
+  // ========================================================================
+  // ServiceEndpoint — maps to JPA ServiceEndpoint entity (table: service_endpoints)
+  // T25 1.3 (R-A-2026-08-15-008) — instance-lookup rows. Credential-free by
+  // construction: no sysUser/sysPass on this row or its DTO.
+  // ========================================================================
+
+  model ServiceEndpoint {
+    /** UUID identity (JPA GenerationType.UUID) */
+    @format("uuid")
+    id: string;
+    /** Logical unit name — lookup key */
+    unit: string;
+    /** Instance label — unique per unit */
+    instance?: string = "primary";
+    host: string;
+    /** IP address (inet) — first-class from day one */
+    ip: string;
+    port: int32;
+    scheme?: string = "http";
+    status?: string = "UNKNOWN";
+    lastHeartbeat?: utcDateTime;
+  }
+
+  /** One reachable endpoint in a lookup response (DTO ServiceEndpointInfo). */
+  model ServiceEndpointInfo {
+    instance: string;
+    host: string;
+    ip: string;
+    port: int32;
+    scheme: string;
+    status: string;
+    lastHeartbeat?: utcDateTime;
+  }
+
+  /**
+   * 200 response for GET /api/v1/lookup/{unit} (DTO ServiceLookupResponse).
+   * envVar follows the <UNIT>_TARGET convention; preferred names the primary instance.
+   */
+  model ServiceLookupResponse {
+    unit: string;
+    envVar?: string;
+    endpoints: ServiceEndpointInfo[];
+    preferred?: string;
+  }
+
+  /** 404 body for an unknown unit. */
+  model LookupNotFound {
+    unit: string;
+    error: string;
+  }
+
+  /** Batch variant: GET /api/v1/lookup?units=a,b,c → { data, meta: { total } }. */
+  model ServiceLookupBatchResponse {
+    data: ServiceLookupResponse[];
+    meta: {
+      total: int32;
+    };
+  }
 }

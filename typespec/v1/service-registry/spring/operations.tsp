@@ -113,4 +113,17 @@ namespace com.aibizarchitect.nexus.v1.serviceregistry {
     @query sort?: string;
   }
 
+  // ========================================================================
+  // External Registration Operations (T25 1.2, R-A-2026-08-15-008)
+  // POST /api/v1/registry/register — the server sets origin="register" on the
+  // created Service row (origin is server-managed, not client-settable).
+  // ========================================================================
+
+  @route("/api/v1/registry/register")
+  @tag("Registry")
+  interface RegistryRegistration {
+    @doc("Register an external service. Server sets Service.origin to \"register\" (T25 1.2); seed rows keep origin \"seed\".")
+    @post register(@body registration: ExternalServiceRegistration): RegistrationResponse;
+  }
+
 }

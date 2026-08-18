@@ -221,4 +221,21 @@ namespace com.aibizarchitect.nexus.v1.topology {
     @doc("Delete a registry server profile")
     @delete delete(@path id: int64): void;
   }
+
+  // ========================================================================
+  // Instance Lookup Operations (T25 1.3, R-A-2026-08-15-008)
+  // Terrain (:8084) is the runtime/provisioning authority — it serves lookup
+  // from terrain.service_endpoints (seeded from runnable_services + servers);
+  // the registry contributes heartbeat freshness via the status merge.
+  // ========================================================================
+
+  @route("/api/v1/lookup")
+  @tag("Instance Lookup")
+  interface Lookup {
+    @doc("Resolve runtime endpoints for a unit. 200 {unit, envVar, endpoints[], preferred}; 404 {unit, error: \"unknown_unit\"} when the unit is unknown.")
+    @get get(@path unit: string): Topology.ServiceLookupResponse | Topology.LookupNotFound;
+
+    @doc("Batch variant — GET /api/v1/lookup?units=a,b,c. Unknown units are omitted; meta.total reflects found units.")
+    @get batch(@query units: string): Topology.ServiceLookupBatchResponse;
+  }
 }
