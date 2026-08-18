@@ -45,6 +45,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import uuid
 from typing import Any
 
 # ── Path setup ──────────────────────────────────────────────────────
@@ -812,7 +813,35 @@ def _post_assembly_comment(
     role: str,
     model: str | None = None,
 ) -> str | None:
-    """Post an agent response as an Assembly comment. Returns comment ID."""
+    """Project an agent response — event FIRST, then the Assembly comment.
+
+    P2 item 9 (inversion): duality.session_events is the source of truth;
+    the Assembly comment is a rendering projection. The typed envelope is
+    written first (its NOTIFY pushes to SSE subscribers), then the comment
+    is projected via the Assembly add_comment path, and the rendered comment
+    id is linked back onto the event payload. Returns the ASSEMBLY comment
+    id (so the turn envelope's response_comment_id resolves in the thread
+    history), or None when the projection failed — the event survives either
+    way.
+    """
+    event_type = "thinking" if role == "thinking" else "comment.created"
+    canonical_id = str(uuid.uuid4())
+
+    # 1. Event FIRST — the durable source of truth (append-only).
+    _record_session_event(
+        pg_conn=pg_conn,
+        thread_id=thread_id,
+        event_type=event_type,
+        event_key=f"comment:{canonical_id}",
+        payload={
+            "comment_id": canonical_id,
+            "role": role,
+            "model": model,
+            "excerpt": body_text[:200],
+        },
+    )
+
+    # 2. Project the Assembly comment (render).
     try:
         payload = {
             "body": body_text,
@@ -831,24 +860,23 @@ def _post_assembly_comment(
             result = json.loads(resp.read())
             comment_id = result.get("id")
     except Exception as e:
-        _log("Failed to post Assembly comment: %s", e)
+        _log("Failed to project Assembly comment (event preserved): %s", e)
         return None
+
+    # 3. Link the rendered comment id back onto the event payload.
     if comment_id:
-        # Emit a durable comment envelope (P1 item 4): 'thinking' for the
-        # reasoning trace, 'comment.created' for everything else. The event
-        # key is the comment id, so re-posting/re-delivery cannot double-emit.
-        _record_session_event(
-            pg_conn=pg_conn,
-            thread_id=thread_id,
-            event_type="thinking" if role == "thinking" else "comment.created",
-            event_key=f"comment:{comment_id}",
-            payload={
-                "comment_id": comment_id,
-                "role": role,
-                "model": model,
-                "excerpt": body_text[:200],
-            },
-        )
+        try:
+            with pg_conn.cursor() as cur:
+                cur.execute(
+                    """UPDATE duality.session_events
+                       SET payload = payload || %s::jsonb
+                       WHERE event_key = %s""",
+                    (json.dumps({"assembly_comment_id": comment_id}),
+                     f"comment:{canonical_id}"),
+                )
+            pg_conn.commit()
+        except Exception as e:
+            _log("Failed to link assembly_comment_id onto event: %s", e)
     return comment_id
 
 
@@ -1001,6 +1029,7 @@ async def handle_comment_created(
     nc: Any,
     pg_conn: Any,
     event_envelope: dict[str, Any],
+    already_recorded: bool = False,
 ) -> None:
     """Process an assembly.comment.created event.
 
@@ -1008,6 +1037,13 @@ async def handle_comment_created(
     2. Query watch table → find target roles
     3. For each watch: coordinator → continue/delegate/close
     4. If continue: invoke agent → post response → consume lease
+
+    already_recorded=True (P2 item 9) marks the session-event ingress: the
+    comment.created row in duality.session_events was written FIRST by the
+    /messages endpoint (the event stream is the source of truth), so the
+    durable dedup-claim step below is skipped — the row's presence IS the
+    claim, and the event must be DISPATCHED rather than treated as a
+    duplicate delivery.
     """
     # ── Dedup (protects both PG LISTEN and NATS paths) ──
     dedup_id = event_envelope.get("aggregate_id") or event_envelope.get("event_id", "")
@@ -1056,11 +1092,12 @@ async def handle_comment_created(
     # path. Inserting with ON CONFLICT DO NOTHING is the claim: a duplicate
     # delivery finds the row already present and is skipped. The comment's
     # own event_key means the log is exactly the replayable history.
-    if request_comment_id:
+    if request_comment_id and not already_recorded:
         # The comment.created row in duality.session_events doubles as the
         # durable dedup claim: an insert that conflicts (ON CONFLICT DO
         # NOTHING) means this comment was already processed — skip without
-        # re-executing the turn.
+        # re-executing the turn. (The session-event ingress skips this: the
+        # row already exists because it IS the source, P2 item 9.)
         claimed = _record_session_event(
             pg_conn,
             thread_id=thread_id,
@@ -1282,6 +1319,93 @@ async def handle_comment_created(
 
 
 # ═══════════════════════════════════════════════════════════════════════
+#  Session-event ingress (P2 item 9 — event stream is the dispatch source)
+# ═══════════════════════════════════════════════════════════════════════
+# The durable duality.session_events log is the canonical transport for user
+# messages: the /messages endpoint writes a comment.created envelope FIRST
+# (source), then projects the Assembly comment (render). This ingress LISTENs
+# on the duality_session_events channel (fired by the V113 AFTER INSERT
+# trigger) and dispatches the turn from the typed envelope — the Assembly
+# comment is no longer the dispatch trigger, only a projection.
+
+def _fetch_session_event(
+    pg_conn: Any,
+    thread_id: str,
+    seq: int,
+) -> dict[str, Any] | None:
+    """Fetch one duality.session_events row by (thread_id, seq).
+
+    Returns the row as a dict with payload decoded to a dict (JSONB comes
+    back from psycopg2 as a string unless a typecaster is registered), or
+    None when the row does not exist.
+    """
+    with pg_conn.cursor() as cur:
+        cur.execute(
+            """SELECT seq, thread_id, turn_id, watch_id, event_type, payload,
+                      created_at
+               FROM duality.session_events
+               WHERE thread_id = %s::uuid AND seq = %s
+               LIMIT 1""",
+            (thread_id, seq),
+        )
+        cols = [d[0] for d in cur.description]
+        row = cur.fetchone()
+    if not row:
+        return None
+    event = dict(zip(cols, row))
+    payload = event.get("payload")
+    if isinstance(payload, str):
+        try:
+            payload = json.loads(payload)
+        except json.JSONDecodeError:
+            payload = {}
+    event["payload"] = payload if isinstance(payload, dict) else {}
+    return event
+
+
+async def _handle_session_event(
+    nc: Any,
+    pg_conn: Any,
+    thread_id: str,
+    seq: int,
+) -> None:
+    """Dispatch a turn from a duality.session_events NOTIFY (P2 item 9).
+
+    Only comment.created envelopes are dispatch triggers (turn.* / thinking /
+    watch.status envelopes are observation-only). The subscriber's own agent
+    response also lands as a comment.created envelope with role == the watch
+    role — the self-reply guard inside handle_comment_created skips it, so no
+    dispatch loop. System/thinking roles are skipped up front.
+    """
+    event = _fetch_session_event(pg_conn, thread_id, seq)
+    if not event:
+        return
+    if event["event_type"] != "comment.created":
+        return
+    payload = event["payload"]
+    role = payload.get("role", "") or ""
+    if role in ("system", "thinking"):
+        return
+    comment_id = payload.get("comment_id", "") or ""
+
+    # Build a duality-conversation-shaped envelope so handle_comment_created
+    # normalizes it via the flat branch. already_recorded=True because the
+    # event row already exists (it IS the source — no durable dedup claim).
+    envelope: dict[str, Any] = {
+        "event_id": f"session-event:{seq}",
+        "payload": {
+            "thread_id": thread_id,
+            "role": role,
+            "comment_id": comment_id,
+            "forum_slug": "",
+        },
+    }
+    _log("session-event %s: comment.created (thread=%s, role=%s)",
+         seq, thread_id[:8], role)
+    await handle_comment_created(nc, pg_conn, envelope, already_recorded=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════
 #  NATS subscriber
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -1302,9 +1426,11 @@ async def run_interactive_turn_subscriber() -> None:  # noqa: C901
     """Main loop: connect NATS + DB, subscribe, process comment events.
 
     Two event sources:
-    1. PostgreSQL LISTEN on ``kernel_transition`` — receives trigger events
-       directly from ``trg_comment_created`` (bypasses the NATS bridge).
-       Channel: ``kernel_transition`` (same channel the trigger uses).
+    1. PostgreSQL LISTEN on ``duality_session_events`` — the durable event
+       stream is the dispatch source (P2 item 9). The /messages endpoint
+       writes a comment.created envelope first and the V113 AFTER INSERT
+       trigger NOTIFYs this channel; the Assembly comment is a projection,
+       not the transport.
     2. NATS on ``nexus.duality.v1.conversation.>`` — future duality-specific
        events and turn.requested replies from freebuff sessions.
     """
@@ -1335,11 +1461,14 @@ async def run_interactive_turn_subscriber() -> None:  # noqa: C901
     )
     _log("PostgreSQL connected")
 
-    # ── LISTEN for trigger events directly (bypass NATS bridge) ──
-    _PG_LISTEN_CHANNEL = "kernel_transition"
+    # ── LISTEN for session-event inserts (the durable dispatch source) ──
+    # P2 item 9: the event stream is the transport; Assembly comments are a
+    # projection. The V113 AFTER INSERT trigger NOTIFYs this channel with
+    # { thread_id, seq }; we fetch the typed envelope and dispatch from it.
+    _PG_LISTEN_CHANNEL = "duality_session_events"
     cur = pg_conn.cursor()
     cur.execute(f"LISTEN {_PG_LISTEN_CHANNEL};")
-    _log("Listening on PostgreSQL channel '%s' for comment triggers",
+    _log("Listening on PostgreSQL channel '%s' for session events",
          _PG_LISTEN_CHANNEL)
 
     # ── Connect to NATS (for duality conversation events + publishing) ──
@@ -1391,13 +1520,15 @@ async def run_interactive_turn_subscriber() -> None:  # noqa: C901
                         continue
                     try:
                         payload: dict[str, Any] = json.loads(notify.payload)
-                        event_type = payload.get("event_type", "")
-                        if event_type != "assembly.comment.created":
+                        thread_id = payload.get("thread_id")
+                        seq = payload.get("seq")
+                        if not thread_id or seq is None:
                             continue
-                        _log("PG NOTIFY: %s (%s)",
-                             event_type, payload.get("aggregate_id", "?")[:8])
-                        # Wrap in the format handle_comment_created expects
-                        await handle_comment_created(nc, pg_conn, payload)
+                        _log("PG NOTIFY: session-event (thread=%s seq=%s)",
+                             str(thread_id)[:8], seq)
+                        await _handle_session_event(
+                            nc, pg_conn, str(thread_id), int(seq),
+                        )
                         processed_count += 1
                     except json.JSONDecodeError as e:
                         _log("Invalid PG payload: %s", e)

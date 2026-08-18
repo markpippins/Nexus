@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'crypto';
 import { pool } from '../db.js';
 import { BadRequestError } from '../errors.js';
 
@@ -243,6 +244,119 @@ dualityRouter.get('/turns/latest', async (req, res, next) => {
       [threadId]
     );
     res.json({ turn: result.rows[0] ?? null });
+  } catch (err) { next(err); }
+});
+
+/** POST /api/duality/sessions/:threadId/messages — event-first message entry
+ *  (P2 item 9). The durable event stream is the source of truth; the
+ *  Assembly comment is a rendering projection.
+ *
+ *  Flow:
+ *    1. write a `comment.created` event (canonical comment_id) to
+ *       duality.session_events — this is the source, and its AFTER INSERT
+ *       trigger NOTIFYs the subscriber to dispatch the turn,
+ *    2. project the Assembly comment via assembly.add_comment (render),
+ *    3. link the rendered comment id back onto the event payload.
+ *
+ *  Body: { body, role = 'user', postedById, model? }
+ *  Returns 201 { comment_id, assembly_comment_id, thread_id }.
+ */
+dualityRouter.post('/sessions/:threadId/messages', async (req, res, next) => {
+  try {
+    const { threadId } = req.params;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(threadId)) {
+      throw new BadRequestError('threadId must be a UUID');
+    }
+    const { body, postedById, model } = req.body;
+    if (!body || !String(body).trim()) {
+      throw new BadRequestError('body is required');
+    }
+    if (!postedById) {
+      throw new BadRequestError('postedById is required');
+    }
+    const role = req.body.role || 'user';
+    const commentId = randomUUID();
+
+    // 0. The thread must exist before we write an event (session_events has
+    //    no FK, so an event for a nonexistent thread would orphan silently).
+    const threadCheck = await pool.query(
+      'SELECT 1 FROM assembly.posts WHERE id = $1 LIMIT 1',
+      [threadId]
+    );
+    if (threadCheck.rows.length === 0) {
+      throw new BadRequestError('threadId does not reference an existing thread');
+    }
+
+    // 1+2. Event FIRST + projection, in ONE transaction. PostgreSQL
+    //    notifications (pg_notify) are delivered at COMMIT, so writing the
+    //    event and its Assembly projection atomically means the subscriber
+    //    is NOTIFIED only after BOTH are durable — the dispatch can never
+    //    observe the event before the comment it should read exists (no
+    //    event-vs-comment race). On projection failure only the projection
+    //    is rolled back (SAVEPOINT) so the event survives — the stream stays
+    //    authoritative and append-only.
+    const client = await pool.connect();
+    let assemblyCommentId = null;
+    try {
+      await client.query('BEGIN');
+
+      // Event FIRST — the durable source of truth.
+      await client.query(
+        `INSERT INTO duality.session_events
+           (thread_id, event_type, event_key, payload)
+         VALUES ($1::uuid, 'comment.created', $2, $3::jsonb)
+         ON CONFLICT (event_key) DO NOTHING`,
+        [
+          threadId,
+          `comment:${commentId}`,
+          JSON.stringify({
+            comment_id: commentId,
+            thread_id: threadId,
+            role,
+            body: String(body),
+            model: model ?? null,
+          }),
+        ]
+      );
+
+      // Project the Assembly comment (render) — the same add_comment path
+      // the legacy POST /forums/threads/:id/comments uses.
+      await client.query('SAVEPOINT projection');
+      try {
+        const projected = await client.query(
+          'SELECT * FROM assembly.add_comment($1, $2, $3, NULL, $4, $5)',
+          [threadId, postedById, String(body), role, model ?? null]
+        );
+        assemblyCommentId = projected.rows[0]?.id ?? null;
+      } catch (err) {
+        await client.query('ROLLBACK TO SAVEPOINT projection');
+        console.error('[duality] comment projection failed (event preserved):', err.message);
+      }
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      client.release();
+      return next(err);
+    }
+    client.release();
+
+    // 3. Link the rendered comment id back onto the event payload.
+    if (assemblyCommentId) {
+      await pool.query(
+        `UPDATE duality.session_events
+         SET payload = payload || jsonb_build_object('assembly_comment_id', $1::text)
+         WHERE event_key = $2`,
+        [assemblyCommentId, `comment:${commentId}`]
+      ).catch(() => {});
+    }
+
+    res.status(201).json({
+      comment_id: commentId,
+      assembly_comment_id: assemblyCommentId,
+      thread_id: threadId,
+      projected: Boolean(assemblyCommentId),
+    });
   } catch (err) { next(err); }
 });
 
