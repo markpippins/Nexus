@@ -424,7 +424,7 @@ def _set_turn_state(
                SET {', '.join(sets)}
                WHERE id = %s::uuid
                  AND state = ANY(ARRAY['accepted','running']::text[])
-               RETURNING thread_id""",
+               RETURNING thread_id, role, execution_backend""",
             params + [turn_id],
         )
         row = cur.fetchone()
@@ -434,6 +434,8 @@ def _set_turn_state(
     # completed/failed/timed_out/cancelled → the terminal type. Idempotent
     # via event_key; skipped when the transition was rejected (already
     # terminal / unknown turn) or for 'accepted' (emitted at _create_turn).
+    # Envelopes are self-describing: role + backend ride along so the SSE
+    # consumer can render the envelope without an extra turn fetch.
     event_type = {
         "running": "turn.started",
         "completed": "turn.completed",
@@ -442,7 +444,10 @@ def _set_turn_state(
         "cancelled": "turn.cancelled",
     }.get(state)
     if row and event_type:
-        payload: dict[str, Any] = {}
+        payload: dict[str, Any] = {
+            "role": row[1],
+            "backend": row[2],
+        }
         if failure_detail is not None:
             payload["failure_detail"] = failure_detail[:2000]
         if response_comment_id is not None:
