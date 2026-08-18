@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: nebula-srv — Nebula Knowledge-Graph API
-  version: 1.0.682a82a3
+  version: 1.0.0b3b4dee
   description: 'Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge
     graph, and cross-references.
 
@@ -5852,6 +5852,38 @@ paths:
         required: true
         schema:
           type: string
+  /api/roles/drift:
+    get:
+      tags:
+      - roles
+      operationId: get_roles_drift
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: '(D-2026-08-16-009 R5). Three planes: governance = nebula.roles (current bitemporal view) + roles_history runtime
+        = tackle.roles (runtime per'
   /api/search:
     get:
       tags:

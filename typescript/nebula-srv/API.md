@@ -5,7 +5,7 @@
 
 Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge graph, and cross-references.
 
-**228 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**229 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -178,6 +178,7 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | DELETE | `/api/roles/:id` | DELETE /api/roles/:id — remove role metadata (Gap 2). Accepts a UUID or a role name (architect review: previously UUID-only). Hard delete guarded: FK references from wind.titles / nebula.roles_history surface as 23503 → 409 with a hint instead of a raw PG error. |
 | GET | `/api/roles/:id` | GET /api/roles/:id — single role |
 | PATCH | `/api/roles/:id` | PATCH /api/roles/:id — update capabilities/visibility/description (Gap 2) |
+| GET | `/api/roles/drift` | (D-2026-08-16-009 R5). Three planes: governance = nebula.roles (current bitemporal view) + roles_history runtime = tackle.roles (runtime personas) execution = tackle.role_leases (ACTIVE leases) Read-only: surfaces drift findings, never silently reconciles. Registered BEFORE /roles/:id so 'drift' is  |
 | GET | `/api/search` | SEARCH (cross-entity full-text) GET /api/search?q=... |
 | POST | `/api/search/semantic` | SEMANTIC SEARCH POST /api/search/semantic — vector similarity search against knowledge graph Accepts a pre-embedded query vector (768-dim, matching nomic-embed-text) and returns similar entities from knowledge.graph_entity_embeddings. |
 | POST | `/api/seed` | POST /api/seed — seed default example data (Plan 0087, idempotent, atomic) |
@@ -246,6 +247,7 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
 
 
 
