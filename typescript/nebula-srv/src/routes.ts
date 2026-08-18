@@ -216,6 +216,43 @@ function parsePagination(query: any): { offset: number; limit: number; page: num
   return { offset: (page - 1) * pageSize, limit: pageSize, page, pageSize };
 }
 
+// ── Role lifecycle event emitter (D-2026-08-16-009 R3) ─────────────
+// Role transitions are written to cascade.events (the LIVE durable bus) so
+// every lifecycle change — grant / revoke / expire / capability change — has
+// a replayable, deduplicated audit trail. The mutation is the source of
+// truth for the transition; the event is the audit trail. Awaited (not
+// fire-and-forget) so conformance tests can assert the event exists
+// immediately after the API returns, but best-effort: a failed event write
+// never fails the caller's response.
+const ROLE_LIFECYCLE_EVENT_TYPES = [
+  'role.granted',
+  'role.revoked',
+  'role.expired',
+  'capability.changed',
+] as const;
+type RoleLifecycleEventType = (typeof ROLE_LIFECYCLE_EVENT_TYPES)[number];
+
+async function emitRoleLifecycleEvent(
+  pool: Pool,
+  eventType: RoleLifecycleEventType,
+  source: string,
+  aggregateType: string,
+  aggregateId: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await pool.query(
+      `INSERT INTO cascade.events
+         (event_type, source, event_timestamp, payload, aggregate_type, aggregate_id, actor_type)
+       VALUES ($1, $2, NOW(), $3::jsonb, $4, $5, 'system')`,
+      [eventType, source, JSON.stringify(payload), aggregateType, aggregateId],
+    );
+  } catch (err: any) {
+    // best-effort — the transition already committed; don't 500 the caller
+    console.error(`[role-lifecycle] failed to emit ${eventType}: ${err?.message}`);
+  }
+}
+
 export function createRoutes(pool: Pool): Router {
   const router = Router();
 
@@ -6892,6 +6929,12 @@ export function createRoutes(pool: Pool): Router {
         [role, leaseChannel, model || null, windowEndTs, budgetUnits ?? null]
       );
       await client.query('COMMIT');
+      await emitRoleLifecycleEvent(pool, 'role.granted', 'nebula-srv.role-leases', 'role_lease', String(lease.id), {
+        role,
+        channel: leaseChannel,
+        model: lease.model || null,
+        windowEnd: lease.window_end,
+      });
       res.status(201).json(lease);
     } catch (err: any) {
       await client.query('ROLLBACK');
@@ -6965,6 +7008,11 @@ export function createRoutes(pool: Pool): Router {
         [id]
       );
       await client.query('COMMIT');
+      await emitRoleLifecycleEvent(pool, 'role.revoked', 'nebula-srv.role-leases', 'role_lease', String(updated.id), {
+        role: updated.role,
+        channel: updated.channel || null,
+        releaseReason: 'revoked',
+      });
       // D-2026-08-16-008 (R3): emit type:lease-revoked on explicit revoke.
       // Deduped on the ACTIVE → RELEASED transition — the pre-check above
       // 400s any non-ACTIVE lease before reaching this point.
@@ -7087,6 +7135,11 @@ export function createRoutes(pool: Pool): Router {
         );
         if (updated) {
           swept.push(updated);
+          await emitRoleLifecycleEvent(pool, 'role.expired', 'nebula-srv.role-leases', 'role_lease', String(updated.id), {
+            role: updated.role,
+            channel: updated.channel || null,
+            releaseReason: 'expired',
+          });
           const sweepId = randomUUID();
           const now = new Date().toISOString();
           pool.query(
@@ -7199,6 +7252,13 @@ export function createRoutes(pool: Pool): Router {
           [lease.id]
         );
         if (revoked.rows.length > 0) {
+          await emitRoleLifecycleEvent(pool, 'role.expired', 'nebula-srv.role-leases', 'role_lease', String(lease.id), {
+            role,
+            channel: lease.channel || null,
+            releaseReason: 'exhausted',
+            consumed: lease.consumed_units,
+            budget: lease.budget_units,
+          });
           // Emit exhaustion record (fire-and-forget — don't block the response)
           const exhaustId = randomUUID();
           const now = new Date().toISOString();
@@ -7677,6 +7737,99 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
     }
   });
 
+  // GET /api/roles/drift — runtime-vs-governance-vs-execution drift check
+  // (D-2026-08-16-009 R5). Three planes:
+  //   governance = nebula.roles (current bitemporal view) + roles_history
+  //   runtime    = tackle.roles (runtime personas)
+  //   execution  = tackle.role_leases (ACTIVE leases)
+  // Read-only: surfaces drift findings, never silently reconciles. Registered
+  // BEFORE /roles/:id so 'drift' is not captured as a role id.
+  router.get('/roles/drift', async (_req: Request, res: Response) => {
+    try {
+      const [govCur, govHist, runtime, exec] = await Promise.all([
+        pool.query('SELECT name FROM nebula.roles'),
+        pool.query('SELECT DISTINCT name FROM nebula.roles_history'),
+        pool.query('SELECT name FROM tackle.roles'),
+        pool.query("SELECT role, channel FROM tackle.role_leases WHERE status = 'ACTIVE'"),
+      ]);
+      const governanceCurrent = new Set<string>(govCur.rows.map((r: any) => r.name));
+      const governanceHistory = new Set<string>(govHist.rows.map((r: any) => r.name));
+      const runtimePersonas = new Set<string>(runtime.rows.map((r: any) => r.name));
+
+      const findings: Array<{ severity: 'high' | 'info'; type: string; role: string; detail: string }> = [];
+
+      // execution vs governance (and runtime)
+      for (const lease of exec.rows) {
+        const role = lease.role;
+        if (governanceCurrent.has(role)) continue;
+        if (governanceHistory.has(role)) {
+          findings.push({
+            severity: 'high',
+            type: 'execution_expired_role',
+            role,
+            detail: `ACTIVE lease references role '${role}' whose governance window is not current (expired in nebula.roles_history)`,
+          });
+        } else if (runtimePersonas.has(role)) {
+          findings.push({
+            severity: 'info',
+            type: 'execution_runtime_persona',
+            role,
+            detail: `ACTIVE lease references runtime persona '${role}' (no governance definition; capability proof = runtime config_bundle)`,
+          });
+        } else {
+          findings.push({
+            severity: 'high',
+            type: 'execution_missing_role',
+            role,
+            detail: `ACTIVE lease references role '${role}' with no canonical key (not governance, not runtime persona)`,
+          });
+        }
+      }
+
+      // governance vs runtime (informational)
+      for (const role of governanceCurrent) {
+        if (!runtimePersonas.has(role)) {
+          findings.push({
+            severity: 'info',
+            type: 'governance_unmaterialized',
+            role,
+            detail: `governance role '${role}' has no runtime persona in tackle.roles`,
+          });
+        }
+      }
+
+      // runtime vs governance (informational)
+      for (const role of runtimePersonas) {
+        if (!governanceHistory.has(role)) {
+          findings.push({
+            severity: 'info',
+            type: 'runtime_persona_unlisted',
+            role,
+            detail: `runtime persona '${role}' has no governance definition in nebula.roles_history`,
+          });
+        }
+      }
+
+      findings.sort((a, b) => {
+        if (a.severity !== b.severity) return a.severity === 'high' ? -1 : 1;
+        return a.role.localeCompare(b.role);
+      });
+
+      res.json({
+        checkedAt: new Date().toISOString(),
+        summary: {
+          governanceRoles: governanceCurrent.size,
+          runtimePersonas: runtimePersonas.size,
+          activeLeases: exec.rows.length,
+          findings: findings.length,
+        },
+        findings,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // GET /api/roles/:id — single role
   router.get('/roles/:id', async (req: Request, res: Response) => {
     try {
@@ -7775,6 +7928,11 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
           b.visibilityScope ?? ['planner', 'all'],
         ]
       );
+      await emitRoleLifecycleEvent(pool, 'role.granted', 'nebula-srv.roles', 'role', String(role.id), {
+        name: role.name,
+        displayName: role.display_name,
+        ownsDomains: role.owns_domains,
+      });
       res.status(201).json(roleToJson(role));
     } catch (err: any) {
       if (err.code === '23505') {
@@ -7819,6 +7977,15 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
         vals
       );
       if (!role) return res.status(404).json({ error: 'Role not found' });
+      const changedFields = fieldMap
+        .filter(([camel]) => b[camel] !== undefined)
+        .map(([camel]) => camel);
+      await emitRoleLifecycleEvent(pool, 'capability.changed', 'nebula-srv.roles', 'role', String(role.id), {
+        name: role.name,
+        changedFields,
+        ownsDomains: role.owns_domains,
+        visibilityScope: role.visibility_scope,
+      });
       res.json(roleToJson(role));
     } catch (err: any) {
       if (err.code === '23505') {
@@ -7836,11 +8003,21 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
     try {
       const id = String(req.params.id);
       const target = isUuid(id) ? id : null;
+      // Capture the role before the V114 INSTEAD OF DELETE soft-expires it
+      // (valid_until = now()), so the event payload carries the role name.
+      const { rows: [existing] } = target
+        ? await pool.query('SELECT id, name FROM nebula.roles WHERE id = $1', [id])
+        : await pool.query('SELECT id, name FROM nebula.roles WHERE name = $1', [id]);
+      if (!existing) return res.status(404).json({ error: 'Role not found' });
       const { rowCount } = target
         ? await pool.query('DELETE FROM nebula.roles WHERE id = $1', [id])
         : await pool.query('DELETE FROM nebula.roles WHERE name = $1', [id]);
       if (rowCount === 0) return res.status(404).json({ error: 'Role not found' });
-      res.json({ ok: true, id });
+      await emitRoleLifecycleEvent(pool, 'role.revoked', 'nebula-srv.roles', 'role', String(existing.id), {
+        name: existing.name,
+        softExpired: true,
+      });
+      res.json({ ok: true, id, name: existing.name });
     } catch (err: any) {
       if (err.code === '23503') {
         return res.status(409).json({
