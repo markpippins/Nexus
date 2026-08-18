@@ -69,7 +69,32 @@ dualityRouter.post('/watches', async (req, res, next) => {
         leaseId ?? null,
       ]
     );
-    res.status(201).json(result.rows[0]);
+    const watchId = result.rows[0].id;
+    // Emit a durable watch.status envelope so the SSE event stream covers
+    // the session from creation (P1 item 4). Idempotent via event_key — a
+    // reactivated watch (UPSERT on the same row) does not double-emit.
+    try {
+      await pool.query(
+        `INSERT INTO duality.session_events
+           (thread_id, watch_id, event_type, event_key, payload)
+         VALUES ($1::uuid, $2::uuid, 'watch.status', $3, $4::jsonb)
+         ON CONFLICT (event_key) DO NOTHING`,
+        [
+          threadId,
+          watchId,
+          `watch.created:${watchId}`,
+          JSON.stringify({
+            status: 'active',
+            role,
+            execution_backend: executionBackend || 'freebuff',
+            forum_slug: forumSlug,
+          }),
+        ]
+      );
+    } catch (err) {
+      console.error('[duality] watch.status event failed:', err.message);
+    }
+    res.status(201).json({ id: watchId });
   } catch (err) { next(err); }
 });
 
@@ -239,4 +264,171 @@ dualityRouter.get('/turns/:turnId', async (req, res, next) => {
     }
     res.json({ turn: result.rows[0] });
   } catch (err) { next(err); }
+});
+
+// ── Session event stream — replayable SSE (P1 items 4-5) ─────────────
+// GET /api/duality/sessions/:threadId/events?after=<seq>
+//
+// Replaces count-based change detection with a replayable typed event
+// stream backed by the durable duality.session_events log (V113).
+//
+// Wire format (SSE):
+//   event: connected      data: { threadId, after, seq, replayed }
+//   event: heartbeat      data: { seq }                    (every 15s)
+//   event: <event_type>   data: { seq, eventType, threadId, turnId,
+//                                 watchId, payload, createdAt }
+//
+// event_type ∈ turn.accepted | turn.started | thinking | comment.created |
+//             turn.completed | turn.failed | turn.timed_out |
+//             turn.cancelled | watch.status
+//
+// Replay: events with seq > after (when after is given) are replayed
+// immediately; afterwards the stream follows live inserts via PG LISTEN on
+// the duality_session_events channel (fired by the V113 AFTER INSERT
+// trigger). The browser reconnects with after=<last seen seq> — no
+// full-thread refetch. Assembly REST stays the command + finite-history
+// surface; this endpoint is observation only.
+
+/** Write one SSE frame: `event: <type>\ndata: <json>\n\n`. */
+function sendSse(res, event, data) {
+  res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
+/** Map a session_events row to the SSE envelope shape. */
+function eventEnvelope(row) {
+  return {
+    seq: Number(row.seq),
+    eventType: row.event_type,
+    threadId: row.thread_id,
+    turnId: row.turn_id ?? null,
+    watchId: row.watch_id ?? null,
+    payload: row.payload ?? {},
+    createdAt: row.created_at,
+  };
+}
+
+/** Fetch events for a thread with seq > cursor (ordered, capped). */
+async function fetchEventsAfter(threadId, cursor, limit = 200) {
+  const result = await pool.query(
+    `SELECT seq, thread_id, turn_id, watch_id, event_type, payload, created_at
+     FROM duality.session_events
+     WHERE thread_id = $1 AND seq > $2
+     ORDER BY seq ASC
+     LIMIT $3`,
+    [threadId, cursor, limit]
+  );
+  return result.rows;
+}
+
+dualityRouter.get('/sessions/:threadId/events', async (req, res, next) => {
+  let client;
+  let heartbeat;
+  let closed = false;
+  // Serializes replay + notification handling so lastSeq is always updated
+  // atomically (no interleaved double-send on coalesced notifications).
+  let chain = Promise.resolve();
+  let lastSeq = 0;
+
+  try {
+    const { threadId } = req.params;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(threadId)) {
+      throw new BadRequestError('threadId must be a UUID');
+    }
+    let after = 0;
+    if (req.query.after !== undefined && req.query.after !== '') {
+      after = Number(req.query.after);
+      if (!Number.isInteger(after) || after < 0) {
+        throw new BadRequestError('after must be a non-negative integer sequence');
+      }
+    }
+
+    // ── SSE response setup ──
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+    req.socket.setTimeout(0);
+    res.setTimeout(0);
+
+    // Dedicated connection for LISTEN; destroyed on close so no pooled
+    // connection leaks the subscription into unrelated queries.
+    client = await pool.connect();
+    await client.query('LISTEN duality_session_events');
+
+    // Current max sequence — the resume baseline for this connection.
+    const maxRes = await pool.query(
+      'SELECT COALESCE(MAX(seq), 0)::bigint AS seq FROM duality.session_events WHERE thread_id = $1',
+      [threadId]
+    );
+    const connectMaxSeq = Number(maxRes.rows[0].seq);
+    lastSeq = Math.max(after, 0);
+
+    const enqueue = (fn) => {
+      chain = chain.then(fn).catch((err) => {
+        if (!closed) console.error('[duality-sse] push error:', err.message);
+      });
+    };
+
+    // ── Live push: PG NOTIFY → fetch rows > lastSeq → write frames ──
+    client.on('notification', (msg) => {
+      if (closed || msg.channel !== 'duality_session_events') return;
+      let payload;
+      try { payload = JSON.parse(msg.payload); } catch { return; }
+      if (payload.thread_id !== threadId) return;
+      enqueue(async () => {
+        if (closed) return;
+        const rows = await fetchEventsAfter(threadId, lastSeq);
+        for (const row of rows) {
+          const env = eventEnvelope(row);
+          sendSse(res, env.eventType, env);
+          lastSeq = Math.max(lastSeq, env.seq);
+        }
+      });
+    });
+
+    // ── Replay backlog (seq > after), then announce connected ──
+    enqueue(async () => {
+      if (closed) return;
+      const rows = await fetchEventsAfter(threadId, lastSeq);
+      let replayed = 0;
+      for (const row of rows) {
+        const env = eventEnvelope(row);
+        sendSse(res, env.eventType, env);
+        lastSeq = Math.max(lastSeq, env.seq);
+        replayed += 1;
+      }
+      sendSse(res, 'connected', {
+        threadId,
+        after: after || null,
+        seq: connectMaxSeq,
+        replayed,
+      });
+    });
+
+    // ── Heartbeat every 15s (keeps proxies + EventSource alive) ──
+    heartbeat = setInterval(() => {
+      if (closed) return;
+      try { sendSse(res, 'heartbeat', { seq: lastSeq }); } catch { /* socket gone */ }
+    }, 15_000);
+
+    // ── Cleanup on client disconnect / error ──
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      if (heartbeat) clearInterval(heartbeat);
+      if (client) {
+        client.removeAllListeners('notification');
+        // Destroy the dedicated connection so the LISTEN subscription does
+        // not linger on a pooled connection.
+        client.release(true);
+        client = undefined;
+      }
+    };
+    req.on('close', cleanup);
+    res.on('error', cleanup);
+  } catch (err) {
+    if (client) { try { client.release(true); } catch { /* noop */ } }
+    next(err);
+  }
 });

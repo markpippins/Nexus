@@ -255,11 +255,71 @@ def _close_watch(pg_conn: Any, watch_id: str, reason: str) -> None:
             """UPDATE duality.session_watches
                SET status = 'closed',
                    updated_at = now()
-               WHERE id = %s::uuid""",
+               WHERE id = %s::uuid
+               RETURNING thread_id""",
             (watch_id,),
         )
+        row = cur.fetchone()
     pg_conn.commit()
     _log("Watch %s closed: %s", watch_id[:8], reason)
+    # Emit a durable watch.status envelope so SSE subscribers see the
+    # session close (P1 item 4). Idempotent via event_key.
+    if row:
+        _record_session_event(
+            pg_conn,
+            thread_id=str(row[0]),
+            watch_id=watch_id,
+            event_type="watch.status",
+            event_key=f"watch.closed:{watch_id}",
+            payload={"status": "closed", "reason": reason[:500]},
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Session event log (P1 items 4-5)
+# ═══════════════════════════════════════════════════════════════════════
+# Durable, append-only per-thread stream in duality.session_events backing
+# the replayable SSE endpoint GET /api/duality/sessions/:id/events?after=<seq>.
+# Each row is a typed envelope with a monotonic sequence and a UNIQUE
+# event_key — the durable dedup key. Writers INSERT ... ON CONFLICT DO
+# NOTHING, so duplicate delivery (NATS + PG LISTEN ingresses, subscriber
+# restart) cannot double-emit; the log is replayable history.
+
+def _record_session_event(
+    pg_conn: Any,
+    thread_id: str,
+    event_type: str,
+    event_key: str,
+    payload: dict[str, Any] | None = None,
+    turn_id: str | None = None,
+    watch_id: str | None = None,
+) -> bool:
+    """Append a typed envelope to duality.session_events (idempotent).
+
+    event_key is the durable dedup key: a re-delivered event is a no-op via
+    ON CONFLICT (event_key) DO NOTHING. Returns True when this call
+    performed the insert, False when the event was already recorded (durable
+    dedup hit). Never raises — event recording is best-effort so a log
+    write failure cannot break turn execution (returns True on error so
+    callers do not treat a failed log write as a duplicate).
+    """
+    try:
+        with pg_conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO duality.session_events
+                     (thread_id, turn_id, watch_id, event_type, event_key, payload)
+                   VALUES (%s::uuid, %s::uuid, %s::uuid, %s, %s, %s)
+                   ON CONFLICT (event_key) DO NOTHING
+                   RETURNING seq""",
+                (thread_id, turn_id, watch_id, event_type, event_key,
+                 json.dumps(payload or {})),
+            )
+            inserted = cur.fetchone() is not None
+        pg_conn.commit()
+        return inserted
+    except Exception as e:
+        _log("Failed to record session event %s: %s", event_key, e)
+        return True
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -307,6 +367,21 @@ def _create_turn(
     pg_conn.commit()
     _log("Turn %s created (thread=%s role=%s backend=%s state=accepted)",
          str(turn_id)[:8], str(thread_id)[:8], role, backend)
+    # Emit the turn.accepted envelope (P1 item 4) — idempotent via event_key.
+    _record_session_event(
+        pg_conn,
+        thread_id=thread_id,
+        turn_id=str(turn_id),
+        watch_id=watch_id,
+        event_type="turn.accepted",
+        event_key=f"turn.accepted:{turn_id}",
+        payload={
+            "role": role,
+            "backend": backend,
+            "request_comment_id": request_comment_id,
+            "execution_plan_version": execution_plan_version,
+        },
+    )
     return str(turn_id)
 
 
@@ -348,11 +423,42 @@ def _set_turn_state(
             f"""UPDATE duality.session_turns
                SET {', '.join(sets)}
                WHERE id = %s::uuid
-                 AND state = ANY(ARRAY['accepted','running']::text[])""",
+                 AND state = ANY(ARRAY['accepted','running']::text[])
+               RETURNING thread_id""",
             params + [turn_id],
         )
+        row = cur.fetchone()
     pg_conn.commit()
     _log("Turn %s → %s", turn_id[:8], state)
+    # Emit the matching typed envelope (P1 item 4): running → turn.started,
+    # completed/failed/timed_out/cancelled → the terminal type. Idempotent
+    # via event_key; skipped when the transition was rejected (already
+    # terminal / unknown turn) or for 'accepted' (emitted at _create_turn).
+    event_type = {
+        "running": "turn.started",
+        "completed": "turn.completed",
+        "failed": "turn.failed",
+        "timed_out": "turn.timed_out",
+        "cancelled": "turn.cancelled",
+    }.get(state)
+    if row and event_type:
+        payload: dict[str, Any] = {}
+        if failure_detail is not None:
+            payload["failure_detail"] = failure_detail[:2000]
+        if response_comment_id is not None:
+            payload["response_comment_id"] = response_comment_id
+        if job_id is not None:
+            payload["job_id"] = job_id
+        if execution_plan_version is not None:
+            payload["execution_plan_version"] = execution_plan_version
+        _record_session_event(
+            pg_conn,
+            thread_id=str(row[0]),
+            turn_id=turn_id,
+            event_type=event_type,
+            event_key=f"turn.{state}:{turn_id}",
+            payload=payload,
+        )
 
 
 def _consume_lease(role: str) -> None:
@@ -644,6 +750,7 @@ async def _emit_turn_requested(
 
 
 def _post_assembly_comment(
+    pg_conn: Any,
     thread_id: str,
     body_text: str,
     role: str,
@@ -666,10 +773,27 @@ def _post_assembly_comment(
         )
         with urllib.request.urlopen(req, timeout=15) as resp:
             result = json.loads(resp.read())
-            return result.get("id")
+            comment_id = result.get("id")
     except Exception as e:
         _log("Failed to post Assembly comment: %s", e)
         return None
+    if comment_id:
+        # Emit a durable comment envelope (P1 item 4): 'thinking' for the
+        # reasoning trace, 'comment.created' for everything else. The event
+        # key is the comment id, so re-posting/re-delivery cannot double-emit.
+        _record_session_event(
+            pg_conn=pg_conn,
+            thread_id=thread_id,
+            event_type="thinking" if role == "thinking" else "comment.created",
+            event_key=f"comment:{comment_id}",
+            payload={
+                "comment_id": comment_id,
+                "role": role,
+                "model": model,
+                "excerpt": body_text[:200],
+            },
+        )
+    return comment_id
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -869,6 +993,34 @@ async def handle_comment_created(
     if not watches:
         return  # thread not managed
 
+    # ── Durable dedup gate (P1 item 5) ──────────────────────────────
+    # The comment.created row in duality.session_events doubles as the
+    # durable dedup record for both ingresses (PG LISTEN + NATS) and across
+    # subscriber restarts — the process-local _seen set above is only a fast
+    # path. Inserting with ON CONFLICT DO NOTHING is the claim: a duplicate
+    # delivery finds the row already present and is skipped. The comment's
+    # own event_key means the log is exactly the replayable history.
+    if request_comment_id:
+        # The comment.created row in duality.session_events doubles as the
+        # durable dedup claim: an insert that conflicts (ON CONFLICT DO
+        # NOTHING) means this comment was already processed — skip without
+        # re-executing the turn.
+        claimed = _record_session_event(
+            pg_conn,
+            thread_id=thread_id,
+            event_type="comment.created",
+            event_key=f"comment:{request_comment_id}",
+            payload={
+                "comment_id": request_comment_id,
+                "role": comment_role,
+                "forum_slug": forum_slug,
+            },
+        )
+        if not claimed:
+            _log("Comment %s already processed — durable dedup skip",
+                 str(request_comment_id)[:8])
+            return
+
     for watch in watches:
         watch_role = watch["role"]
         watch_id = watch["id"]
@@ -927,6 +1079,7 @@ async def handle_comment_created(
             _log("Watch %s: leased role %s has no valid lease — failing turn (%s)",
                  watch_id[:8], watch_role, reason)
             _post_assembly_comment(
+                pg_conn,
                 thread_id,
                 f"[system] Agent {watch_role} encountered an error: {reason}",
                 "system",
@@ -981,6 +1134,7 @@ async def handle_comment_created(
                 stderr, stdout, exit_code, result.get("job_id")
             )
             _post_assembly_comment(
+                pg_conn,
                 thread_id,
                 f"[system] Agent {watch_role} encountered an error: {detail}",
                 "system",
@@ -1005,6 +1159,7 @@ async def handle_comment_created(
         trace = result.get("trace") or ""
         if isinstance(trace, str) and trace.strip():
             _post_assembly_comment(
+                pg_conn,
                 thread_id, trace[:4000], "thinking",
                 model=lease.get("model") if lease else None,
             )
@@ -1014,6 +1169,7 @@ async def handle_comment_created(
         # 5. Post agent response
         response_preview = stdout[:3000]
         response_comment_id = _post_assembly_comment(
+            pg_conn,
             thread_id, response_preview, watch_role,
             model=lease.get("model") if lease else None,
         )
