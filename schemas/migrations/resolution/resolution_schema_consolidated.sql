@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict MnCv16CCtEZSNSnPflk0EFNZQUSVbCFqg0W21mqWcQWwYhBGFVJlaSDmdcGSTV2
+\restrict j9XZJZun14CRSVOqFZUz3uLW0iekAaeBqGIOWfAvfPd8NX4DF16xtTKSg7kamqX
 
 -- Dumped from database version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
@@ -72,6 +72,43 @@ BEGIN
     END IF;
 
     RETURN v_admission_result;
+END;
+$$;
+
+
+--
+-- Name: check_and_record_disagreement(uuid, text, uuid); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.check_and_record_disagreement(p_representation_comparison_id uuid, p_external_id text, p_relational_proposition_id uuid) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_check      RECORD;
+    v_concept_id uuid;
+    v_asserted   uuid;
+BEGIN
+    SELECT * INTO v_check FROM resolution.detect_disagreement(p_representation_comparison_id, p_external_id);
+
+    SELECT c.id INTO v_concept_id FROM resolution.concept c WHERE c.name = 'WorkRequest';
+    INSERT INTO resolution.observation (trigger_type, asset_concept_id, source_artifact_id, payload, assessed)
+    VALUES ('representation_disagreement', v_concept_id,
+            resolution.resolve_entity_uuid(p_external_id, 'WorkRequest'),
+            jsonb_build_object('from_repr', v_check.from_repr, 'to_repr', v_check.to_repr,
+                                'from_value', v_check.from_value, 'to_value', v_check.to_value, 'agrees', v_check.agrees),
+            true);
+
+    SELECT cav.id INTO v_asserted
+    FROM resolution.concept_attribute_value cav
+    JOIN resolution.concept_attribute ca ON ca.id = cav.attribute_id AND ca.name = 'disposition'
+    JOIN resolution.concept c ON c.id = ca.concept_id AND c.name = 'Proposition'
+    WHERE cav.value = 'Asserted';
+
+    UPDATE resolution.proposition
+    SET value = v_check.agrees, disposition_value_id = v_asserted, last_evaluated_at = now()
+    WHERE id = p_relational_proposition_id;
+
+    RETURN v_check.agrees;
 END;
 $$;
 
@@ -430,15 +467,24 @@ CREATE FUNCTION resolution.compile_proposition_ref(expr_id uuid) RETURNS text
     AS $$
 DECLARE
     v_prop_id uuid;
+    v_field   text;
 BEGIN
-    SELECT referenced_proposition_id INTO v_prop_id FROM resolution.expression WHERE id = expr_id;
+    SELECT referenced_proposition_id, coalesce(proposition_ref_field, 'disposition')
+    INTO v_prop_id, v_field
+    FROM resolution.expression WHERE id = expr_id;
+
     IF v_prop_id IS NULL THEN
         RAISE EXCEPTION 'proposition_ref node % has no referenced_proposition_id', expr_id;
     END IF;
-    RETURN format(
-        '(SELECT cav.value FROM resolution.proposition p JOIN resolution.concept_attribute_value cav ON cav.id = p.disposition_value_id WHERE p.id = %L)',
-        v_prop_id
-    );
+
+    IF v_field = 'value' THEN
+        RETURN format('(SELECT p.value::text FROM resolution.proposition p WHERE p.id = %L)', v_prop_id);
+    ELSE
+        RETURN format(
+            '(SELECT cav.value FROM resolution.proposition p JOIN resolution.concept_attribute_value cav ON cav.id = p.disposition_value_id WHERE p.id = %L)',
+            v_prop_id
+        );
+    END IF;
 END;
 $$;
 
@@ -522,6 +568,76 @@ $$;
 
 
 --
+-- Name: derive_external_id(text, uuid); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.derive_external_id(p_concept_name text, p_entity_id uuid) RETURNS text
+    LANGUAGE plpgsql
+    AS $_$
+DECLARE
+    v_schema      text;
+    v_table       text;
+    v_asset_id    uuid;
+    v_external_id text;
+BEGIN
+    SELECT r.schema_name, r.table_name INTO v_schema, v_table
+    FROM resolution.representation r
+    JOIN resolution.concept c ON c.id = r.concept_id AND c.name = p_concept_name
+    JOIN resolution.representation_identity ri ON ri.representation_id = r.id;
+    IF v_table IS NULL THEN
+        RAISE EXCEPTION 'no identity-bearing representation for concept %', p_concept_name;
+    END IF;
+
+    EXECUTE format('SELECT asset_id FROM %I.%I WHERE id = $1', v_schema, v_table)
+        INTO v_asset_id USING p_entity_id;
+    IF v_asset_id IS NULL THEN
+        RAISE EXCEPTION 'entity % (concept %) has no asset_id, cannot derive an external id', p_entity_id, p_concept_name;
+    END IF;
+
+    SELECT canonical_asset_id INTO v_external_id
+    FROM resolution.canonical_asset WHERE id = v_asset_id AND expired_at IS NULL;
+    RETURN v_external_id;
+END;
+$_$;
+
+
+--
+-- Name: detect_disagreement(uuid, text); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.detect_disagreement(p_representation_comparison_id uuid, p_external_id text) RETURNS TABLE(agrees boolean, from_value text, to_value text, from_repr text, to_repr text)
+    LANGUAGE plpgsql
+    AS $_$
+DECLARE
+    v_comp              RECORD;
+    v_rr                RECORD;
+    v_from_repr         RECORD;
+    v_to_repr           RECORD;
+    v_from_concept_name text;
+    v_from_entity_id    uuid;
+    v_from_value        text;
+    v_to_value          text;
+BEGIN
+    SELECT * INTO v_comp FROM resolution.representation_comparison WHERE id = p_representation_comparison_id;
+    SELECT * INTO v_rr   FROM resolution.representation_relationship WHERE id = v_comp.representation_relationship_id;
+    SELECT * INTO v_from_repr FROM resolution.representation WHERE id = v_rr.from_representation_id;
+    SELECT * INTO v_to_repr   FROM resolution.representation WHERE id = v_rr.to_representation_id;
+
+    SELECT c.name INTO v_from_concept_name FROM resolution.concept c WHERE c.id = v_from_repr.concept_id;
+    v_from_entity_id := resolution.resolve_entity_uuid(p_external_id, v_from_concept_name);
+
+    EXECUTE format('SELECT %I::text FROM %I.%I WHERE id = $1', v_comp.from_column, v_from_repr.schema_name, v_from_repr.table_name)
+        INTO v_from_value USING v_from_entity_id;
+
+    EXECUTE format('SELECT %I::text FROM %I.%I WHERE work_request_uuid = $1', v_comp.to_column, v_to_repr.schema_name, v_to_repr.table_name)
+        INTO v_to_value USING p_external_id;
+
+    RETURN QUERY SELECT (v_from_value IS NOT DISTINCT FROM v_to_value), v_from_value, v_to_value, v_from_repr.label, v_to_repr.label;
+END;
+$_$;
+
+
+--
 -- Name: evaluate_proposition(uuid); Type: FUNCTION; Schema: resolution; Owner: -
 --
 
@@ -534,23 +650,20 @@ DECLARE
     v_result               boolean;
     v_sql                  text;
     v_all_passed           boolean := true;
+    v_relational_failed    boolean := false;
     v_disposition_value_id uuid;
     v_disposition          text;
 BEGIN
     SELECT subject_entity_id INTO v_subject_entity_id FROM resolution.proposition WHERE id = p_proposition_id;
-    IF v_subject_entity_id IS NULL THEN
-        RAISE EXCEPTION 'no proposition %', p_proposition_id;
-    END IF;
 
     FOR r IN
-        SELECT pa.rule_id, rl.expression_id
+        SELECT pa.rule_id, rl.expression_id, rl.is_relational_check
         FROM resolution.proposition_assertion pa
         JOIN resolution.rule rl ON rl.id = pa.rule_id
         WHERE pa.proposition_id = p_proposition_id
     LOOP
         IF r.expression_id IS NULL THEN
-            v_result := false;
-            v_sql := NULL;
+            v_result := false; v_sql := NULL;
         ELSE
             SELECT eg.result, eg.compiled_sql INTO v_result, v_sql
             FROM resolution.evaluate_relationship_guard(r.expression_id, v_subject_entity_id) eg;
@@ -561,10 +674,15 @@ BEGIN
 
         IF NOT v_result THEN
             v_all_passed := false;
+            IF r.is_relational_check THEN v_relational_failed := true; END IF;
         END IF;
     END LOOP;
 
-    v_disposition := CASE WHEN v_all_passed THEN 'Asserted' ELSE 'Rejected' END;
+    v_disposition := CASE
+        WHEN v_all_passed THEN 'Asserted'
+        WHEN v_relational_failed THEN 'Disputed'
+        ELSE 'Rejected'
+    END;
 
     SELECT cav.id INTO v_disposition_value_id
     FROM resolution.concept_attribute_value cav
@@ -572,7 +690,9 @@ BEGIN
     JOIN resolution.concept c ON c.id = ca.concept_id AND c.name = 'Proposition'
     WHERE cav.value = v_disposition;
 
-    UPDATE resolution.proposition SET disposition_value_id = v_disposition_value_id WHERE id = p_proposition_id;
+    UPDATE resolution.proposition
+    SET disposition_value_id = v_disposition_value_id, last_evaluated_at = now()
+    WHERE id = p_proposition_id;
 
     RETURN QUERY SELECT v_disposition, v_all_passed;
 END;
@@ -593,6 +713,171 @@ BEGIN
     v_sql := resolution.compile_root(expr_id, quote_literal(root_instance_id::text));
     EXECUTE format('SELECT %s', v_sql) INTO v_result;
     RETURN QUERY SELECT v_sql, v_result;
+END;
+$$;
+
+
+--
+-- Name: on_change(text, uuid); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.on_change(p_concept_name text, p_entity_id uuid) RETURNS TABLE(proposition_id uuid, action_taken text, resulting_disposition text)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    r      RECORD;
+    v_eval RECORD;
+    v_ext  text;
+BEGIN
+    -- Pending, Asserted, Rejected, and Stale all get a real re-evaluation
+    -- on a change event -- "something changed" is reason enough to
+    -- re-check regardless of current disposition. Retracted is left alone
+    -- (explicitly terminal); Disputed is handled separately below since
+    -- it needs the comparator-refresh logic reopen_disputed_proposition
+    -- has and plain evaluate_proposition doesn't.
+    FOR r IN
+        SELECT p.id FROM resolution.proposition p
+        JOIN resolution.concept_attribute_value cav ON cav.id = p.disposition_value_id
+        JOIN resolution.concept c ON c.id = p.asset_concept_id
+        WHERE cav.value IN ('Pending', 'Asserted', 'Rejected', 'Stale')
+          AND c.name = p_concept_name AND p.subject_entity_id = p_entity_id
+          AND EXISTS (SELECT 1 FROM resolution.proposition_assertion pa WHERE pa.proposition_id = p.id)
+    LOOP
+        SELECT * INTO v_eval FROM resolution.evaluate_proposition(r.id);
+        RETURN QUERY SELECT r.id, 'event_evaluate'::text, v_eval.disposition;
+    END LOOP;
+
+    BEGIN
+        v_ext := resolution.derive_external_id(p_concept_name, p_entity_id);
+    EXCEPTION WHEN OTHERS THEN
+        v_ext := NULL;
+    END;
+
+    IF v_ext IS NOT NULL THEN
+        FOR r IN
+            SELECT p.id FROM resolution.proposition p
+            JOIN resolution.concept_attribute_value cav ON cav.id = p.disposition_value_id
+            JOIN resolution.concept c ON c.id = p.asset_concept_id
+            WHERE cav.value = 'Disputed' AND c.name = p_concept_name AND p.subject_entity_id = p_entity_id
+              AND EXISTS (SELECT 1 FROM resolution.proposition_comparison pc WHERE pc.proposition_id = p.id)
+        LOOP
+            SELECT * INTO v_eval FROM resolution.reopen_disputed_proposition(r.id, v_ext);
+            RETURN QUERY SELECT r.id, 'event_reopen'::text, v_eval.disposition;
+        END LOOP;
+    END IF;
+
+    RETURN;
+END;
+$$;
+
+
+--
+-- Name: reopen_disputed_proposition(uuid, text); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.reopen_disputed_proposition(p_proposition_id uuid, p_external_id text) RETURNS TABLE(disposition text, comparators_agree boolean, assertions_passed boolean)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_current_disposition text;
+    v_comp                RECORD;
+    v_relational_prop_id  uuid;
+    v_all_agree           boolean := true;
+    v_eval                RECORD;
+    v_target_value        text;
+    v_target_value_id     uuid;
+BEGIN
+    SELECT cav.value INTO v_current_disposition
+    FROM resolution.proposition p JOIN resolution.concept_attribute_value cav ON cav.id = p.disposition_value_id
+    WHERE p.id = p_proposition_id;
+
+    IF v_current_disposition IS DISTINCT FROM 'Disputed' THEN
+        RAISE EXCEPTION 'proposition % is not Disputed (currently %), nothing to reopen', p_proposition_id, v_current_disposition;
+    END IF;
+
+    FOR v_comp IN
+        SELECT pc.representation_comparison_id
+        FROM resolution.proposition_comparison pc WHERE pc.proposition_id = p_proposition_id
+    LOOP
+        -- refresh the Relational proposition for this comparison, if one
+        -- exists, so evaluate_proposition below sees current data rather
+        -- than whatever value was last recorded.
+        SELECT p2.id INTO v_relational_prop_id
+        FROM resolution.proposition p2
+        JOIN resolution.proposition_comparison pc2
+            ON pc2.proposition_id = p2.id AND pc2.representation_comparison_id = v_comp.representation_comparison_id
+        JOIN resolution.concept_attribute_value gcav ON gcav.id = p2.grounding_status_value_id AND gcav.value = 'Relational'
+        LIMIT 1;
+
+        IF v_relational_prop_id IS NOT NULL THEN
+            PERFORM resolution.check_and_record_disagreement(v_comp.representation_comparison_id, p_external_id, v_relational_prop_id);
+            IF NOT (SELECT p3.value FROM resolution.proposition p3 WHERE p3.id = v_relational_prop_id) THEN
+                v_all_agree := false;
+            END IF;
+        ELSIF NOT (SELECT agrees FROM resolution.detect_disagreement(v_comp.representation_comparison_id, p_external_id)) THEN
+            -- no Relational proposition wired for this comparison -- fall
+            -- back to a direct check
+            v_all_agree := false;
+        END IF;
+    END LOOP;
+
+    SELECT * INTO v_eval FROM resolution.evaluate_proposition(p_proposition_id);
+    -- evaluate_proposition already wrote its own disposition based on the
+    -- (now-refreshed) assertions -- nothing further to override here,
+    -- since a failing relational assertion already yields Disputed and a
+    -- clean pass already yields Asserted.
+
+    SELECT cav.value INTO v_target_value
+    FROM resolution.proposition p JOIN resolution.concept_attribute_value cav ON cav.id = p.disposition_value_id
+    WHERE p.id = p_proposition_id;
+
+    RETURN QUERY SELECT v_target_value, v_all_agree, v_eval.all_passed;
+END;
+$$;
+
+
+--
+-- Name: resolve_disputed_via_verification(uuid, uuid); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.resolve_disputed_via_verification(p_proposition_id uuid, p_verified_statement_id uuid) RETURNS text
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_current_disposition text;
+    v_vs                  RECORD;
+    v_proposition_concept uuid;
+    v_asserted_value      uuid;
+BEGIN
+    SELECT cav.value INTO v_current_disposition
+    FROM resolution.proposition p JOIN resolution.concept_attribute_value cav ON cav.id = p.disposition_value_id
+    WHERE p.id = p_proposition_id;
+
+    IF v_current_disposition IS DISTINCT FROM 'Disputed' THEN
+        RAISE EXCEPTION 'proposition % is not Disputed (currently %)', p_proposition_id, v_current_disposition;
+    END IF;
+
+    SELECT * INTO v_vs FROM resolution.verified_statement WHERE id = p_verified_statement_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'no verified_statement %', p_verified_statement_id; END IF;
+
+    SELECT id INTO v_proposition_concept FROM resolution.concept WHERE name = 'Proposition';
+
+    IF v_vs.asset_concept_id IS DISTINCT FROM v_proposition_concept OR v_vs.target_asset_id IS DISTINCT FROM p_proposition_id THEN
+        RAISE EXCEPTION 'verified_statement % does not target proposition % -- refusing to resolve on an unrelated verification',
+            p_verified_statement_id, p_proposition_id;
+    END IF;
+
+    SELECT cav.id INTO v_asserted_value
+    FROM resolution.concept_attribute_value cav
+    JOIN resolution.concept_attribute ca ON ca.id = cav.attribute_id AND ca.name = 'disposition'
+    JOIN resolution.concept c ON c.id = ca.concept_id AND c.name = 'Proposition'
+    WHERE cav.value = 'Asserted';
+
+    UPDATE resolution.proposition
+    SET disposition_value_id = v_asserted_value, last_evaluated_at = now()
+    WHERE id = p_proposition_id;
+
+    RETURN 'Asserted';
 END;
 $$;
 
@@ -633,6 +918,86 @@ BEGIN
     RETURN v_result;
 END;
 $_$;
+
+
+--
+-- Name: run_reconciliation_sweep(interval, integer); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.run_reconciliation_sweep(p_stale_after interval DEFAULT '01:00:00'::interval, p_batch_limit integer DEFAULT 50) RETURNS TABLE(proposition_id uuid, action_taken text, resulting_disposition text)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN
+        SELECT p.id, c.name AS concept_name, p.subject_entity_id
+        FROM resolution.proposition p
+        JOIN resolution.concept_attribute_value cav ON cav.id = p.disposition_value_id
+        JOIN resolution.concept c ON c.id = p.asset_concept_id
+        WHERE cav.value IN ('Pending', 'Disputed') AND p.subject_entity_id IS NOT NULL
+        LIMIT p_batch_limit
+    LOOP
+        RETURN QUERY SELECT * FROM resolution.on_change(r.concept_name, r.subject_entity_id);
+    END LOOP;
+
+    RETURN QUERY SELECT * FROM resolution.run_staleness_sweep(p_stale_after, p_batch_limit);
+END;
+$$;
+
+
+--
+-- Name: run_staleness_sweep(interval, integer); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.run_staleness_sweep(p_stale_after interval DEFAULT '01:00:00'::interval, p_batch_limit integer DEFAULT 50) RETURNS TABLE(proposition_id uuid, action_taken text, resulting_disposition text)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    r           RECORD;
+    v_eval      RECORD;
+    v_stale_ids uuid[];
+    v_value_id  uuid;
+BEGIN
+    SELECT array_agg(p.id) INTO v_stale_ids
+    FROM resolution.proposition p
+    JOIN resolution.concept_attribute_value cav ON cav.id = p.disposition_value_id
+    WHERE cav.value = 'Stale';
+
+    SELECT cav.id INTO v_value_id
+    FROM resolution.concept_attribute_value cav
+    JOIN resolution.concept_attribute ca ON ca.id = cav.attribute_id AND ca.name = 'disposition'
+    JOIN resolution.concept c ON c.id = ca.concept_id AND c.name = 'Proposition'
+    WHERE cav.value = 'Stale';
+
+    FOR r IN
+        SELECT p.id FROM resolution.proposition p
+        JOIN resolution.concept_attribute_value cav ON cav.id = p.disposition_value_id
+        WHERE cav.value = 'Asserted'
+          AND (p.last_evaluated_at IS NULL OR p.last_evaluated_at < now() - p_stale_after)
+        LIMIT p_batch_limit
+    LOOP
+        UPDATE resolution.proposition SET disposition_value_id = v_value_id WHERE id = r.id;
+        RETURN QUERY SELECT r.id, 'marked_stale'::text, 'Stale'::text;
+    END LOOP;
+
+    SELECT cav.id INTO v_value_id
+    FROM resolution.concept_attribute_value cav
+    JOIN resolution.concept_attribute ca ON ca.id = cav.attribute_id AND ca.name = 'disposition'
+    JOIN resolution.concept c ON c.id = ca.concept_id AND c.name = 'Proposition'
+    WHERE cav.value = 'Pending';
+
+    IF v_stale_ids IS NOT NULL THEN
+        FOR r IN SELECT unnest(v_stale_ids) AS id LOOP
+            UPDATE resolution.proposition SET disposition_value_id = v_value_id WHERE id = r.id;
+            SELECT * INTO v_eval FROM resolution.evaluate_proposition(r.id);
+            RETURN QUERY SELECT r.id, 'reopened_from_stale'::text, v_eval.disposition;
+        END LOOP;
+    END IF;
+
+    RETURN;
+END;
+$$;
 
 
 SET default_tablespace = '';
@@ -888,9 +1253,11 @@ CREATE TABLE resolution.expression (
     concept_relationship_id uuid,
     quantifier text,
     referenced_proposition_id uuid,
+    proposition_ref_field text,
     CONSTRAINT expression_kind_check CHECK ((kind = ANY (ARRAY['literal'::text, 'attribute_ref'::text, 'operator'::text, 'function_call'::text, 'relationship_ref'::text, 'proposition_ref'::text]))),
     CONSTRAINT expression_kind_fields_check CHECK ((((kind = 'literal'::text) AND (literal_value IS NOT NULL) AND (attribute_id IS NULL) AND (function_name IS NULL) AND (concept_relationship_id IS NULL) AND (operator IS NULL) AND (referenced_proposition_id IS NULL)) OR ((kind = 'attribute_ref'::text) AND (attribute_id IS NOT NULL) AND (literal_value IS NULL) AND (function_name IS NULL) AND (concept_relationship_id IS NULL) AND (operator IS NULL) AND (referenced_proposition_id IS NULL)) OR ((kind = 'operator'::text) AND (operator IS NOT NULL) AND (attribute_id IS NULL) AND (literal_value IS NULL) AND (function_name IS NULL) AND (concept_relationship_id IS NULL) AND (referenced_proposition_id IS NULL)) OR ((kind = 'function_call'::text) AND (function_name IS NOT NULL) AND (attribute_id IS NULL) AND (literal_value IS NULL) AND (concept_relationship_id IS NULL) AND (operator IS NULL) AND (referenced_proposition_id IS NULL)) OR ((kind = 'relationship_ref'::text) AND (concept_relationship_id IS NOT NULL) AND (quantifier IS NOT NULL) AND (attribute_id IS NULL) AND (literal_value IS NULL) AND (function_name IS NULL) AND (operator IS NULL) AND (referenced_proposition_id IS NULL)) OR ((kind = 'proposition_ref'::text) AND (referenced_proposition_id IS NOT NULL) AND (attribute_id IS NULL) AND (literal_value IS NULL) AND (function_name IS NULL) AND (concept_relationship_id IS NULL) AND (operator IS NULL)))),
     CONSTRAINT expression_operator_whitelist_check CHECK (((operator IS NULL) OR (operator = ANY (ARRAY['='::text, '<>'::text, '>'::text, '<'::text, '>='::text, '<='::text, 'AND'::text, 'OR'::text])))),
+    CONSTRAINT expression_proposition_ref_field_check CHECK (((proposition_ref_field IS NULL) OR (proposition_ref_field = ANY (ARRAY['disposition'::text, 'value'::text])))),
     CONSTRAINT expression_quantifier_check CHECK (((quantifier IS NULL) OR (quantifier = ANY (ARRAY['EXISTS'::text, 'ALL'::text, 'COUNT'::text]))))
 );
 
@@ -1111,13 +1478,16 @@ CREATE TABLE resolution.proposition (
     title text NOT NULL,
     description text,
     asset_concept_id uuid,
-    subject_entity_id uuid NOT NULL,
+    subject_entity_id uuid,
     disposition_value_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     valid_from timestamp with time zone DEFAULT now() NOT NULL,
     valid_until timestamp with time zone DEFAULT 'infinity'::timestamp with time zone NOT NULL,
     recorded_on_dt timestamp with time zone DEFAULT now() NOT NULL,
-    recorded_until_dt timestamp with time zone DEFAULT 'infinity'::timestamp with time zone NOT NULL
+    recorded_until_dt timestamp with time zone DEFAULT 'infinity'::timestamp with time zone NOT NULL,
+    last_evaluated_at timestamp with time zone,
+    grounding_status_value_id uuid,
+    value boolean
 );
 
 
@@ -1128,6 +1498,17 @@ CREATE TABLE resolution.proposition (
 CREATE TABLE resolution.proposition_assertion (
     proposition_id uuid NOT NULL,
     rule_id uuid NOT NULL,
+    added_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: proposition_comparison; Type: TABLE; Schema: resolution; Owner: -
+--
+
+CREATE TABLE resolution.proposition_comparison (
+    proposition_id uuid NOT NULL,
+    representation_comparison_id uuid NOT NULL,
     added_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
@@ -1147,6 +1528,19 @@ CREATE TABLE resolution.representation (
     raw_metadata jsonb,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     expired_at timestamp with time zone
+);
+
+
+--
+-- Name: representation_comparison; Type: TABLE; Schema: resolution; Owner: -
+--
+
+CREATE TABLE resolution.representation_comparison (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    representation_relationship_id uuid NOT NULL,
+    from_column text NOT NULL,
+    to_column text NOT NULL,
+    notes text
 );
 
 
@@ -1246,6 +1640,7 @@ CREATE TABLE resolution.rule (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     expired_at timestamp with time zone,
     state_transition_id uuid,
+    is_relational_check boolean DEFAULT false NOT NULL,
     CONSTRAINT rule_check CHECK (((((((concept_id IS NOT NULL))::integer + ((concept_relationship_id IS NOT NULL))::integer) + ((representation_id IS NOT NULL))::integer) + ((state_transition_id IS NOT NULL))::integer) = 1)),
     CONSTRAINT rule_rule_type_check CHECK ((rule_type = ANY (ARRAY['invariant'::text, 'guard'::text, 'conditional'::text, 'derivation'::text]))),
     CONSTRAINT rule_severity_check CHECK ((severity = ANY (ARRAY['hard'::text, 'soft'::text])))
@@ -1636,11 +2031,27 @@ ALTER TABLE ONLY resolution.proposition_assertion
 
 
 --
+-- Name: proposition_comparison proposition_comparison_pkey; Type: CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.proposition_comparison
+    ADD CONSTRAINT proposition_comparison_pkey PRIMARY KEY (proposition_id, representation_comparison_id);
+
+
+--
 -- Name: proposition proposition_pkey; Type: CONSTRAINT; Schema: resolution; Owner: -
 --
 
 ALTER TABLE ONLY resolution.proposition
     ADD CONSTRAINT proposition_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: representation_comparison representation_comparison_pkey; Type: CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.representation_comparison
+    ADD CONSTRAINT representation_comparison_pkey PRIMARY KEY (id);
 
 
 --
@@ -1821,13 +2232,6 @@ CREATE INDEX idx_resolution_work_request_plan_id ON resolution.work_request USIN
 --
 
 CREATE UNIQUE INDEX idx_work_request_edge_active_pair ON resolution.work_request_edge USING btree (parent_work_request_id, child_work_request_id, edge_type) WHERE (valid_until = 'infinity'::timestamp with time zone);
-
-
---
--- Name: one_state_attr_per_concept; Type: INDEX; Schema: resolution; Owner: -
---
-
-CREATE UNIQUE INDEX one_state_attr_per_concept ON resolution.concept_attribute USING btree (concept_id) WHERE is_state_attribute;
 
 
 --
@@ -2142,11 +2546,43 @@ ALTER TABLE ONLY resolution.proposition
 
 
 --
+-- Name: proposition_comparison proposition_comparison_proposition_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.proposition_comparison
+    ADD CONSTRAINT proposition_comparison_proposition_id_fkey FOREIGN KEY (proposition_id) REFERENCES resolution.proposition(id);
+
+
+--
+-- Name: proposition_comparison proposition_comparison_representation_comparison_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.proposition_comparison
+    ADD CONSTRAINT proposition_comparison_representation_comparison_id_fkey FOREIGN KEY (representation_comparison_id) REFERENCES resolution.representation_comparison(id);
+
+
+--
 -- Name: proposition proposition_disposition_value_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
 --
 
 ALTER TABLE ONLY resolution.proposition
     ADD CONSTRAINT proposition_disposition_value_id_fkey FOREIGN KEY (disposition_value_id) REFERENCES resolution.concept_attribute_value(id);
+
+
+--
+-- Name: proposition proposition_grounding_status_value_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.proposition
+    ADD CONSTRAINT proposition_grounding_status_value_id_fkey FOREIGN KEY (grounding_status_value_id) REFERENCES resolution.concept_attribute_value(id);
+
+
+--
+-- Name: representation_comparison representation_comparison_representation_relationship_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.representation_comparison
+    ADD CONSTRAINT representation_comparison_representation_relationship_id_fkey FOREIGN KEY (representation_relationship_id) REFERENCES resolution.representation_relationship(id);
 
 
 --
@@ -2393,5 +2829,5 @@ ALTER TABLE ONLY resolution.work_request
 -- PostgreSQL database dump complete
 --
 
-\unrestrict MnCv16CCtEZSNSnPflk0EFNZQUSVbCFqg0W21mqWcQWwYhBGFVJlaSDmdcGSTV2
+\unrestrict j9XZJZun14CRSVOqFZUz3uLW0iekAaeBqGIOWfAvfPd8NX4DF16xtTKSg7kamqX
 
