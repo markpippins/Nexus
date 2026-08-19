@@ -29,13 +29,13 @@ CREATE TABLE IF NOT EXISTS assembly.forum_agendas (
     PRIMARY KEY (forum_id, agenda_id)
 );
 
--- 4. Bridge: posts ↔ nebula artifacts (intent_records, requirements, agenda_items, specs)
+-- 4. Bridge: posts ↔ nebula artifacts (requirements, agenda_items, specs)
 --   A post (thread root) can reference one or more domain artifacts.
 --   An artifact can be discussed in multiple posts.
 CREATE TABLE IF NOT EXISTS assembly.post_artifact_refs (
     post_id       UUID NOT NULL REFERENCES assembly.posts(id) ON DELETE CASCADE,
     artifact_type TEXT NOT NULL CHECK (artifact_type IN (
-        'intent_record', 'requirement', 'agenda_item', 'spec', 'implementation_plan'
+        'requirement', 'agenda_item', 'spec', 'implementation_plan'
     )),
     artifact_id   UUID NOT NULL,
     label         TEXT,     -- optional: "proposes", "discusses", "resolves", etc.
@@ -73,7 +73,7 @@ CREATE INDEX IF NOT EXISTS idx_post_supporting_comment ON assembly.post_supporti
 ALTER TABLE assembly.post_artifact_refs DROP CONSTRAINT IF EXISTS post_artifact_refs_artifact_type_check;
 ALTER TABLE assembly.post_artifact_refs ADD CONSTRAINT post_artifact_refs_artifact_type_check
   CHECK (artifact_type IN (
-    'intent_record', 'requirement', 'agenda_item', 'spec', 'implementation_plan',
+    'requirement', 'agenda_item', 'spec', 'implementation_plan',
     'harvest', 'harvest_candidate'
   ));
 

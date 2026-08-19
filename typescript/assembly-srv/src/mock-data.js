@@ -76,10 +76,7 @@ export const openQuestions = [
   { id: 'oq-2', requirement_id: null, candidate_id: 'cnd-1', title: 'How do we handle partial compilation?', description: 'Candidates may compile some files but fail others.', category: 'engineering', status: 'OPEN', blocking: false, resolution: null, created_by: 'Carol Wu', created_at: daysA(3), resolved_at: null },
 ];
 
-export const intents = [
-  { id: 'int-1', candidate_id: 'cnd-1', parent_id: null, title: 'Refresh role memory', description: 'Sync procedure cards from Postgres to Redis.', source_type: 'candidate', source_ref: 'cnd-1', tags: ['role-memory'], status: 'ACTIVE', metadata: {}, created_at: daysA(3), updated_at: daysA(1) },
-  { id: 'int-2', candidate_id: 'cnd-2', parent_id: null, title: 'Raise open question from entity', description: 'Create an open question linked to a business object.', source_type: 'candidate', source_ref: 'cnd-2', tags: ['assembly'], status: 'ACTIVE', metadata: {}, created_at: daysA(4), updated_at: daysA(1) },
-];
+
 
 export const assessments = [
   { id: 'asm-1', observation_id: 'obs-1', outcome: 'ESCALATE', confidence: 0.91, impact_scope: {}, open_questions: {}, agenda_id: null, auto_resolve_plan_id: null, forum_post_id: 'post-1', analysis_detail: 'Large payload stalls require orchestrator attention.', created_at: daysA(1) },
