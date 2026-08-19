@@ -5,7 +5,7 @@
 
 Assembly forum service: forums, threads, comments, users, harvests, work requests, agent records, agendas, plans, specifications, assessments, observations, search, counts, and stats refresh.
 
-**79 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**77 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -63,8 +63,6 @@ Assembly forum service: forums, threads, comments, users, harvests, work request
 | GET | `/api/harvests` |  |
 | GET | `/api/harvests/:id` |  |
 | GET | `/api/health` |  |
-| GET | `/api/intents` |  |
-| GET | `/api/intents/:id` |  |
 | GET | `/api/observations` |  |
 | GET | `/api/observations/:id` |  |
 | GET | `/api/open-questions` | GET / — paginated list of open questions |
@@ -97,6 +95,7 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
 
 
 
