@@ -9,7 +9,7 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/agendas` | AGENDAS (scoped by hierarchy via agenda_items → intent_records → harvest_candidates) GET /api/agendas — list ALL agendas (unscoped, when no hierarchy selected) |
+| GET | `/api/agendas` | AGENDAS (scoped by hierarchy via agenda_items → requirements) GET /api/agendas — list ALL agendas (unscoped, when no hierarchy selected) |
 | GET | `/api/agendas/:id` | GET /api/agendas/:id — single agenda with items |
 | POST | `/api/agendas/:id/finalize` | POST /api/agendas/:id/finalize — create a specification from an agenda |
 | DELETE | `/api/agendas/:id/items` | DELETE /api/agendas/:id/items — remove an agenda item by source_id Query: ?sourceId=<uuid> — finds and deletes the item matching that source |
@@ -82,7 +82,6 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | GET | `/api/features/:id/agendas` | GET /api/features/:id/agendas — list agendas scoped to a feature, with nested items |
 | GET | `/api/features/:id/harvest-candidates` | GET /api/features/:id/harvest-candidates — list all harvest candidates linked to a specific feature (filter by feature_id). |
 | GET | `/api/features/:id/implementation-plans` | GET /api/features/:id/implementation-plans — plans linked to a feature |
-| GET | `/api/features/:id/intent-records` | GET /api/features/:id/intent-records — list intent records scoped to a feature |
 | GET | `/api/features/:id/specifications` | GET /api/features/:id/specifications — list specification revisions scoped to a feature |
 | GET | `/api/features/:id/work-requests` | GET /api/features/:id/work-requests — list work requests scoped to a feature |
 | POST | `/api/features/move` | COMPLEX OPERATIONS (transactional) POST /api/features/move — re-parent a feature to a different subsystem |
@@ -107,10 +106,6 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | GET | `/api/inbox-pointer/:role` | INBOX POINTERS — per-role watermark for unread messages GET /api/inbox-pointer/:role — get the inbox pointer for a role |
 | PUT | `/api/inbox-pointer/:role` | PUT /api/inbox-pointer/:role — set the inbox pointer for a role |
 | GET | `/api/inbox-pointers` | GET /api/inbox-pointers — list all inbox pointers (debugging) |
-| GET | `/api/intent-records` | INTENT RECORDS (scoped by hierarchy via harvest_candidates JOIN) GET /api/intent-records — list ALL intent records with pagination |
-| GET | `/api/intent-records/:id` | GET /api/intent-records/:id — full intent record with candidate info |
-| GET | `/api/intents` | INTENT RECORDS GET /api/intents — list with pagination |
-| GET | `/api/intents/:id` | GET /api/intents/:id — single intent record |
 | GET | `/api/inventory` | GET /api/inventory — rollup counts for the full hierarchy tree Returns per-node counts (systems/subsystems/features) for tree badges plus global totals. Single query, no per-node N+1. |
 | GET | `/api/knowledge/cross-references` | GET /api/knowledge/cross-references — list cross-references for graph overlay with pagination. Also includes harvest_candidate spawn-plan cross-references from nebula.cross_references. |
 | GET | `/api/knowledge/edges` | GET /api/knowledge/edges — list graph edges with optional filters and pagination |
@@ -206,7 +201,6 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | GET | `/api/subsystems/:id/docs` | GET /api/subsystems/:id/docs — read docs from workspace path for a subsystem |
 | GET | `/api/subsystems/:id/harvest-candidates` | GET /api/subsystems/:id/harvest-candidates — list all harvest candidates linked to a specific subsystem (filter by subsystem_id). |
 | GET | `/api/subsystems/:id/implementation-plans` | GET /api/subsystems/:id/implementation-plans — plans linked to a subsystem |
-| GET | `/api/subsystems/:id/intent-records` | GET /api/subsystems/:id/intent-records — list intent records scoped to a subsystem |
 | GET | `/api/subsystems/:id/specifications` | GET /api/subsystems/:id/specifications — list specification revisions scoped to a subsystem |
 | GET | `/api/subsystems/:id/work-requests` | GET /api/subsystems/:id/work-requests — list work requests scoped to a subsystem |
 | POST | `/api/subsystems/move` | POST /api/subsystems/move — re-parent a subsystem to a different system |
@@ -226,7 +220,6 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | GET | `/api/systems/:id/info` | SYSTEM INFO TABS GET /api/systems/:id/info — get all info tabs for a system with pagination |
 | DELETE | `/api/systems/:id/info/:tabId` | DELETE /api/systems/:id/info/:tabId — delete an info tab When tabId='harvest_context', also unlinks all candidates from this system. |
 | PUT | `/api/systems/:id/info/:tabId` | PUT /api/systems/:id/info/:tabId — save an info tab |
-| GET | `/api/systems/:id/intent-records` | GET /api/systems/:id/intent-records — list intent records scoped to a system |
 | GET | `/api/systems/:id/inventory` | SYSTEM INVENTORY (unified cross-schema view) GET /api/systems/:id/inventory — unified inventory via asset_relation V076 migration: joins through asset_relation (system OWNS service) instead of the deprecated system_external_ids junction. |
 | GET | `/api/systems/:id/specifications` | GET /api/systems/:id/specifications — list specification revisions scoped to a system |
 | GET | `/api/systems/:id/work-requests` | GET /api/systems/:id/work-requests — list work requests scoped to a system |
@@ -290,9 +283,9 @@ Each level has CRUD + scoped children lists:
 
 | Resource | CRUD | Scoped children |
 |----------|------|-----------------|
-| Systems | `GET/POST /api/systems`, `GET/PATCH/DELETE /api/systems/:id`, `POST /api/systems/demote/:id` | `…/:id/agendas`, `docs`, `harvest-candidates`, `implementation-plans`, `intent-records`, `specifications`, `work-requests`, `inventory`, `info`, `external-ids`, `folders` |
-| Subsystems | `POST /api/subsystems`, `GET/PATCH/DELETE /api/subsystems/:id`, `POST /api/subsystems/move` | `…/:id/agendas`, `docs`, `harvest-candidates`, `implementation-plans`, `intent-records`, `specifications`, `work-requests` |
-| Features | `POST /api/features`, `GET/PATCH/DELETE /api/features/:id`, `POST /api/features/move` | `…/:id/agendas`, `harvest-candidates`, `implementation-plans`, `intent-records`, `specifications`, `work-requests` |
+| Systems | `GET/POST /api/systems`, `GET/PATCH/DELETE /api/systems/:id`, `POST /api/systems/demote/:id` | `…/:id/agendas`, `docs`, `harvest-candidates`, `implementation-plans`, `specifications`, `work-requests`, `inventory`, `info`, `external-ids`, `folders` |
+| Subsystems | `POST /api/subsystems`, `GET/PATCH/DELETE /api/subsystems/:id`, `POST /api/subsystems/move` | `…/:id/agendas`, `docs`, `harvest-candidates`, `implementation-plans`, `specifications`, `work-requests` |
+| Features | `POST /api/features`, `GET/PATCH/DELETE /api/features/:id`, `POST /api/features/move` | `…/:id/agendas`, `harvest-candidates`, `implementation-plans`, `specifications`, `work-requests` |
 
 ## Harvests
 
@@ -314,7 +307,7 @@ Each level has CRUD + scoped children lists:
 | `GET /api/harvest-candidates/:id` | Single candidate. |
 | `PATCH /api/harvest-candidates/:id` | Update. |
 | `GET /api/harvest-candidates/:id/dependencies` | Candidate dependencies. |
-| `POST /api/harvest-candidates/:id/promote` | Promote → intent record. |
+| `POST /api/harvest-candidates/:id/promote` | Promote → mark candidate as useful (stage). |
 | `POST /api/harvest-candidates/:id/spawn-plan` | Spawn an implementation plan. |
 | `POST /api/harvest-candidates/discover` | Batch discovery. |
 | `POST /api/harvest-candidates/promote-to-plan` | Bulk promote-to-plan. |
@@ -411,7 +404,6 @@ UI (normalized field set differs from conduit-srv's native shapes).
 |--------|-----------|
 | Roles | `GET/POST /api/roles`, `GET/PATCH/DELETE /api/roles/:id` |
 | Sessions | `GET/POST /api/sessions`, `PATCH/DELETE /api/sessions/:id` |
-| Intents / intent-records | `GET /api/intents[/:id]`, `GET /api/intent-records[/:id]` |
 | Observations / assessments | `GET /api/observations[/:id]`, `GET /api/assessments[/:id]` |
 | Architect specs / artifact provenance / op-registry | CRUD per family; op-registry adds `…/:id/lineage`, `…/:id/supersede`, `…/:id/deprecate`, `POST /api/op-registry/fork` |
 | Evidence links | `GET/POST/DELETE /api/evidence-links`, `DELETE /api/evidence-links` (bulk by query) |

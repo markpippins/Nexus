@@ -3204,151 +3204,7 @@ export function createRoutes(pool: Pool): Router {
   });
 
 
-  // ════════════════════════════════════════════════════════════════
-  //  INTENT RECORDS (scoped by hierarchy via harvest_candidates JOIN)
-  // ════════════════════════════════════════════════════════════════
-
-
-  // GET /api/intent-records — list ALL intent records with pagination
-  router.get('/intent-records', async (req: Request, res: Response) => {
-    try {
-      const { offset, limit, page, pageSize } = parsePagination(req.query);
-
-      const [dataResult, countResult] = await Promise.all([
-        pool.query(
-          `SELECT ir.*, hc.system_id, hc.subsystem_id, hc.feature_id,
-                  h.source_filename AS harvest_source
-           FROM nebula.intent_records ir
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
-           ORDER BY ir.created_at DESC
-           LIMIT $1 OFFSET $2`,
-          [pageSize, offset]
-        ),
-        pool.query('SELECT COUNT(*)::int AS total FROM nebula.intent_records'),
-      ]);
-
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-  // GET /api/systems/:id/intent-records — list intent records scoped to a system
-  router.get('/systems/:id/intent-records', async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      const { offset, limit, page, pageSize } = parsePagination(req.query);
-
-      const [dataResult, countResult] = await Promise.all([
-        pool.query(
-          `SELECT ir.id, hc.id AS candidate_id, ir.parent_id, ir.title, ir.description,
-                  ir.source_type, ir.source_ref, ir.tags, ir.status, ir.metadata,
-                  ir.created_at, ir.updated_at
-           FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           WHERE hc.system_id = $1
-           ORDER BY ir.created_at DESC
-           LIMIT $2 OFFSET $3`,
-          [id, pageSize, offset]
-        ),
-        pool.query(
-          `SELECT COUNT(*)::int AS total
-           FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           WHERE hc.system_id = $1`,
-          [id]
-        ),
-      ]);
-
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // GET /api/subsystems/:id/intent-records — list intent records scoped to a subsystem
-  router.get('/subsystems/:id/intent-records', async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      const { offset, limit, page, pageSize } = parsePagination(req.query);
-
-      const [dataResult, countResult] = await Promise.all([
-        pool.query(
-          `SELECT ir.id, hc.id AS candidate_id, ir.parent_id, ir.title, ir.description,
-                  ir.source_type, ir.source_ref, ir.tags, ir.status, ir.metadata,
-                  ir.created_at, ir.updated_at
-           FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           WHERE hc.subsystem_id = $1
-           ORDER BY ir.created_at DESC
-           LIMIT $2 OFFSET $3`,
-          [id, pageSize, offset]
-        ),
-        pool.query(
-          `SELECT COUNT(*)::int AS total
-           FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           WHERE hc.subsystem_id = $1`,
-          [id]
-        ),
-      ]);
-
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // GET /api/features/:id/intent-records — list intent records scoped to a feature
-  router.get('/features/:id/intent-records', async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      const { offset, limit, page, pageSize } = parsePagination(req.query);
-
-      const [dataResult, countResult] = await Promise.all([
-        pool.query(
-          `SELECT ir.id, hc.id AS candidate_id, ir.parent_id, ir.title, ir.description,
-                  ir.source_type, ir.source_ref, ir.tags, ir.status, ir.metadata,
-                  ir.created_at, ir.updated_at
-           FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           WHERE hc.feature_id = $1
-           ORDER BY ir.created_at DESC
-           LIMIT $2 OFFSET $3`,
-          [id, pageSize, offset]
-        ),
-        pool.query(
-          `SELECT COUNT(*)::int AS total
-           FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           WHERE hc.feature_id = $1`,
-          [id]
-        ),
-      ]);
-
-      res.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-
-
-  // GET /api/intent-records/:id — full intent record with candidate info
-  router.get('/intent-records/:id', async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      const { rows: [row] } = await pool.query(
-        `SELECT ir.*, hc.system_id, hc.subsystem_id, hc.feature_id, h.source_filename AS harvest_source\n         FROM nebula.intent_records ir\n         LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id\n         LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id\n         WHERE ir.id = $1`,
-        [id]
-      );
-      if (!row) return res.status(404).json({ error: 'Intent record not found' });
-      res.json(row);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-  //  AGENDAS (scoped by hierarchy via agenda_items → intent_records → harvest_candidates)
+  //  AGENDAS (scoped by hierarchy via agenda_items → requirements)
   // ════════════════════════════════════════════════════════════════
 
 
@@ -3422,10 +3278,8 @@ export function createRoutes(pool: Pool): Router {
                   a.created_at, a.updated_at
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
-           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
-           WHERE hc.system_id = $1 OR req.system_id = $1
+           WHERE req.system_id = $1
            ORDER BY a.created_at DESC
            LIMIT $2 OFFSET $3`,
           [id, pageSize, offset]
@@ -3434,10 +3288,8 @@ export function createRoutes(pool: Pool): Router {
           `SELECT COUNT(DISTINCT a.id)::int AS total
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
-           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
-           WHERE hc.system_id = $1 OR req.system_id = $1`,
+           WHERE req.system_id = $1`,
           [id]
         ),
       ]);
@@ -3478,10 +3330,8 @@ export function createRoutes(pool: Pool): Router {
                   a.created_at, a.updated_at
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
-           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
-           WHERE hc.subsystem_id = $1 OR req.subsystem_id = $1
+           WHERE req.subsystem_id = $1
            ORDER BY a.created_at DESC
            LIMIT $2 OFFSET $3`,
           [id, pageSize, offset]
@@ -3490,10 +3340,8 @@ export function createRoutes(pool: Pool): Router {
           `SELECT COUNT(DISTINCT a.id)::int AS total
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
-           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
-           WHERE hc.subsystem_id = $1 OR req.subsystem_id = $1`,
+           WHERE req.subsystem_id = $1`,
           [id]
         ),
       ]);
@@ -3533,10 +3381,8 @@ export function createRoutes(pool: Pool): Router {
                   a.created_at, a.updated_at
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
-           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
-           WHERE hc.feature_id = $1 OR req.feature_id = $1
+           WHERE req.feature_id = $1
            ORDER BY a.created_at DESC
            LIMIT $2 OFFSET $3`,
           [id, pageSize, offset]
@@ -3545,10 +3391,8 @@ export function createRoutes(pool: Pool): Router {
           `SELECT COUNT(DISTINCT a.id)::int AS total
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
-           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
-           WHERE hc.feature_id = $1 OR req.feature_id = $1`,
+           WHERE req.feature_id = $1`,
           [id]
         ),
       ]);
@@ -3584,7 +3428,7 @@ export function createRoutes(pool: Pool): Router {
       const sourceId = req.query.sourceId as string;
       if (!sourceId) return res.status(400).json({ error: 'sourceId query parameter is required' });
       const { rowCount } = await pool.query(
-        `UPDATE nebula.agenda_items SET valid_until = now() WHERE agenda_id = $1 AND (source_id = $2 OR source_id IN (SELECT ir.id FROM nebula.intent_records ir JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id WHERE hc.id = $2)) AND valid_until > now()`,
+        `UPDATE nebula.agenda_items SET valid_until = now() WHERE agenda_id = $1 AND source_id = $2 AND valid_until > now()`,
         [id, sourceId]
       );
       if (rowCount === 0) return res.status(404).json({ error: 'Agenda item not found' });
@@ -3717,12 +3561,9 @@ export function createRoutes(pool: Pool): Router {
                   s.agenda_title,
                   s.agenda_status
            FROM nebula.active_specifications s
-           LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
-               AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
-           WHERE hc.system_id = $1 OR req.system_id = $1
+           WHERE req.system_id = $1
            ORDER BY s.created_at DESC
            LIMIT $2 OFFSET $3`,
           [id, pageSize, offset]
@@ -3730,12 +3571,9 @@ export function createRoutes(pool: Pool): Router {
         pool.query(
           `SELECT COUNT(*)::int AS total
            FROM nebula.active_specifications s
-           LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
-               AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
-           WHERE hc.system_id = $1 OR req.system_id = $1`,
+           WHERE req.system_id = $1`,
           [id]
         ),
       ]);
@@ -3768,12 +3606,9 @@ export function createRoutes(pool: Pool): Router {
                   s.agenda_title,
                   s.agenda_status
            FROM nebula.active_specifications s
-           LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
-               AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
-           WHERE hc.subsystem_id = $1 OR req.subsystem_id = $1
+           WHERE req.subsystem_id = $1
            ORDER BY s.created_at DESC
            LIMIT $2 OFFSET $3`,
           [id, pageSize, offset]
@@ -3781,12 +3616,9 @@ export function createRoutes(pool: Pool): Router {
         pool.query(
           `SELECT COUNT(*)::int AS total
            FROM nebula.active_specifications s
-           LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
-               AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
-           WHERE hc.subsystem_id = $1 OR req.subsystem_id = $1`,
+           WHERE req.subsystem_id = $1`,
           [id]
         ),
       ]);
@@ -3819,12 +3651,9 @@ export function createRoutes(pool: Pool): Router {
                   s.agenda_title,
                   s.agenda_status
            FROM nebula.active_specifications s
-           LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
-               AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
-           WHERE hc.feature_id = $1 OR req.feature_id = $1
+           WHERE req.feature_id = $1
            ORDER BY s.created_at DESC
            LIMIT $2 OFFSET $3`,
           [id, pageSize, offset]
@@ -3832,12 +3661,9 @@ export function createRoutes(pool: Pool): Router {
         pool.query(
           `SELECT COUNT(*)::int AS total
            FROM nebula.active_specifications s
-           LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
-               AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
-           WHERE hc.feature_id = $1 OR req.feature_id = $1`,
+           WHERE req.feature_id = $1`,
           [id]
         ),
       ]);
@@ -3905,9 +3731,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
-           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           WHERE req.system_id = $1 OR hc.system_id = $1
+           WHERE req.system_id = $1
            ORDER BY wr.id, wr.created_at DESC
            LIMIT $2 OFFSET $3`,
           [id, pageSize, offset]
@@ -3918,9 +3742,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
-           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           WHERE req.system_id = $1 OR hc.system_id = $1`,
+           WHERE req.system_id = $1`,
           [id]
         ),
       ]);
@@ -3944,9 +3766,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
-           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           WHERE req.subsystem_id = $1 OR hc.subsystem_id = $1
+           WHERE req.subsystem_id = $1
            ORDER BY wr.id, wr.created_at DESC
            LIMIT $2 OFFSET $3`,
           [id, pageSize, offset]
@@ -3957,9 +3777,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
-           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           WHERE req.subsystem_id = $1 OR hc.subsystem_id = $1`,
+           WHERE req.subsystem_id = $1`,
           [id]
         ),
       ]);
@@ -3983,9 +3801,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
-           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           WHERE req.feature_id = $1 OR hc.feature_id = $1
+           WHERE req.feature_id = $1
            ORDER BY wr.id, wr.created_at DESC
            LIMIT $2 OFFSET $3`,
           [id, pageSize, offset]
@@ -3996,9 +3812,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
            LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
            LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
-           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           WHERE req.feature_id = $1 OR hc.feature_id = $1`,
+           WHERE req.feature_id = $1`,
           [id]
         ),
       ]);
@@ -4399,33 +4213,18 @@ export function createRoutes(pool: Pool): Router {
       );
       if (!spec) return res.status(404).json({ error: 'Specification not found' });
 
-      // Extract candidate IDs from items:
-      // - harvest_candidate items: source_id IS the candidate ID
-      // - intent_record items: look up intent_records.candidate_id
+      // Extract candidate IDs from items (harvest_candidate items: source_id IS the candidate ID)
       const directCandidateIds: string[] = [];
-      const intentRecordIds: string[] = [];
       const items = spec.item_snapshot || [];
       for (const item of items) {
         if (!item.source_id) continue;
         if (item.source_type === 'harvest_candidate') {
           directCandidateIds.push(item.source_id);
-        } else if (item.source_type === 'intent_record') {
-          intentRecordIds.push(item.source_id);
         }
       }
 
-      // Resolve intent_record IDs to candidate IDs
-      let candidateIds = [...directCandidateIds];
-      candidateIds = [...new Set(candidateIds)];  // deduplicate
-      if (intentRecordIds.length > 0) {
-        const { rows: resolved } = await pool.query(
-          'SELECT candidate_id FROM nebula.intent_records WHERE id = ANY($1::uuid[]) AND candidate_id IS NOT NULL',
-          [intentRecordIds]
-        );
-        for (const r of resolved) {
-          candidateIds.push(r.candidate_id);
-        }
-      }
+      // Deduplicate
+      const candidateIds = [...new Set(directCandidateIds)];
 
       if (candidateIds.length === 0) {
         return res.status(200).json({ ok: true, linked: 0, message: 'No harvest_candidate items in snapshot' });
@@ -8061,79 +7860,6 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
   });
 
   // ════════════════════════════════════════════════════════════════
-  //  INTENT RECORDS
-  // ════════════════════════════════════════════════════════════════
-
-  // GET /api/intents — list with pagination
-  router.get('/intents', async (req: Request, res: Response) => {
-    try {
-      const { offset, limit, page, pageSize } = parsePagination(req.query);
-
-      const [dataResult, countResult] = await Promise.all([
-        pool.query(
-          `SELECT id, candidate_id, parent_id, title, description,
-                  source_type, source_ref, tags, status, metadata,
-                  created_at, updated_at
-           FROM nebula.intent_records
-           ORDER BY created_at DESC
-           LIMIT $1 OFFSET $2`,
-          [pageSize, offset]
-        ),
-        pool.query('SELECT COUNT(*)::int AS total FROM nebula.intent_records'),
-      ]);
-
-      const items = dataResult.rows.map((r: any) => ({
-        id: r.id,
-        candidateId: r.candidate_id,
-        parentId: r.parent_id,
-        title: r.title,
-        description: r.description,
-        sourceType: r.source_type,
-        sourceRef: r.source_ref,
-        tags: r.tags,
-        status: r.status,
-        metadata: r.metadata,
-        createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
-        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
-      }));
-
-      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // GET /api/intents/:id — single intent record
-  router.get('/intents/:id', async (req: Request, res: Response) => {
-    try {
-      const { rows: [r] } = await pool.query(
-        `SELECT id, candidate_id, parent_id, title, description,
-                source_type, source_ref, tags, status, metadata,
-                created_at, updated_at
-         FROM nebula.intent_records WHERE id = $1`,
-        [req.params.id]
-      );
-      if (!r) { res.status(404).json({ error: 'Intent not found' }); return; }
-      res.json({
-        id: r.id,
-        candidateId: r.candidate_id,
-        parentId: r.parent_id,
-        title: r.title,
-        description: r.description,
-        sourceType: r.source_type,
-        sourceRef: r.source_ref,
-        tags: r.tags,
-        status: r.status,
-        metadata: r.metadata,
-        createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
-        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
-      });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // ════════════════════════════════════════════════════════════════
   //  ASSESSMENTS
   // ════════════════════════════════════════════════════════════════
 
@@ -8477,7 +8203,7 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
 
       const [
         threadResult, requirementResult, agendaResult, candidateResult,
-        harvestResult, oqResult, intentResult, assessmentResult,
+        harvestResult, oqResult, assessmentResult,
         observationResult, agentRecordResult, specificationResult, planResult,
         userResult,
       ] = await Promise.all([
@@ -8514,12 +8240,6 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
         // Open questions
         pool.query(
           `SELECT id, title, description, status, 'open_question' AS result_type FROM nebula.open_questions
-           WHERE title ILIKE $1 ESCAPE '\\' OR description ILIKE $1 ESCAPE '\\' LIMIT $2`,
-          [pattern, limit]
-        ),
-        // Intent records
-        pool.query(
-          `SELECT id, title, description, status, 'intent' AS result_type FROM nebula.intent_records
            WHERE title ILIKE $1 ESCAPE '\\' OR description ILIKE $1 ESCAPE '\\' LIMIT $2`,
           [pattern, limit]
         ),
@@ -8570,7 +8290,6 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
         ...candidateResult.rows,
         ...harvestResult.rows,
         ...oqResult.rows,
-        ...intentResult.rows,
         ...assessmentResult.rows,
         ...observationResult.rows,
         ...agentRecordResult.rows,
@@ -8609,7 +8328,7 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
     try {
       const [
         postsResult, requirementsResult, agendasResult, candidatesResult,
-        harvestsResult, oqResult, intentsResult, assessmentsResult,
+        harvestsResult, oqResult, assessmentsResult,
         observationsResult, agentRecordsResult, specificationsResult, plansResult,
         usersResult, toDoThreadsResult,
       ] = await Promise.all([
@@ -8619,7 +8338,6 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
         pool.query('SELECT COUNT(*)::int AS total FROM nebula.harvest_candidates'),
         pool.query('SELECT COUNT(*)::int AS total FROM nebula.harvests'),
         pool.query('SELECT COUNT(*)::int AS total FROM nebula.open_questions'),
-        pool.query('SELECT COUNT(*)::int AS total FROM nebula.intent_records'),
         pool.query('SELECT COUNT(*)::int AS total FROM nebula.assessments'),
         pool.query('SELECT COUNT(*)::int AS total FROM nebula.observations'),
         pool.query('SELECT COUNT(*)::int AS total FROM nebula.agent_records'),
@@ -8636,7 +8354,6 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
         candidates: candidatesResult.rows[0].total,
         harvests: harvestsResult.rows[0].total,
         openQuestions: oqResult.rows[0].total,
-        intents: intentsResult.rows[0].total,
         assessments: assessmentsResult.rows[0].total,
         observations: observationsResult.rows[0].total,
         agentRecords: agentRecordsResult.rows[0].total,
