@@ -2618,6 +2618,9 @@ export function createRoutes(pool: Pool): Router {
       const visibilityScope = req.query.visibilityScope as string | undefined;
       const tag = req.query.tag as string | undefined;
       const search = req.query.search as string | undefined;
+      const systemId = req.query.systemId as string | undefined;
+      const subsystemId = req.query.subsystemId as string | undefined;
+      const featureId = req.query.featureId as string | undefined;
       const sort = (req.query.sort as string) || 'created_at';
       const { offset, limit, page, pageSize } = parsePagination(req.query);
 
@@ -2672,13 +2675,26 @@ export function createRoutes(pool: Pool): Router {
         clauses.push(`(COALESCE(h.source_filename, '') || ' ' || COALESCE(h.source_path, '') || ' ' || COALESCE(h.model, '')) ILIKE '%' || $${pi} || '%'`);
         params.push(search); filterParams.push(search); pi++;
       }
+      // Hierarchy filter — a harvest belongs to a tree node if it has ≥1 candidate
+      // linked to that system/subsystem/feature. Multiple levels OR together so the
+      // tree's deepest selection (e.g. a feature) also matches its ancestor levels.
+      if (systemId || subsystemId || featureId) {
+        const ors: string[] = [];
+        if (systemId) { ors.push(`c.system_id = $${pi++}`); params.push(systemId); filterParams.push(systemId); }
+        if (subsystemId) { ors.push(`c.subsystem_id = $${pi++}`); params.push(subsystemId); filterParams.push(subsystemId); }
+        if (featureId) { ors.push(`c.feature_id = $${pi++}`); params.push(featureId); filterParams.push(featureId); }
+        clauses.push(`EXISTS (SELECT 1 FROM nebula.harvest_candidates c WHERE c.harvest_id = h.id AND (${ors.join(' OR ')}))`);
+      }
       const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
 
-      // Count-query WHERE: renumber clause placeholders to start at $1 (each clause has
-      // exactly one placeholder) so the count statement matches filterParams ordering.
-      const countWhere = clauses.length > 0
-        ? 'WHERE ' + clauses.map((c, i) => c.replace(/\$\d+/, `$${i + 1}`)).join(' AND ')
-        : '';
+      // Count-query WHERE: renumber clause placeholders sequentially so the count
+      // statement matches filterParams ordering. Handles multi-placeholder clauses
+      // (e.g. the hierarchy EXISTS) via a running counter, not per-clause replace.
+      let countWhere = '';
+      if (clauses.length > 0) {
+        let ci = 1;
+        countWhere = 'WHERE ' + clauses.map(c => c.replace(/\$\d+/g, () => `$${ci++}`)).join(' AND ');
+      }
 
       // NOTE (2026-07-31): restructured to inner-select + LIMIT first, then compute the
       // expensive docklang analytics only on the returned page. Previously the per-row
