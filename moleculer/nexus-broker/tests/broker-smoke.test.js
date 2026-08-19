@@ -97,3 +97,21 @@ test('GET /api/solir/status responds', async () => {
   const res = await fetch(`${BASE}/solir/status`)
   assert.equal(res.status, 200)
 })
+
+test('POST /api/solir/snapshot performs an idempotent write path', async () => {
+  const label = `p11-depth-${Date.now()}`
+  const res = await fetch(`${BASE}/solir/snapshot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label }),
+  })
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.equal(body.ok, true)
+  assert.equal(body.label, label)
+  // Replace-per-snapshot projection: versioned, counts are numbers.
+  assert.ok(Number.isInteger(body.version) && body.version > 0)
+  assert.ok(Number.isInteger(body.observations))
+  assert.ok(Number.isInteger(body.assessments))
+  assert.ok(Number.isInteger(body.driftFindings))
+})
