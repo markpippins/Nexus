@@ -13,11 +13,13 @@
 #    and ship with the next push.
 #
 # 3. Tools & Scripts catalog gate: if the pushed commits touch nexus/bin/
-#    (.sh/.py), verify every script is registered as a nebula feature with
-#    context documentation (bin/sync-tools-and-scripts.py --check). If any
-#    script is missing from the catalog, the push is BLOCKED so the sync is
-#    run (registers features via the nebula API — no file to commit).
-#    Skips with a warning if the nebula API is unreachable.
+#    (.sh/.py), nexus/tools/, nexus/go/wrp/ccnf-ref, or
+#    nexus/rust/wrp/ccnf-verifier/src, verify every script/tool/package is
+#    registered as a nebula feature with context documentation
+#    (bin/sync-tools-and-scripts.py --check). If anything is missing from the
+#    catalog, the push is BLOCKED so the sync is run (registers features via
+#    the nebula API — no file to commit). Skips with a warning if the nebula
+#    API is unreachable.
 #
 # RANGE-AWARE: reads the refs git feeds on stdin and only runs the slow checks
 # when the pushed commits touch the relevant paths. Otherwise it skips in
@@ -54,8 +56,10 @@ WATCH_RE='^(angular/shared-react/(utils/|scripts/|package\.json)|angular/(tackle
 WATCH_RE_API='^(tools/api-docs/|\.githooks/pre-push$|.*/openapi\.yaml$|.*/API\.md$|typescript/[^/]+-srv/src/|typescript/semantics-srv/scripts/|python/[^/]+-srv/src/)'
 
 # Paths that, when touched, require the Tools & Scripts catalog sync check:
-#   - any script under bin/ or tool under tools/ (add / modify / delete all affect the catalog)
-WATCH_RE_BIN='^(bin|tools)/'
+#   - any script under bin/, tool under tools/, Go package under go/wrp/ccnf-ref,
+#     or Rust module under rust/wrp/ccnf-verifier/src (add / modify / delete all
+#     affect the catalog)
+WATCH_RE_BIN='^(bin|tools)/|^go/wrp/ccnf-ref(/|$)|^rust/wrp/ccnf-verifier/src/'
 
 # ---------------------------------------------------------------------------
 # Gate 1 — inline shared-utils sync check
@@ -166,15 +170,15 @@ fi
 
 # --- Gate 3: Tools & Scripts catalog sync ---------------------------------
 if [ "$need_bin" -eq 1 ]; then
-  echo "pre-push: bin/ scripts touched — checking Tools & Scripts catalog sync"
+  echo "pre-push: bin/ tools/ go/ rust/ touched — checking Tools & Scripts catalog sync"
   if ! command -v python3 >/dev/null 2>&1 || [ ! -f "$ROOT/bin/sync-tools-and-scripts.py" ]; then
     echo "pre-push: skipping catalog gate (python3 or bin/sync-tools-and-scripts.py not available)" >&2
   elif ! curl -sf --max-time 3 "http://localhost:3101/api/systems" >/dev/null 2>&1; then
     echo "pre-push: skipping catalog gate (nebula API on :3101 unreachable)" >&2
   elif ! (cd "$ROOT" && python3 bin/sync-tools-and-scripts.py --check >/dev/null 2>&1); then
-    echo "pre-push check failed: bin/ or tools/ has scripts/tools not registered in the nebula Tools & Scripts catalog." >&2
+    echo "pre-push check failed: bin/, tools/, go/, or rust/ has scripts/tools/packages not registered in the nebula Tools & Scripts catalog." >&2
     echo "  Fix: cd nexus && python3 bin/sync-tools-and-scripts.py" >&2
-    echo "  (registers the missing scripts/tools as features with context docs; DB-only, nothing to commit)" >&2
+    echo "  (registers the missing scripts/tools/packages as features with context docs; DB-only, nothing to commit)" >&2
     exit 1
   else
     echo "pre-push: Tools & Scripts catalog in sync"
