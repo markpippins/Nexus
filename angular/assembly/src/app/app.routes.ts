@@ -11,7 +11,6 @@ import { HarvestsViewComponent } from './views/harvests-view/harvests-view.compo
 import { ConversationsViewComponent } from './views/conversations-view/conversations-view.component';
 import { OpenQuestionsViewComponent } from './views/open-questions-view/open-questions-view.component';
 import { ResolutionsViewComponent } from './views/resolutions-view/resolutions-view.component';
-import { IntentsViewComponent } from './views/intents-view/intents-view.component';
 import { AssessmentsViewComponent } from './views/assessments-view/assessments-view.component';
 import { ObservationsViewComponent } from './views/observations-view/observations-view.component';
 import { ReportsViewComponent } from './views/reports-view/reports-view.component';
@@ -50,8 +49,6 @@ export const routes: Routes = [
   { path: 'open-questions', component: OpenQuestionsViewComponent },
   { path: 'resolutions', component: ResolutionsViewComponent },
   { path: 'open-questions/:id', component: EntityDetailViewComponent },
-  { path: 'intents', component: IntentsViewComponent },
-  { path: 'intents/:id', component: EntityDetailViewComponent },
   { path: 'assessments', component: AssessmentsViewComponent },
   { path: 'assessments/:id', component: EntityDetailViewComponent },
   { path: 'observations', component: ObservationsViewComponent },

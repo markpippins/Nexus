@@ -245,14 +245,14 @@ export const toolDefinitions: MCPToolDefinition[] = [
   // ── Bridge: post ↔ artifact ─────────────────────────────────────
   {
     name: "assembly_link_post_artifact",
-    description: "Link a post (thread) to a domain artifact (intent_record, requirement, agenda_item, spec, implementation_plan)",
+    description: "Link a post (thread) to a domain artifact (requirement, agenda_item, spec, implementation_plan)",
     inputSchema: {
       type: "object",
       properties: {
         post_id: { type: "string", description: "Post UUID" },
         artifact_type: {
           type: "string",
-          enum: ["intent_record", "requirement", "agenda_item", "spec", "implementation_plan"],
+          enum: ["requirement", "agenda_item", "spec", "implementation_plan"],
           description: "Type of domain artifact",
         },
         artifact_id: { type: "string", description: "Artifact UUID in nebula schema" },
@@ -619,7 +619,7 @@ const handlers: Record<string, ToolHandler> = {
     if (!post_id || !artifact_type || !artifact_id) {
       return createError("INVALID_ARGUMENTS", "post_id, artifact_type, and artifact_id are required");
     }
-    const validTypes = ["intent_record", "requirement", "agenda_item", "spec", "implementation_plan"];
+    const validTypes = ["requirement", "agenda_item", "spec", "implementation_plan"];
     if (!validTypes.includes(artifact_type)) {
       return createError("VALIDATION_ERROR", `artifact_type must be one of: ${validTypes.join(", ")}`);
     }

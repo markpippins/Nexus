@@ -5,7 +5,6 @@ const ENTITY_ROUTE_MAP: Record<string, string> = {
   candidate: 'candidates',
   harvest: 'harvests',
   conversation: 'conversations',
-  intent_record: 'intents',
   assessment: 'assessments',
   observation: 'observations',
   report: 'reports',

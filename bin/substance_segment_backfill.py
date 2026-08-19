@@ -12,8 +12,7 @@ conversation_snapshots + conversation_blocks + docklang discourse_units:
   2. segment_sets       - one set per harvest (conversation) with units.
   3. segment_set_members- every unit segment member of its harvest's set.
   4. domain links       - candidate_segment_sets (via harvest_candidates),
-                          requirement_segment_sets (via requirements.candidate_id),
-                          intent_record_segment_sets (via intent_records.candidate_id).
+                          requirement_segment_sets (via requirements.candidate_id).
 
 Sentinel-aware: segments_history uses '9999-12-31 23:59:59+00';
 segment_sets / members / link tables use '9999-12-31 00:00:00+00'.
@@ -102,11 +101,6 @@ def projected_counts() -> str:
           JOIN nebula.harvest_candidates hc ON hc.id = r.candidate_id
           JOIN targets t ON t.harvest_id = hc.harvest_id
          WHERE r.valid_until > now()
-        UNION ALL
-        SELECT 'intent_links', count(*) FROM nebula.intent_records ir
-          JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
-          JOIN targets t ON t.harvest_id = hc.harvest_id
-         WHERE ir.valid_until > now()
     """
 
 
@@ -256,19 +250,6 @@ def build_backfill_sql(harvest_ids: list[str]) -> str:
           WHERE cl.requirement_id = r.id AND cl.segment_set_id = s.id
       );
 
-    INSERT INTO nebula.intent_record_segment_sets
-        (intent_record_id, segment_set_id, role, active, valid_from, valid_until)
-    SELECT ir.id, s.id, 'primary', true, now(), {SEG_FOREVER}
-    FROM nebula.intent_records ir
-    JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
-    JOIN nebula.segment_sets s ON s.metadata->>'harvest_id' = hc.harvest_id::text
-    WHERE hc.harvest_id IN ({ids})
-      AND ir.valid_until > now()
-      AND NOT EXISTS (
-          SELECT 1 FROM nebula.intent_record_segment_sets cl
-          WHERE cl.intent_record_id = ir.id AND cl.segment_set_id = s.id
-      );
-
     COMMIT;
     """
 
@@ -283,8 +264,7 @@ def coverage_report() -> None:
       (SELECT count(*) FROM nebula.segment_set_members
        WHERE valid_until > now() AND included) AS live_members,
       (SELECT count(*) FROM nebula.candidate_segment_sets) AS candidate_links,
-      (SELECT count(*) FROM nebula.requirement_segment_sets) AS requirement_links,
-      (SELECT count(*) FROM nebula.intent_record_segment_sets) AS intent_links
+      (SELECT count(*) FROM nebula.requirement_segment_sets) AS requirement_links
     """)
     log.info("Coverage after run: %s", out if rc == 0 else "?")
 

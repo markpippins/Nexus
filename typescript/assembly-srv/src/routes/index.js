@@ -11,7 +11,6 @@ import { harvestsRouter } from './harvests.js';
 import { conversationsRouter } from './conversations.js';
 
 import { openQuestionsRouter } from './open-questions.js';
-import { intentsRouter } from './intents.js';
 import { assessmentsRouter } from './assessments.js';
 import { observationsRouter } from './observations.js';
 import { agentRecordsRouter } from './agent-records.js';
@@ -40,7 +39,6 @@ routes.use('/harvests', harvestsRouter);
 routes.use('/conversations', conversationsRouter);
 
 routes.use('/open-questions', openQuestionsRouter);
-routes.use('/intents', intentsRouter);
 routes.use('/assessments', assessmentsRouter);
 routes.use('/observations', observationsRouter);
 routes.use('/agent-records', agentRecordsRouter);

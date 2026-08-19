@@ -90,49 +90,6 @@ def nebula_post(path: str, body: dict) -> dict:
 # via tackle-mcp config bundles / config/ai/resolve/:role (port 3400).
 
 
-def check_filename_dedup(filenames: list[str]) -> dict[str, str]:
-    """Pre-inference dedup check: for each filename, check if existing
-    candidates from that filename (if any) are already duplicates of
-    intent_records or implementation_plans.
-
-    Returns a dict mapping filename -> skip_reason (or absent = don't skip).
-    A filename is skipped if its existing candidates already match
-    intent_records, meaning another LLM pass would just produce more
-    duplicates.
-    """
-    if not filenames:
-        return {}
-
-    # Format filenames for SQL IN clause
-    fn_list = ",".join(f"'{fn.replace(chr(39), chr(39)+chr(39))}'" for fn in filenames)
-
-    # For each filename, find existing candidate titles and check if
-    # they match intent_records (trigram > 0.6)
-    sql = f"""
-    WITH existing AS (
-        SELECT hc.title, h.source_filename
-        FROM nebula.harvest_candidates hc
-        JOIN nebula.harvests h ON hc.harvest_id = h.id
-        WHERE h.source_filename IN ({fn_list})
-    )
-    SELECT DISTINCT e.source_filename
-    FROM existing e
-    WHERE EXISTS (
-        SELECT 1 FROM nebula.intent_records ir
-        WHERE similarity(ir.title, e.title) > 0.6
-    )
-    """
-    rc, out = psql(sql)
-    if rc != 0 or not out:
-        return {}
-
-    skip_map = {}
-    for line in out.splitlines():
-        fn = line.strip()
-        if fn:
-            skip_map[fn] = "existing candidates already match intent_records"
-    return skip_map
-
 
 def fetch_hierarchy() -> list[dict]:
     # FIXME: paginate if total > pageSize — nebula-srv caps at 100, so >100 systems would be silently truncated
@@ -338,23 +295,6 @@ def get_unfiled_harvests(limit: int = None, skip_unchanged: bool = False,
                 remaining.append(h)
         harvests = remaining
 
-    # Pre-inference dedup: skip filenames whose existing candidates already
-    # match intent_records. Another LLM pass would just produce duplicates.
-    dedup_skipped = []
-    if harvests:
-        filenames = list(set(h["filename"] for h in harvests))
-        skip_map = check_filename_dedup(filenames)
-        if skip_map:
-            remaining = []
-            for h in harvests:
-                reason = skip_map.get(h["filename"])
-                if reason:
-                    dedup_skipped.append(h["filename"])
-                    log.info("  Skip (dedup): %s — %s", h["filename"], reason)
-                else:
-                    remaining.append(h)
-            harvests = remaining
-
     log.info("Unfiled: %d / %d harvests (direct SQL exclusion)", len(harvests), total)
     if truncated_skipped:
         log.info("Skipped (truncated source): %d", len(truncated_skipped))
@@ -362,9 +302,7 @@ def get_unfiled_harvests(limit: int = None, skip_unchanged: bool = False,
         log.info("Skipped (unchanged/smaller): %d", len(skipped))
     if reharvested:
         log.info("Reharvest (larger version): %d", len(reharvested))
-    if dedup_skipped:
-        log.info("Skipped (pre-inference dedup): %d", len(dedup_skipped))
-    all_skipped = truncated_skipped + skipped + dedup_skipped
+    all_skipped = truncated_skipped + skipped
     if limit:
         harvests = harvests[:limit]
     return harvests, all_skipped

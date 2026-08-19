@@ -12,7 +12,7 @@ const FORUM_SLUG = 'issues-and-open-questions';
 /** Entity types whose IDs are UUIDs that the backend can link to OpenQuestion records. */
 const SUPPORTS_OPEN_QUESTIONS = new Set([
   'requirement', 'candidate', 'work_request', 'harvest', 'conversation',
-  'intent_record', 'assessment', 'observation', 'report', 'agent_record',
+  'assessment', 'observation', 'report', 'agent_record',
   'agent', 'specification', 'agenda', 'thread', 'open_question',
 ]);
 
