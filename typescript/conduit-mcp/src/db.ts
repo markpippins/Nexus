@@ -1166,6 +1166,10 @@ const migrations: Migration[] = [
       // Backfill event log for existing pending work requests.
       // Every existing WR with status 'pending' gets a synthetic WR_SUBMITTED event
       // so the fold produces VALIDATED state, making them eligible for the decision loop.
+      // Skip identity-less rows (wr_id NULL/'' — e.g. the resolution seed
+      // `wr-mongo-wiring`): they have no compile-unit identity, so they can't
+      // carry an event-log entry (wr_id is the FK key). Backfilling them would
+      // violate the NOT NULL constraint and brick fresh-schema bootstrap.
       await exec(`
         INSERT INTO ${PG_SCHEMA}.work_request_events (wr_id, event_type, payload, created_at)
         SELECT wr_id, 'WR_SUBMITTED',
@@ -1173,6 +1177,8 @@ const migrations: Migration[] = [
                recorded_on_dt
         FROM ${VISION_SCHEMA}.work_requests
         WHERE status = 'pending'
+          AND wr_id IS NOT NULL
+          AND wr_id <> ''
           AND wr_id NOT IN (
             SELECT wr_id FROM ${PG_SCHEMA}.work_request_events WHERE event_type = 'WR_SUBMITTED'
           )

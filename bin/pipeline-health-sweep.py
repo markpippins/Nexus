@@ -149,17 +149,24 @@ ORDER BY recorded_on_dt
 """
 
 QUERY_WR_ENTITY_KEY = """
--- Q4 P1 invariant (V093 backfill): every live vision WorkRequest must carry a
--- CCNF content identity (entity_key) — the pure-Python/Go/Rust-identical hash
--- of the canonical WR shape (system execute on workrequest:<wr_id>), derived
--- at birth by vision_bridge / vision-srv / losm-host write paths. Regression:
--- migration v37 added the column but no write path populated it (all 24 rows
--- were NULL) until V093. A row here means the write path did NOT stamp an
+-- Q4 P1 invariant (V093 backfill): every live vision WorkRequest with a
+-- compile-unit identity (non-empty wr_id) must carry a CCNF content identity
+-- (entity_key) — the pure-Python/Go/Rust-identical hash of the canonical WR
+-- shape (system execute on workrequest:<wr_id>), derived at birth by
+-- vision_bridge / vision-srv / losm-host write paths. Regression: migration
+-- v37 added the column but no write path populated it (all 24 rows were
+-- NULL) until V093. A row here means the write path did NOT stamp an
 -- entity_key (pre-dates V093, or a bypass path like the runtime kernel's
--- explicit-asset insert) — flag for backfill, never auto-fix.
+-- explicit-asset insert) — flag for backfill, never auto-fix. Identity-less
+-- rows (wr_id NULL/'') are resolution-comparator fixtures (e.g. the
+-- `wr-mongo-wiring` seed) with no compile-unit identity, exactly the class
+-- conduit's v17 event-log backfill skips — they are not WRs and cannot
+-- carry a birth identity, so they are out of scope here.
 SELECT wr_id, work_request_uuid, status, to_char(recorded_on_dt,'YYYY-MM-DD HH24:MI') AS recorded
 FROM vision.work_requests
 WHERE entity_key IS NULL
+  AND wr_id IS NOT NULL
+  AND wr_id <> ''
 ORDER BY recorded_on_dt
 """
 
