@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: nebula-srv — Nebula Knowledge-Graph API
-  version: 1.0.0b3b4dee
+  version: 1.0.82db4bc8
   description: 'Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge
     graph, and cross-references.
 
@@ -91,8 +91,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: 'AGENDAS (scoped by hierarchy via agenda_items → requirements) GET /api/agendas — list
-        ALL agendas (unscoped, when no '
+      summary: AGENDAS (scoped by hierarchy via agenda_items → requirements) GET /api/agendas — list ALL agendas (unscoped,
+        when no hierarchy selected)
   /api/agendas/{id}:
     get:
       tags:

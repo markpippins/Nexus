@@ -9,7 +9,7 @@ Role Memory Procedure Registry: procedure cards and indexes, with a PG→Redis r
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/health` | Health check |
+| GET | `/health` |  |
 | GET | `/procedure/:slug` |  |
 | GET | `/procedures/:role` |  |
 | POST | `/refresh` | Refresh (repopulate Redis from PG) |
@@ -22,6 +22,8 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
+
 
 
 

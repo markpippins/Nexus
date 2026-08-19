@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: role-memory-srv — Role Memory Procedure Registry
-  version: 1.0.0f6abd6c
+  version: 1.0.e570c1f2
   description: 'Role Memory Procedure Registry: procedure cards and indexes, with a PG→Redis refresh endpoint.
 
 
@@ -45,7 +45,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: Health check
   /procedure/{slug}:
     get:
       tags:

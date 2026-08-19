@@ -5,7 +5,7 @@
 
 Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge graph, and cross-references.
 
-**229 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**222 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -240,6 +240,8 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
+
 
 
 
