@@ -12,6 +12,13 @@
 #    produced changes, the push is BLOCKED so the refreshed docs get committed
 #    and ship with the next push.
 #
+# 3. Tools & Scripts catalog gate: if the pushed commits touch nexus/bin/
+#    (.sh/.py), verify every script is registered as a nebula feature with
+#    context documentation (bin/sync-tools-and-scripts.py --check). If any
+#    script is missing from the catalog, the push is BLOCKED so the sync is
+#    run (registers features via the nebula API — no file to commit).
+#    Skips with a warning if the nebula API is unreachable.
+#
 # RANGE-AWARE: reads the refs git feeds on stdin and only runs the slow checks
 # when the pushed commits touch the relevant paths. Otherwise it skips in
 # milliseconds. Unresolvable ranges (stale/missing refs, new branches without
@@ -46,6 +53,10 @@ WATCH_RE='^(angular/shared-react/(utils/|scripts/|package\.json)|angular/(tackle
 #   - committed specs / endpoint references / this hook
 WATCH_RE_API='^(tools/api-docs/|\.githooks/pre-push$|.*/openapi\.yaml$|.*/API\.md$|typescript/[^/]+-srv/src/|typescript/semantics-srv/scripts/|python/[^/]+-srv/src/)'
 
+# Paths that, when touched, require the Tools & Scripts catalog sync check:
+#   - any script under bin/ or tool under tools/ (add / modify / delete all affect the catalog)
+WATCH_RE_BIN='^(bin|tools)/'
+
 # ---------------------------------------------------------------------------
 # Gate 1 — inline shared-utils sync check
 # ---------------------------------------------------------------------------
@@ -59,6 +70,7 @@ fi
 
 need_check=0
 need_api=0
+need_bin=0
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -z "$local_ref" ] && continue
   # Deletions push nothing to check.
@@ -90,6 +102,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     if [ -z "$base" ]; then
       need_check=1
       need_api=1
+      need_bin=1
       break
     fi
   fi
@@ -101,6 +114,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   if ! changed="$(git diff --name-only --no-renames "$base" "$local_sha" 2>/dev/null)"; then
     need_check=1
     need_api=1
+    need_bin=1
     break
   fi
   if printf '%s\n' "$changed" | grep -qE "$WATCH_RE"; then
@@ -109,10 +123,13 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   if printf '%s\n' "$changed" | grep -qE "$WATCH_RE_API"; then
     need_api=1
   fi
+  if printf '%s\n' "$changed" | grep -qE "$WATCH_RE_BIN"; then
+    need_bin=1
+  fi
 done
 
-if [ "$need_check" -eq 0 ] && [ "$need_api" -eq 0 ]; then
-  echo "pre-push: pushed commits don't touch shared utils, inlined copies, service routes, or api docs — skipping checks"
+if [ "$need_check" -eq 0 ] && [ "$need_api" -eq 0 ] && [ "$need_bin" -eq 0 ]; then
+  echo "pre-push: pushed commits don't touch shared utils, inlined copies, service routes, api docs, or bin/ scripts — skipping checks"
   exit 0
 fi
 
@@ -144,6 +161,23 @@ if [ "$need_api" -eq 1 ]; then
     exit 1
   else
     echo "pre-push: api docs current"
+  fi
+fi
+
+# --- Gate 3: Tools & Scripts catalog sync ---------------------------------
+if [ "$need_bin" -eq 1 ]; then
+  echo "pre-push: bin/ scripts touched — checking Tools & Scripts catalog sync"
+  if ! command -v python3 >/dev/null 2>&1 || [ ! -f "$ROOT/bin/sync-tools-and-scripts.py" ]; then
+    echo "pre-push: skipping catalog gate (python3 or bin/sync-tools-and-scripts.py not available)" >&2
+  elif ! curl -sf --max-time 3 "http://localhost:3101/api/systems" >/dev/null 2>&1; then
+    echo "pre-push: skipping catalog gate (nebula API on :3101 unreachable)" >&2
+  elif ! (cd "$ROOT" && python3 bin/sync-tools-and-scripts.py --check >/dev/null 2>&1); then
+    echo "pre-push check failed: bin/ or tools/ has scripts/tools not registered in the nebula Tools & Scripts catalog." >&2
+    echo "  Fix: cd nexus && python3 bin/sync-tools-and-scripts.py" >&2
+    echo "  (registers the missing scripts/tools as features with context docs; DB-only, nothing to commit)" >&2
+    exit 1
+  else
+    echo "pre-push: Tools & Scripts catalog in sync"
   fi
 fi
 
