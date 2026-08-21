@@ -76,6 +76,14 @@
       "superseded": [],
       "projections": ["schemas/projection-manifests/knowledge-graph.sql"],
       "note": "Canonical graph type definition. The SQL projection is regenerated from it. GraphSnapshot/VectorSnapshot (knowledge-graph.jsonld, extensions/vector-snapshot.jsonld) and graph-data backups (graph/nexus-knowledge-graph.json.bak/.pre-rebuild) are GENERATED PROJECTIONS — point-in-time artifacts that never carry canonical authority."
+    },
+    {
+      "domain": "supervisor_execution",
+      "canonical": "schemas/protocol/supervisor-execution-protocol.json",
+      "kind": "protocol",
+      "superseded": [],
+      "projections": [],
+      "note": "Canonical coordination contract for leased execution. The Supervisor coordinates grants, attempts, claims, evidence, SOL evaluation, settlement requests, and recovery, but PEB/kernel owns admission and settlement, SOL/resolution owns semantic evaluation, lease infrastructure owns lease lifecycle, and projections have no authority."
     }
   ]
 }

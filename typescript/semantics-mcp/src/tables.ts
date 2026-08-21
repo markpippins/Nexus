@@ -1,5 +1,5 @@
 /**
- * tables.ts — registry of the 12 semantics.* tables (V057 design model + V060 relationship vocabulary).
+ * tables.ts — registry of the 16 semantics.* tables (V057 design model + V060 relationship vocabulary).
  * Kept in sync with semantics-srv/src/tables.ts (each package is self-contained).
  *
  * `writable` = column names accepted as p_* params by the add_/update_ procs,
@@ -221,6 +221,37 @@ export const TABLES: TableMeta[] = [
     jsonbCols: [],
     writable: ["evidence_item_id", "statement_type", "statement_id", "role", "strength", "comment", "expired_at"],
     required: ["evidence_item_id", "statement_type", "statement_id", "role"],
-    note: "Polymorphic junction — statement_type ∈ {concept_relationship, representation_relationship}. Unique on (evidence_item_id, statement_type, statement_id, role).",
+    note: "Polymorphic junction — statement_type includes concept_relationship, representation_relationship, and execution_claim. Unique on (evidence_item_id, statement_type, statement_id, role).",
+  },
+  {
+    table: "execution_claim",
+    label: "execution claim (semantics projection of a bounded SOL execution claim)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: ["subject_ref", "object_value", "verification_summary"],
+    writable: [
+      "resolution_claim_id",
+      "claim_key",
+      "subject_kind",
+      "subject_ref",
+      "predicate",
+      "object_value",
+      "policy_version_hash",
+      "lease_id",
+      "grant_id",
+      "attempt_id",
+      "declared_by",
+      "declared_at",
+      "observed_at",
+      "disposition",
+      "verification_method",
+      "verified_by",
+      "verified_at",
+      "verification_summary",
+      "expired_at",
+    ],
+    required: ["claim_key", "subject_kind", "predicate", "declared_by"],
+    note: "Projection/correlation surface for resolution.execution_claim. It does not issue leases, grant capabilities, authorize execution, or prove kernel materialization; link evidence with statement_type=execution_claim.",
   },
 ];

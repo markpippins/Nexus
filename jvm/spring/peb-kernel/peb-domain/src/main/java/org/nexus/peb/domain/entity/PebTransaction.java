@@ -74,6 +74,19 @@ public class PebTransaction {
         return id;
     }
 
+    /**
+     * Ensure the transaction has a correlation identity before an admission
+     * adapter is called. The same UUID is then persisted by JPA and supplied
+     * to resolution, so an admission receipt cannot float without a PEB
+     * transaction identity.
+     */
+    public UUID ensureId() {
+        if (id == null) {
+            id = UUID.randomUUID();
+        }
+        return id;
+    }
+
     public String getIdempotencyKey() {
         return idempotencyKey;
     }
