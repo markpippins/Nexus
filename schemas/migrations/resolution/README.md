@@ -17,7 +17,7 @@ This is the tracked copy that gets applied to the `nexus` database's
 |---|---|
 | `resolution_schema_consolidated.sql` | Full schema dump (pg_dump) — **current canonical schema state** |
 | `resolution_data_consolidated.sql` | Full data dump (pg_dump) — **current canonical seed data** |
-| `resolution_migration_v{3,4,5,6,7,11,12,13,17,18,19,20,21,22,23,23b,24b}.sql` | Incremental migrations (v3 → v24b) |
+| `resolution_migration_v{3,4,5,6,7,11,12,13,17,18,19,20,21,22,23,23b,24b,28,29,30}.sql` | Incremental migrations (v3 → v30) |
 | `resolution_evaluate_proposition_v1.sql` | Proposition evaluation function (disposition fast path) |
 | `resolution_comparator_v1.sql` | Cross-representation disagreement detection (`detect_disagreement`) |
 | `resolution_authority_resolution_v1.sql` | Authority resolution via verified statement |
@@ -51,9 +51,9 @@ Notes:
   markers are no-ops on local psql 17.10 (verified).
 - The `resolution` schema is a SOL sandbox — "zero blast radius to
   production" per its own comment. No external schema depends on it.
-- Last applied: 2026-08-19 (v20→v24b + comparator_v1 + authority_resolution_v1 +
-  scheduler_v1 + on_change_v2 + reopen_fix_v2, full swap from refreshed consolidated
-  dumps; vision.work_requests seed row for `wr-mongo-wiring` applied separately).
+- Last applied: 2026-08-20 (v28 execution claims + evidence vocabulary, v29 T24
+  graph-edge evidence bridge, v30 verified execution admission bridge, applied as
+  incremental migrations on top of v24b; consolidated dump refreshed).
 
 ## Related
 

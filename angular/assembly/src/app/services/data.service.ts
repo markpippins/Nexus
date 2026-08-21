@@ -23,7 +23,6 @@ export interface Counts {
   candidates: number;
   harvests: number;
   openQuestions: number;
-  intents: number;
   assessments: number;
   observations: number;
   agentRecords: number;

@@ -27,6 +27,10 @@ ORDER BY COALESCE(f.sort_order, 0) ASC, f.name ASC;
 COMMENT ON VIEW assembly.forum_list_v IS 'Forum listing with thread/comment counts, replaces forums.js:11 inline query';
 
 -- 2. Thread list (per-forum, parameterized via WHERE clause in JS)
+-- Aggregated in ONE pass over comments (GROUP BY + array_agg) instead of 3
+-- correlated subqueries per post — the correlated version ran each subquery
+-- once per row (2052x for transcripts), making every list request ~1.8s even
+-- when paginated. Column names/shapes are unchanged for consumers.
 CREATE OR REPLACE VIEW assembly.thread_list_v AS
 SELECT
     p.id AS post_id,
@@ -42,14 +46,22 @@ SELECT
     f.id AS forum_id,
     f.slug AS forum_slug,
     f.name AS forum_name,
-    (SELECT COUNT(*) FROM assembly.comments c WHERE c.post_id = p.id) AS reply_count,
-    (SELECT c2.created FROM assembly.comments c2 WHERE c2.post_id = p.id ORDER BY c2.created DESC LIMIT 1) AS last_reply_at,
-    (SELECT u2.alias FROM assembly.comments c3
-       JOIN assembly.users u2 ON u2.id = c3.posted_by_id
-       WHERE c3.post_id = p.id ORDER BY c3.created DESC LIMIT 1) AS last_reply_user_alias
+    COALESCE(c.reply_count, 0) AS reply_count,
+    c.last_reply_at,
+    c.last_reply_user_alias
 FROM assembly.posts p
 JOIN assembly.forums f ON f.id = p.forum_uuid AND (f.expiration_dt = 'infinity'::timestamptz OR f.expiration_dt > now())
 JOIN assembly.users u ON u.id = p.posted_by_id
+LEFT JOIN (
+    SELECT
+        cc.post_id,
+        COUNT(*) AS reply_count,
+        MAX(cc.created) AS last_reply_at,
+        (array_agg(uu.alias ORDER BY cc.created DESC))[1] AS last_reply_user_alias
+    FROM assembly.comments cc
+    JOIN assembly.users uu ON uu.id = cc.posted_by_id
+    GROUP BY cc.post_id
+) c ON c.post_id = p.id
 WHERE (p.expiration_dt = 'infinity'::timestamptz OR p.expiration_dt > now())
 ORDER BY p.created DESC;
 

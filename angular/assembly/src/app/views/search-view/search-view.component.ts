@@ -148,7 +148,6 @@ export class SearchViewComponent implements OnInit {
       harvest: 'Harvest',
       conversation: 'Conversation',
       'open-question': 'Open Question',
-      intent: 'Intent Record',
       assessment: 'Assessment',
       observation: 'Observation',
       'agent-record': 'Agent Record',

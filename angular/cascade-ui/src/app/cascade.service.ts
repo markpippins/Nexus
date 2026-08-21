@@ -32,6 +32,7 @@ export interface PipelineFunnel {
   harvests: number;
   candidates: number;
   promoted: number;
+  intent_records: number;
   plans: number;
 }
 

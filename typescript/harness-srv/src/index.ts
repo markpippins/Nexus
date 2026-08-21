@@ -36,6 +36,12 @@ const PROMPT_DIR = join(WORK_DIR, ".harness", "prompts");
 const RUNAWAY_THRESHOLD_MS = 15 * 60 * 1000; // 15 min
 const WATCHDOG_INTERVAL_MS = 60_000; // check every 60s
 
+// ── First-token failover guard ────────────────────────────────────
+// A model that never emits a text/reasoning token within this window is
+// abandoned (exit 124 + marker) so the failover ladder can roll to the next
+// model instead of waiting out the full run timeout on a hung provider.
+const FIRST_TOKEN_TIMEOUT_MS = Number(process.env.FIRST_TOKEN_TIMEOUT_MS || 120_000);
+
 interface TrackedSession {
   jobId: string;
   role: string;
@@ -64,15 +70,24 @@ interface HarnessJobEvent {
   seq: number;
   type:
     | "job.accepted" | "job.started" | "text.delta" | "thinking"
-    | "job.completed" | "job.failed" | "job.timed_out" | "job.cancelled";
+    | "job.completed" | "job.failed" | "job.timed_out" | "job.cancelled"
+    | "job.fallback";
   ts: number;
   payload: Record<string, unknown>;
+}
+
+interface AttemptRecord {
+  model: string;
+  source: "primary" | "fallback";
+  exit_code: number;
 }
 
 interface HarnessJob {
   jobId: string;
   role: string;
   model: string | null;
+  modelUsed: string | null; // model that ran the terminal (successful) attempt
+  attempts: AttemptRecord[]; // failover attempt log
   harnessId: string;
   state: HarnessJobState;
   startedAt: number;
@@ -103,6 +118,8 @@ function registerJob(opts: {
     jobId: opts.jobId,
     role: opts.role,
     model: opts.model,
+    modelUsed: null,
+    attempts: [],
     harnessId: opts.harnessId,
     state: "accepted",
     startedAt: Date.now(),
@@ -273,6 +290,8 @@ function jobEnvelope(job: HarnessJob): Record<string, unknown> {
     state: job.state,
     role: job.role,
     model: job.model,
+    model_used: job.modelUsed,
+    attempts: job.attempts,
     harness_id: job.harnessId,
     plan: job.plan,
     exit_code: job.exitCode,
@@ -572,6 +591,7 @@ app.post("/run", async (req, res) => {
     let exitCode = 0;
     let stdout = "";
     let stderr = "";
+    let modelUsed: string | null = null;
 
     if (resolveOnly) {
       // Skip execution — return resolved context only
@@ -592,24 +612,76 @@ app.post("/run", async (req, res) => {
         wind_task_id,
       });
 
-      try {
-        const result = await executeHarness({
-          harness_id: effectiveHarnessId,
-          prompt_file: promptFile,
-          work_dir: effectiveWorkDir,
-          agent: effectiveAgent,
-          role: resolved.role,
+      // ── Failover ladder (mirrors /run-direct) — primary first, then
+      // fallbacks in priority order. Each fallback carries its own opencode
+      // wire id + harness so a failed/rate-limited primary rolls to the next
+      // provider/binary instead of failing the whole workflow node.
+      const attempts: Array<{
+        model: string | undefined;
+        model_identifier: string | undefined;
+        harness_id: string;
+        source: "primary" | "fallback";
+      }> = [
+        {
           model: effectiveModel,
           model_identifier: resolved.model?.model_identifier,
-          timeout_ms,
-        });
-        stdout = result.stdout;
-        stderr = result.stderr;
-        exitCode = result.exitCode;
-      } catch (execError: any) {
-        exitCode = execError.exitCode || 1;
-        stdout = execError.stdout || "";
-        stderr = execError.stderr || execError.message;
+          harness_id: effectiveHarnessId,
+          source: "primary",
+        },
+        ...(resolved.model?.fallback_models ?? []).map((f) => ({
+          model: f.opencode_model_id,
+          model_identifier: f.model_identifier,
+          harness_id: f.harness_id,
+          source: "fallback" as const,
+        })),
+      ];
+
+      try {
+        for (let i = 0; i < attempts.length; i++) {
+          const attempt = attempts[i];
+          let attemptExit = 1;
+          let attemptStdout = "";
+          let attemptStderr = "";
+          try {
+            const result = await executeHarness({
+              harness_id: attempt.harness_id,
+              prompt_file: promptFile,
+              work_dir: effectiveWorkDir,
+              agent: effectiveAgent,
+              role: resolved.role,
+              model: attempt.model,
+              model_identifier: attempt.model_identifier,
+              timeout_ms,
+            });
+            attemptExit = result.exitCode;
+            attemptStdout = result.stdout;
+            attemptStderr = result.stderr;
+          } catch (execError: any) {
+            attemptExit = execError.exitCode || 1;
+            attemptStdout = execError.stdout || "";
+            attemptStderr = execError.stderr || execError.message;
+          }
+
+          stdout = attemptStdout;
+          // Accumulate stderr across attempts so a failed primary's real
+          // cause survives into the terminal result even when a later
+          // fallback also fails.
+          stderr = stderr
+            ? `${stderr}\n--- ${attempt.source} (${attempt.model ?? "unset"}) exit=${attemptExit} ---\n${attemptStderr}`
+            : attemptStderr;
+          exitCode = attemptExit;
+
+          if (attemptExit === 0) {
+            modelUsed = attempt.model ?? null;
+            break;
+          }
+
+          const next = attempts[i + 1] ?? null;
+          await log(
+            "warn",
+            `run job=${jobId} role=${resolved.role} ${attempt.source} model=${attempt.model ?? "(unset)"} exit=${attemptExit} — failing over to ${next ? `${next.source} ${next.model ?? "unset"}` : "none"}`
+          );
+        }
       } finally {
         activeSessions.delete(jobId);
       }
@@ -628,6 +700,7 @@ app.post("/run", async (req, res) => {
         wind_task_id,
         role: resolved.role,
         task_slug: resolved.task.task_slug,
+        model_used: modelUsed,
         exit_code: exitCode,
         duration_ms: Date.now() - startTime,
         stdout_preview: stdout.slice(0, 500),
@@ -640,7 +713,7 @@ app.post("/run", async (req, res) => {
 
     await log(
       exitCode === 0 ? "info" : "warn",
-      `run job=${jobId} role=${resolved.role} exit=${exitCode} duration_ms=${Date.now() - startTime} model=${effectiveModel ?? "(harness default)"}`
+      `run job=${jobId} role=${resolved.role} exit=${exitCode} duration_ms=${Date.now() - startTime} model=${modelUsed ?? effectiveModel ?? "(harness default)"}`
     );
 
     // 6b. Governance completion receipts — IMPLEMENTATION then
@@ -654,6 +727,7 @@ app.post("/run", async (req, res) => {
         wind_task_id,
         task_slug: resolved.task.task_slug,
         harness_id: effectiveHarnessId,
+        model_used: modelUsed,
         exit_code: exitCode,
         duration_ms: durationMs,
         stdout_preview: stdout.slice(0, 300),
@@ -694,6 +768,7 @@ app.post("/run", async (req, res) => {
       outcome: parsedOutcome, // { code, id, confidence } or null
       prompt_preview: resolved.prompt.slice(0, 300) + "...",
       harness_id: effectiveHarnessId,
+      model_used: modelUsed,
       exit_code: exitCode,
       stdout,
       stderr,
@@ -997,6 +1072,30 @@ app.post("/run-direct", async (req, res) => {
       },
     };
 
+    // ── Failover ladder — primary first, then fallbacks in priority order.
+    // resolveRoleModel sorts bundles ascending; each fallback now carries its
+    // own opencode_model_id + harness so a failed/rate-limited primary rolls
+    // to the next provider or binary instead of leaving the role dead.
+    const attempts: Array<{
+      model: string;
+      model_identifier: string;
+      harness_id: string;
+      source: "primary" | "fallback";
+    }> = [
+      {
+        model: effectiveModel,
+        model_identifier: modelConfig.model_identifier,
+        harness_id: harnessId,
+        source: "primary",
+      },
+      ...modelConfig.fallback_models.map((f) => ({
+        model: f.opencode_model_id,
+        model_identifier: f.model_identifier,
+        harness_id: f.harness_id,
+        source: "fallback" as const,
+      })),
+    ];
+
     const runJob = async (): Promise<void> => {
       setJobState(jobId, "running");
       const interruptedBeforeStart = jobs.get(jobId)?.interrupted;
@@ -1004,15 +1103,66 @@ app.post("/run-direct", async (req, res) => {
       let exitCode = 0;
       let stdout = "";
       let stderr = "";
+      let modelUsed: string | null = null;
+      const attemptLog: AttemptRecord[] = [];
+
       try {
-        const result = await executeHarness(execParams);
-        stdout = result.stdout;
-        stderr = result.stderr;
-        exitCode = result.exitCode;
-      } catch (execError: any) {
-        exitCode = execError.exitCode || 1;
-        stdout = execError.stdout || "";
-        stderr = execError.stderr || execError.message;
+        for (const attempt of attempts) {
+          // Honour an interrupt that landed between attempts.
+          if (jobs.get(jobId)?.interrupted) break;
+
+          execParams.harness_id = attempt.harness_id;
+          execParams.model = attempt.model;
+          execParams.model_identifier = attempt.model_identifier;
+
+          let attemptExit = 1;
+          let attemptStdout = "";
+          let attemptStderr = "";
+          try {
+            const result = await executeHarness(execParams);
+            attemptExit = result.exitCode;
+            attemptStdout = result.stdout;
+            attemptStderr = result.stderr;
+          } catch (execError: any) {
+            attemptExit = execError.exitCode || 1;
+            attemptStdout = execError.stdout || "";
+            attemptStderr = execError.stderr || execError.message;
+          }
+
+          attemptLog.push({
+            model: attempt.model,
+            source: attempt.source,
+            exit_code: attemptExit,
+          });
+          stdout = attemptStdout;
+          // Accumulate stderr across attempts so a failed primary's real
+          // cause (e.g. a 429 envelope) survives into the terminal envelope
+          // even when a later fallback also fails.
+          stderr = stderr
+            ? `${stderr}\n--- ${attempt.source} (${attempt.model}) exit=${attemptExit} ---\n${attemptStderr}`
+            : attemptStderr;
+          exitCode = attemptExit;
+
+          if (attemptExit === 0) {
+            modelUsed = attempt.model;
+            break;
+          }
+
+          // Don't fail over if the user interrupted mid-attempt.
+          if (jobs.get(jobId)?.interrupted) break;
+
+          const next = attempts[attemptLog.length] ?? null;
+          await log(
+            "warn",
+            `run-direct job=${jobId} role=${role} ${attempt.source} model=${attempt.model} exit=${attemptExit} — failing over to ${next ? `${next.source} ${next.model}` : "none"}`
+          );
+          pushJobEvent(jobId, "job.fallback", {
+            from: attempt.model,
+            source: attempt.source,
+            exit_code: attemptExit,
+            next: next ? { model: next.model, source: next.source } : null,
+          });
+        }
       } finally {
         activeSessions.delete(jobId);
       }
@@ -1023,6 +1173,8 @@ app.post("/run-direct", async (req, res) => {
         job.stdout = stdout;
         job.stderr = stderr;
         job.exitCode = exitCode;
+        job.modelUsed = modelUsed;
+        job.attempts = attemptLog;
       }
 
       await unlink(promptFile).catch(() => {});
@@ -1038,7 +1190,7 @@ app.post("/run-direct", async (req, res) => {
         return;
       }
       let state: HarnessJobState = exitCode === 0 ? "completed" : "failed";
-      if (exitCode === 124 || /timeout after/i.test(stderr)) state = "timed_out";
+      if (exitCode === 124 || /timeout after|no first token/i.test(stderr)) state = "timed_out";
       setJobState(jobId, state, { exitCode, stderr });
 
       // 5. Emit harness.completed/failed event
@@ -1099,6 +1251,8 @@ app.post("/run-direct", async (req, res) => {
       prompt_preview: prompt.slice(0, 300) + (prompt.length > 300 ? "..." : ""),
       harness_id: harnessId,
       model: effectiveModel || null,
+      model_used: job?.modelUsed ?? null,
+      attempts: job?.attempts ?? [],
       plan,
       events: { started: startedEventId },
     });
@@ -1460,6 +1614,9 @@ async function executeOpencode(
     let stdout = '';
     let stderr = '';
     let timedOut = false;
+    let noFirstToken = false;
+    let firstTokenSeen = false;
+    let firstTokenTimer: NodeJS.Timeout | null = null;
     // ── Stream translation (P1 item 6) ───────────────────────────
     // opencode --format json emits a JSON-lines stream; translate each
     // envelope ONCE here into typed events (text → text.delta, reasoning →
@@ -1467,8 +1624,8 @@ async function executeOpencode(
     // subscriber) never parse opencode's wire format themselves. Lines can
     // span chunks, so a partial line buffer is kept.
     let lineBuf = '';
+    const errorMsgs: string[] = [];
     const emitParsed = () => {
-      if (!onEvent) return;
       const lines = (lineBuf + '').split('\n');
       lineBuf = lines.pop() ?? ''; // last element may be incomplete
       for (const line of lines) {
@@ -1476,16 +1633,42 @@ async function executeOpencode(
         if (!trimmed.startsWith('{')) continue;
         try {
           const ev = JSON.parse(trimmed) as any;
+          if (ev?.type === 'error') {
+            // opencode surfaces provider failures (e.g. 429 rate-limit) as a
+            // `{"type":"error","error":{"name":..,"data":{"message":..,
+            // "statusCode":..}}}` envelope on stdout — NOT on stderr. Surface
+            // it so callers see the real cause instead of "no text output".
+            const err = ev.error ?? {};
+            const data = err.data ?? err;
+            const msg =
+              typeof data?.message === 'string'
+                ? data.message
+                : typeof err?.message === 'string'
+                  ? err.message
+                  : null;
+            const status = data?.statusCode ?? err?.statusCode ?? err?.status;
+            if (msg) {
+              errorMsgs.push(
+                status ? `opencode error (${status}): ${msg}` : `opencode error: ${msg}`
+              );
+            }
+          }
           if (ev?.type === 'text' || ev?.type === 'reasoning') {
-            const part = ev.part ?? {};
-            const text =
-              typeof part?.text === 'string'
-                ? part.text
-                : typeof ev.text === 'string'
-                  ? ev.text
-                  : '';
-            if (text.trim()) {
-              onEvent(ev.type, { text });
+            if (!firstTokenSeen) {
+              firstTokenSeen = true;
+              if (firstTokenTimer) clearTimeout(firstTokenTimer);
+            }
+            if (onEvent) {
+              const part = ev.part ?? {};
+              const text =
+                typeof part?.text === 'string'
+                  ? part.text
+                  : typeof ev.text === 'string'
+                    ? ev.text
+                    : '';
+              if (text.trim()) {
+                onEvent(ev.type, { text });
+              }
             }
           }
         } catch { /* non-JSON line — skip */ }
@@ -1508,11 +1691,28 @@ async function executeOpencode(
       }, 5000);
     }, timeout_ms);
 
+    // First-token guard — a model that never emits a text/reasoning token
+    // within FIRST_TOKEN_TIMEOUT_MS is abandoned (exit 124 + marker) so the
+    // failover ladder rolls to the next model instead of waiting out the full
+    // run timeout on a hung provider.
+    firstTokenTimer = setTimeout(() => {
+      if (firstTokenSeen) return;
+      noFirstToken = true;
+      child.kill('SIGTERM');
+      setTimeout(() => {
+        try { child.kill('SIGKILL'); } catch { /* already dead */ }
+      }, 5000);
+    }, Math.min(timeout_ms, FIRST_TOKEN_TIMEOUT_MS));
+
     child.on('close', (code) => {
       clearTimeout(timer);
+      if (firstTokenTimer) clearTimeout(firstTokenTimer);
       let exitCode = code ?? 1;
       let stderrOut = stderr;
-      if (timedOut) {
+      if (noFirstToken) {
+        exitCode = 124;
+        stderrOut = `opencode produced no first token within ${Math.min(timeout_ms, FIRST_TOKEN_TIMEOUT_MS)}ms — abandoning`;
+      } else if (timedOut) {
         // A signal-killed child reports code=null, which otherwise surfaces
         // as a misleading '(no stderr; exit 1)'. Mirror the ollama path's
         // exitCode 124 + message so callers know this was a timeout, and
@@ -1526,6 +1726,10 @@ async function executeOpencode(
         exitCode = 137;
         stderrOut = 'opencode killed by signal (watchdog or external kill) — partial output below';
       }
+      if (errorMsgs.length > 0) {
+        const errText = errorMsgs.join("\n");
+        stderrOut = stderrOut ? `${stderrOut}\n${errText}` : errText;
+      }
       if (exitCode === 0) {
         incrementConsumedUnits(role).catch(() => {});
       }
@@ -1534,6 +1738,7 @@ async function executeOpencode(
 
     child.on('error', (err) => {
       clearTimeout(timer);
+      if (firstTokenTimer) clearTimeout(firstTokenTimer);
       resolve({ exitCode: 1, stdout, stderr: err.message });
     });
   });

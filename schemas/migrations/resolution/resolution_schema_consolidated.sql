@@ -2,14 +2,15 @@
 -- PostgreSQL database dump
 --
 
-\restrict j9XZJZun14CRSVOqFZUz3uLW0iekAaeBqGIOWfAvfPd8NX4DF16xtTKSg7kamqX
+\restrict ucNZb8kb7jLzjYfVy6mrWQlRGKSbg3K0NGkGK1BG6uvmjlQKvEgglmD1G2vGNgQ
 
--- Dumped from database version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
--- Dumped by pg_dump version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
+-- Dumped from database version 17.10 (Debian 17.10-1.pgdg12+1)
+-- Dumped by pg_dump version 17.11 (Debian 17.11-0+deb13u1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -74,6 +75,130 @@ BEGIN
     RETURN v_admission_result;
 END;
 $$;
+
+
+--
+-- Name: admit_verified_execution_claim(uuid, uuid, uuid, text, text, text, text, text, text); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.admit_verified_execution_claim(p_peb_transaction_id uuid, p_claim_id uuid, p_evidence_id uuid, p_policy_version_hash text, p_lease_id text, p_grant_id text, p_attempt_id text, p_source_system text DEFAULT 'git-verifier'::text, p_evidence_kind text DEFAULT 'git_ref_commit'::text) RETURNS TABLE(admitted boolean, reason text, receipt_id uuid)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_claim                 resolution.execution_claim%ROWTYPE;
+    v_evidence              resolution.execution_evidence%ROWTYPE;
+    v_link                  resolution.execution_claim_evidence%ROWTYPE;
+    v_existing              resolution.execution_admission_receipt%ROWTYPE;
+    v_admitted               boolean := true;
+    v_reason                 text := 'verified Git evidence is eligible for PEB admission';
+    v_receipt_id             uuid := gen_random_uuid();
+BEGIN
+    IF p_peb_transaction_id IS NULL OR p_claim_id IS NULL OR p_evidence_id IS NULL
+       OR p_policy_version_hash IS NULL OR p_lease_id IS NULL
+       OR p_grant_id IS NULL OR p_attempt_id IS NULL THEN
+        RETURN QUERY SELECT false, 'MISSING_EXECUTION_ADMISSION_CONTEXT', NULL::uuid;
+        RETURN;
+    END IF;
+
+    -- Idempotent replay is allowed only for the exact same correlation. A
+    -- transaction id may never be reused to smuggle a different claim or
+    -- evidence into the admission ledger.
+    SELECT * INTO v_existing
+    FROM resolution.execution_admission_receipt
+    WHERE peb_transaction_id = p_peb_transaction_id;
+
+    IF FOUND THEN
+        IF v_existing.claim_id = p_claim_id
+           AND v_existing.evidence_id = p_evidence_id
+           AND v_existing.policy_version_hash = p_policy_version_hash
+           AND v_existing.lease_id = p_lease_id
+           AND v_existing.grant_id = p_grant_id
+           AND v_existing.attempt_id = p_attempt_id
+           AND v_existing.source_system = p_source_system
+           AND v_existing.evidence_kind = p_evidence_kind THEN
+            RETURN QUERY SELECT v_existing.admitted, v_existing.reason, v_existing.id;
+        END IF;
+        RETURN QUERY SELECT false, 'CONFLICTING_EXECUTION_ADMISSION_REPLAY', NULL::uuid;
+        RETURN;
+    END IF;
+
+    SELECT * INTO v_claim
+    FROM resolution.execution_claim
+    WHERE id = p_claim_id;
+
+    SELECT * INTO v_evidence
+    FROM resolution.execution_evidence
+    WHERE id = p_evidence_id;
+
+    SELECT ce.* INTO v_link
+    FROM resolution.execution_claim_evidence ce
+    WHERE ce.claim_id = p_claim_id
+      AND ce.evidence_id = p_evidence_id
+      AND ce.role = 'supports'
+      AND ce.verification_state = 'confirmed'
+      AND ce.expired_at IS NULL
+    ORDER BY ce.linked_at DESC
+    LIMIT 1;
+
+    IF NOT FOUND OR v_claim.id IS NULL OR v_evidence.id IS NULL THEN
+        v_admitted := false;
+        v_reason := 'CLAIM_EVIDENCE_LINK_NOT_CONFIRMED';
+    ELSIF v_claim.disposition IN ('Rejected', 'Disputed', 'Stale', 'Retracted') THEN
+        v_admitted := false;
+        v_reason := 'CLAIM_SEMANTIC_DISPOSITION_NOT_ADMISSIBLE';
+    ELSIF v_evidence.context_kind <> 'execution'
+       OR v_evidence.policy_version_hash IS NULL
+       OR v_evidence.lease_id IS NULL
+       OR v_evidence.grant_id IS NULL
+       OR v_evidence.attempt_id IS NULL THEN
+        v_admitted := false;
+        v_reason := 'EVIDENCE_MISSING_EXECUTION_CONTEXT';
+    ELSIF v_evidence.policy_version_hash IS DISTINCT FROM p_policy_version_hash
+       OR v_evidence.lease_id IS DISTINCT FROM p_lease_id
+       OR v_evidence.grant_id IS DISTINCT FROM p_grant_id
+       OR v_evidence.attempt_id IS DISTINCT FROM p_attempt_id
+       OR v_claim.policy_version_hash IS DISTINCT FROM p_policy_version_hash
+       OR v_claim.lease_id IS DISTINCT FROM p_lease_id
+       OR v_claim.grant_id IS DISTINCT FROM p_grant_id
+       OR v_claim.attempt_id IS DISTINCT FROM p_attempt_id THEN
+        v_admitted := false;
+        v_reason := 'EXECUTION_CONTEXT_MISMATCH';
+    ELSIF v_evidence.source_system IS DISTINCT FROM p_source_system
+       OR v_evidence.evidence_kind IS DISTINCT FROM p_evidence_kind THEN
+        v_admitted := false;
+        v_reason := 'UNEXPECTED_EVIDENCE_ADAPTER';
+    ELSIF v_evidence.verifier_independence IS DISTINCT FROM true
+       OR v_evidence.verifier_id IS NULL
+       OR v_evidence.verifier_method IS NULL
+       OR coalesce(v_evidence.payload->>'outcome', '') IS DISTINCT FROM 'verified' THEN
+        v_admitted := false;
+        v_reason := 'EVIDENCE_NOT_INDEPENDENTLY_VERIFIED';
+    END IF;
+
+    IF v_claim.id IS NOT NULL AND v_evidence.id IS NOT NULL THEN
+        INSERT INTO resolution.execution_admission_receipt (
+            id, peb_transaction_id, claim_id, evidence_id, evidence_kind,
+            source_system, policy_version_hash, lease_id, grant_id, attempt_id,
+            admitted, reason
+        ) VALUES (
+            v_receipt_id, p_peb_transaction_id, p_claim_id, p_evidence_id,
+            p_evidence_kind, p_source_system, p_policy_version_hash, p_lease_id,
+            p_grant_id, p_attempt_id, v_admitted, v_reason
+        );
+    END IF;
+
+    RETURN QUERY SELECT v_admitted, v_reason,
+        CASE WHEN v_claim.id IS NOT NULL AND v_evidence.id IS NOT NULL
+             THEN v_receipt_id ELSE NULL::uuid END;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION admit_verified_execution_claim(p_peb_transaction_id uuid, p_claim_id uuid, p_evidence_id uuid, p_policy_version_hash text, p_lease_id text, p_grant_id text, p_attempt_id text, p_source_system text, p_evidence_kind text); Type: COMMENT; Schema: resolution; Owner: -
+--
+
+COMMENT ON FUNCTION resolution.admit_verified_execution_claim(p_peb_transaction_id uuid, p_claim_id uuid, p_evidence_id uuid, p_policy_version_hash text, p_lease_id text, p_grant_id text, p_attempt_id text, p_source_system text, p_evidence_kind text) IS 'Fail-closed execution admission assessment. Only confirmed, independently verified, context-matching Git evidence may return admitted=true; PEB records the final transaction result separately.';
 
 
 --
@@ -700,6 +825,68 @@ $$;
 
 
 --
+-- Name: evaluate_proposition(uuid, text); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.evaluate_proposition(p_proposition_id uuid, p_trigger_reason text DEFAULT 'manual'::text) RETURNS TABLE(disposition text, all_passed boolean)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_subject_entity_id    uuid;
+    r                      RECORD;
+    v_result               boolean;
+    v_sql                  text;
+    v_all_passed           boolean := true;
+    v_relational_failed    boolean := false;
+    v_disposition_value_id uuid;
+    v_disposition          text;
+BEGIN
+    SELECT subject_entity_id INTO v_subject_entity_id FROM resolution.proposition WHERE id = p_proposition_id;
+
+    FOR r IN
+        SELECT pa.rule_id, rl.expression_id, rl.is_relational_check
+        FROM resolution.proposition_assertion pa
+        JOIN resolution.rule rl ON rl.id = pa.rule_id
+        WHERE pa.proposition_id = p_proposition_id
+    LOOP
+        IF r.expression_id IS NULL THEN
+            v_result := false; v_sql := NULL;
+        ELSE
+            SELECT eg.result, eg.compiled_sql INTO v_result, v_sql
+            FROM resolution.evaluate_relationship_guard(r.expression_id, v_subject_entity_id) eg;
+        END IF;
+
+        INSERT INTO resolution.assertion_evaluation (proposition_id, rule_id, result, compiled_sql, trigger_reason)
+        VALUES (p_proposition_id, r.rule_id, v_result, v_sql, p_trigger_reason);
+
+        IF NOT v_result THEN
+            v_all_passed := false;
+            IF r.is_relational_check THEN v_relational_failed := true; END IF;
+        END IF;
+    END LOOP;
+
+    v_disposition := CASE
+        WHEN v_all_passed THEN 'Asserted'
+        WHEN v_relational_failed THEN 'Disputed'
+        ELSE 'Rejected'
+    END;
+
+    SELECT cav.id INTO v_disposition_value_id
+    FROM resolution.concept_attribute_value cav
+    JOIN resolution.concept_attribute ca ON ca.id = cav.attribute_id AND ca.name = 'disposition'
+    JOIN resolution.concept c ON c.id = ca.concept_id AND c.name = 'Proposition'
+    WHERE cav.value = v_disposition;
+
+    UPDATE resolution.proposition
+    SET disposition_value_id = v_disposition_value_id, last_evaluated_at = now()
+    WHERE id = p_proposition_id;
+
+    RETURN QUERY SELECT v_disposition, v_all_passed;
+END;
+$$;
+
+
+--
 -- Name: evaluate_relationship_guard(uuid, uuid); Type: FUNCTION; Schema: resolution; Owner: -
 --
 
@@ -718,6 +905,58 @@ $$;
 
 
 --
+-- Name: execution_evidence_immutable(); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.execution_evidence_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RAISE EXCEPTION 'resolution.execution_evidence is immutable: % is not allowed', TG_OP;
+END;
+$$;
+
+
+--
+-- Name: is_stale(uuid); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.is_stale(p_proposition_id uuid) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_last_evaluated  timestamptz;
+    v_tightest_window interval;
+    v_type_default    interval;
+BEGIN
+    SELECT last_evaluated_at INTO v_last_evaluated FROM resolution.proposition WHERE id = p_proposition_id;
+    IF v_last_evaluated IS NULL THEN
+        RETURN false;
+    END IF;
+
+    SELECT min(rl.staleness_window) INTO v_tightest_window
+    FROM resolution.proposition_assertion pa
+    JOIN resolution.rule rl ON rl.id = pa.rule_id
+    WHERE pa.proposition_id = p_proposition_id AND rl.staleness_window IS NOT NULL;
+
+    IF v_tightest_window IS NULL THEN
+        SELECT st.default_staleness_window INTO v_type_default
+        FROM resolution.proposition p
+        JOIN resolution.semantic_type st ON st.id = p.semantic_type_id
+        WHERE p.id = p_proposition_id;
+        v_tightest_window := v_type_default;
+    END IF;
+
+    IF v_tightest_window IS NULL THEN
+        RETURN false;  -- no assertion override AND no semantic-type default -- never stale
+    END IF;
+
+    RETURN v_last_evaluated < now() - v_tightest_window;
+END;
+$$;
+
+
+--
 -- Name: on_change(text, uuid); Type: FUNCTION; Schema: resolution; Owner: -
 --
 
@@ -728,22 +967,19 @@ DECLARE
     r      RECORD;
     v_eval RECORD;
     v_ext  text;
+    v_reason text;
 BEGIN
-    -- Pending, Asserted, Rejected, and Stale all get a real re-evaluation
-    -- on a change event -- "something changed" is reason enough to
-    -- re-check regardless of current disposition. Retracted is left alone
-    -- (explicitly terminal); Disputed is handled separately below since
-    -- it needs the comparator-refresh logic reopen_disputed_proposition
-    -- has and plain evaluate_proposition doesn't.
     FOR r IN
-        SELECT p.id FROM resolution.proposition p
+        SELECT p.id, cav.value AS current_disposition
+        FROM resolution.proposition p
         JOIN resolution.concept_attribute_value cav ON cav.id = p.disposition_value_id
         JOIN resolution.concept c ON c.id = p.asset_concept_id
         WHERE cav.value IN ('Pending', 'Asserted', 'Rejected', 'Stale')
           AND c.name = p_concept_name AND p.subject_entity_id = p_entity_id
           AND EXISTS (SELECT 1 FROM resolution.proposition_assertion pa WHERE pa.proposition_id = p.id)
     LOOP
-        SELECT * INTO v_eval FROM resolution.evaluate_proposition(r.id);
+        v_reason := CASE WHEN r.current_disposition = 'Pending' THEN 'pending_created' ELSE 'upstream_changed' END;
+        SELECT * INTO v_eval FROM resolution.evaluate_proposition(r.id, v_reason);
         RETURN QUERY SELECT r.id, 'event_evaluate'::text, v_eval.disposition;
     END LOOP;
 
@@ -921,6 +1157,32 @@ $_$;
 
 
 --
+-- Name: run_reconciliation_sweep(integer); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.run_reconciliation_sweep(p_batch_limit integer DEFAULT 50) RETURNS TABLE(proposition_id uuid, action_taken text, resulting_disposition text)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN
+        SELECT p.id, c.name AS concept_name, p.subject_entity_id
+        FROM resolution.proposition p
+        JOIN resolution.concept_attribute_value cav ON cav.id = p.disposition_value_id
+        JOIN resolution.concept c ON c.id = p.asset_concept_id
+        WHERE cav.value IN ('Pending', 'Disputed') AND p.subject_entity_id IS NOT NULL
+        LIMIT p_batch_limit
+    LOOP
+        RETURN QUERY SELECT * FROM resolution.on_change(r.concept_name, r.subject_entity_id);
+    END LOOP;
+
+    RETURN QUERY SELECT * FROM resolution.run_staleness_sweep(p_batch_limit);
+END;
+$$;
+
+
+--
 -- Name: run_reconciliation_sweep(interval, integer); Type: FUNCTION; Schema: resolution; Owner: -
 --
 
@@ -942,6 +1204,68 @@ BEGIN
     END LOOP;
 
     RETURN QUERY SELECT * FROM resolution.run_staleness_sweep(p_stale_after, p_batch_limit);
+END;
+$$;
+
+
+--
+-- Name: run_staleness_sweep(integer); Type: FUNCTION; Schema: resolution; Owner: -
+--
+
+CREATE FUNCTION resolution.run_staleness_sweep(p_batch_limit integer DEFAULT 50) RETURNS TABLE(proposition_id uuid, action_taken text, resulting_disposition text)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    r           RECORD;
+    v_eval      RECORD;
+    v_stale_ids uuid[];
+    v_value_id  uuid;
+BEGIN
+    -- snapshot ALREADY-stale propositions, oldest-checked first, so a
+    -- proposition that's been waiting longest gets priority for reopening
+    SELECT array_agg(p.id ORDER BY p.last_evaluated_at ASC NULLS FIRST) INTO v_stale_ids
+    FROM resolution.proposition p
+    JOIN resolution.concept_attribute_value cav ON cav.id = p.disposition_value_id
+    WHERE cav.value = 'Stale';
+
+    SELECT cav.id INTO v_value_id
+    FROM resolution.concept_attribute_value cav
+    JOIN resolution.concept_attribute ca ON ca.id = cav.attribute_id AND ca.name = 'disposition'
+    JOIN resolution.concept c ON c.id = ca.concept_id AND c.name = 'Proposition'
+    WHERE cav.value = 'Stale';
+
+    -- oldest-checked-first here too: without this ORDER BY, which N rows
+    -- come back under LIMIT is whatever the planner happens to pick --
+    -- under real load that means some propositions could go unchecked
+    -- indefinitely while others get hit every cycle. Ordering by
+    -- last_evaluated_at means each call makes genuine, fair progress
+    -- rather than an arbitrary one.
+    FOR r IN
+        SELECT p.id FROM resolution.proposition p
+        JOIN resolution.concept_attribute_value cav ON cav.id = p.disposition_value_id
+        WHERE cav.value = 'Asserted' AND resolution.is_stale(p.id)
+        ORDER BY p.last_evaluated_at ASC NULLS FIRST
+        LIMIT p_batch_limit
+    LOOP
+        UPDATE resolution.proposition SET disposition_value_id = v_value_id WHERE id = r.id;
+        RETURN QUERY SELECT r.id, 'marked_stale'::text, 'Stale'::text;
+    END LOOP;
+
+    SELECT cav.id INTO v_value_id
+    FROM resolution.concept_attribute_value cav
+    JOIN resolution.concept_attribute ca ON ca.id = cav.attribute_id AND ca.name = 'disposition'
+    JOIN resolution.concept c ON c.id = ca.concept_id AND c.name = 'Proposition'
+    WHERE cav.value = 'Pending';
+
+    IF v_stale_ids IS NOT NULL THEN
+        FOR r IN SELECT unnest(v_stale_ids[1:p_batch_limit]) AS id LOOP
+            UPDATE resolution.proposition SET disposition_value_id = v_value_id WHERE id = r.id;
+            SELECT * INTO v_eval FROM resolution.evaluate_proposition(r.id, 'clock_stale_retry');
+            RETURN QUERY SELECT r.id, 'reopened_from_stale'::text, v_eval.disposition;
+        END LOOP;
+    END IF;
+
+    RETURN;
 END;
 $$;
 
@@ -1014,7 +1338,9 @@ CREATE TABLE resolution.assertion_evaluation (
     rule_id uuid NOT NULL,
     result boolean NOT NULL,
     compiled_sql text,
-    evaluated_at timestamp with time zone DEFAULT now() NOT NULL
+    evaluated_at timestamp with time zone DEFAULT now() NOT NULL,
+    trigger_reason text DEFAULT 'manual'::text,
+    CONSTRAINT assertion_evaluation_trigger_reason_check CHECK ((trigger_reason = ANY (ARRAY['pending_created'::text, 'upstream_changed'::text, 'explicit_repair'::text, 'clock_stale_retry'::text, 'manual'::text])))
 );
 
 
@@ -1235,6 +1561,144 @@ CREATE TABLE resolution.consumer_operation (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     expired_at timestamp with time zone
 );
+
+
+--
+-- Name: execution_admission_receipt; Type: TABLE; Schema: resolution; Owner: -
+--
+
+CREATE TABLE resolution.execution_admission_receipt (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    peb_transaction_id uuid NOT NULL,
+    claim_id uuid NOT NULL,
+    evidence_id uuid NOT NULL,
+    evidence_kind text NOT NULL,
+    source_system text NOT NULL,
+    policy_version_hash text NOT NULL,
+    lease_id text NOT NULL,
+    grant_id text NOT NULL,
+    attempt_id text NOT NULL,
+    admitted boolean NOT NULL,
+    reason text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE execution_admission_receipt; Type: COMMENT; Schema: resolution; Owner: -
+--
+
+COMMENT ON TABLE resolution.execution_admission_receipt IS 'Resolution-side assessment of whether independently verified execution evidence is eligible for PEB admission. It is not a PEB settlement receipt.';
+
+
+--
+-- Name: execution_claim; Type: TABLE; Schema: resolution; Owner: -
+--
+
+CREATE TABLE resolution.execution_claim (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    claim_key text NOT NULL,
+    proposition_id uuid,
+    subject_kind text NOT NULL,
+    subject_ref jsonb DEFAULT '{}'::jsonb NOT NULL,
+    predicate text NOT NULL,
+    object_value jsonb DEFAULT '{}'::jsonb NOT NULL,
+    policy_version_hash text,
+    lease_id text,
+    grant_id text,
+    attempt_id text,
+    declared_by text NOT NULL,
+    declared_at timestamp with time zone DEFAULT now() NOT NULL,
+    observed_at timestamp with time zone,
+    disposition text DEFAULT 'Proposed'::text NOT NULL,
+    verification_method text,
+    verified_by text,
+    verified_at timestamp with time zone,
+    verification_summary jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    valid_from timestamp with time zone DEFAULT now() NOT NULL,
+    valid_until timestamp with time zone DEFAULT 'infinity'::timestamp with time zone NOT NULL,
+    recorded_on_dt timestamp with time zone DEFAULT now() NOT NULL,
+    recorded_until_dt timestamp with time zone DEFAULT 'infinity'::timestamp with time zone NOT NULL,
+    CONSTRAINT execution_claim_check CHECK (((disposition <> 'Asserted'::text) OR ((verification_method IS NOT NULL) AND (verified_by IS NOT NULL) AND (verified_at IS NOT NULL)))),
+    CONSTRAINT execution_claim_disposition_check CHECK ((disposition = ANY (ARRAY['Proposed'::text, 'Pending'::text, 'Asserted'::text, 'Disputed'::text, 'Rejected'::text, 'Stale'::text, 'Retracted'::text])))
+);
+
+
+--
+-- Name: TABLE execution_claim; Type: COMMENT; Schema: resolution; Owner: -
+--
+
+COMMENT ON TABLE resolution.execution_claim IS 'SOL execution claim. Inserted claims are proposals; Asserted requires resolution evaluation plus independent evidence. PEB settlement/acceptance is a separate authoritative receipt.';
+
+
+--
+-- Name: execution_claim_evidence; Type: TABLE; Schema: resolution; Owner: -
+--
+
+CREATE TABLE resolution.execution_claim_evidence (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    claim_id uuid NOT NULL,
+    evidence_id uuid NOT NULL,
+    role text NOT NULL,
+    verification_state text DEFAULT 'candidate'::text NOT NULL,
+    strength numeric,
+    linked_by text NOT NULL,
+    linked_at timestamp with time zone DEFAULT now() NOT NULL,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    expired_at timestamp with time zone,
+    CONSTRAINT execution_claim_evidence_role_check CHECK ((role = ANY (ARRAY['supports'::text, 'contradicts'::text, 'contextualizes'::text, 'originated_from'::text, 'supersedes'::text]))),
+    CONSTRAINT execution_claim_evidence_strength_check CHECK (((strength IS NULL) OR ((strength >= (0)::numeric) AND (strength <= (1)::numeric)))),
+    CONSTRAINT execution_claim_evidence_verification_state_check CHECK ((verification_state = ANY (ARRAY['candidate'::text, 'confirmed'::text, 'contested'::text, 'superseded'::text])))
+);
+
+
+--
+-- Name: TABLE execution_claim_evidence; Type: COMMENT; Schema: resolution; Owner: -
+--
+
+COMMENT ON TABLE resolution.execution_claim_evidence IS 'Evidence is related to a claim with polarity and verification state. Active links are append-only/expire-not-delete; the link does not itself settle a PEB execution outcome.';
+
+
+--
+-- Name: execution_evidence; Type: TABLE; Schema: resolution; Owner: -
+--
+
+CREATE TABLE resolution.execution_evidence (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    evidence_key text NOT NULL,
+    evidence_kind text NOT NULL,
+    source_system text NOT NULL,
+    source_ref jsonb DEFAULT '{}'::jsonb NOT NULL,
+    source_hash text NOT NULL,
+    captured_at timestamp with time zone NOT NULL,
+    captured_by text NOT NULL,
+    context_kind text DEFAULT 'provenance'::text NOT NULL,
+    policy_version_hash text,
+    lease_id text,
+    grant_id text,
+    attempt_id text,
+    verifier_id text,
+    verifier_independence boolean,
+    verifier_method text,
+    payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    valid_from timestamp with time zone DEFAULT now() NOT NULL,
+    valid_until timestamp with time zone DEFAULT 'infinity'::timestamp with time zone NOT NULL,
+    recorded_on_dt timestamp with time zone DEFAULT now() NOT NULL,
+    recorded_until_dt timestamp with time zone DEFAULT 'infinity'::timestamp with time zone NOT NULL,
+    CONSTRAINT execution_evidence_check CHECK (((context_kind <> 'execution'::text) OR ((policy_version_hash IS NOT NULL) AND (lease_id IS NOT NULL) AND (grant_id IS NOT NULL) AND (attempt_id IS NOT NULL)))),
+    CONSTRAINT execution_evidence_context_kind_check CHECK ((context_kind = ANY (ARRAY['execution'::text, 'provenance'::text])))
+);
+
+
+--
+-- Name: TABLE execution_evidence; Type: COMMENT; Schema: resolution; Owner: -
+--
+
+COMMENT ON TABLE resolution.execution_evidence IS 'Immutable execution observation. Content identity is source_system + evidence_kind + source_hash; evidence alone never establishes claim authority.';
 
 
 --
@@ -1487,7 +1951,8 @@ CREATE TABLE resolution.proposition (
     recorded_until_dt timestamp with time zone DEFAULT 'infinity'::timestamp with time zone NOT NULL,
     last_evaluated_at timestamp with time zone,
     grounding_status_value_id uuid,
-    value boolean
+    value boolean,
+    semantic_type_id uuid
 );
 
 
@@ -1641,9 +2106,22 @@ CREATE TABLE resolution.rule (
     expired_at timestamp with time zone,
     state_transition_id uuid,
     is_relational_check boolean DEFAULT false NOT NULL,
+    staleness_window interval,
     CONSTRAINT rule_check CHECK (((((((concept_id IS NOT NULL))::integer + ((concept_relationship_id IS NOT NULL))::integer) + ((representation_id IS NOT NULL))::integer) + ((state_transition_id IS NOT NULL))::integer) = 1)),
     CONSTRAINT rule_rule_type_check CHECK ((rule_type = ANY (ARRAY['invariant'::text, 'guard'::text, 'conditional'::text, 'derivation'::text]))),
     CONSTRAINT rule_severity_check CHECK ((severity = ANY (ARRAY['hard'::text, 'soft'::text])))
+);
+
+
+--
+-- Name: semantic_type; Type: TABLE; Schema: resolution; Owner: -
+--
+
+CREATE TABLE resolution.semantic_type (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    description text,
+    default_staleness_window interval
 );
 
 
@@ -1686,6 +2164,74 @@ CREATE TABLE resolution.specification_lineage (
     derived_from_id uuid NOT NULL,
     CONSTRAINT specification_lineage_check CHECK ((specification_id <> derived_from_id))
 );
+
+
+--
+-- Name: t24_graph_edge_evidence; Type: TABLE; Schema: resolution; Owner: -
+--
+
+CREATE TABLE resolution.t24_graph_edge_evidence (
+    evidence_id uuid NOT NULL,
+    graph_edge_id uuid NOT NULL,
+    source_section text NOT NULL,
+    source_id text NOT NULL,
+    relation_type text NOT NULL,
+    target_section text,
+    target_id text NOT NULL,
+    edge_properties jsonb DEFAULT '{}'::jsonb NOT NULL,
+    source_migration_id uuid,
+    graph_resolution text DEFAULT 'unknown'::text NOT NULL,
+    unresolved_reason text,
+    graph_created_at timestamp with time zone,
+    imported_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT t24_graph_edge_evidence_check CHECK ((((graph_resolution = 'unresolved'::text) AND (unresolved_reason IS NOT NULL)) OR (graph_resolution <> 'unresolved'::text))),
+    CONSTRAINT t24_graph_edge_evidence_check1 CHECK (((graph_resolution <> 'unresolved'::text) OR (target_section IS NULL))),
+    CONSTRAINT t24_graph_edge_evidence_graph_resolution_check CHECK ((graph_resolution = ANY (ARRAY['resolved'::text, 'unresolved'::text, 'unknown'::text])))
+);
+
+
+--
+-- Name: TABLE t24_graph_edge_evidence; Type: COMMENT; Schema: resolution; Owner: -
+--
+
+COMMENT ON TABLE resolution.t24_graph_edge_evidence IS 'Lossless T24 graph-edge provenance attached to immutable SOL execution_evidence. Resolved endpoint identity is not semantic truth or execution acceptance.';
+
+
+--
+-- Name: v_t24_execution_evidence; Type: VIEW; Schema: resolution; Owner: -
+--
+
+CREATE VIEW resolution.v_t24_execution_evidence AS
+ SELECT ee.id AS evidence_id,
+    ee.evidence_key,
+    ee.evidence_kind,
+    ee.source_system,
+    ee.source_hash,
+    ee.captured_at,
+    ee.captured_by,
+    ee.context_kind,
+    ee.policy_version_hash,
+    ee.lease_id,
+    ee.grant_id,
+    ee.attempt_id,
+    ee.verifier_id,
+    ee.verifier_independence,
+    ge.graph_edge_id,
+    ge.source_section,
+    ge.source_id,
+    ge.relation_type,
+    ge.target_section,
+    ge.target_id,
+    ge.edge_properties,
+    ge.source_migration_id,
+    ge.graph_resolution,
+    ge.unresolved_reason,
+    ce.claim_id,
+    ce.role AS claim_evidence_role,
+    ce.verification_state
+   FROM ((resolution.execution_evidence ee
+     JOIN resolution.t24_graph_edge_evidence ge ON ((ge.evidence_id = ee.id)))
+     LEFT JOIN resolution.execution_claim_evidence ce ON ((ce.evidence_id = ee.id)));
 
 
 --
@@ -1903,6 +2449,38 @@ ALTER TABLE ONLY resolution.consumer_operation
 
 
 --
+-- Name: execution_admission_receipt execution_admission_receipt_pkey; Type: CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.execution_admission_receipt
+    ADD CONSTRAINT execution_admission_receipt_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: execution_claim_evidence execution_claim_evidence_pkey; Type: CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.execution_claim_evidence
+    ADD CONSTRAINT execution_claim_evidence_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: execution_claim execution_claim_pkey; Type: CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.execution_claim
+    ADD CONSTRAINT execution_claim_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: execution_evidence execution_evidence_pkey; Type: CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.execution_evidence
+    ADD CONSTRAINT execution_evidence_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: expression_operand expression_operand_pkey; Type: CONSTRAINT; Schema: resolution; Owner: -
 --
 
@@ -2111,6 +2689,22 @@ ALTER TABLE ONLY resolution.rule
 
 
 --
+-- Name: semantic_type semantic_type_name_key; Type: CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.semantic_type
+    ADD CONSTRAINT semantic_type_name_key UNIQUE (name);
+
+
+--
+-- Name: semantic_type semantic_type_pkey; Type: CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.semantic_type
+    ADD CONSTRAINT semantic_type_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: specification_lineage specification_lineage_pkey; Type: CONSTRAINT; Schema: resolution; Owner: -
 --
 
@@ -2124,6 +2718,22 @@ ALTER TABLE ONLY resolution.specification_lineage
 
 ALTER TABLE ONLY resolution.specification
     ADD CONSTRAINT specification_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: t24_graph_edge_evidence t24_graph_edge_evidence_graph_edge_id_evidence_id_key; Type: CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.t24_graph_edge_evidence
+    ADD CONSTRAINT t24_graph_edge_evidence_graph_edge_id_evidence_id_key UNIQUE (graph_edge_id, evidence_id);
+
+
+--
+-- Name: t24_graph_edge_evidence t24_graph_edge_evidence_pkey; Type: CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.t24_graph_edge_evidence
+    ADD CONSTRAINT t24_graph_edge_evidence_pkey PRIMARY KEY (evidence_id);
 
 
 --
@@ -2162,6 +2772,90 @@ CREATE INDEX idx_assertion_evaluation_proposition ON resolution.assertion_evalua
 --
 
 CREATE UNIQUE INDEX idx_canonical_asset_active_canonical_asset_id ON resolution.canonical_asset USING btree (canonical_asset_id) WHERE (expired_at IS NULL);
+
+
+--
+-- Name: idx_execution_admission_receipt_claim; Type: INDEX; Schema: resolution; Owner: -
+--
+
+CREATE INDEX idx_execution_admission_receipt_claim ON resolution.execution_admission_receipt USING btree (claim_id, evidence_id);
+
+
+--
+-- Name: idx_execution_admission_receipt_peb_tx; Type: INDEX; Schema: resolution; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_execution_admission_receipt_peb_tx ON resolution.execution_admission_receipt USING btree (peb_transaction_id);
+
+
+--
+-- Name: idx_execution_claim_active_key; Type: INDEX; Schema: resolution; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_execution_claim_active_key ON resolution.execution_claim USING btree (claim_key) WHERE ((recorded_until_dt = 'infinity'::timestamp with time zone) AND (valid_until = 'infinity'::timestamp with time zone));
+
+
+--
+-- Name: idx_execution_claim_attempt; Type: INDEX; Schema: resolution; Owner: -
+--
+
+CREATE INDEX idx_execution_claim_attempt ON resolution.execution_claim USING btree (attempt_id) WHERE (attempt_id IS NOT NULL);
+
+
+--
+-- Name: idx_execution_claim_disposition; Type: INDEX; Schema: resolution; Owner: -
+--
+
+CREATE INDEX idx_execution_claim_disposition ON resolution.execution_claim USING btree (disposition);
+
+
+--
+-- Name: idx_execution_claim_evidence_active; Type: INDEX; Schema: resolution; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_execution_claim_evidence_active ON resolution.execution_claim_evidence USING btree (claim_id, evidence_id, role) WHERE (expired_at IS NULL);
+
+
+--
+-- Name: idx_execution_claim_evidence_claim; Type: INDEX; Schema: resolution; Owner: -
+--
+
+CREATE INDEX idx_execution_claim_evidence_claim ON resolution.execution_claim_evidence USING btree (claim_id);
+
+
+--
+-- Name: idx_execution_claim_evidence_evidence; Type: INDEX; Schema: resolution; Owner: -
+--
+
+CREATE INDEX idx_execution_claim_evidence_evidence ON resolution.execution_claim_evidence USING btree (evidence_id);
+
+
+--
+-- Name: idx_execution_claim_grant; Type: INDEX; Schema: resolution; Owner: -
+--
+
+CREATE INDEX idx_execution_claim_grant ON resolution.execution_claim USING btree (grant_id) WHERE (grant_id IS NOT NULL);
+
+
+--
+-- Name: idx_execution_evidence_active_key; Type: INDEX; Schema: resolution; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_execution_evidence_active_key ON resolution.execution_evidence USING btree (evidence_key) WHERE ((recorded_until_dt = 'infinity'::timestamp with time zone) AND (valid_until = 'infinity'::timestamp with time zone));
+
+
+--
+-- Name: idx_execution_evidence_content; Type: INDEX; Schema: resolution; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_execution_evidence_content ON resolution.execution_evidence USING btree (source_system, evidence_kind, source_hash);
+
+
+--
+-- Name: idx_execution_evidence_source; Type: INDEX; Schema: resolution; Owner: -
+--
+
+CREATE INDEX idx_execution_evidence_source ON resolution.execution_evidence USING btree (source_system, evidence_kind);
 
 
 --
@@ -2228,10 +2922,38 @@ CREATE INDEX idx_resolution_work_request_plan_id ON resolution.work_request USIN
 
 
 --
+-- Name: idx_t24_graph_edge_evidence_edge; Type: INDEX; Schema: resolution; Owner: -
+--
+
+CREATE INDEX idx_t24_graph_edge_evidence_edge ON resolution.t24_graph_edge_evidence USING btree (graph_edge_id);
+
+
+--
+-- Name: idx_t24_graph_edge_evidence_endpoint; Type: INDEX; Schema: resolution; Owner: -
+--
+
+CREATE INDEX idx_t24_graph_edge_evidence_endpoint ON resolution.t24_graph_edge_evidence USING btree (source_section, source_id, target_section, target_id);
+
+
+--
+-- Name: idx_t24_graph_edge_evidence_migration; Type: INDEX; Schema: resolution; Owner: -
+--
+
+CREATE INDEX idx_t24_graph_edge_evidence_migration ON resolution.t24_graph_edge_evidence USING btree (source_migration_id) WHERE (source_migration_id IS NOT NULL);
+
+
+--
 -- Name: idx_work_request_edge_active_pair; Type: INDEX; Schema: resolution; Owner: -
 --
 
 CREATE UNIQUE INDEX idx_work_request_edge_active_pair ON resolution.work_request_edge USING btree (parent_work_request_id, child_work_request_id, edge_type) WHERE (valid_until = 'infinity'::timestamp with time zone);
+
+
+--
+-- Name: execution_evidence trg_execution_evidence_immutable; Type: TRIGGER; Schema: resolution; Owner: -
+--
+
+CREATE TRIGGER trg_execution_evidence_immutable BEFORE DELETE OR UPDATE ON resolution.execution_evidence FOR EACH ROW EXECUTE FUNCTION resolution.execution_evidence_immutable();
 
 
 --
@@ -2375,6 +3097,46 @@ ALTER TABLE ONLY resolution.concept_state_transition
 
 ALTER TABLE ONLY resolution.consumer_operation
     ADD CONSTRAINT consumer_operation_representation_id_fkey FOREIGN KEY (representation_id) REFERENCES resolution.representation(id);
+
+
+--
+-- Name: execution_admission_receipt execution_admission_receipt_claim_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.execution_admission_receipt
+    ADD CONSTRAINT execution_admission_receipt_claim_id_fkey FOREIGN KEY (claim_id) REFERENCES resolution.execution_claim(id);
+
+
+--
+-- Name: execution_admission_receipt execution_admission_receipt_evidence_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.execution_admission_receipt
+    ADD CONSTRAINT execution_admission_receipt_evidence_id_fkey FOREIGN KEY (evidence_id) REFERENCES resolution.execution_evidence(id);
+
+
+--
+-- Name: execution_claim_evidence execution_claim_evidence_claim_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.execution_claim_evidence
+    ADD CONSTRAINT execution_claim_evidence_claim_id_fkey FOREIGN KEY (claim_id) REFERENCES resolution.execution_claim(id);
+
+
+--
+-- Name: execution_claim_evidence execution_claim_evidence_evidence_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.execution_claim_evidence
+    ADD CONSTRAINT execution_claim_evidence_evidence_id_fkey FOREIGN KEY (evidence_id) REFERENCES resolution.execution_evidence(id);
+
+
+--
+-- Name: execution_claim execution_claim_proposition_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.execution_claim
+    ADD CONSTRAINT execution_claim_proposition_id_fkey FOREIGN KEY (proposition_id) REFERENCES resolution.proposition(id);
 
 
 --
@@ -2578,6 +3340,14 @@ ALTER TABLE ONLY resolution.proposition
 
 
 --
+-- Name: proposition proposition_semantic_type_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.proposition
+    ADD CONSTRAINT proposition_semantic_type_id_fkey FOREIGN KEY (semantic_type_id) REFERENCES resolution.semantic_type(id);
+
+
+--
 -- Name: representation_comparison representation_comparison_representation_relationship_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
 --
 
@@ -2754,6 +3524,14 @@ ALTER TABLE ONLY resolution.specification
 
 
 --
+-- Name: t24_graph_edge_evidence t24_graph_edge_evidence_evidence_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
+--
+
+ALTER TABLE ONLY resolution.t24_graph_edge_evidence
+    ADD CONSTRAINT t24_graph_edge_evidence_evidence_id_fkey FOREIGN KEY (evidence_id) REFERENCES resolution.execution_evidence(id);
+
+
+--
 -- Name: verified_statement verified_statement_answer_id_fkey; Type: FK CONSTRAINT; Schema: resolution; Owner: -
 --
 
@@ -2829,5 +3607,5 @@ ALTER TABLE ONLY resolution.work_request
 -- PostgreSQL database dump complete
 --
 
-\unrestrict j9XZJZun14CRSVOqFZUz3uLW0iekAaeBqGIOWfAvfPd8NX4DF16xtTKSg7kamqX
+\unrestrict ucNZb8kb7jLzjYfVy6mrWQlRGKSbg3K0NGkGK1BG6uvmjlQKvEgglmD1G2vGNgQ
 

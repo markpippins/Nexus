@@ -5,21 +5,21 @@
 # PURPOSE:
 #   Promote ready harvest candidates into the pipeline.
 #   Runs CPF computation first, then promotes candidates that meet the
-#   readiness threshold by creating intent_records.
+#   readiness threshold by marking them as 'promoted'.
 #
 #   This closes the loop:
-#     Harvest → Candidate → CPF readiness → IntentRecord → Requirements → Specs → ImplementationPlan → WorkRequest
+#     Harvest → Candidate → CPF readiness → Promoted → Requirements → ...
 #
-#   NOTE (2026-07-03): This script no longer creates conduit plans directly.
-#   candidate_promote.py now creates intent_records (lightweight pre-canonical
-#   intents). The old flow (candidate → conduit plan) caused 10 stuck-pending
-#   plans every 30 minutes — fixed structurally.
+#   NOTE (2026-08-21): V115 removed nebula.intent_records. candidate_promote.py
+#   no longer creates intent_records — it marks candidates as promoted directly.
+#   intent_requirement_promote.py reads candidates from harvest_candidates and
+#   creates requirements in the backlog.
 #
-# PREREQUISITES:
+#   PREREQUISITES:
 #   - Docker container `pgvector_db` running with the nexus database
 #   - Conduit-mcp NOT required (no longer creates conduit plans)
 #   - Python venv at nexus/python/rover/.venv
-#   - cpf_compute.py and candidate_promote.py in ROVER_DIR
+#   - cpf_compute.py in BIN_DIR and candidate_promote.py in TACKLE_DIR
 #
 # USAGE:
 #   cd ~/dev/nexus

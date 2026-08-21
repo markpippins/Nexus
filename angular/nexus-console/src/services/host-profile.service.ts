@@ -3,9 +3,11 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { RegistryServerProfile } from '../models/registry-server-profile.model.js';
 import { PagedResponse } from '../models/paged-response.model.js';
+import { TERRAIN_UNIT, TERRAIN_ENV, TERRAIN_LEGACY, SERVICE_REGISTRY_UNIT, SERVICE_REGISTRY_ENV, SERVICE_REGISTRY_LEGACY, resolveEndpoint } from './endpoint-resolver.js';
 
-const TOPOLOGY_SERVER_URL = 'http://localhost:8084';
-const PROFILES_API = `${TOPOLOGY_SERVER_URL}/api/v1/registry-server-profiles`;
+// T25 3.2 (R-A-2026-08-15-008): runtime lookup > env > legacy localhost.
+const topology = resolveEndpoint(TERRAIN_UNIT, TERRAIN_ENV, TERRAIN_LEGACY);
+const registry = resolveEndpoint(SERVICE_REGISTRY_UNIT, SERVICE_REGISTRY_ENV, SERVICE_REGISTRY_LEGACY);
 
 export type HostProfile = RegistryServerProfile;
 
@@ -18,29 +20,46 @@ export class HostProfileService {
   /** Maps frontend profile id (string) → backend numeric id (Long) */
   private backendIdMap = new Map<string, number>();
 
+  /** Terrain/topology base URL — env/legacy initially, refined by lookup. */
+  private topologyBaseUrl: string = topology.initial;
+
+  private get PROFILES_API(): string {
+    return `${this.topologyBaseUrl}/api/v1/registry-server-profiles`;
+  }
+
   readonly profiles = signal<HostProfile[]>([
     {
       id: 'default-local-host',
       name: 'Local Host',
-      registryServerUrl: 'http://localhost:8085',
+      registryServerUrl: registry.initial,
       imageUrl: '',
       description: 'Default local registry server',
       isActive: true,
     }
   ]);
 
+  /** Registry base URL used for the default profile — refined by lookup. */
+  private registryDefaultUrl: string = registry.initial;
+
   activeProfile(): HostProfile | undefined {
     return this.profiles().find(p => p.isActive) || this.profiles()[0];
   }
 
   constructor() {
-    this.loadProfiles();
+    // Load immediately with env/legacy defaults; runtime lookup refines the
+    // terrain + registry URLs when it returns (silent on failure).
+    void this.loadProfiles();
+    void Promise.all([topology.refine(), registry.refine()]).then(([t, r]) => {
+      if (t) this.topologyBaseUrl = t;
+      if (r) this.registryDefaultUrl = r;
+      void this.loadProfiles();
+    }).catch(() => { /* keep env/legacy defaults */ });
   }
 
   async loadProfiles(): Promise<void> {
     try {
       const response = await firstValueFrom(
-        this.http.get<PagedResponse<any>>(PROFILES_API)
+        this.http.get<PagedResponse<any>>(this.PROFILES_API)
       );
       const apiProfiles = response.data || [];
       if (apiProfiles.length > 0) {
@@ -89,7 +108,7 @@ export class HostProfileService {
     if (existing && backendId) {
       // Update existing profile via backend id
       const result = await firstValueFrom(
-        this.http.put<HostProfile>(`${PROFILES_API}/${backendId}`, {
+        this.http.put<HostProfile>(`${this.PROFILES_API}/${backendId}`, {
           profileId: profile.id,
           name: profile.name,
           registryServerUrl: profile.registryServerUrl,
@@ -114,7 +133,7 @@ export class HostProfileService {
       // Create new profile
       const profileId = profile.id || Date.now().toString();
       const created = await firstValueFrom(
-        this.http.post<any>(PROFILES_API, {
+        this.http.post<any>(this.PROFILES_API, {
           profileId,
           name: profile.name,
           registryServerUrl: profile.registryServerUrl || '',
@@ -143,7 +162,7 @@ export class HostProfileService {
     const backendId = this.backendIdMap.get(id);
     if (backendId) {
       try {
-        await firstValueFrom(this.http.delete(`${PROFILES_API}/${backendId}`));
+        await firstValueFrom(        this.http.delete(`${this.PROFILES_API}/${backendId}`));
       } catch (e) {
         console.error(`[HostProfileService] Failed to delete profile ${id}`, e);
         // fallback: remove from local state
@@ -159,7 +178,7 @@ export class HostProfileService {
 
   async updateProfile(id: string, profile: Partial<HostProfile>): Promise<HostProfile> {
     const backendId = this.backendIdMap.get(id);
-    const url = backendId ? `${PROFILES_API}/${backendId}` : `${PROFILES_API}/${id}`;
+    const url = backendId ? `${this.PROFILES_API}/${backendId}` : `${this.PROFILES_API}/${id}`;
     const result = await firstValueFrom(
       this.http.put<HostProfile>(url, profile)
     );

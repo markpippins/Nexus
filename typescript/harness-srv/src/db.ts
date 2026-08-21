@@ -100,6 +100,8 @@ export interface ResolvedModelConfig {
 export interface ResolvedFallbackModel {
   priority: number;
   model_identifier: string;
+  /** opencode --model value computed from model_identifier (mirrors primary) */
+  opencode_model_id: string;
   provider_type: string;
   api_key: string | null;
   endpoint_url: string | null;
@@ -266,6 +268,11 @@ export async function resolveRoleModel(role: string): Promise<ResolvedModelConfi
   const fallbacks: ResolvedFallbackModel[] = rows.slice(1).map((f: any) => ({
     priority: f.priority,
     model_identifier: f.model_identifier,
+    opencode_model_id: opencodeModelId(
+      f.provider_id ?? "",
+      f.model_identifier,
+      opencodeProviderFromConfig(f.provider_config_json)
+    ),
     provider_id: f.provider_id ?? "",
     provider_type: f.provider_type ?? "",
     api_key: f.api_key ?? null,

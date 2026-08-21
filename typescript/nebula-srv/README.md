@@ -86,17 +86,16 @@ The full REST API is documented comprehensively in **[API-SPEC.md](./API-SPEC.md
 | 17 | `/api/audit` | Audit file sync & regeneration |
 | 18 | `/api/preferences` | User preference key-value store |
 | 19–20 | `/api/harvests`, `/api/harvest-candidates` | Harvest pipeline CRUD + promotion |
-| 21 | `/api/intent-records` | Intent record management |
-| 22–23 | `/api/specifications`, `/api/agendas` | Bitemporal specs & deliberation agendas |
-| 24–25 | `/api/assessments`, `/api/observations` | Assessment & observation records |
-| 26 | `/api/roles` | Governance role definitions |
-| 27 | `/api/open-questions` | Open question management with answers & participants |
-| 28 | `/api/search` | Cross-entity full-text search & semantic vector search |
-| 29 | `/api/counts` | Aggregate row counts across 13 tables |
-| 30 | Block Segmentation | Conversation snapshot & block management (internal) |
-| 31 | `/api/cross-references` | Entity cross-reference CRUD |
-| 32 | `/api/evidence-links` | Evidence-to-knowledge-entity links |
-| 33 | `/api/agent-records` | Durable agent audit entries |
+| 21–22 | `/api/specifications`, `/api/agendas` | Bitemporal specs & deliberation agendas |
+| 23–24 | `/api/assessments`, `/api/observations` | Assessment & observation records |
+| 25 | `/api/roles` | Governance role definitions |
+| 26 | `/api/open-questions` | Open question management with answers & participants |
+| 27 | `/api/search` | Cross-entity full-text search & semantic vector search |
+| 28 | `/api/counts` | Aggregate row counts across 13 tables |
+| 29 | Block Segmentation | Conversation snapshot & block management (internal) |
+| 30 | `/api/cross-references` | Entity cross-reference CRUD |
+| 31 | `/api/evidence-links` | Evidence-to-knowledge-entity links |
+| 32 | `/api/agent-records` | Durable agent audit entries |
 | 34 | `/api/op-registry` | Operation registry (intent → opcode sequences) |
 | 35–36 | `/api/knowledge/entities`, `/api/knowledge/edges` | Knowledge graph nodes & edges |
 | 37 | `/api/projections` | DB→filesystem markdown projections |

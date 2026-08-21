@@ -3,9 +3,11 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { RegistryServerProfile } from '../models/registry-server-profile.model.js';
 import { PagedResponse } from '../models/paged-response.model.js';
+import { TERRAIN_UNIT, TERRAIN_ENV, TERRAIN_LEGACY, SERVICE_REGISTRY_UNIT, SERVICE_REGISTRY_ENV, SERVICE_REGISTRY_LEGACY, resolveEndpoint } from './endpoint-resolver.js';
 
-const TOPOLOGY_SERVER_URL = 'http://localhost:8084';
-const PROFILES_API = `${TOPOLOGY_SERVER_URL}/api/v1/registry-server-profiles`;
+// T25 3.2 (R-A-2026-08-15-008): runtime lookup > env > legacy localhost.
+const topology = resolveEndpoint(TERRAIN_UNIT, TERRAIN_ENV, TERRAIN_LEGACY);
+const registry = resolveEndpoint(SERVICE_REGISTRY_UNIT, SERVICE_REGISTRY_ENV, SERVICE_REGISTRY_LEGACY);
 
 @Injectable({
     providedIn: 'root'
@@ -16,10 +18,20 @@ export class RegistryServerProfileService {
     /** Maps frontend profile id (string) → backend numeric id (Long) */
     private backendIdMap = new Map<string, number>();
 
+    /** Terrain/topology base URL — env/legacy initially, refined by lookup. */
+    private topologyBaseUrl: string = topology.initial;
+
+    /** Registry base URL used for the default profile — refined by lookup. */
+    private registryDefaultUrl: string = registry.initial;
+
+    private get PROFILES_API(): string {
+        return `${this.topologyBaseUrl}/api/v1/registry-server-profiles`;
+    }
+
     readonly profiles = signal<RegistryServerProfile[]>([{
         id: 'default-local-host',
         name: 'Local Host',
-        registryServerUrl: 'http://localhost:8085',
+        registryServerUrl: this.registryDefaultUrl,
         imageUrl: '',
         description: 'Default local registry server',
         isActive: true // Default profile is active by default
@@ -59,13 +71,20 @@ export class RegistryServerProfileService {
     });
 
     constructor() {
-        this.loadProfiles();
+        // Load profiles immediately with env/legacy defaults, then let the
+        // runtime lookup refine terrain + registry URLs when it returns.
+        void this.loadProfiles();
+        void Promise.all([topology.refine(), registry.refine()]).then(([t, r]) => {
+            if (t) this.topologyBaseUrl = t;
+            if (r) this.registryDefaultUrl = r;
+            void this.loadProfiles();
+        }).catch(() => { /* keep env/legacy defaults */ });
     }
 
     async loadProfiles(): Promise<void> {
         try {
             const response = await firstValueFrom(
-                this.http.get<PagedResponse<any>>(PROFILES_API)
+                this.http.get<PagedResponse<any>>(this.PROFILES_API)
             );
             const apiProfiles = response.data || [];
             if (apiProfiles.length > 0) {
@@ -114,7 +133,7 @@ export class RegistryServerProfileService {
             if (backendId) {
                 try {
                     await firstValueFrom(
-                        this.http.put(`${PROFILES_API}/${backendId}`, {
+                        this.http.put(`${this.PROFILES_API}/${backendId}`, {
                             profileId: profile.id,
                             name: profile.name,
                             registryServerUrl: profile.registryServerUrl,
@@ -141,7 +160,7 @@ export class RegistryServerProfileService {
             // Update existing profile
             try {
                 await firstValueFrom(
-                    this.http.put(`${PROFILES_API}/${backendId}`, {
+                    this.http.put(`${this.PROFILES_API}/${backendId}`, {
                         profileId: profile.id,
                         name: profile.name,
                         registryServerUrl: profile.registryServerUrl,
@@ -164,7 +183,7 @@ export class RegistryServerProfileService {
             }
             try {
                 const created = await firstValueFrom(
-                    this.http.post<any>(PROFILES_API, {
+                    this.http.post<any>(this.PROFILES_API, {
                         profileId: profile.id,
                         name: profile.name,
                         registryServerUrl: profile.registryServerUrl,
@@ -191,7 +210,7 @@ export class RegistryServerProfileService {
         if (backendId) {
             try {
                 await firstValueFrom(
-                    this.http.delete(`${PROFILES_API}/${backendId}`)
+                    this.http.delete(`${this.PROFILES_API}/${backendId}`)
                 );
             } catch (e) {
                 console.error(`[RegistryServerProfileService] Failed to delete profile ${profileId}`, e);

@@ -288,6 +288,20 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   /** When true, the terminal fills the entire viewport (fixed overlay). */
   isTerminalMaximized = signal(false);
 
+  /**
+   * Dock height for the messagebox above the viewport bottom (px). Clears the
+   * console pane when it is open so the messagebox docks above the console
+   * panel instead of overlapping it (and its resize handles stay clear of the
+   * console resizer). Bottom bar 30px + console resizer 6px + console pane
+   * height; when collapsed the console strip is h-6 (24px).
+   */
+  messageBoxDockOffset = computed(() => {
+    const bottomBar = 30;
+    if (this.isTerminalMaximized()) return bottomBar;
+    if (this.isConsoleCollapsed()) return bottomBar + 24; // h-6 collapsed console strip
+    return bottomBar + 6 + this.consolePaneHeight(); // resizer (h-1.5) + console pane
+  });
+
   toggleMaximize(): void {
     this.isTerminalMaximized.update(v => !v);
   }

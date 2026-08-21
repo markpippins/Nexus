@@ -22,20 +22,21 @@ type ResizeEdge = 'n' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
       [class.dragging]="dragging"
       [class.resizing]="resizing"
       [style.left.px]="box.left"
+      [style.bottom.px]="bottomOffset()"
       [style.width.px]="box.minimized ? 280 : box.width"
       [style.height.px]="box.minimized ? null : box.height"
       [style.zIndex]="zIndex"
       (mousedown)="onFocus()"
     >
       @if (!box.minimized) {
-        <div class="mbox-resize mbox-resize-n" (mousedown)="onResizeStart($event, 'n')"></div>
-        <div class="mbox-resize mbox-resize-ne" (mousedown)="onResizeStart($event, 'ne')"></div>
-        <div class="mbox-resize mbox-resize-nw" (mousedown)="onResizeStart($event, 'nw')"></div>
-        <div class="mbox-resize mbox-resize-se" (mousedown)="onResizeStart($event, 'se')"></div>
-        <div class="mbox-resize mbox-resize-sw" (mousedown)="onResizeStart($event, 'sw')"></div>
+        <div class="mbox-resize mbox-resize-n" (pointerdown)="onResizeStart($event, 'n')"></div>
+        <div class="mbox-resize mbox-resize-ne" (pointerdown)="onResizeStart($event, 'ne')"></div>
+        <div class="mbox-resize mbox-resize-nw" (pointerdown)="onResizeStart($event, 'nw')"></div>
+        <div class="mbox-resize mbox-resize-se" (pointerdown)="onResizeStart($event, 'se')"></div>
+        <div class="mbox-resize mbox-resize-sw" (pointerdown)="onResizeStart($event, 'sw')"></div>
       }
 
-      <div class="mbox-header" (mousedown)="onHeaderMouseDown($event)">
+      <div class="mbox-header" (pointerdown)="onHeaderPointerDown($event)">
         <span class="mbox-title">{{ box.title }}</span>
         <div class="mbox-controls">
           <button
@@ -124,7 +125,7 @@ type ResizeEdge = 'n' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
     </div>
   `,
   styles: [
-    `.message-box{position:fixed;bottom:30px;display:flex;flex-direction:column;background:rgb(var(--color-surface));border:1px solid rgb(var(--color-border-base));border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -2px 24px rgba(0,0,0,.25);overflow:hidden;z-index:900}`,
+    `.message-box{position:fixed;display:flex;flex-direction:column;background:rgb(var(--color-surface));border:1px solid rgb(var(--color-border-base));border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -2px 24px rgba(0,0,0,.25);overflow:hidden;z-index:900}`,
     `.message-box.minimized{height:auto!important;min-height:0}`,
     `.message-box.active{box-shadow:0 -4px 28px rgba(0,0,0,.35),0 0 0 1px rgb(var(--color-accent-ring))}`,
     `.mbox-header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgb(var(--color-surface-muted));border-bottom:1px solid rgb(var(--color-border-muted));cursor:grab;user-select:none;flex-shrink:0}`,
@@ -187,51 +188,81 @@ export class MessageBoxComponent {
   slashFiltered: SlashCommand[] = [];
   slashSelectedIndex = 0;
 
-  private dragCleanup?: () => void;
-  private resizeCleanup?: () => void;
-
   constructor(private mbox: MessageBoxService) {}
 
   get zIndex(): number {
     return 900 + (this.active ? 100 : 0);
   }
 
+  get bottomOffset(): () => number {
+    return this.mbox.bottomOffset;
+  }
+
   onFocus(): void {
     this.mbox.focus(this.box.id);
   }
 
-  onHeaderMouseDown(event: MouseEvent): void {
+  /**
+   * Drag the box horizontally by its header. Uses Pointer Events with
+   * setPointerCapture so pointerup is guaranteed even when the pointer leaves
+   * the window or crosses one of the app's many iframes — the leaked
+   * document-level listeners caused the "chases mouse" behavior.
+   */
+  onHeaderPointerDown(event: PointerEvent): void {
+    if (event.button !== 0) return;
     if ((event.target as HTMLElement).closest('.mbox-btn')) return;
 
     event.preventDefault();
     this.onFocus();
     this.dragging = true;
 
+    const header = event.currentTarget as HTMLElement;
+    try {
+      header.setPointerCapture(event.pointerId);
+    } catch {
+      // Pointer already released — nothing to capture.
+    }
+
     const startX = event.clientX;
     const startLeft = this.box.left;
 
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
+      if (!this.dragging) return;
       const left = startLeft + (e.clientX - startX);
       this.mbox.updatePosition(this.box.id, left);
     };
 
-    const onUp = () => {
+    const onUp = (e: PointerEvent) => {
       this.dragging = false;
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      this.dragCleanup = undefined;
+      header.removeEventListener('pointermove', onMove);
+      header.removeEventListener('pointerup', onUp);
+      header.removeEventListener('pointercancel', onUp);
+      try {
+        header.releasePointerCapture(e.pointerId);
+      } catch {
+        // Already released.
+      }
     };
 
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-    this.dragCleanup = onUp;
+    header.addEventListener('pointermove', onMove);
+    header.addEventListener('pointerup', onUp);
+    header.addEventListener('pointercancel', onUp);
   }
 
-  onResizeStart(event: MouseEvent, edge: ResizeEdge): void {
+  /** Resize the box from a handle edge. Same pointer-capture approach as drag. */
+  onResizeStart(event: PointerEvent, edge: ResizeEdge): void {
+    if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
     this.onFocus();
     this.resizing = true;
+
+    const handle = event.currentTarget as HTMLElement;
+    try {
+      handle.setPointerCapture(event.pointerId);
+    } catch {
+      // Pointer already released — nothing to capture.
+    }
 
     const startX = event.clientX;
     const startY = event.clientY;
@@ -239,7 +270,8 @@ export class MessageBoxComponent {
     const startWidth = this.box.width;
     const startHeight = this.box.height;
 
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
+      if (!this.resizing) return;
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
 
@@ -257,16 +289,21 @@ export class MessageBoxComponent {
       this.mbox.updateSize(this.box.id, left, width, height);
     };
 
-    const onUp = () => {
+    const onUp = (e: PointerEvent) => {
       this.resizing = false;
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      this.resizeCleanup = undefined;
+      handle.removeEventListener('pointermove', onMove);
+      handle.removeEventListener('pointerup', onUp);
+      handle.removeEventListener('pointercancel', onUp);
+      try {
+        handle.releasePointerCapture(e.pointerId);
+      } catch {
+        // Already released.
+      }
     };
 
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-    this.resizeCleanup = onUp;
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp);
+    handle.addEventListener('pointercancel', onUp);
   }
 
   toggleMinimize(event: MouseEvent): void {

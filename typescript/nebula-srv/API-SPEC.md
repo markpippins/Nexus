@@ -2539,7 +2539,7 @@ Artifact provenance (`nebula.artifact_provenance`) traces "which exact source ar
 **Purpose:** List provenance records with optional filters and pagination.
 
 **Query Parameters:** (all optional)
-- `subject_type` — filter by subject entity type (e.g. `harvest_candidate`, `intent_record`)
+- `subject_type` — filter by subject entity type (e.g. `harvest_candidate`, `requirement`)
 - `subject_id` — filter by subject entity UUID
 - `source_type` — filter by source entity type (e.g. `harvest`, `requirement`)
 - `source_id` — filter by source entity UUID

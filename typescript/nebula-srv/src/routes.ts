@@ -2621,7 +2621,13 @@ export function createRoutes(pool: Pool): Router {
       const systemId = req.query.systemId as string | undefined;
       const subsystemId = req.query.subsystemId as string | undefined;
       const featureId = req.query.featureId as string | undefined;
-      const sort = (req.query.sort as string) || 'created_at';
+      // Sort direction: a trailing `_asc` suffix selects ascending order
+      // (the nebula-ui harvests view has offered 'created_at_asc'/'Oldest'
+      // since fc07c18); everything else defaults to DESC like before.
+      const rawSort = (req.query.sort as string) || 'created_at';
+      const sortAsc = rawSort.endsWith('_asc');
+      const sort = sortAsc ? rawSort.slice(0, -'_asc'.length) : rawSort;
+      const sortDir = sortAsc ? 'ASC' : 'DESC';
       const { offset, limit, page, pageSize } = parsePagination(req.query);
 
       const validSorts = ['candidate_count', 'code_blocks', 'turns', 'block_density', 'collaboration', 'created_at', 'tag_frequency', 'keyword_hits'];
@@ -2722,7 +2728,7 @@ export function createRoutes(pool: Pool): Router {
                  h.docklang
           FROM nebula.harvests h
           ${where}
-          ORDER BY ${sortExpr[sort]} DESC NULLS LAST
+          ORDER BY ${sortExpr[sort]} ${sortDir} NULLS LAST
           LIMIT $${pi} OFFSET $${pi + 1}
         ) s`;
 

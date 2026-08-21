@@ -613,6 +613,45 @@ def _extract_opencode_trace(stdout: str) -> str:
     return "\n\n".join(parts)
 
 
+def _extract_opencode_error(stdout: str) -> str:
+    """Extract a provider/API error message from an opencode `--format json`
+    event stream.
+
+    opencode reports provider failures (e.g. a 429 rate-limit) as a
+    `{"type":"error","error":{"name":..,"data":{"message":..,
+    "statusCode":..}}}` envelope on stdout — not stderr — so the raw stream
+    is the only place the real cause lives. This pulls the message + status
+    out so a failed turn surfaces "Rate limit exceeded …" instead of
+    "(agent produced no text output this turn)".
+    """
+    if not stdout:
+        return ""
+    msgs: list[str] = []
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if ev.get("type") != "error":
+            continue
+        err = ev.get("error") or {}
+        if not isinstance(err, dict):
+            continue
+        data = err.get("data")
+        data = data if isinstance(data, dict) else err
+        msg = data.get("message")
+        if not isinstance(msg, str):
+            msg = err.get("message")
+        if not isinstance(msg, str) or not msg.strip():
+            continue
+        status = data.get("statusCode") or err.get("statusCode") or err.get("status")
+        msgs.append(f"opencode error ({status}): {msg}" if status else f"opencode error: {msg}")
+    return "\n".join(msgs)
+
+
 def _compose_failure_detail(
     stderr: str, stdout: str, exit_code: int, job_id: str | None = None,
 ) -> str:
@@ -678,6 +717,14 @@ def _invoke_agent_harness(
     def _result(data: dict[str, Any]) -> dict[str, Any]:
         raw = data.get("stdout", "") or ""
         plan = data.get("plan") or {}
+        stderr = data.get("stderr", "") or ""
+        # harness-srv now surfaces opencode error envelopes into stderr, but
+        # keep a fallback here for stale/older harness-srv builds: extract the
+        # error message from the raw stream so the real cause (e.g. a 429
+        # rate-limit) is never hidden behind "no text output".
+        opencode_err = _extract_opencode_error(raw)
+        if opencode_err and opencode_err not in stderr:
+            stderr = f"{opencode_err}\n{stderr}".strip()
         return {
             "exit_code": data.get("exit_code", 0),
             # opencode --format json emits a JSON-lines event stream;
@@ -687,7 +734,7 @@ def _invoke_agent_harness(
             # Keep the reasoning trace ("agent thinking") for the UI —
             # extracted from the RAW stream, not the reduced stdout.
             "trace": _extract_opencode_trace(raw),
-            "stderr": data.get("stderr", ""),
+            "stderr": stderr,
             "job_id": data.get("job_id"),
             # P1 item 7 — the Tackle-resolved versioned execution plan.
             "plan_version": plan.get("plan_version"),

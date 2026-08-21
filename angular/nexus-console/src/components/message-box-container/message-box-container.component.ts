@@ -1,4 +1,4 @@
-import { Component, computed } from '@angular/core';
+import { Component, computed, input, effect } from '@angular/core';
 import { MessageBoxService } from '../../services/message-box.service';
 import { MessageBoxComponent } from '../message-box/message-box.component';
 
@@ -25,5 +25,14 @@ export class MessageBoxContainerComponent {
   readonly instances = computed(() => this.mbox.instances());
   readonly activeId = computed(() => this.mbox.activeId());
 
-  constructor(private mbox: MessageBoxService) {}
+  /**
+   * Dock height above the viewport bottom (px). The app passes
+   * bottom-bar + console-resizer + console-pane height when the console is
+   * open so the messagebox docks above the console panel instead of on top of it.
+   */
+  readonly consoleOffset = input(30);
+
+  constructor(private mbox: MessageBoxService) {
+    effect(() => this.mbox.setBottomOffset(this.consoleOffset()));
+  }
 }

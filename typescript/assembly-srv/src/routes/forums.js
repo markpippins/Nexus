@@ -4,6 +4,22 @@ import { BadRequestError, NotFoundError } from '../errors.js';
 
 export const forumsRouter = Router();
 
+// ── Thread list cache (in-memory TTL) ───────────────────────────────
+// Transcripts-style forums (2000+ threads with full bodies) are expensive
+// to re-serialize on every request. Cache the mapped list per slug+params
+// for a short TTL; any write to a thread/comment invalidates the whole
+// cache (write volume is low, so a coarse clear is simplest and safe).
+const threadListCache = new Map();
+const THREAD_LIST_CACHE_TTL_MS = 60_000;
+
+function cacheKey(slug, includeBody, bodyWindow, paginate, page, pageSize) {
+  return `${slug}|body:${includeBody ? 1 : 0}|win:${bodyWindow}|page:${paginate ? `${page}:${pageSize}` : 'all'}`;
+}
+
+function invalidateThreadListCache() {
+  threadListCache.clear();
+}
+
 // ── Forum CRUD ──────────────────────────────────────────────────────
 
 forumsRouter.get('/', async (_req, res, next) => {
@@ -20,23 +36,99 @@ forumsRouter.get('/', async (_req, res, next) => {
       postCount: parseInt(row.comment_count, 10) + parseInt(row.thread_count, 10),
     }));
 
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     res.json(forums);
   } catch (err) {
     next(err);
   }
 });
 
+// GET /:slug/threads — thread list with three progressive optimizations:
+//   1. body is omitted unless ?includeBody=true — or ?bodyWindow=N, which
+//      returns bodies ONLY for the N most-recent threads of the forum (by
+//      post_created, on any page) so large forums like transcripts get recent
+//      previews without shipping every body (~99% of the payload; the detail
+//      endpoint serves the rest on demand)
+//   2. pagination via ?page=&pageSize= (or ?perPage=) — when ANY pagination
+//      param is present the response is an envelope
+//      { items, total, page, pageSize }; without them it stays a flat array
+//      for legacy consumers (Angular assembly app, duality-ui, scripts)
+//   3. responses are cached in-memory for 60s and sent with a short
+//      Cache-Control (public, max-age=60, stale-while-revalidate=300) so
+//      browsers/ETags can revalidate instead of re-downloading
 forumsRouter.get('/:slug/threads', async (req, res, next) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM assembly.thread_list_v WHERE forum_slug = $1',
-      [req.params.slug]
-    );
+    const includeBody = req.query.includeBody === 'true';
+    // bodyWindow=N: include bodies ONLY for the N most-recent threads of the
+    // forum (by post_created) on any page — large forums like transcripts get
+    // recent previews without shipping every body. Independent of includeBody
+    // (which returns all bodies when true). Clamped to [0, 100].
+    const bodyWindowParam = parseInt(req.query.bodyWindow, 10);
+    const bodyWindow = Number.isFinite(bodyWindowParam) && bodyWindowParam > 0
+      ? Math.min(bodyWindowParam, 100) : 0;
+    const pageParam = parseInt(req.query.page, 10);
+    const sizeParam = parseInt(req.query.pageSize ?? req.query.perPage, 10);
+    const paginate = Number.isFinite(pageParam) || Number.isFinite(sizeParam);
+    const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
+    const pageSize = Number.isFinite(sizeParam) && sizeParam > 0 ? Math.min(sizeParam, 500) : 100;
+
+    const key = cacheKey(req.params.slug, includeBody, bodyWindow, paginate, page, pageSize);
+    const cached = threadListCache.get(key);
+    if (cached && Date.now() - cached.at < THREAD_LIST_CACHE_TTL_MS) {
+      res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+      return res.json(cached.body);
+    }
+
+    // Explicit column list (not SELECT *) so `text` (body) can be omitted.
+    const baseCols = `
+      post_id, title, post_created, role, model,
+      user_id, alias, avatar_url, forum_id, forum_slug, forum_name,
+      reply_count, last_reply_at, last_reply_user_alias`;
+    const cols = includeBody ? `${baseCols}, text` : baseCols;
+
+    let result;
+    let total = null;
+    if (paginate) {
+      const [listResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT ${cols} FROM assembly.thread_list_v WHERE forum_slug = $1
+           ORDER BY post_created DESC LIMIT $2 OFFSET $3`,
+          [req.params.slug, pageSize, (page - 1) * pageSize]
+        ),
+        pool.query(
+          'SELECT count(*)::int AS total FROM assembly.thread_list_v WHERE forum_slug = $1',
+          [req.params.slug]
+        ),
+      ]);
+      result = listResult;
+      total = countResult.rows[0]?.total ?? 0;
+    } else {
+      result = await pool.query(
+        `SELECT ${cols} FROM assembly.thread_list_v WHERE forum_slug = $1
+         ORDER BY post_created DESC`,
+        [req.params.slug]
+      );
+    }
+
+    // bodyWindow>0: fetch bodies for the N most-recent threads of the forum
+    // (independent of pagination) and merge by post_id. Keeps the main query
+    // body-less for large forums while still returning recent previews.
+    let recentBodies = null;
+    if (bodyWindow > 0) {
+      const recent = await pool.query(
+        `SELECT post_id, text FROM assembly.thread_list_v
+         WHERE forum_slug = $1 ORDER BY post_created DESC LIMIT $2`,
+        [req.params.slug, bodyWindow]
+      );
+      recentBodies = new Map(recent.rows.map(r => [r.post_id, r.text || '']));
+    }
 
     const threads = result.rows.map(row => ({
       id: row.post_id,
       title: row.title || 'Untitled',
-      body: row.text || '',
+      body: includeBody
+        ? (row.text || '')
+        : (recentBodies?.get(row.post_id) ?? undefined),
       role: row.role || null,
       model: row.model || null,
       createdAt: new Date(row.post_created).toISOString(),
@@ -56,7 +148,10 @@ forumsRouter.get('/:slug/threads', async (req, res, next) => {
       },
     }));
 
-    res.json(threads);
+    const body = paginate ? { items: threads, total, page, pageSize } : threads;
+    threadListCache.set(key, { at: Date.now(), body });
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    res.json(body);
   } catch (err) {
     next(err);
   }
@@ -78,6 +173,7 @@ forumsRouter.post('/:slug/threads', async (req, res, next) => {
       'SELECT * FROM assembly.create_thread($1, $2, $3, $4, $5, $6, $7)',
       [req.params.slug, userId, String(title).slice(0, 500), String(body), source_url || null, role || null, model || null]
     );
+    invalidateThreadListCache();
 
     res.status(201).json({ id: result.rows[0].id, title: result.rows[0].title, role: result.rows[0].role, model: result.rows[0].model });
   } catch (err) {
@@ -105,6 +201,7 @@ forumsRouter.post('/by-id/:forumId/threads', async (req, res, next) => {
        RETURNING id, title, role, model`,
       [req.params.forumId, postedById, String(title).slice(0, 500), String(body), source_url || null, role || null, model || null]
     );
+    invalidateThreadListCache();
     res.status(201).json(result.rows[0]);
   } catch (err) { next(err); }
 });
@@ -122,6 +219,7 @@ forumsRouter.get('/by-id/:forumId/threads', async (req, res, next) => {
        ORDER BY p.created DESC`,
       [req.params.forumId]
     );
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     res.json(result.rows);
   } catch (err) { next(err); }
 });
@@ -233,6 +331,7 @@ forumsRouter.post('/threads/:threadId/comments', async (req, res, next) => {
       'SELECT * FROM assembly.add_comment($1, $2, $3, $4, $5, $6)',
       [req.params.threadId, postedById, String(body), parentId || null, role || null, model || null]
     );
+    invalidateThreadListCache();
 
     res.status(201).json({ id: result.rows[0].id, role: result.rows[0].role, model: result.rows[0].model });
   } catch (err) {
@@ -356,6 +455,7 @@ forumsRouter.post('/move-thread', async (req, res, next) => {
       [req.params.threadId]
     );
     if (result.rowCount === 0) throw new NotFoundError('Thread not found');
+    invalidateThreadListCache();
     res.json({ deleted: true, expired: true, thread_id: req.params.threadId });
   } catch (err) {
     if (err.code === 'P0002') return next(new NotFoundError('Thread not found'));
@@ -407,6 +507,7 @@ forumsRouter.get('/comments/:id', async (req, res, next) => {
       [req.params.id]
     );
     if (result.rowCount === 0) throw new NotFoundError('Comment not found');
+    invalidateThreadListCache();
     res.json({ deleted: true, expired: true, comment_id: req.params.id });
   } catch (err) {
     if (err.code === 'P0002') return next(new NotFoundError('Comment not found'));

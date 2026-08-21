@@ -47,6 +47,18 @@ export class MessageBoxService {
   readonly instances = signal<MessageBoxInstance[]>([]);
   readonly activeId = signal<string | null>(null);
 
+  /**
+   * Dock height above the viewport bottom (px). Defaults to the bottom bar
+   * (30px). When the console pane is open the app raises this to clear the
+   * console resizer + pane so the messagebox never overlaps console UI.
+   */
+  readonly bottomOffset = signal<number>(30);
+
+  /** Update the dock offset (called by the container when console layout changes). */
+  setBottomOffset(px: number): void {
+    this.bottomOffset.set(px);
+  }
+
   private idCounter = 0;
   private cachedChatUrl: string | null = null;
 
@@ -237,6 +249,16 @@ export class MessageBoxService {
     return Math.max(MARGIN, Math.min(left, maxLeft));
   }
 
+  /**
+   * Height available to the box above the dock offset, minus margin. The box is
+   * bottom-docked, so its top edge = viewport - bottomOffset - height; keep the
+   * top edge at least MARGIN below the viewport top.
+   */
+  private maxBoxHeight(): number {
+    if (typeof window === "undefined") return 800;
+    return Math.max(MIN_HEIGHT, window.innerHeight - this.bottomOffset() - MARGIN);
+  }
+
   private defaultLeft(width: number): number {
     if (typeof window === "undefined") return MARGIN;
     const boxes = this.instances();
@@ -254,7 +276,7 @@ export class MessageBoxService {
   }
 
   private clampHeight(height: number): number {
-    const max = typeof window !== "undefined" ? window.innerHeight * 0.8 : 800;
+    const max = this.maxBoxHeight();
     return Math.max(MIN_HEIGHT, Math.min(height, max));
   }
 

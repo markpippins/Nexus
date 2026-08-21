@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { HostProfileService } from './host-profile.service.js';
+import { SERVICE_REGISTRY_ENV, SERVICE_REGISTRY_LEGACY, readEnv } from './endpoint-resolver.js';
 
 export interface SeedResult {
   seeded: boolean;
@@ -23,7 +24,8 @@ export class DataService {
   private getBaseUrl(): string {
     const profile = this.hostProfileService.activeProfile();
     if (!profile) {
-      return 'http://localhost:8085';
+      // T25 3.2 (R-A-2026-08-15-008): runtime lookup > env > legacy localhost.
+      return readEnv(SERVICE_REGISTRY_ENV) || SERVICE_REGISTRY_LEGACY;
     }
 
     let url = profile.registryServerUrl;

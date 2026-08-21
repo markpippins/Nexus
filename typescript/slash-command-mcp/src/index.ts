@@ -77,6 +77,8 @@ app.get("/health", (_req, res) => {
 // ── Start ──────────────────────────────────────────────────────────
 async function main() {
   console.log("[slash-command-mcp] Starting (reads mcp.command_registry, executes via tools-aggregator)...");
+  console.log(`[slash-command-mcp] Attempting to listen on port ${PORT}`);
+  
   const server = app.listen(PORT, () => {
     console.log(`[slash-command-mcp] Server running on http://localhost:${PORT}`);
     console.log(`[slash-command-mcp] MCP endpoint: POST http://localhost:${PORT}/`);
@@ -92,6 +94,7 @@ async function main() {
   });
 
   server.on("error", (err: NodeJS.ErrnoException) => {
+    console.error(`[slash-command-mcp] Server error:`, err);
     if (err.code === "EADDRINUSE") {
       console.error(`slash-command-mcp: port ${PORT} already in use, exiting (code EADDRINUSE)`);
     } else {
@@ -99,6 +102,8 @@ async function main() {
     }
     process.exit(1);
   });
+
+  console.log(`[slash-command-mcp] Listen call completed`);
 }
 
 main().catch((err) => {
