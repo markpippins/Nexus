@@ -66,24 +66,85 @@ def content_hash(text: str) -> str:
 
 
 def build_discourse_units(turns: list[dict]) -> list[dict]:
-    """Transform MongoDB turns into discourse_units format.
+    """Transform turns into discourse_units using the rule-based segmenter.
 
-    Each turn becomes one discourse_unit with one block.
-    Block indices are sequential 0..N-1 across all units.
+    Each discourse-arc SEGMENT becomes one discourse_unit whose `blocks`
+    array contains the turns it spans (block_index = turn index). This
+    replaces the old 1-turn=1-unit model with arc-based segmentation so
+    segments never end mid-arc or start on filler.
+
+    Falls back to per-turn units if the segmenter is unavailable.
+    Block indices are sequential 0..N-1 across all turns (block_index =
+    turn index, unchanged from the old model — only the UNIT grouping
+    changes).
     """
+    try:
+        from discourse_segmenter import segment as segment_transcript
+    except ImportError:
+        return _build_per_turn_units(turns)
+
+    transcript = {"turns": turns}
+    segs = segment_transcript(transcript)
+    if not segs:
+        return _build_per_turn_units(turns)
+
+    units = []
+    for seg in segs:
+        start = seg["start_turn"]
+        end = seg["end_turn"]
+        seg_turns = turns[start:end + 1]
+        # Concatenate the turns' content as the unit body.
+        parts = []
+        for t in seg_turns:
+            content = t.get("content", "")
+            if isinstance(content, list):
+                content = "\n".join(
+                    p.get("text", "") if isinstance(p, dict) else str(p)
+                    for p in content
+                )
+            parts.append(str(content))
+        body = "\n\n".join(p for p in parts if p.strip())
+        role = (seg_turns[0].get("role") or "unknown") if seg_turns else "unknown"
+
+        units.append({
+            "heading": seg.get("title") or f"Segment {seg['segment_index']} — {role}",
+            "body": body,
+            "blocks": [
+                {
+                    "type": "paragraph",
+                    "content": (str(t.get("content", "")) if not isinstance(t.get("content"), list)
+                                else "\n".join(p.get("text", "") if isinstance(p, dict) else str(p)
+                                     for p in t["content"])),
+                    "provenance": {"block_index": start + j, "role": t.get("role")},
+                }
+                for j, t in enumerate(seg_turns)
+            ],
+            "provenance": {
+                "role": role,
+                "segment_index": seg["segment_index"],
+                "start_turn": start,
+                "end_turn": end,
+                "turn_count": seg["turn_count"],
+                "boundary_reason": seg.get("boundary_reason"),
+                "block_count": len(seg_turns),
+            },
+        })
+    return units
+
+
+def _build_per_turn_units(turns: list[dict]) -> list[dict]:
+    """Fallback: 1 turn = 1 discourse_unit = 1 block (old model)."""
     units = []
     block_offset = 0
     for i, turn in enumerate(turns):
         role = turn.get("role", "unknown")
         content = turn.get("content", "")
         if isinstance(content, list):
-            # Some formats have content as array of parts
             content = "\n".join(
                 p.get("text", "") if isinstance(p, dict) else str(p)
                 for p in content
             )
         content = str(content)
-
         units.append({
             "heading": f"Turn {i + 1} — {role}",
             "body": content,

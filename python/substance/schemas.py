@@ -64,3 +64,26 @@ class DomainLinkOut(BaseModel):
     role: Role
     active: bool
     segment_set: Optional[SegmentSetOut] = None
+
+
+# ── Transcript-ingest support ────────────────────────────────────────
+
+class SegmentFromArcs(BaseModel):
+    """A pre-computed discourse-arc segment (from discourse_segmenter)."""
+    start_block_id: uuid.UUID
+    end_block_id: uuid.UUID
+    start_block_index: int
+    end_block_index: int
+    segment_type: Optional[str] = "discussion"
+    title: Optional[str] = None
+    notes_md: Optional[str] = None
+
+
+class SegmentSetFromSegmentsCreate(BaseModel):
+    """Create a segment set + segments + members from pre-computed arcs."""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    metadata: dict = Field(default_factory=dict)
+    conversation_id: uuid.UUID
+    snapshot_id: uuid.UUID
+    segments: list[SegmentFromArcs]

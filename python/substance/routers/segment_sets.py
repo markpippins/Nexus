@@ -8,6 +8,7 @@ from ..schemas import (
     MembersAddIn,
     ResolvedSegment,
     SegmentSetCreate,
+    SegmentSetFromSegmentsCreate,
     SegmentSetOut,
     SegmentSetUpdate,
 )
@@ -77,3 +78,19 @@ async def remove_member(segment_set_id: uuid.UUID, segment_id: uuid.UUID):
     await repo.exclude_member(segment_set_id, segment_id)
     await cache.invalidate_segset(segment_set_id)
     return await _resolve(segment_set_id)
+
+
+@router.post("/from-segments", response_model=SegmentSetOut, status_code=201)
+async def create_from_segments(body: SegmentSetFromSegmentsCreate):
+    """Create a segment set + segments_history rows + members from
+    pre-computed discourse-arc segments (from discourse_segmenter).
+    Atomic — all-or-nothing."""
+    row = await repo.create_segment_set_from_segments(
+        name=body.name,
+        description=body.description,
+        metadata=body.metadata,
+        conversation_id=body.conversation_id,
+        snapshot_id=body.snapshot_id,
+        segments=[s.model_dump() for s in body.segments],
+    )
+    return await _resolve(row["id"])
