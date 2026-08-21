@@ -180,6 +180,44 @@ def content_hash(transcript: dict) -> str:
     ).hexdigest()
 
 
+# ── Idempotency: check existing harvest ──────────────────────────────
+
+
+def find_existing_harvest(source_filename: str) -> dict | None:
+    """Check if a harvest already exists for this source file.
+    Returns {id, content_hash} or None."""
+    try:
+        data = _get_json(f"{NEBULA_API}/api/harvests")
+        harvests = data.get("harvests", data) if isinstance(data, dict) else data
+        if not isinstance(harvests, list):
+            return None
+        for h in harvests:
+            if h.get("source_filename") == source_filename:
+                # content_hash is stored in docklang JSONB or metadata
+                ch = (h.get("docklang") or {}).get("content_hash") if isinstance(h.get("docklang"), dict) else None
+                ch = ch or (h.get("metadata") or {}).get("content_hash")
+                return {"id": h.get("id"), "content_hash": ch}
+        return None
+    except Exception:
+        return None
+
+
+def delete_harvest_and_segments(harvest_id: str) -> None:
+    """Delete a harvest + its segment set + forum thread (for re-ingest)."""
+    # Delete segment set (by metadata.harvest_id lookup via substance)
+    try:
+        # Find segment sets with this harvest_id in metadata
+        sets = _get_json(f"{SUBSTANCE_API}/segment-sets")
+        for s in (sets if isinstance(sets, list) else sets.get("items", [])):
+            meta = s.get("metadata", {}) or {}
+            if meta.get("harvest_id") == harvest_id:
+                _delete_url(f"{SUBSTANCE_API}/segment-sets/{s['id']}")
+    except Exception:
+        pass
+    # Delete harvest (cascades to snapshots, blocks, segments_history)
+    _delete_url(f"{NEBULA_API}/api/harvests/{harvest_id}")
+
+
 # ── Core: ingest one transcript ──────────────────────────────────────
 
 
@@ -209,6 +247,10 @@ def ingest_transcript(
     fmt_key = transcript.get("source_format", fmt)
     model = transcript.get("model", "unknown")
     post_date = extract_timestamp(fpath)
+    source_file = (
+        (transcript.get("file_metadata") or {}).get("source_file")
+        or os.path.basename(fpath)
+    )
 
     # 1) Segment
     segs = segment_transcript(transcript)
@@ -230,16 +272,23 @@ def ingest_transcript(
         result["action"] = "dry_run"
         return result
 
+    # Idempotency: check if this source file is already ingested
+    existing = find_existing_harvest(source_file)
+    if existing:
+        if existing.get("content_hash") == ch:
+            result["action"] = "unchanged"
+            result["harvest_id"] = existing["id"]
+            return result
+        # Content changed → delete old harvest + segments, then re-ingest
+        delete_harvest_and_segments(existing["id"])
+        result["action"] = "updated"
+
     # State for rollback
     harvest_id = None
     thread_id = None
 
     try:
         # 2) Insert harvest into PG (via nebula-srv API)
-        source_file = (
-            (transcript.get("file_metadata") or {}).get("source_file")
-            or os.path.basename(fpath)
-        )
         harvest_resp = _post_json(f"{NEBULA_API}/api/harvests", {
             "sourcePath": fpath,
             "sourceFilename": source_file,
