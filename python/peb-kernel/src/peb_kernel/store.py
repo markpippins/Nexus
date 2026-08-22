@@ -122,7 +122,7 @@ class InMemoryPebStore:
         return max(self._decisions.values(), key=lambda item: item.created_at or datetime.min, default=None)
 
     def health(self) -> dict[str, Any]:
-        return {"status": "UP", "database": "reachable", "backend": "memory", "schema": "peb"}
+        return {"status": "UP", "database": "reachable", "schema": "peb"}
 
     @property
     def transactions(self) -> list[PebTransaction]:
@@ -187,10 +187,11 @@ class PostgresPebStore:
                 output, before_hash, after_hash, state_delta, created_at, committed_at,
                 kernel_event_id, kernel_event_type)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-               ON CONFLICT (idempotency_key) DO UPDATE SET
+               ON CONFLICT (id) DO UPDATE SET
                  admission_result = EXCLUDED.admission_result,
-                 output = EXCLUDED.output, before_hash = EXCLUDED.before_hash,
-                 after_hash = EXCLUDED.after_hash, state_delta = EXCLUDED.state_delta,
+                 output = EXCLUDED.output,
+                 after_hash = EXCLUDED.after_hash,
+                 state_delta = EXCLUDED.state_delta,
                  committed_at = EXCLUDED.committed_at,
                  kernel_event_id = EXCLUDED.kernel_event_id,
                  kernel_event_type = EXCLUDED.kernel_event_type""",
@@ -308,10 +309,25 @@ class PostgresPebStore:
         row = cursor.fetchone()
         if row is None:
             return None
+
+        # Be defensive against DB rows whose enum values don't match the
+        # Python enum (e.g. legacy lowercase or values written by a
+        # different service). The JVM's JPA silently maps these via
+        # Hibernate; Python's strict enum would crash the request.
+        # Unknown values are treated as None rather than failing the call.
+        try:
+            status = DecisionStatus(row[4])
+        except ValueError:
+            status = None
+        try:
+            entropy_class = EntropyClass(row[7]) if row[7] else None
+        except ValueError:
+            entropy_class = None
+
         return PebDecision(
             id=row[0], transaction_id=row[1], adr_number=row[2], title=row[3],
-            status=DecisionStatus(row[4]), summary=row[5], affected_keys=row[6] or [],
-            entropy_class=EntropyClass(row[7]) if row[7] else None, before_hash=row[8],
+            status=status, summary=row[5], affected_keys=row[6] or [],
+            entropy_class=entropy_class, before_hash=row[8],
             after_hash=row[9], author_id=row[10], parent_decision_id=row[11],
             rollback_of=row[12], created_at=row[13],
         )
@@ -322,7 +338,7 @@ class PostgresPebStore:
             cursor = connection.cursor()
             cursor.execute("SELECT current_database()")
             catalog = cursor.fetchone()[0]
-            return {"status": "UP", "database": "reachable", "backend": "postgres", "schema": "peb", "catalog": catalog}
+            return {"status": "UP", "database": "reachable", "schema": "peb", "catalog": catalog}
         finally:
             connection.close()
 

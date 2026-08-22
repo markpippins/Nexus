@@ -103,6 +103,81 @@ def test_typespec_admission_response_wire_shape_is_shared() -> None:
     assert isinstance(response.to_dict()["admitted"], bool)
 
 
+def test_typespec_admission_response_json_body_has_both_fields() -> None:
+    """The TypeSpec AdmissionResponse model requires {message, admitted}.
+    The JVM returns plain text (ResponseEntity<String>); Python returns
+    JSON matching the contract. This test pins the Python side to the
+    TypeSpec so a regression to plain-text is caught immediately.
+    """
+    from peb_kernel.api import AdmissionController
+
+    controller = AdmissionController(PebGovernanceEngine(InMemoryPebStore()))
+    result = controller.submit_transaction(
+        {"idempotencyKey": "json-test", "entityId": "e", "toolName": "peb_validate_transition", "input": {}}
+    )
+    assert result.status_code == 200
+    assert set(result.body.keys()) == {"message", "admitted"}
+    assert isinstance(result.body["message"], str)
+    assert isinstance(result.body["admitted"], bool)
+    assert result.body["admitted"] is True
+
+
+def test_typespec_admission_response_denied_body_has_both_fields() -> None:
+    """Denied responses must also be JSON with both fields, not plain text."""
+    from peb_kernel.api import AdmissionController
+
+    controller = AdmissionController(PebGovernanceEngine(InMemoryPebStore()))
+    result = controller.submit_transaction(
+        {"idempotencyKey": "json-deny", "entityId": "e", "toolName": "unknown_tool", "input": {}}
+    )
+    assert result.status_code == 422
+    assert set(result.body.keys()) == {"message", "admitted"}
+    assert result.body["admitted"] is False
+
+
+def test_typespec_health_response_matches_peb_health_response_model() -> None:
+    """The TypeSpec PebHealthResponse model has {status, database?, schema?,
+    catalog?, error?}. Python must not return fields outside that contract
+    (e.g. 'backend' was removed to match the model).
+    """
+    from peb_kernel.store import InMemoryPebStore
+
+    health = InMemoryPebStore().health()
+    allowed_keys = {"status", "database", "schema", "catalog", "error"}
+    assert set(health.keys()).issubset(allowed_keys)
+    assert health["status"] == "UP"
+    assert health["database"] == "reachable"
+    assert health["schema"] == "peb"
+
+
+def test_typespec_admission_response_denied_includes_reason_in_message() -> None:
+    """Denied execution-claim responses must include the rejection reason in
+    the message field so consumers can inspect why admission failed.
+    """
+    from peb_kernel.domain import ExecutionClaimAdmission
+    from peb_kernel.engine import PebGovernanceEngine
+    from peb_kernel.store import InMemoryPebStore
+
+    class FakeRejection:
+        def admit_verified_execution_claim(self, peb_transaction_id, input):
+            return ExecutionClaimAdmission.rejected("EVIDENCE_REJECTED")
+
+    store = InMemoryPebStore()
+    engine = PebGovernanceEngine(store, resolution_claim_adapter=FakeRejection())
+    transaction = PebTransaction(
+        idempotency_key="deny-reason-test",
+        entity_id="claim-test",
+        tool_name="peb_record_decision",
+        input={
+            "execution_claim": {"resolution_claim_id": "00000000-0000-0000-0000-000000000001"},
+            "execution_evidence": {"resolution_evidence_id": "00000000-0000-0000-0000-000000000002"},
+        },
+    )
+    response = engine.process_for_path(transaction, AdmissionPath.MUTATE)
+    assert response.admitted is False
+    assert "EVIDENCE_REJECTED" in response.message
+
+
 def admission_cases() -> list[dict[str, Any]]:
     fixture = Path(__file__).resolve().parents[3] / "typespec/v1/peb-kernel/conformance/admission_cases.json"
     return json.loads(fixture.read_text())

@@ -93,7 +93,27 @@ def load_catalog():
     if tools is None:
         sys.exit(f"ERROR: system '{TOOLS_SYSTEM}' not found in nebula")
     subs = {sub["name"]: sub for sub in tools["subsystems"]}
-    feats = [f for sub in subs.values() for f in sub["features"]]
+    # Skip features that have been explicitly expired (validUntil set to a
+    # past timestamp).  The API defaults validUntil to a far-future epoch
+    # (9999-12-31), so we compare against the current time instead of
+    # checking for the field's mere presence.  validUntil may be returned
+    # as epoch-ms (int) or an ISO string.
+    import time as _time
+    from datetime import datetime as _dt, timezone as _tz
+    _now = _dt.now(_tz.utc)
+
+    def _is_expired(f):
+        vu = f.get("validUntil")
+        if not vu:
+            return False
+        try:
+            if isinstance(vu, str):
+                return _dt.fromisoformat(vu.replace("Z", "+00:00")) < _now
+            return vu < _now.timestamp() * 1000
+        except (ValueError, TypeError):
+            return False
+
+    feats = [f for sub in subs.values() for f in sub["features"] if not _is_expired(f)]
     by_file = {}
     by_pkg = {}
     for f in feats:

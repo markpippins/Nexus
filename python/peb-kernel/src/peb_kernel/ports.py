@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 from typing import Any, Iterator, Protocol
+from uuid import UUID
 
 from .domain import (
+    ExecutionClaimAdmission,
     PebCapability,
     PebDecision,
     PebState,
@@ -40,3 +42,17 @@ class LosmIrTransitionPort(Protocol):
     def transition(self, wr_id: str, to_state: str, actor: str, reason: str) -> Any: ...
     def get_work_request(self, wr_id: str) -> Any: ...
     def orchestrate(self, wr_id: str) -> Any: ...
+
+
+class ResolutionExecutionClaimPort(Protocol):
+    """Port used by PEB before admitting an execution transaction that carries
+    an execution claim.
+
+    The implementation asks the resolution schema to validate the immutable
+    evidence linkage and execution context. The worker/model never implements
+    this port and cannot self-authorize or self-verify a claim.
+    """
+
+    def admit_verified_execution_claim(
+        self, peb_transaction_id: UUID, input: Any
+    ) -> ExecutionClaimAdmission: ...

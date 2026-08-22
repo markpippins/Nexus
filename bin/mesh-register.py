@@ -221,14 +221,15 @@ CANDIDATES: tuple[Candidate, ...] = (
         name="peb-kernel",
         port=8080,
         kind="runnable_service",
-        service_type="Spring Boot",
+        service_type="Python",
         health_url="http://localhost:8080/actuator/health",
         description=(
-            "Spring Boot kernel for the plugin-execution bus (PEB). Started "
-            "Jun22; PID held in main JVM module nexus/jvm/spring/."
+            "Python FastAPI kernel for the Persistent Engineering Brain (PEB). "
+            "Replaces the JVM Spring Boot kernel in the active runtime path; "
+            "the JVM implementation remains as the retained reference."
         ),
         startup="systemd: systemctl --user start peb-kernel.service",
-        workspace_path="nexus/jvm/spring/peb-kernel",
+        workspace_path="nexus/python/peb-kernel",
     ),
     Candidate(
         name="broker-gateway",
