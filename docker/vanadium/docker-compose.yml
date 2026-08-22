@@ -240,3 +240,9 @@ services:
       SPRING_DATA_REDIS_HOST: ${REGISTRY_REDIS_HOST:-172.17.0.1}
     ports:
       - "${REGISTRY_HOST_PORT:-8085}:8085"
+  redis:
+    image: redis:7-alpine
+    container_name: vd-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
