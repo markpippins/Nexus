@@ -237,8 +237,8 @@ JVM_ID=$(create_system "JVM Services" '"Java/Kotlin service broker and registry 
   create_subsystem "$JVM_ID" "Shared Core" '"Shared core library for JVM services"' "jvm/shared/core/README.md"
   create_workspace "$JVM_ID" "" "jvm/shared/core"
 
-  create_subsystem "$JVM_ID" "Ballerina" '"Ballerina integration services"' "jvm/ballerina/README.md"
-  create_workspace "$JVM_ID" "" "jvm/ballerina"
+  # Ballerina moved out of the JVM tier to nexus/ballerina (2026-08-22,
+  # admin decision) — it is its own moat layer now, not a JVM concern.
 }
 
 # ── Go Services ────────────────────────────────────────────────────
