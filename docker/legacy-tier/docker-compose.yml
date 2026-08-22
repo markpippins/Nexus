@@ -19,7 +19,7 @@ services:
       WIND_SRV_PORT: ${WIND_SRV_PORT:-3300}
       NEXUS_PG_DSN: ${NEXUS_PG_DSN}
     ports:
-      - "${WIND_SRV_PORT:-3300}:3300"
+      - "${WIND_HOST_PORT:-3300}:3300"
 
   tackle:
     build:
@@ -35,7 +35,7 @@ services:
       MEMORY_SRV_URL: ${MEMORY_SRV_URL:-http://legacy-memory:3500}
       PIPELINE_ROOT: ${PIPELINE_ROOT:-/nexus}
     ports:
-      - "${TACKLE_SRV_PORT:-3410}:3410"
+      - "${TACKLE_HOST_PORT:-3410}:3410"
 
   kernel:
     build:
@@ -51,7 +51,7 @@ services:
       DB_PASS: ${PG_PASS:-pgpass}
       DB_NAME: ${PG_DB_NAME:-nexus}
     ports:
-      - "${KERNEL_SRV_PORT:-8100}:8100"
+      - "${KERNEL_HOST_PORT:-8100}:8100"
 
   peb:
     build:
@@ -63,7 +63,7 @@ services:
       PEB_SRV_PORT: ${PEB_SRV_PORT:-3111}
       PEB_PG_DSN: ${PEB_PG_DSN}
     ports:
-      - "${PEB_SRV_PORT:-3111}:3111"
+      - "${PEB_HOST_PORT:-3111}:3111"
 
   cascade:
     build:
@@ -79,7 +79,7 @@ services:
       DB_PASS: ${PG_PASS:-pgpass}
       DB_NAME: ${PG_DB_NAME:-nexus}
     ports:
-      - "${CASCADE_SRV_PORT:-3106}:3106"
+      - "${CASCADE_HOST_PORT:-3106}:3106"
 
   harness:
     build:
@@ -96,13 +96,18 @@ services:
       OPENCODE_BIN: ${OPENCODE_BIN:-opencode}
       OLLAMA_URL: ${OLLAMA_URL:-http://localhost:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-}
+      PG_HOST: ${PG_HOST:-postgres}
+      PG_PORT: ${PG_PORT:-5432}
+      PG_DATABASE: ${PG_DB_NAME:-nexus}
+      PG_USER: ${PG_USER:-pguser}
+      PG_PASSWORD: ${PG_PASS:-pgpass}
       NEBULA_URL: ${NEBULA_URL:-http://legacy-nebula:3101}
       CONDUIT_MCP_URL: ${CONDUIT_MCP_URL:-http://legacy-conduit:3100}
       NEXUS_PG_DSN: ${NEXUS_PG_DSN}
     volumes:
       - ${HARNESS_WORK_DIR:-./work}:/nexus
     ports:
-      - "${HARNESS_SRV_PORT:-3420}:3420"
+      - "${HARNESS_HOST_PORT:-3420}:3420"
 
   pty:
     build:
@@ -112,8 +117,9 @@ services:
     restart: unless-stopped
     environment:
       PTY_SRV_PORT: ${PTY_SRV_PORT:-3120}
+      PTY_HOST: ${PTY_HOST:-127.0.0.1}
     ports:
-      - "${PTY_SRV_PORT:-3120}:3120"
+      - "${PTY_HOST_PORT:-3120}:3121"
 
   execution:
     build:
@@ -129,7 +135,7 @@ services:
       PGPASSWORD: ${PG_PASS:-pgpass}
       PGDATABASE: ${PG_DB_NAME:-nexus}
     ports:
-      - "${EXECUTION_SRV_PORT:-3110}:3110"
+      - "${EXECUTION_HOST_PORT:-3110}:3110"
 
   prompt-sync:
     build:
@@ -145,7 +151,7 @@ services:
       CONDUIT_PG_DSN: ${CONDUIT_PG_DSN}
       MEMORY_REDIS_URL: ${MEMORY_REDIS_URL}
     ports:
-      - "${PROMPT_SRV_PORT:-3501}:3501"
+      - "${PROMPT_HOST_PORT:-3501}:3501"
 
   memory:
     build:
@@ -159,4 +165,4 @@ services:
       MEMORY_REDIS_URL: ${MEMORY_REDIS_URL:-redis://redis:6379}
       CONDUIT_PG_DSN: ${CONDUIT_PG_DSN}
     ports:
-      - "${MEMORY_SRV_PORT:-3500}:3500"
+      - "${MEMORY_HOST_PORT:-3500}:3500"
