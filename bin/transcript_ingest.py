@@ -37,8 +37,11 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "python"))
+_bin_dir = os.path.dirname(os.path.abspath(__file__))
+_legacy_bin = os.path.join(os.path.dirname(_bin_dir), "legacy", "bin")
+sys.path.insert(0, _bin_dir)
+sys.path.insert(0, _legacy_bin)
+sys.path.insert(0, os.path.join(_bin_dir, "python"))
 
 from format_detector import detect
 from deepseek_parser import parse_export as parse_deepseek_dir
@@ -46,6 +49,17 @@ from gemini_parser import parse_gemini_html
 from chatgpt_json_parser import parse_chatgpt_json
 from chatgpt_md_parser import parse_chatgpt_markdown
 from claude_parser import parse_claude_html
+# Optional parsers: copilot_html_parser / deepseek_html_parser are not yet
+# implemented; import lazily so their absence doesn't crash every ingest run
+# (affected formats fail per-file at dispatch instead).
+try:
+    from copilot_html_parser import parse_copilot_html
+except ImportError:
+    parse_copilot_html = None  # type: ignore[assignment]
+try:
+    from deepseek_html_parser import parse_deepseek_html
+except ImportError:
+    parse_deepseek_html = None  # type: ignore[assignment]
 from discourse_segmenter import segment as segment_transcript, pool_turns
 from mongo_to_pg_docklang import build_discourse_units
 
@@ -128,6 +142,16 @@ def parse_file(fpath: str, fmt: str) -> list[dict]:
         return [t] if t else []
     elif fmt == "claude_html":
         t = parse_claude_html(fpath)
+        return [t] if t else []
+    elif fmt == "chatgpt_html":
+        if parse_copilot_html is None:
+            raise ValueError("chatgpt_html detected but copilot_html_parser is not implemented")
+        t = parse_copilot_html(fpath)
+        return [t] if t else []
+    elif fmt == "deepseek_html":
+        if parse_deepseek_html is None:
+            raise ValueError("deepseek_html detected but deepseek_html_parser is not implemented")
+        t = parse_deepseek_html(fpath)
         return [t] if t else []
     return []
 
@@ -373,7 +397,7 @@ def _create_snapshot_and_blocks(
 
     # Build snapshot INSERT
     source_hash = hashlib.md5(
-        json.dumps([t.get("content", "") for t in turns], ensure_ascii=False).encode()
+        json.dumps([t.get("content", "").replace("\x00", "") for t in turns], ensure_ascii=False).encode()
     ).hexdigest()
     block_count = len(turns)
 
@@ -394,13 +418,14 @@ def _create_snapshot_and_blocks(
             content = "\n".join(
                 p.get("text", "") if isinstance(p, dict) else str(p) for p in content
             )
-        content = str(content).replace("'", "''")
+        content = str(content).replace(chr(0), "")  # strip null bytes for PG UTF8
+        content = content.replace("'", "''")
         bid = str(uuid_mod.uuid4())
         block_ids.append(bid)
         ch = hashlib.md5(content.encode()).hexdigest()
         rows.append(
             f"('{bid}'::uuid, '{harvest_id}'::uuid, '{snapshot_id}'::uuid, "
-            f"{i}, 'paragraph', E'{content}', '{ch}', '{role}')"
+            f"{i}, 'paragraph', '{content}', '{ch}', '{role}')"
         )
     if rows:
         values = ",\n".join(rows)
@@ -473,24 +498,54 @@ def _post_forum_thread(
     return resp.get("id")
 
 
+# Forum body limit — leave headroom for JSON envelope + metadata
+_MAX_COMMENT_BODY = 500_000  # chars
+
+
 def _post_forum_comment(
     thread_id: str, turn: dict, user_id: str, fmt: str, model: str | None
 ):
-    """Post one pooled turn as a comment, referencing its segment."""
+    """Post one pooled turn as a comment, referencing its segment.
+
+    Large comments are truncated (full content is in PG conversation_blocks)."""
     role = turn.get("role", "unknown")
     role_label = "User" if role == "user" else "Assistant"
     segs = turn.get("segment_indices", [])
     seg_ref = f" (segments: {', '.join(str(s) for s in segs)})" if segs else ""
-    body = f"**{role_label}**{seg_ref}\n\n{turn.get('content', '')}"
-    _post_json(
-        f"{ASSEMBLY_API}/api/forums/threads/{thread_id}/comments",
-        {
-            "body": body,
-            "postedById": user_id,
-            "role": "engineer",
-            "model": os.environ.get("NEXUS_AGENT_MODEL", "z-ai/glm-5.2"),
-        },
-    )
+    content = turn.get("content", "")
+    truncated = False
+    if len(content) > _MAX_COMMENT_BODY:
+        content = content[:_MAX_COMMENT_BODY] + f"\n\n*… truncated ({len(turn.get('content', ''))} chars total; full content in PG)*"
+        truncated = True
+    body = f"**{role_label}**{seg_ref}\n\n{content}"
+    try:
+        _post_json(
+            f"{ASSEMBLY_API}/api/forums/threads/{thread_id}/comments",
+            {
+                "body": body,
+                "postedById": user_id,
+                "role": "engineer",
+                "model": os.environ.get("NEXUS_AGENT_MODEL", "z-ai/glm-5.2"),
+            },
+        )
+    except Exception as e:
+        # If still too large after truncation, post a stub
+        if truncated:
+            stub = f"**{role_label}**{seg_ref}\n\n*Content too large for forum ({len(content)} chars). Full content in PG conversation_blocks.*"
+            try:
+                _post_json(
+                    f"{ASSEMBLY_API}/api/forums/threads/{thread_id}/comments",
+                    {
+                        "body": stub,
+                        "postedById": user_id,
+                        "role": "engineer",
+                        "model": os.environ.get("NEXUS_AGENT_MODEL", "z-ai/glm-5.2"),
+                    },
+                )
+            except Exception:
+                pass  # forum is best-effort; PG is canonical
+        else:
+            raise
 
 
 # ── Main ─────────────────────────────────────────────────────────────
