@@ -22,7 +22,12 @@ Known, documented divergences are asserted separately and annotated:
    the stricter-but-compatible behavior (both reject the transaction,
    just at different layers).
 
-Tests are skipped when the JVM is not reachable on port 8080.
+The file is runtime-aware: the runtime serving port 8080 is detected from
+its health envelope (Spring Boot actuator exposes ``components``; the
+Python kernel exposes ``database``/``catalog``). JVM-comparison tests are
+skipped whenever :8080 does not serve the JVM — including the post-cutover
+state where the Python kernel is permanent — so the suite stays green in
+CI. The Python-only fixture tests always run (no network dependency).
 """
 
 from __future__ import annotations
@@ -47,20 +52,35 @@ FIXTURE_PATH = (
 )
 
 
-def _jvm_reachable() -> bool:
-    """Return True iff the JVM PEB kernel is serving on port 8080."""
+def _runtime_on_8080() -> str | None:
+    """Detect which PEB runtime is serving port 8080 ("jvm" | "python" | None).
+
+    Both runtimes serve ``GET /actuator/health`` with ``status: UP``, so the
+    status field alone cannot discriminate. Spring Boot's actuator envelope
+    carries a top-level ``components`` key; the Python kernel's envelope
+    carries ``database``/``catalog`` instead.
+    """
     try:
         resp = urllib.request.urlopen(
             "http://localhost:8080/actuator/health", timeout=3
         )
         data = json.loads(resp.read())
-        return data.get("status") == "UP"
+        if "components" in data:
+            return "jvm"
+        if "database" in data or "catalog" in data:
+            return "python"
+        return None
     except Exception:
-        return False
+        return None
 
 
-pytestmark = pytest.mark.skipif(
-    not _jvm_reachable(), reason="JVM PEB kernel not reachable on port 8080"
+# True iff the live JVM kernel is serving :8080 at import time. JVM-comparison
+# tests are skipped when Python is serving (permanent post-cutover state); the
+# Python-only fixture tests are never gated on the network.
+JVM_RUNNING = _runtime_on_8080() == "jvm"
+
+jvm_required = pytest.mark.skipif(
+    not JVM_RUNNING, reason="JVM PEB kernel not serving on port 8080 (Python runtime active)"
 )
 
 
@@ -134,6 +154,7 @@ def _jvm_message(body: str) -> str:
 
 
 @pytest.mark.parametrize("case", _load_cases(), ids=lambda c: c["name"])
+@jvm_required
 def test_http_status_codes_match(case: dict[str, Any]) -> None:
     """JVM and Python must return the same HTTP status code for each fixture.
 
@@ -160,6 +181,7 @@ def test_http_status_codes_match(case: dict[str, Any]) -> None:
 
 
 @pytest.mark.parametrize("case", _load_cases(), ids=lambda c: c["name"])
+@jvm_required
 def test_admission_outcome_matches(case: dict[str, Any]) -> None:
     """JVM and Python must produce the same admission outcome (admitted/denied).
 
@@ -187,6 +209,7 @@ def test_admission_outcome_matches(case: dict[str, Any]) -> None:
 
 
 @pytest.mark.parametrize("case", _load_cases(), ids=lambda c: c["name"])
+@jvm_required
 def test_message_text_matches(case: dict[str, Any]) -> None:
     """The message text must be identical between JVM and Python.
 
@@ -229,6 +252,7 @@ def test_message_text_matches(case: dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 
 
+@jvm_required
 def test_jvm_returns_plain_text_python_returns_json() -> None:
     """Divergence #1: JVM returns text/plain, Python returns application/json.
 
@@ -251,6 +275,7 @@ def test_jvm_returns_plain_text_python_returns_json() -> None:
     assert py_body["message"] == jvm_body
 
 
+@jvm_required
 def test_null_input_divergence_is_documented() -> None:
     """Divergence #2: null input is handled at different layers.
 
@@ -301,6 +326,7 @@ def test_null_input_divergence_is_documented() -> None:
 
 
 @pytest.mark.parametrize("case", _load_cases(), ids=lambda c: c["name"])
+@jvm_required
 def test_jvm_matches_fixture_expectations(case: dict[str, Any]) -> None:
     """The JVM kernel must produce the outcomes the shared fixture expects."""
     jvm = _jvm_submit(case)

@@ -214,6 +214,7 @@ SERVICE_HEALTH_PATHS=(
     ["peb-ui.service"]="/"
     ["semantic-kernel-ui.service"]="/"
     # Other services with non-standard health paths
+    ["peb-kernel.service"]="/actuator/health"
     ["terrain.service"]="/api/v1/platform/health"
     ["quarkus-broker-gateway.service"]="/api/health"
     ["mildred-dam-api.service"]="/api/health"

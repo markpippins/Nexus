@@ -21,4 +21,9 @@ namespace org.nexus.pebkernel {
   @get
   @doc("Health check.")
   op health(): PebHealthResponse;
+
+  @route("/api/v1/peb/state/hash")
+  @get
+  @doc("Current PEB state digest (Merkle root, per-document hashes, decision hash).")
+  op stateHash(): PebStateHashResponse;
 }

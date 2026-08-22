@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from .domain import AdmissionPath, PebTransaction, MalformedAdmissionRequest
+from .domain import AdmissionPath, PebTransaction, PebStateHash, MalformedAdmissionRequest
 from .engine import PebGovernanceEngine
 from .ports import PebStore
 
@@ -43,6 +43,56 @@ class AdmissionController:
             return ApiResult(422, {"message": f"Malformed admission request: {exc}"})
 
         return ApiResult(200 if response.admitted else 422, response.to_dict())
+
+    def state_hash(self) -> ApiResult:
+        """Build the PebStateResponse envelope served at GET /api/v1/peb/state/hash.
+
+        The envelope matches the ``PebStateResponse`` contract in the peb-mcp
+        client (``typescript/peb-mcp/src/api/apiClient.ts``). Field semantics:
+
+        - ``peb_state_hash``: the canonical sorted-leaf Merkle root over all
+          peb state rows plus the latest decision's ``after_hash`` (same
+          algorithm as the Java kernel's peb-hash).
+        - ``document_hashes``: ``{state_key: checksum}`` for every state row,
+          keys sorted for determinism.
+        - ``last_decision_hash``: the latest decision's ``after_hash``
+          (falling back to ``before_hash``), or ``""`` when no decision exists.
+        - ``thought_context_hash``: the kernel has no separate thought-context
+          store, so this is a deterministic digest over the current epistemic
+          context: ``sha256(peb_state_hash + ":" + last_decision_hash)``.
+        - ``cognitive_mode``: static ``"operational"`` — no cognitive-mode
+          store exists; the field is kept for contract compatibility.
+        """
+        store = self.governance_engine.store
+        hash_service = self.governance_engine.transaction_engine.hash_service
+        try:
+            # PostgresPebStore requires reads inside store.transaction() (the
+            # connection is bound to the context); the read-only commit is a
+            # no-op for InMemoryPebStore.
+            with store.transaction():
+                states = store.list_states()
+                latest_decision = store.latest_decision()
+        except Exception as exc:
+            return ApiResult(
+                503,
+                {"status": "DOWN", "database": "unreachable", "schema": "peb", "error": str(exc)},
+            )
+        system_hash = hash_service.compute_system_hash(states, latest_decision).value
+        document_hashes = {state.key: state.checksum for state in sorted(states, key=lambda s: s.key or "")}
+        last_decision_hash = ""
+        if latest_decision is not None:
+            last_decision_hash = latest_decision.after_hash or latest_decision.before_hash or ""
+        thought_context_hash = PebStateHash.compute(f"{system_hash}:{last_decision_hash}").value
+        return ApiResult(
+            200,
+            {
+                "peb_state_hash": system_hash,
+                "document_hashes": document_hashes,
+                "last_decision_hash": last_decision_hash,
+                "thought_context_hash": thought_context_hash,
+                "cognitive_mode": "operational",
+            },
+        )
 
     @classmethod
     def _missing_fields(cls, payload: Mapping[str, Any]) -> list[str]:
@@ -95,5 +145,10 @@ def create_app(store: PebStore | None = None, controller: AdmissionController | 
                 status_code=503,
                 content={"status": "DOWN", "database": "unreachable", "schema": "peb", "error": str(exc)},
             )
+
+    @app.get("/api/v1/peb/state/hash")
+    def state_hash():
+        result = controller.state_hash()
+        return JSONResponse(status_code=result.status_code, content=result.body)
 
     return app
