@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 import time
 import urllib.error
@@ -291,6 +292,26 @@ def ollama_chat(model: str, chunk_text: str, timeout: int = 900) -> list[dict]:
     return [n for n in (normalize_candidate(c) for c in parsed.get("candidates", [])) if n]
 
 
+def opencode_extract(model_full: str, chunk_text: str,
+                     timeout: int = 300) -> list[dict]:
+    """Harness-mediated extraction: shells out to `opencode run` under the
+    named model (default opencode/x-preview-f-free). This is the low-rate-
+    limit route for ox-alpha-family models — they have no raw OpenAI API
+    route (prov-opencode resolves to conduit :3100), so the harness IS the
+    transport. stdout carries the response; logs go to stderr."""
+    msg = (SYSTEM_PROMPT +
+           "\n\nRespond with ONLY the raw JSON object, nothing else."
+           f"\n\n<transcript_chunk>\n{chunk_text}\n</transcript_chunk>")
+    res = subprocess.run(
+        ["opencode", "run", "-m", model_full, "--pure", msg],
+        capture_output=True, text=True, timeout=timeout)
+    if res.returncode != 0:
+        raise AbsorbError("E_TRANSIENT_LLM_UNAVAILABLE",
+                          f"opencode rc={res.returncode}: {res.stderr[-160:]}")
+    parsed = _loads_loose(res.stdout)
+    return [n for n in (normalize_candidate(c) for c in parsed.get("candidates", [])) if n]
+
+
 # ── Document selection + chunking ────────────────────────────────────
 
 def pending_documents(limit: int | None) -> list[dict]:
@@ -416,8 +437,10 @@ def main(argv=None) -> int:
     c = sub.add_parser("consume", help="extract candidates from unconsumed documents")
     c.add_argument("--limit", type=int, default=5,
                    help="batch size; hourly cadence uses 5 most-recent")
-    c.add_argument("--backend", choices=["tackle", "ollama"], default="tackle",
-                   help="tackle = Rover-lineage configbundle via tackle-srv (default); "
+    c.add_argument("--backend", choices=["opencode", "tackle", "ollama"],
+                   default="opencode",
+                   help="opencode = harness-mediated x-preview-f-free (low rate limits, "
+                        "default per operator); tackle = Rover/Nemotron configbundle; "
                         "ollama = local fallback")
     c.add_argument("--model", default="qwen2.5-coder:latest",
                    help="only used with --backend ollama")
@@ -451,8 +474,11 @@ def main(argv=None) -> int:
             target = None
             if args.backend == "tackle":
                 target = resolve_llm_target(args.role_config)
+            oc_model = "opencode/x-preview-f-free"
             for i, ch in enumerate(chunks):
-                if target:
+                if args.backend == "opencode":
+                    found.extend(opencode_extract(oc_model, ch))
+                elif target:
                     found.extend(llm_extract(target, ch))
                 else:
                     found.extend(ollama_chat(args.model, ch))
