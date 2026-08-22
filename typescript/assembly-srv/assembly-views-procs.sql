@@ -48,7 +48,8 @@ SELECT
     f.name AS forum_name,
     COALESCE(c.reply_count, 0) AS reply_count,
     c.last_reply_at,
-    c.last_reply_user_alias
+    c.last_reply_user_alias,
+    p.rating
 FROM assembly.posts p
 JOIN assembly.forums f ON f.id = p.forum_uuid AND (f.expiration_dt = 'infinity'::timestamptz OR f.expiration_dt > now())
 JOIN assembly.users u ON u.id = p.posted_by_id

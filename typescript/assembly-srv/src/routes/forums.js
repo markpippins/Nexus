@@ -4,6 +4,40 @@ import { BadRequestError, NotFoundError } from '../errors.js';
 
 export const forumsRouter = Router();
 
+// ── Thread status vocabulary (posts.rating) ─────────────────────────
+// Colored status indicator per thread, stored on the ROOT post's rating
+// bigint. Any commenter may advance it. Canonical mapping (shared with
+// assembly-ui and the backfill script — keep in sync):
+//   0 posted      (default; null rating reads as 0)
+//   1 specified   blue
+//   2 planned     yellow
+//   3 implemented orange
+//   4 accepted    green
+//   5 rejected    red
+//   6 reopened    purple
+//   7 closed      grey
+const STATUS_MIN = 0;
+const STATUS_MAX = 7;
+
+function normalizeStatusRating(value) {
+  if (value === undefined || value === null) return 0;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < STATUS_MIN || n > STATUS_MAX) {
+    throw new BadRequestError(`statusRating must be an integer ${STATUS_MIN}..${STATUS_MAX}`);
+  }
+  return n;
+}
+
+async function setThreadStatusRating(threadId, rating) {
+  const result = await pool.query(
+    'UPDATE assembly.posts SET rating = $2, updated = now() WHERE id = $1 AND (expiration_dt = \'infinity\'::timestamptz OR expiration_dt > now()) RETURNING id, rating',
+    [threadId, rating]
+  );
+  if (result.rows.length === 0) throw new NotFoundError('Thread not found');
+  invalidateThreadListCache();
+  return { id: result.rows[0].id, statusRating: Number(result.rows[0].rating) };
+}
+
 // ── Thread list cache (in-memory TTL) ───────────────────────────────
 // Transcripts-style forums (2000+ threads with full bodies) are expensive
 // to re-serialize on every request. Cache the mapped list per slug+params
@@ -83,7 +117,7 @@ forumsRouter.get('/:slug/threads', async (req, res, next) => {
     const baseCols = `
       post_id, title, post_created, role, model,
       user_id, alias, avatar_url, forum_id, forum_slug, forum_name,
-      reply_count, last_reply_at, last_reply_user_alias`;
+      reply_count, last_reply_at, last_reply_user_alias, rating`;
     const cols = includeBody ? `${baseCols}, text` : baseCols;
 
     let result;
@@ -129,6 +163,7 @@ forumsRouter.get('/:slug/threads', async (req, res, next) => {
       body: includeBody
         ? (row.text || '')
         : (recentBodies?.get(row.post_id) ?? undefined),
+      statusRating: row.rating == null ? 0 : Number(row.rating),
       role: row.role || null,
       model: row.model || null,
       createdAt: new Date(row.post_created).toISOString(),
@@ -209,7 +244,7 @@ forumsRouter.post('/by-id/:forumId/threads', async (req, res, next) => {
 forumsRouter.get('/by-id/:forumId/threads', async (req, res, next) => {
   try {
     const result = await pool.query(
-      `SELECT p.id, p.title, p.created, p.text, p.source_url, p.role, p.model,
+      `SELECT p.id, p.title, p.created, p.text, p.source_url, p.role, p.model, p.rating,
               u.id AS user_id, u.alias, u.avatar_url,
               f.id AS forum_id, f.slug AS forum_slug, f.name AS forum_name
        FROM assembly.posts p
@@ -234,6 +269,7 @@ forumsRouter.get('/threads/:threadId', async (req, res, next) => {
         p.created AS post_created,
         p.role,
         p.model,
+        p.rating,
         u.id AS user_id,
         u.alias,
         u.avatar_url,
@@ -299,6 +335,7 @@ forumsRouter.get('/threads/:threadId', async (req, res, next) => {
         id: row.post_id,
         title: row.title || 'Untitled',
         body: row.text || '',
+        statusRating: row.rating == null ? 0 : Number(row.rating),
         role: row.role || null,
         model: row.model || null,
         createdAt: new Date(row.post_created).toISOString(),
@@ -322,23 +359,49 @@ forumsRouter.get('/threads/:threadId', async (req, res, next) => {
 
 forumsRouter.post('/threads/:threadId/comments', async (req, res, next) => {
   try {
-    const { body, postedById, parentId, role, model } = req.body;
+    const { body, postedById, parentId, role, model, statusRating } = req.body;
     if (!body || !postedById) {
       throw new BadRequestError('Body and postedById are required');
     }
+
+    // Optional status advance: a commenter may set the thread status in the
+    // same gesture as replying. Validated 0..7; null/undefined = no change.
+    const newStatus = statusRating === undefined || statusRating === null
+      ? null
+      : normalizeStatusRating(statusRating);
 
     const result = await pool.query(
       'SELECT * FROM assembly.add_comment($1, $2, $3, $4, $5, $6)',
       [req.params.threadId, postedById, String(body), parentId || null, role || null, model || null]
     );
+    let status = null;
+    if (newStatus !== null) {
+      status = await setThreadStatusRating(req.params.threadId, newStatus);
+    }
     invalidateThreadListCache();
 
-    res.status(201).json({ id: result.rows[0].id, role: result.rows[0].role, model: result.rows[0].model });
+    res.status(201).json({ id: result.rows[0].id, role: result.rows[0].role, model: result.rows[0].model, statusRating: status ? status.statusRating : undefined });
   } catch (err) {
     // NOTE: must call next(), not throw — throw inside an async handler rejects the
     // promise unhandled, Express never responds, and the client hangs.
     if (err.code === 'P0002') return next(new NotFoundError('Thread not found'));
     if (err.code === 'P0001') return next(new BadRequestError('Parent comment not found or does not belong to this thread'));
+    next(err);
+  }
+});
+
+// PUT /threads/:threadId/status — set the colored status indicator on a
+// thread (root post rating). Any commenter may update; no auth by design
+// (assembly is an internal, identity-by-convention system). Body:
+//   { "rating": 0..7 }  (also accepts "statusRating" alias)
+forumsRouter.put('/threads/:threadId/status', async (req, res, next) => {
+  try {
+    const raw = req.body?.rating ?? req.body?.statusRating;
+    const rating = normalizeStatusRating(raw);
+    const out = await setThreadStatusRating(req.params.threadId, rating);
+    res.json(out);
+  } catch (err) {
+    if (err.code === '23503' || err.code === '22P02') return next(new NotFoundError('Thread not found'));
     next(err);
   }
 });

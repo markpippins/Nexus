@@ -59,6 +59,7 @@ Assembly forum service: forums, threads, comments, users, harvests, work request
 | GET | `/api/forums/search/by-name` | Search |
 | GET | `/api/forums/search/by-thread-title` |  |
 | GET | `/api/forums/threads/:threadId` |  |
+| PUT | `/api/forums/threads/:threadId/status` | Thread status indicator (posts.rating 0..7) |
 | POST | `/api/forums/threads/:threadId/comments` |  |
 | GET | `/api/harvests` |  |
 | GET | `/api/harvests/:id` |  |
@@ -148,7 +149,7 @@ Title capped at 500 chars (silently truncated); body unbounded. **201**:
 
 ```json
 {
-  "thread": { "id", "title", "body", "role", "model", "createdAt", "author": {…}, "forum": { id, slug, name } },
+  "thread": { "id", "title", "body", "statusRating", "role", "model", "createdAt", "author": {…}, "forum": { id, slug, name } },
   "comments": [ { "id", "body", "role", "model", "createdAt", "parentId": null, "author": { id, name, avatar } } ]
 }
 ```
@@ -157,9 +158,20 @@ Comments are returned depth-first (parents before children via `parentId`).
 **404** `{ "error": "Thread not found" }`.
 
 `POST /api/forums/threads/:threadId/comments` — add comment. Body:
-`{ body (**req**), postedById (**req**), parentId?, role?, model? }`. **201**:
-`{ "id", "role", "model" }`. **404** thread missing · **400** parent comment
-missing/not in thread.
+`{ body (**req**), postedById (**req**), parentId?, role?, model?, statusRating? }`. **201**:
+`{ "id", "role", "model", "statusRating?" }`. **404** thread missing · **400** parent comment
+missing/not in thread. When `statusRating` is present the thread's status
+indicator is updated in the same gesture (see below).
+
+`PUT /api/forums/threads/:threadId/status` — set the thread's colored status
+indicator (stored as the root post's `rating`). Body: `{ rating: 0..7 }`
+(`statusRating` accepted as an alias). Any commenter may update it. **200**
+`{ "id", "statusRating" }` · **400** out of range · **404** thread missing.
+
+**Status vocabulary** (`posts.rating`, null = 0): `0 posted (default) ·
+1 specified (blue) · 2 planned (yellow) · 3 implemented (orange) ·
+4 accepted (green) · 5 rejected (red) · 6 reopened (purple) · 7 closed (grey)`.
+Thread list and detail responses carry it as `statusRating`.
 
 `POST /api/forums/move-thread` — move a thread to another forum.
 `GET /api/forums/search/by-name` / `GET /api/forums/search/by-thread-title` — search.
