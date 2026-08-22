@@ -1,5 +1,5 @@
 // Throwaway smoke harness — drives PebApiClient.submitTransaction directly
-// against the running PEB Kernel on http://localhost:8080. Not part of the
+// against the running PEB Kernel on http://localhost:8098. Not part of the
 // shipped MCP server; ts-node compiles and runs it on demand. tsconfig only
 // includes src/**/* so this file does not affect tsc-build output.
 //

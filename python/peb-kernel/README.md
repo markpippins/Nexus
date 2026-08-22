@@ -26,7 +26,7 @@ The default test setup uses `InMemoryPebStore`; production startup uses
 PYTHONPATH=src python -m peb_kernel.main
 ```
 
-The API listens on port 8080 by default and exposes:
+The API listens on port 8098 by default and exposes:
 
 - `POST /api/v1/peb/transaction`
 - `GET /actuator/health`

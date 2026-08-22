@@ -219,10 +219,10 @@ CANDIDATES: tuple[Candidate, ...] = (
     ),
     Candidate(
         name="peb-kernel",
-        port=8080,
+        port=8098,
         kind="runnable_service",
         service_type="Python",
-        health_url="http://localhost:8080/actuator/health",
+        health_url="http://localhost:8098/actuator/health",
         description=(
             "Python FastAPI kernel for the Persistent Engineering Brain (PEB). "
             "Replaces the JVM Spring Boot kernel in the active runtime path; "

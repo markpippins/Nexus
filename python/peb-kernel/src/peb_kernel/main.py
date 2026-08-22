@@ -15,7 +15,7 @@ def main() -> None:
     uvicorn.run(
         "peb_kernel.main:app",
         host=os.getenv("PEB_HOST", "0.0.0.0"),
-        port=int(os.getenv("PEB_PORT", "8080")),
+        port=int(os.getenv("PEB_PORT", "8098")),
         reload=False,
     )
 

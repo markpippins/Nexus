@@ -1,5 +1,5 @@
 [Unit]
-Description=PEB Kernel — Persistent Engineering Brain (Python, port 8080)
+Description=PEB Kernel — Persistent Engineering Brain (Python, port 8098)
 Documentation=https://github.com/nexus/python/peb-kernel
 After=network.target postgresql.service
 Wants=postgresql.service
@@ -11,7 +11,7 @@ Group=codex
 WorkingDirectory=/home/codex/dev/nexus/python/peb-kernel
 
 # ── Environment ────────────────────────────────────────────────────────
-Environment=PEB_PORT=8080
+Environment=PEB_PORT=8098
 Environment=PEB_HOST=0.0.0.0
 Environment=PEB_STORE=postgres
 Environment=PEB_DATABASE_URL=postgresql://pguser:pgpass@localhost:5432/nexus

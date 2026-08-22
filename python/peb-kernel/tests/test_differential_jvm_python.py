@@ -2,7 +2,7 @@
 
 Runs each shared admission fixture from
 ``typespec/v1/peb-kernel/conformance/admission_cases.json`` against both the
-live JVM kernel (HTTP ``POST /api/v1/peb/transaction`` on port 8080) and the
+live JVM kernel (HTTP ``POST /api/v1/peb/transaction`` on port 8098) and the
 Python ``AdmissionController``, then asserts that the **admission outcome**
 (admitted/denied), **HTTP status code**, and **message text** are equivalent.
 
@@ -22,10 +22,10 @@ Known, documented divergences are asserted separately and annotated:
    the stricter-but-compatible behavior (both reject the transaction,
    just at different layers).
 
-The file is runtime-aware: the runtime serving port 8080 is detected from
+The file is runtime-aware: the runtime serving port 8098 is detected from
 its health envelope (Spring Boot actuator exposes ``components``; the
 Python kernel exposes ``database``/``catalog``). JVM-comparison tests are
-skipped whenever :8080 does not serve the JVM — including the post-cutover
+skipped whenever :8098 does not serve the JVM — including the post-cutover
 state where the Python kernel is permanent — so the suite stays green in
 CI. The Python-only fixture tests always run (no network dependency).
 """
@@ -45,15 +45,15 @@ from peb_kernel.api import AdmissionController
 from peb_kernel.engine import PebGovernanceEngine
 from peb_kernel.store import InMemoryPebStore
 
-JVM_URL = "http://localhost:8080/api/v1/peb/transaction"
+JVM_URL = "http://localhost:8098/api/v1/peb/transaction"
 FIXTURE_PATH = (
     Path(__file__).resolve().parents[3]
     / "typespec/v1/peb-kernel/conformance/admission_cases.json"
 )
 
 
-def _runtime_on_8080() -> str | None:
-    """Detect which PEB runtime is serving port 8080 ("jvm" | "python" | None).
+def _runtime_on_8098() -> str | None:
+    """Detect which PEB runtime is serving port 8098 ("jvm" | "python" | None).
 
     Both runtimes serve ``GET /actuator/health`` with ``status: UP``, so the
     status field alone cannot discriminate. Spring Boot's actuator envelope
@@ -62,7 +62,7 @@ def _runtime_on_8080() -> str | None:
     """
     try:
         resp = urllib.request.urlopen(
-            "http://localhost:8080/actuator/health", timeout=3
+            "http://localhost:8098/actuator/health", timeout=3
         )
         data = json.loads(resp.read())
         if "components" in data:
@@ -74,13 +74,13 @@ def _runtime_on_8080() -> str | None:
         return None
 
 
-# True iff the live JVM kernel is serving :8080 at import time. JVM-comparison
+# True iff the live JVM kernel is serving :8098 at import time. JVM-comparison
 # tests are skipped when Python is serving (permanent post-cutover state); the
 # Python-only fixture tests are never gated on the network.
-JVM_RUNNING = _runtime_on_8080() == "jvm"
+JVM_RUNNING = _runtime_on_8098() == "jvm"
 
 jvm_required = pytest.mark.skipif(
-    not JVM_RUNNING, reason="JVM PEB kernel not serving on port 8080 (Python runtime active)"
+    not JVM_RUNNING, reason="JVM PEB kernel not serving on port 8098 (Python runtime active)"
 )
 
 

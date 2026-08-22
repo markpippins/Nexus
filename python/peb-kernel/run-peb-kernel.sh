@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run-peb-kernel.sh — peb-kernel systemd wrapper (Python, port 8080)
+# run-peb-kernel.sh — peb-kernel systemd wrapper (Python, port 8098)
 #
 # WHY: The systemd unit's ExecStart must point at a wrapper script, not a
 # bare `python -m` invocation, so that environment setup, prerequisite
@@ -14,7 +14,7 @@
 #      half-functional service that silently accepts requests.
 #
 # Environment:
-#   PEB_PORT          — listen port (default 8080, matches JVM)
+#   PEB_PORT          — listen port (default 8098, matches JVM)
 #   PEB_HOST          — bind address (default 0.0.0.0)
 #   PEB_STORE         — "postgres" (production) or "memory" (tests)
 #   PEB_DATABASE_URL  — PostgreSQL DSN when PEB_STORE=postgres
@@ -29,7 +29,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # ── Defaults (mirror sysadmin-config.json + JVM application.yml) ───────
-export PEB_PORT="${PEB_PORT:-8080}"
+export PEB_PORT="${PEB_PORT:-8098}"
 export PEB_HOST="${PEB_HOST:-0.0.0.0}"
 export PEB_STORE="${PEB_STORE:-postgres}"
 export PEB_DATABASE_URL="${PEB_DATABASE_URL:-postgresql://pguser:pgpass@localhost:5432/nexus}"

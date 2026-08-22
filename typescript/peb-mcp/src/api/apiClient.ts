@@ -16,10 +16,11 @@ export interface PebStateResponse {
   cognitive_mode: string;
 }
 
-const PEB_URL = process.env.PEB_KERNEL_URL || 'http://localhost:8080/api/v1/peb';
+const PEB_URL = process.env.PEB_KERNEL_URL || 'http://localhost:8098/api/v1/peb';
 
 /**
- * PebApiClient handles the communication with the Spring Boot PEB Kernel.
+ * PebApiClient handles the communication with the PEB Kernel (Python
+ * FastAPI runtime on 8098; the JVM Spring Boot runtime is the retained backup).
  * Every tool facade invokes `submitTransaction` to enforce admission rules.
  */
 export class PebApiClient {

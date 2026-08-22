@@ -11,7 +11,7 @@ set -e
 echo "=== Restarting PEB Kernel ==="
 
 RUNTIME="${PEB_KERNEL_RUNTIME:-jvm}"
-PEB_PORT="${PEB_PORT:-8080}"
+PEB_PORT="${PEB_PORT:-8098}"
 HEALTH_URL="http://localhost:${PEB_PORT}/actuator/health"
 
 # ── Kill any existing PEB process ──────────────────────────────────────

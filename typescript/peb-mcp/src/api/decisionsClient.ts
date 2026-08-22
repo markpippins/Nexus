@@ -1,6 +1,6 @@
 /**
  * Client for peb-srv REST API (port 3111).
- * Separate from PebApiClient which talks to the Spring Boot PEB kernel (port 8080).
+ * Separate from PebApiClient which talks to the PEB kernel (port 8098).
  */
 const PEB_SRV_URL = process.env.PEB_SRV_URL || 'http://localhost:3111/api/peb';
 
