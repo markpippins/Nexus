@@ -1,3 +1,4 @@
+import datetime
 import uuid
 from typing import Optional
 
@@ -41,6 +42,22 @@ async def create_segment_set(
         name,
         description,
         metadata,
+    )
+
+
+async def list_segment_sets(limit: int = 200, offset: int = 0) -> list[asyncpg.Record]:
+    """List all current-valid segment sets."""
+    pool = get_pool()
+    return await pool.fetch(
+        """
+        select id, name, description, status, metadata, created_at, updated_at
+        from nebula.segment_sets
+        where valid_until > now()
+        order by created_at desc
+        limit $1 offset $2
+        """,
+        limit,
+        offset,
     )
 
 
@@ -220,7 +237,7 @@ async def list_domain_links(
 
 # ── Transcript-ingest support ────────────────────────────────────────
 
-_SEG_HISTORY_FOREVER = "9999-12-31 23:59:59+00"  # segments_history sentinel
+_SEG_HISTORY_FOREVER = datetime.datetime(9999, 12, 31, 23, 59, 59, tzinfo=datetime.timezone.utc)  # segments_history sentinel
 
 
 async def create_segment_set_from_segments(
@@ -262,14 +279,14 @@ async def create_segment_set_from_segments(
                 seg_id = await conn.fetchval(
                     """
                     insert into nebula.segments_history
-                        (conversation_id, snapshot_id,
+                        (id, conversation_id, snapshot_id,
                          start_block_id, end_block_id,
                          start_block_index, end_block_index,
                          segment_type, state, source,
                          title, notes_md, created_by,
                          as_of_dt, expiration_dt)
-                    values ($1, $2, $3, $4, $5, $6, $7, 'ACTIVE', 'HARVEST',
-                            $8, $9, 'SYSTEM', now(), $10)
+                    values (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7,
+                            'ACTIVE', 'HARVEST', $8, $9, 'SYSTEM', now(), $10)
                     returning id
                     """,
                     conversation_id,

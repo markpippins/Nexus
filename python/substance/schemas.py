@@ -47,7 +47,7 @@ class SegmentSetOut(BaseModel):
     metadata: dict
     created_at: dt.datetime
     updated_at: dt.datetime
-    segments: list[ResolvedSegment]
+    segments: list[ResolvedSegment] = []
 
 
 class MembersAddIn(BaseModel):

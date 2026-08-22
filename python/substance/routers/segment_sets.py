@@ -40,6 +40,12 @@ async def cached_resolve(segment_set_id: uuid.UUID) -> SegmentSetOut:
     return resolved
 
 
+@router.get("", response_model=list[SegmentSetOut])
+async def list_segment_sets(limit: int = 200, offset: int = 0):
+    rows = await repo.list_segment_sets(limit=limit, offset=offset)
+    return [SegmentSetOut.model_validate(dict(r)) for r in rows]
+
+
 @router.post("", response_model=SegmentSetOut, status_code=201)
 async def create_segment_set(body: SegmentSetCreate):
     row = await repo.create_segment_set(body.name, body.description, body.metadata)
