@@ -11,6 +11,8 @@ WORKDIR /app/wind-srv
 COPY wind-srv/package.json ./
 COPY heartbeat-client ../heartbeat-client
 RUN npm install --omit=dev --no-package-lock
+# Build file: sibling so its dist/ exists at runtime (main -> ./dist/index.js)
+RUN cd ../heartbeat-client && npm install --no-package-lock --include=dev && npm run build
 
 COPY wind-srv/src ./src
 

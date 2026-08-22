@@ -8,6 +8,8 @@ WORKDIR /app/kernel-srv
 COPY kernel-srv/package.json ./
 COPY heartbeat-client ../heartbeat-client
 RUN npm install --no-package-lock
+# Build file: sibling so its dist/ exists at runtime (main -> ./dist/index.js)
+RUN cd ../heartbeat-client && npm install --no-package-lock && npm run build
 COPY kernel-srv/tsconfig.json ./
 COPY kernel-srv/src ./src
 RUN npm run build
