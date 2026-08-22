@@ -294,7 +294,7 @@ def ollama_chat(model: str, chunk_text: str, timeout: int = 900) -> list[dict]:
 # ── Document selection + chunking ────────────────────────────────────
 
 def pending_documents(limit: int | None) -> list[dict]:
-    """Documents with a delivered pg.harvests artifact and no consumer watermark."""
+    """Most-recent-first selection (hourly cadence default)."""
     sql = """
       SELECT d.id::text, d.title, d.metadata->>'content_hash' AS content_hash,
              a.ref->>'harvest_id' AS harvest_id,
@@ -310,6 +310,32 @@ def pending_documents(limit: int | None) -> list[dict]:
       ORDER BY d.created_at DESC
       LIMIT %s"""
     return pg_fetchall(sql, (CONSUMER_PROFILE, CONSUMER_VERSION, limit or 10**9))
+
+
+def largest_pending_documents(limit: int | None) -> list[dict]:
+    """Largest-first selection (manual deep-extraction runs): ranked by total
+    transcript content length."""
+    sql = """
+      SELECT d.id::text, d.title, d.metadata->>'content_hash' AS content_hash,
+             a.ref->>'harvest_id' AS harvest_id,
+             COALESCE(sum(s.end_turn - s.start_turn + 1), 0)::int AS seg_count,
+             COALESCE(sum(t.len), 0)::bigint AS content_len
+      FROM absorb.documents d
+      JOIN absorb.artifacts a ON a.document_id = d.id AND a.artifact_type='pg.harvests'
+      LEFT JOIN absorb.segments s ON s.document_id = d.id
+      LEFT JOIN LATERAL (
+          SELECT sum(length(u.content_md)) AS len FROM absorb.turns u
+          WHERE u.document_id = d.id
+            AND u.turn_index BETWEEN s.start_turn AND s.end_turn
+      ) t ON true
+      WHERE NOT EXISTS (
+        SELECT 1 FROM absorb.watermarks w
+        WHERE w.profile_id=%s AND w.profile_version=%s
+          AND w.source_fingerprint = d.id::text)
+      GROUP BY d.id, d.title, content_hash, harvest_id
+      ORDER BY content_len DESC
+      LIMIT %s"""
+    return pg_fetchall(sql, (CONSUMER_PROFILE, CONSUMER_VERSION, limit or 10))
 
 
 def document_chunks(document_id: str, max_chars: int) -> list[str]:
@@ -398,11 +424,20 @@ def main(argv=None) -> int:
     c.add_argument("--role-config", default="Rover",
                    help="tackle AI role config driving the tackle backend")
     c.add_argument("--chunk-chars", type=int, default=12000)
+    c.add_argument("--largest", type=int, metavar="N",
+                   help="process the N largest pending documents (by transcript size) "
+                        "instead of most-recent")
     c.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
 
-    docs = pending_documents(args.limit)
-    print(f"{len(docs)} document(s) pending candidate extraction")
+    if getattr(args, 'largest', None):
+        docs = largest_pending_documents(args.largest)
+        print(f"largest {len(docs)} pending document(s):")
+        for d in docs:
+            print(f"  ~ {int(d.get('content_len', 0))//1024}KB {d['title'][:60]}")
+    else:
+        docs = pending_documents(args.limit)
+        print(f"{len(docs)} document(s) pending candidate extraction")
     ok = failed = candidates_written = 0
     for d in docs:
         label = f"{(d['title'] or '?')[:52]}"
