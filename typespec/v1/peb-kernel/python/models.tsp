@@ -8,18 +8,19 @@ namespace org.nexus.pebkernel {
 
   /** Admission request for a PEB transaction. */
   model PebTransactionRequest {
+    /** Optional caller-supplied UUID; the Python domain assigns one when omitted. */
+    @format("uuid")
+    id?: string;
     idempotencyKey: string;
     entityId: string;
     toolName: string;
-    input: Record<unknown>;
+    input: unknown;
   }
 
-  /** Admission decision. */
+  /** Admission decision shared with the Spring PEB contract. */
   model AdmissionResponse {
+    message: string;
     admitted: boolean;
-    /** Admission path / disposition. */
-    path?: string;
-    decision?: Record<unknown>;
   }
 
   /** Health response. */

@@ -31,6 +31,19 @@ def make_transaction(tool_name: str, payload: Any | None = None) -> PebTransacti
     )
 
 
+def test_typespec_request_preserves_optional_id() -> None:
+    transaction = PebTransaction.from_payload(
+        {
+            "id": "00000000-0000-0000-0000-000000000001",
+            "idempotencyKey": "parity-with-id",
+            "entityId": "contract-test",
+            "toolName": "peb_validate_transition",
+            "input": {"from_state": "a", "to_state": "b"},
+        }
+    )
+    assert str(transaction.id) == "00000000-0000-0000-0000-000000000001"
+
+
 @pytest.mark.parametrize("tool_name", VALIDATION_TOOLS)
 def test_typespec_validate_tools_are_allowed(tool_name: str) -> None:
     transaction = make_transaction(tool_name)
