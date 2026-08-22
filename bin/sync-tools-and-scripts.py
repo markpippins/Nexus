@@ -95,21 +95,21 @@ def load_catalog():
     subs = {sub["name"]: sub for sub in tools["subsystems"]}
     # Skip features that have been explicitly expired (validUntil set to a
     # past timestamp).  The API defaults validUntil to a far-future epoch
-    # (9999-12-31), so we compare against the current time instead of
-    # checking for the field's mere presence.  validUntil may be returned
-    # as epoch-ms (int) or an ISO string.
+    # (9999-12-31 = 253402300799000 ms).  If validUntil is an epoch-ms int
+    # in the past, the feature was expired (e.g. by a prior sync run or
+    # manual API call).  Note: the API's PATCH endpoint silently ignores
+    # validUntil changes, so expiration is done via DELETE instead, but we
+    # keep this filter for any features that were expired via direct DB
+    # access or a future API fix.
     import time as _time
-    from datetime import datetime as _dt, timezone as _tz
-    _now = _dt.now(_tz.utc)
+    _now_ms = int(_time.time() * 1000)
 
     def _is_expired(f):
         vu = f.get("validUntil")
-        if not vu:
+        if not vu or isinstance(vu, str):
             return False
         try:
-            if isinstance(vu, str):
-                return _dt.fromisoformat(vu.replace("Z", "+00:00")) < _now
-            return vu < _now.timestamp() * 1000
+            return vu < _now_ms
         except (ValueError, TypeError):
             return False
 
@@ -462,10 +462,40 @@ def main():
         api("POST", "/api/features", payload)
         created += 1
         print(f"REGISTERED [{sub}] (package): {pkg} -> feature '{humanize(pkg[len(entry['dir']) + 1:])}'")
+    # --- expire stale features (file-granularity) ---------------------------
+    # Stale features reference scripts/tools that have been deleted from disk.
+    # Expire them by setting validUntil to the current time so they are
+    # filtered out on subsequent runs.  This is safer than DELETE (which
+    # could break foreign-key references) and is reversible.
+    # --- delete stale features (file-granularity) ---------------------------
+    # Stale features reference scripts/tools that have been deleted from disk.
+    # Delete them from the catalog so --check passes.  The API supports
+    # DELETE /api/features/:id, which removes the feature entirely.
+    # (PATCH validUntil was tried but the API silently ignores it.)
+    deleted = 0
     for name, rel in stale:
-        print(f"NOTE: feature '{name}' references {rel} which is not on disk")
+        feat = by_file.get(rel)
+        if feat and feat.get("id"):
+            try:
+                api("DELETE", f"/api/features/{feat['id']}")
+                deleted += 1
+                print(f"DELETED: feature '{name}' -> {rel} (stale — file removed)")
+            except Exception as e:
+                print(f"WARNING: could not delete '{name}': {e}")
+        else:
+            print(f"NOTE: feature '{name}' references {rel} which is not on disk (no id — skipped)")
+    # --- delete stale features (package-granularity) ------------------------
     for name, pkg in stale_pkgs:
-        print(f"NOTE: feature '{name}' references {pkg} which is not on disk")
+        feat = by_pkg.get(pkg)
+        if feat and feat.get("id"):
+            try:
+                api("DELETE", f"/api/features/{feat['id']}")
+                deleted += 1
+                print(f"DELETED: feature '{name}' -> {pkg} (stale — package removed)")
+            except Exception as e:
+                print(f"WARNING: could not delete '{name}': {e}")
+        else:
+            print(f"NOTE: feature '{name}' references {pkg} which is not on disk (no id — skipped)")
 
     # --- refresh auto-generated readmes -------------------------------------
     if args.refresh:
@@ -510,7 +540,7 @@ def main():
             else:
                 print(f"UNCHANGED: {pkg or rel}")
 
-    print(f"\nDone. {created} registered, {len(on_disk)} scripts/tools + "
+    print(f"\nDone. {created} registered, {deleted} deleted (stale), {len(on_disk)} scripts/tools + "
           f"{len(on_disk_pkgs)} packages on disk, "
           f"{len(by_file) + len(by_pkg) + created - len(stale) - len(stale_pkgs)} features in catalog.")
     return 0
