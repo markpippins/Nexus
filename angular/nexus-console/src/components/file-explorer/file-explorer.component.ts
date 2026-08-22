@@ -147,6 +147,7 @@ export class FileExplorerComponent implements OnDestroy {
   // --- README Banner State ---
   readmeContent = signal<string | null>(null);
   isReadmeLoading = signal(false);
+  isReadmeDismissed = signal(false);
   renderedReadmeHtml = computed(() => {
     const content = this.readmeContent();
     if (!content) return null;
@@ -365,6 +366,7 @@ export class FileExplorerComponent implements OnDestroy {
     this.state.set({ status: 'loading', items: [] });
     this.readmeContent.set(null); // Clear readme on navigation
     this.isReadmeLoading.set(false);
+    this.isReadmeDismissed.set(false);
     try {
       const items = await this.fileSystemProvider().getContents(requestedPath);
 
