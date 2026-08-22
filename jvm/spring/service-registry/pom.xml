@@ -127,6 +127,17 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <!-- Explicit repackage binding: parent is the custom nexus
+                     POM (not spring-boot-starter-parent), so no default
+                     executions exist. Makes `mvn package` produce the
+                     executable fat jar for dockerized deploys. -->
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
