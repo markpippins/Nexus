@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily vanadium CI backup to barium (04:15)
+
+[Timer]
+# 04:15 — after the 03:30 PG pipeline clears. Persistent=true catch-up.
+OnCalendar=*-*-* 04:15:00
+Persistent=true
+RandomizedDelaySec=15min
+
+[Install]
+WantedBy=timers.target
