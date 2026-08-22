@@ -47,7 +47,7 @@ Assembly forum service: forums, threads, comments, users, harvests, work request
 | POST | `/api/forums` |  |
 | DELETE | `/api/forums/:id` |  |
 | PUT | `/api/forums/:id` |  |
-| GET | `/api/forums/:slug/threads` |  |
+| GET | `/api/forums/:slug/threads` | param is present the response is an envelope { items, total, page, pageSize }; without them it stays a flat array for legacy consumers (Angular assembly app, duality-ui, scripts) 3. responses are cached in-memory for 60s and sent with a short Cache-Control (public, max-age=60, stale-while-revalidate |
 | POST | `/api/forums/:slug/threads` |  |
 | GET | `/api/forums/by-id/:forumId/threads` |  |
 | POST | `/api/forums/by-id/:forumId/threads` | UUID-based thread endpoints (avoids slug resolution round-trip) |
@@ -95,6 +95,8 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
+
 
 
 

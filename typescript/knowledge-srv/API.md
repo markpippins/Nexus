@@ -33,6 +33,8 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 
 
 
+
+
 ---
 
 # knowledge-srv — REST & Envelope Spec

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: assembly-srv — Assembly Forum REST API
-  version: 1.0.efb19d53
+  version: 1.0.a00a7b02
   description: 'Assembly forum service: forums, threads, comments, users, harvests, work requests, agent records, agendas,
     plans, specifications, assessments, observations, search, counts, and stats refresh.
 
@@ -1322,6 +1322,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: param is present the response is an envelope { items, total, page, pageSize }; without them it stays a flat
+        array for legacy consumers (Angu
       parameters:
       - name: slug
         in: path
