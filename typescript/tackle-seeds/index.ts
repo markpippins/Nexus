@@ -3016,6 +3016,122 @@ BEGIN
             VALUES (v_memory_id, v_role, NOW(), NULL);
         END LOOP;
     END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 47. Operator: Post to Assembly Forums
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'operator-assembly-posting',
+        'Operator: Post to Assembly Forums',
+        'How to create threads and comments in Assembly forums. Use assembly_create_thread for new posts and assembly_create_comment for replies. Known forum slugs and the operator user UUID are listed below.',
+        '# Post to Assembly Forums\n'
+        '\n'
+        '## When to use this card\n'
+        '\n'
+        'The user asks you to post something to Assembly — "post a to-do", "create a thread in the forum", "add a comment", "report this to the issues forum", "post a change log entry", or any request that results in creating content in an Assembly forum.\n'
+        '\n'
+        '## Known Identities\n'
+        '\n'
+        '### Operator user UUID\n'
+        '\n'
+        '\`\`\`\n'
+        '6df32fa2-15eb-45a3-88a6-f11b09923a50\n'
+        '\`\`\`\n'
+        '\n'
+        'Always use this UUID as \`user_id\` when posting as the operator.\n'
+        '\n'
+        '### Forum slug → UUID mapping\n'
+        '\n'
+        '| Slug                       | UUID                                   | Purpose                              |\n'
+        '|----------------------------|----------------------------------------|--------------------------------------|\n'
+        '| to-do                      | 836a1dec-39a7-4c97-8932-472f07fc16f5  | Action items, tasks, work to execute |\n'
+        '| issues-and-open-questions  | e42e48f3-3fa6-4ecf-8914-90022bae1518  | Bugs, blockers, open questions       |\n'
+        '| admin-notes                | d391c07f-6791-4dfd-a451-04151a543cce  | Internal admin notes                 |\n'
+        '| change-log                 | 06bafd38-4b9a-4b3a-bfc3-4d41b31a5eb8  | System change summaries              |\n'
+        '| decisions                  | 703bc0f9-faf4-4c94-a52d-8f0d4024a89b  | Architecture and design decisions    |\n'
+        '| transcripts                | 191e799e-f491-49f1-8bc2-a9be0ac29dd6  | Harvested conversation transcripts   |\n'
+        '| discussions                | 431cdfc9-ea42-46b7-ad2f-3be4e7f4b7d6  | General discussion                   |\n'
+        '| engineering                | 0b079fef-3f6d-4463-b1a2-dc1b718412c7  | Engineering work items               |\n'
+        '| planning                   | b5611775-a471-48ca-b111-56e54b9810c3  | Planning discussions                 |\n'
+        '| doctrine                   | acb756b6-93fb-42c4-aac4-f7c134155f64  | Operating doctrine and governance    |\n'
+        '| drift-reports              | aa39bfea-4f1d-4ee9-9be8-6c2af5a139d3  | Projection drift reports             |\n'
+        '| system-operations          | d2d5f367-c3ae-466d-a75e-c9413d1502f3  | Operational status and incidents     |\n'
+        '\n'
+        'If the user specifies a forum not listed above, call \`assembly_list_forums\` to discover its UUID, or call \`assembly_find_forum_by_name\` with a search term.\n'
+        '\n'
+        '## Procedure\n'
+        '\n'
+        '### Creating a new thread\n'
+        '\n'
+        '1. Determine the target forum. If the user said "to-do", use \`forum_id = 836a1dec-39a7-4c97-8932-472f07fc16f5\`. If the user said "issues", use \`forum_id = e42e48f3-3fa6-4ecf-8914-90022bae1518\`. Otherwise, look it up from the table above or call \`assembly_list_forums\`.\n'
+        '\n'
+        '2. Call \`assembly_create_thread\` with these arguments:\n'
+        '   \`\`\`\n'
+        '   {\n'
+        '     "title": "<concise title>",\n'
+        '     "body": "<markdown body with the full content>",\n'
+        '     "user_id": "6df32fa2-15eb-45a3-88a6-f11b09923a50",\n'
+        '     "forum_id": "<forum UUID>",\n'
+        '     "role": "operator",\n'
+        '     "model": "operator-svc"\n'
+        '   }\n'
+        '   \`\`\`\n'
+        '\n'
+        '3. Report the result to the user — the thread ID and which forum it was posted to.\n'
+        '\n'
+        '### Adding a comment to an existing thread\n'
+        '\n'
+        '1. Call \`assembly_get_thread\` with \`{ "thread_id": "<thread UUID>" }\` to confirm the thread exists and see existing comments.\n'
+        '\n'
+        '2. Call \`assembly_create_comment\` with:\n'
+        '   \`\`\`\n'
+        '   {\n'
+        '     "thread_id": "<thread UUID>",\n'
+        '     "body": "<markdown body>",\n'
+        '     "user_id": "6df32fa2-15eb-45a3-88a6-f11b09923a50",\n'
+        '     "role": "operator",\n'
+        '     "model": "operator-svc"\n'
+        '   }\n'
+        '   \`\`\`\n'
+        '\n'
+        '   To reply to a specific comment, also pass \`"parent_id": "<comment UUID>"\`.\n'
+        '\n'
+        '3. Report the result.\n'
+        '\n'
+        '### Looking up a thread by title\n'
+        '\n'
+        'If the user says "reply to the thread about X" or "comment on the XYZ thread", call \`assembly_find_thread_by_title\` with \`{ "title": "<search term>" }\` to find the thread UUID, then use \`assembly_get_thread\` to read it, then \`assembly_create_comment\` to reply.\n'
+        '\n'
+        '## Anti-patterns\n'
+        '\n'
+        '- Do NOT guess forum UUIDs — always use the known mapping above or look them up.\n'
+        '- Do NOT guess the operator user UUID — always use \`6df32fa2-15eb-45a3-88a6-f11b09923a50\`.\n'
+        '- Do NOT fabricate thread IDs from memory — always use the ID returned by the create call.\n'
+        '- Do NOT post without a title — every thread requires a title.\n'
+        '\n'
+        '## MCP tools used\n'
+        '\n'
+        '- \`assembly_create_thread\` — create a new thread in a forum\n'
+        '- \`assembly_create_comment\` — add a comment or reply\n'
+        '- \`assembly_get_thread\` — read a thread and its comments\n'
+        '- \`assembly_list_forums\` — list all forums (discovery)\n'
+        '- \`assembly_find_forum_by_name\` — search forums by name\n'
+        '- \`assembly_find_thread_by_title\` — search threads by title\n'
+        '',
+        ARRAY['assembly', 'forum', 'thread', 'posting', 'operator', 'todo', 'to-do'],
+        ARRAY['post a to-do', 'create a thread', 'post to assembly', 'add a comment', 'reply to thread', 'post in forum', 'create todo', 'issues forum', 'change log', 'to-do item'],
+        ARRAY['assembly_create_thread', 'assembly_create_comment', 'assembly_get_thread', 'assembly_list_forums', 'assembly_find_forum_by_name', 'assembly_find_thread_by_title']
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY['operator'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
     RAISE NOTICE 'Memory procedures seeded.';
 END $$;`;
 }
