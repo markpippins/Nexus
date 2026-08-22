@@ -1,0 +1,89 @@
+[
+  {
+    "name": "validate path with valid transaction",
+    "toolName": "peb_validate_transition",
+    "entityId": "fixture-entity",
+    "input": {},
+    "expectedPath": "VALIDATE",
+    "defaultAdmissionResult": "ALLOWED",
+    "validatorPasses": true,
+    "engineAdmissionResult": "ALLOWED",
+    "admitted": true,
+    "message": "Validation processed"
+  },
+  {
+    "name": "mutate path with valid transaction",
+    "toolName": "peb_record_decision",
+    "entityId": "fixture-entity",
+    "input": {},
+    "expectedPath": "MUTATE",
+    "defaultAdmissionResult": "ALLOWED",
+    "validatorPasses": true,
+    "engineAdmissionResult": "ALLOWED",
+    "admitted": true,
+    "message": "Mutation processed"
+  },
+  {
+    "name": "violation report bypasses structural validator",
+    "toolName": "peb_report_violation",
+    "entityId": "fixture-entity",
+    "input": {
+      "violation_type": "authority_leakage",
+      "severity": "hard"
+    },
+    "expectedPath": "REPORT_VIOLATION",
+    "defaultAdmissionResult": "REJECTED",
+    "validatorPasses": true,
+    "engineAdmissionResult": "REJECTED",
+    "admitted": true,
+    "message": "Violation recorded as REJECTED"
+  },
+  {
+    "name": "unknown tool fails closed",
+    "toolName": "unknown_tool",
+    "entityId": "fixture-entity",
+    "input": {},
+    "expectedPath": "UNKNOWN",
+    "defaultAdmissionResult": "ROUTED",
+    "validatorPasses": false,
+    "engineAdmissionResult": "REJECTED",
+    "admitted": false,
+    "message": "Admission denied by invariant validator"
+  },
+  {
+    "name": "blank entity fails structural validation",
+    "toolName": "peb_validate_transition",
+    "entityId": " ",
+    "input": {},
+    "expectedPath": "VALIDATE",
+    "defaultAdmissionResult": "ALLOWED",
+    "validatorPasses": false,
+    "engineAdmissionResult": "REJECTED",
+    "admitted": false,
+    "message": "Admission denied by invariant validator"
+  },
+  {
+    "name": "null input fails structural validation",
+    "toolName": "peb_validate_transition",
+    "entityId": "fixture-entity",
+    "input": null,
+    "expectedPath": "VALIDATE",
+    "defaultAdmissionResult": "ALLOWED",
+    "validatorPasses": false,
+    "engineAdmissionResult": "REJECTED",
+    "admitted": false,
+    "message": "Admission denied by invariant validator"
+  },
+  {
+    "name": "null tool fails closed",
+    "toolName": null,
+    "entityId": "fixture-entity",
+    "input": {},
+    "expectedPath": "UNKNOWN",
+    "defaultAdmissionResult": "ROUTED",
+    "validatorPasses": false,
+    "engineAdmissionResult": "REJECTED",
+    "admitted": false,
+    "message": "Admission denied by invariant validator"
+  }
+]

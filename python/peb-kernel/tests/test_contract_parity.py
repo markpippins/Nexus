@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -99,3 +101,28 @@ def test_typespec_admission_response_wire_shape_is_shared() -> None:
     assert set(response.to_dict()) == {"message", "admitted"}
     assert isinstance(response.to_dict()["message"], str)
     assert isinstance(response.to_dict()["admitted"], bool)
+
+
+def admission_cases() -> list[dict[str, Any]]:
+    fixture = Path(__file__).resolve().parents[3] / "typespec/v1/peb-kernel/conformance/admission_cases.json"
+    return json.loads(fixture.read_text())
+
+
+@pytest.mark.parametrize("case", admission_cases(), ids=lambda case: case["name"])
+def test_shared_admission_fixture_matches_python_engine(case: dict[str, Any]) -> None:
+    transaction = PebTransaction(
+        idempotency_key="shared-fixture",
+        entity_id=case["entityId"],
+        tool_name=case["toolName"],
+        input=case["input"],
+    )
+    path = AdmissionPath.from_tool_name(transaction.tool_name)
+    validator_passes = PebGovernanceEngine(InMemoryPebStore()).validator.validate(transaction)
+    response = PebGovernanceEngine(InMemoryPebStore()).process_for_path(transaction, path)
+
+    assert path.value == case["expectedPath"]
+    assert path.default_admission_result().value == case["defaultAdmissionResult"]
+    assert validator_passes is case["validatorPasses"]
+    assert transaction.admission_result.value == case["engineAdmissionResult"]
+    assert response.admitted is case["admitted"]
+    assert response.message == case["message"]

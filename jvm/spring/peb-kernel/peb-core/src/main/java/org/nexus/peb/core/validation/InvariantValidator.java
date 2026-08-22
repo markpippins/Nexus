@@ -70,7 +70,7 @@ public class InvariantValidator {
         }
 
         // ── input payload must be present ──
-        if (transaction.getInput() == null) {
+        if (transaction.getInput() == null || transaction.getInput().isNull()) {
             log.warn("InvariantValidator: rejecting transaction {} — "
                      + "input payload is null", transaction.getId());
             return false;
