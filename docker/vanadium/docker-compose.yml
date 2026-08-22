@@ -1,10 +1,4 @@
-# docker/vanadium — the vanadium failover tier manifest.
-# Operator scope 2026-08-22: the 17 .directory-marked typescript servers
-# + jvm/spring/service-registry (+ service-broker and jvm/spring/peb-kernel
-# once built). Container names prefixed vd-; host ports via *_HOST_PORT env
-# so the same file serves local smoke tests (offset ports) and vanadium.
 name: nexus-vanadium-tier
-
 services:
   wind:
     build:
@@ -15,8 +9,9 @@ services:
     environment:
       WIND_SRV_PORT: ${WIND_SRV_PORT:-3300}
       NEXUS_PG_DSN: ${NEXUS_PG_DSN}
+      HEARTBEAT_REGISTRY_URL: ${HEARTBEAT_REGISTRY_URL:-}
     ports:
-      - "${WIND_HOST_PORT:-3300}:3300"
+    - ${WIND_HOST_PORT:-3300}:3300
   tackle:
     build:
       context: ../../typescript
@@ -30,8 +25,9 @@ services:
       MEMORY_REDIS_URL: ${MEMORY_REDIS_URL}
       MEMORY_SRV_URL: ${MEMORY_SRV_URL:-http://legacy-memory:3500}
       PIPELINE_ROOT: ${PIPELINE_ROOT:-/nexus}
+      HEARTBEAT_REGISTRY_URL: ${HEARTBEAT_REGISTRY_URL:-}
     ports:
-      - "${TACKLE_HOST_PORT:-3410}:3410"
+    - ${TACKLE_HOST_PORT:-3410}:3410
   kernel:
     build:
       context: ../../typescript
@@ -45,8 +41,9 @@ services:
       DB_USER: ${PG_USER:-pguser}
       DB_PASS: ${PG_PASS:-pgpass}
       DB_NAME: ${PG_DB_NAME:-nexus}
+      HEARTBEAT_REGISTRY_URL: ${HEARTBEAT_REGISTRY_URL:-}
     ports:
-      - "${KERNEL_HOST_PORT:-8100}:8100"
+    - ${KERNEL_HOST_PORT:-8100}:8100
   peb:
     build:
       context: ../../typescript
@@ -56,8 +53,9 @@ services:
     environment:
       PEB_SRV_PORT: ${PEB_SRV_PORT:-3111}
       PEB_PG_DSN: ${PEB_PG_DSN}
+      HEARTBEAT_REGISTRY_URL: ${HEARTBEAT_REGISTRY_URL:-}
     ports:
-      - "${PEB_HOST_PORT:-3111}:3111"
+    - ${PEB_HOST_PORT:-3111}:3111
   cascade:
     build:
       context: ../../typescript
@@ -72,7 +70,7 @@ services:
       DB_PASS: ${PG_PASS:-pgpass}
       DB_NAME: ${PG_DB_NAME:-nexus}
     ports:
-      - "${CASCADE_HOST_PORT:-3106}:3106"
+    - ${CASCADE_HOST_PORT:-3106}:3106
   harness:
     build:
       context: ../../typescript
@@ -97,9 +95,9 @@ services:
       CONDUIT_MCP_URL: ${CONDUIT_MCP_URL:-http://legacy-conduit:3100}
       NEXUS_PG_DSN: ${NEXUS_PG_DSN}
     volumes:
-      - ${HARNESS_WORK_DIR:-./work}:/nexus
+    - ${HARNESS_WORK_DIR:-./work}:/nexus
     ports:
-      - "${HARNESS_HOST_PORT:-3420}:3420"
+    - ${HARNESS_HOST_PORT:-3420}:3420
   pty:
     build:
       context: ../../typescript
@@ -109,8 +107,9 @@ services:
     environment:
       PTY_SRV_PORT: ${PTY_SRV_PORT:-3120}
       PTY_HOST: ${PTY_HOST:-127.0.0.1}
+      HEARTBEAT_REGISTRY_URL: ${HEARTBEAT_REGISTRY_URL:-}
     ports:
-      - "${PTY_HOST_PORT:-3120}:3121"
+    - ${PTY_HOST_PORT:-3120}:3121
   execution:
     build:
       context: ../../typescript
@@ -124,8 +123,9 @@ services:
       PGUSER: ${PG_USER:-pguser}
       PGPASSWORD: ${PG_PASS:-pgpass}
       PGDATABASE: ${PG_DB_NAME:-nexus}
+      HEARTBEAT_REGISTRY_URL: ${HEARTBEAT_REGISTRY_URL:-}
     ports:
-      - "${EXECUTION_HOST_PORT:-3110}:3110"
+    - ${EXECUTION_HOST_PORT:-3110}:3110
   prompt-sync:
     build:
       context: ../../typescript
@@ -139,8 +139,9 @@ services:
       TACKLE_PG_DSN: ${TACKLE_PG_DSN}
       CONDUIT_PG_DSN: ${CONDUIT_PG_DSN}
       MEMORY_REDIS_URL: ${MEMORY_REDIS_URL}
+      HEARTBEAT_REGISTRY_URL: ${HEARTBEAT_REGISTRY_URL:-}
     ports:
-      - "${PROMPT_HOST_PORT:-3501}:3501"
+    - ${PROMPT_HOST_PORT:-3501}:3501
   memory:
     build:
       context: ../../typescript
@@ -153,7 +154,7 @@ services:
       MEMORY_REDIS_URL: ${MEMORY_REDIS_URL:-redis://redis:6379}
       CONDUIT_PG_DSN: ${CONDUIT_PG_DSN}
     ports:
-      - "${MEMORY_HOST_PORT:-3500}:3500"
+    - ${MEMORY_HOST_PORT:-3500}:3500
   assembly:
     build:
       context: ../../typescript
@@ -161,10 +162,11 @@ services:
     container_name: vd-assembly
     restart: unless-stopped
     environment:
-      PORT: ${ASSEMBLY_HOST_PORT:-3107}
-      NEXUS_PG_DSN: ${NEXUS_PG_DSN}
+      ASSEMBLY_SRV_PORT: ${ASSEMBLY_SRV_PORT:-3107}
+      ASSEMBLY_PG_DSN: ${ASSEMBLY_PG_DSN}
+      HEARTBEAT_REGISTRY_URL: ${HEARTBEAT_REGISTRY_URL:-}
     ports:
-      - "${ASSEMBLY_HOST_PORT:-3107}:3107"
+    - ${ASSEMBLY_HOST_PORT:-3107}:3107
   conduit:
     build:
       context: ../../typescript
@@ -174,8 +176,9 @@ services:
     environment:
       CONDUIT_SRV_PORT: ${CONDUIT_HOST_PORT:-3104}
       CONDUIT_PG_DSN: ${CONDUIT_PG_DSN}
+      HEARTBEAT_REGISTRY_URL: ${HEARTBEAT_REGISTRY_URL:-}
     ports:
-      - "${CONDUIT_HOST_PORT:-3104}:3104"
+    - ${CONDUIT_HOST_PORT:-3104}:3104
   knowledge:
     build:
       context: ../../typescript
@@ -184,8 +187,14 @@ services:
     restart: unless-stopped
     environment:
       PORT: ${KNOWLEDGE_HOST_PORT:-3109}
+      PGHOST: ${PG_HOST}
+      PGPORT: ${PG_PORT}
+      PGDATABASE: ${PG_DB_NAME}
+      PGUSER: ${PG_USER}
+      PGPASSWORD: ${PG_PASS}
+      HEARTBEAT_REGISTRY_URL: ${HEARTBEAT_REGISTRY_URL:-}
     ports:
-      - "${KNOWLEDGE_HOST_PORT:-3109}:3109"
+    - ${KNOWLEDGE_HOST_PORT:-3109}:3109
   nebula:
     build:
       context: ../../typescript
@@ -193,9 +202,14 @@ services:
     container_name: vd-nebula
     restart: unless-stopped
     environment:
-      NEBULA_PORT: ${NEBULA_HOST_PORT:-3101}
+      PORT: ${NEBULA_SRV_PORT:-3101}
+      PG_HOST: ${PG_HOST}
+      PG_PORT: ${PG_PORT}
+      PG_USER: ${PG_USER}
+      PG_PASSWORD: ${PG_PASS}
+      PG_DB_NAME: ${PG_DB_NAME}
     ports:
-      - "${NEBULA_HOST_PORT:-3101}:3101"
+    - ${NEBULA_HOST_PORT:-3101}:3101
   semantics:
     build:
       context: ../../typescript
@@ -205,8 +219,9 @@ services:
     environment:
       SEMANTICS_SRV_PORT: ${SEMANTICS_HOST_PORT:-3160}
       SEMANTICS_PG_DSN: ${SEMANTICS_PG_DSN}
+      HEARTBEAT_REGISTRY_URL: ${HEARTBEAT_REGISTRY_URL:-}
     ports:
-      - "${SEMANTICS_HOST_PORT:-3160}:3160"
+    - ${SEMANTICS_HOST_PORT:-3160}:3160
   terrain-ts:
     build:
       context: ../../typescript/terrain-srv
@@ -215,7 +230,7 @@ services:
     environment:
       PORT: ${TERRAIN_TS_HOST_PORT:-8086}
     ports:
-      - "${TERRAIN_TS_HOST_PORT:-8086}:8084"
+    - ${TERRAIN_TS_HOST_PORT:-8086}:8084
   voyager:
     build:
       context: ../../typescript
@@ -223,9 +238,15 @@ services:
     container_name: vd-voyager
     restart: unless-stopped
     environment:
-      PORT: ${VOYAGER_HOST_PORT:-3114}
+      PORT: ${VOYAGER_SRV_PORT:-3114}
+      PG_HOST: ${PG_HOST}
+      PG_PORT: ${PG_PORT}
+      PG_USER: ${PG_USER}
+      PG_PASSWORD: ${PG_PASS}
+      PG_DB_NAME: ${PG_DB_NAME}
+      HEARTBEAT_REGISTRY_URL: ${HEARTBEAT_REGISTRY_URL:-}
     ports:
-      - "${VOYAGER_HOST_PORT:-3114}:3114"
+    - ${VOYAGER_HOST_PORT:-3114}:3114
   service-registry:
     image: nexus-vanadium/service-registry
     build:
@@ -234,15 +255,39 @@ services:
     container_name: vd-service-registry
     restart: unless-stopped
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://${PG_HOST}:${PG_PORT}/${PG_DB_NAME}?currentSchema=registry
+      # Dedicated registry DB per briefing — NEVER the shared nexus DB here;
+      # Hibernate auto-DDL would touch production schemas.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${PG_HOST}:${PG_PORT}/${REGISTRY_DB_NAME:-vanadium_registry}?currentSchema=registry
       SPRING_DATASOURCE_USERNAME: ${PG_USER}
       SPRING_DATASOURCE_PASSWORD: ${PG_PASS}
-      SPRING_DATA_REDIS_HOST: ${REGISTRY_REDIS_HOST:-172.17.0.1}
+      SPRING_JPA_PROPERTIES_HIBERNATE_HBM2DDL_CREATE_NAMESPACES: "true"
+      SPRING_DATA_REDIS_HOST: ${REGISTRY_REDIS_HOST:-redis}
     ports:
-      - "${REGISTRY_HOST_PORT:-8085}:8085"
+    - ${REGISTRY_HOST_PORT:-8085}:8085
+  broker-gateway:
+    image: nexus-vanadium/broker-gateway
+    build:
+      context: ../../jvm
+      dockerfile: spring/service-broker/broker-gateway/Dockerfile
+    container_name: vd-broker-gateway
+    restart: unless-stopped
+    depends_on:
+    - service-registry
+    - redis
+    environment:
+      SERVER_PORT: "8081"
+      GATEWAY_PG_URL: jdbc:postgresql://${PG_HOST}:${PG_PORT}/nexus?currentSchema=gateway
+      SPRING_DATASOURCE_USERNAME: ${PG_USER}
+      SPRING_DATASOURCE_PASSWORD: ${PG_PASS}
+      SPRING_JPA_PROPERTIES_HIBERNATE_HBM2DDL_CREATE_NAMESPACES: "true"
+      SPRING_DATA_MONGODB_URI: mongodb://${PG_HOST}:27017/nexus
+      SPRING_DATA_REDIS_HOST: ${GATEWAY_REDIS_HOST:-redis}
+      SERVICE_REGISTRY_URL: http://service-registry:8085
+    ports:
+    - ${GATEWAY_HOST_PORT:-8081}:8081
   redis:
     image: redis:7-alpine
     container_name: vd-redis
     restart: unless-stopped
     ports:
-      - "${REDIS_HOST_PORT:-6379}:6379"
+    - ${REDIS_HOST_PORT:-6379}:6379
