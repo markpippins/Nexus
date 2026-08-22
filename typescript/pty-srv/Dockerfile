@@ -10,6 +10,8 @@ WORKDIR /app/pty-srv
 COPY pty-srv/package.json ./
 COPY heartbeat-client ../heartbeat-client
 RUN npm install --no-package-lock
+# Build file: sibling so its dist/ exists at runtime (main -> ./dist/index.js)
+RUN cd ../heartbeat-client && npm install --no-package-lock && npm run build
 COPY pty-srv/tsconfig.json ./
 COPY pty-srv/src ./src
 RUN npm run build
