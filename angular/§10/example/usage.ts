@@ -1,5 +1,5 @@
-import { DesignIR } from "../src/types/designIR";
-import { DesignIRCompiler } from "../src/compiler/compiler";
+import { DesignIR } from "../src/core/types/designIR";
+import { DesignIRCompiler } from "../src/core/compiler/compiler";
 
 export const exampleDesignIR: DesignIR = {
   name: "Execution Overview",

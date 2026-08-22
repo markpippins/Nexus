@@ -1,16 +1,16 @@
-export * from "./types/designIR";
-export * from "./types/capabilities";
-export * from "./types/viewSpec";
-export * from "./adapter/types";
-export * from "./adapter/runtime";
-export * from "./widget/catalog";
-export * from "./compiler/compiler";
-export * from "./compiler/regionResolver";
-export { SimpleEventBus } from "./runtime/eventBus";
-export { WidgetRegistry } from "./runtime/widgetRegistry";
-export * from "./runtime/contractState";
-export { DefaultActionInterpreter } from "./runtime/actionInterpreter";
-export * from "./runtime/runtime";
+export * from "./core/types/designIR";
+export * from "./core/types/capabilities";
+export * from "./core/types/viewSpec";
+export * from "./core/adapter/types";
+export * from "./core/adapter/runtime";
+export * from "./core/widget/catalog";
+export * from "./core/compiler/compiler";
+export * from "./core/compiler/regionResolver";
+export { SimpleEventBus } from "./core/runtime/eventBus";
+export { WidgetRegistry } from "./core/runtime/widgetRegistry";
+export * from "./core/runtime/contractState";
+export { DefaultActionInterpreter } from "./core/runtime/actionInterpreter";
+export * from "./core/runtime/runtime";
 export type {
   RuntimeView,
   RuntimeWidget,
@@ -21,5 +21,5 @@ export type {
   EventHandler,
   WidgetImplementation,
   RuntimeOptions,
-} from "./runtime/types";
-export type { ActionHandler as RuntimeActionHandler } from "./runtime/actionInterpreter";
+} from "./core/runtime/types";
+export type { ActionHandler as RuntimeActionHandler } from "./core/runtime/actionInterpreter";

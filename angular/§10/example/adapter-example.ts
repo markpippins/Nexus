@@ -1,5 +1,5 @@
-import { AdapterRuntime } from "../src/adapter/runtime";
-import { Adapter } from "../src/adapter/types";
+import { AdapterRuntime } from "../src/core/adapter/runtime";
+import { Adapter } from "../src/core/adapter/types";
 
 const mockResponse = {
   metrics: {
