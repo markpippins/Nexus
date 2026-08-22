@@ -6,12 +6,14 @@ import { runMigrations } from './migrate';
 import { initRedis, closeRedis } from './services/block-segmentation-redis.service';
 
 // ── PostgreSQL Connection ──────────────────────────────────────────
+// Env overrides added for container deploys (vanadium failover tier);
+// defaults preserve the native localhost configuration.
 const pool = new Pool({
-  host: 'localhost',
-  port: 5432,
-  user: 'pguser',
-  password: 'pgpass',
-  database: 'nexus',
+  host: process.env.PG_HOST || 'localhost',
+  port: parseInt(process.env.PG_PORT || '5432', 10),
+  user: process.env.PG_USER || 'pguser',
+  password: process.env.PG_PASSWORD || process.env.PG_PASS || 'pgpass',
+  database: process.env.PG_DB_NAME || 'nexus',
   options: '-c search_path=nebula',
   max: 10,
   idleTimeoutMillis: 30000,
