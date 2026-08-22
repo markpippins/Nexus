@@ -14,6 +14,7 @@
 // SHAPE must not. That distinction is the whole point of the envelope check.
 
 import ballerina/http;
+import ballerina/io;
 import ballerina/lang.runtime;
 
 configurable string legacyBase = ?;
@@ -44,30 +45,27 @@ public function compareGet(string path, http:Client legacy,
 
     runtime:sleep(0.05); // gentle pacing; one target shares a LAN Pi
 
-    // Explicit Request + forward() => full http:Response back (status codes),
-    // rather than target-type payload extraction.
-    http:Request legacyReq = new;
-    legacyReq.method = "GET";
-
-    var lResp = legacy->forward(path, legacyReq, http:Response);
+    // Plain get() defaults to a full http:Response (status codes included).
+    http:Response|http:ClientError lResp = legacy->get(path);
     if lResp is http:Response {
         res.legacyStatus = lResp.statusCode;
-        var lj = lResp.getJsonPayload();
+        json|http:ClientError lj = lResp.getJsonPayload();
         if lj is map<json> {
             legacyEnvelope = lj;
         }
+    } else {
+        res.detail = "legacy: " + lResp.toString() + " ";
     }
 
-    http:Request candidateReq = new;
-    candidateReq.method = "GET";
-
-    var cResp = candidate->forward(path, candidateReq, http:Response);
+    http:Response|http:ClientError cResp = candidate->get(path);
     if cResp is http:Response {
         res.candidateStatus = cResp.statusCode;
-        var cj = cResp.getJsonPayload();
+        json|http:ClientError cj = cResp.getJsonPayload();
         if cj is map<json> {
             candidateEnvelope = cj;
         }
+    } else {
+        res.detail += "candidate: " + cResp.toString();
     }
 
     res.statusMatch = res.legacyStatus == res.candidateStatus;
@@ -112,4 +110,47 @@ function diffShape(map<json> a, map<json> b) returns string {
         out += d + "; ";
     }
     return out.trim();
+}
+
+
+
+// langlib has no padding; tiny helper for report alignment.
+function pad(string s, int width) returns string {
+    if s.length() >= width { return s; }
+    string sp = "";
+    foreach int _ in 0 ..< (width - s.length()) {
+        sp += " ";
+    }
+    return s + sp;
+}
+
+// ------------------------------------------------------------- runner ----
+
+public function main() returns error? {
+    http:Client legacy = check new (legacyBase);
+    http:Client candidate = check new (candidateBase);
+
+    string[] endpoints = [
+        "/health",
+        "/procedures/engineer",
+        "/procedures/architect",
+        "/procedure/nonexistent-slug-probe"
+    ];
+
+    io:println("parity baseline: legacy=" + legacyBase + "  candidate=" + candidateBase);
+    io:println(pad("endpoint", 38) + pad("status", 14) + "shape  detail");
+    int nPass = 0; int nFail = 0;
+
+    foreach string ep in endpoints {
+        ParityResult r = compareGet(ep, legacy, candidate);
+        boolean ok = r.statusMatch && r.shapeMatch
+            && r.legacyStatus >= 0 && r.candidateStatus >= 0;
+        if ok { nPass += 1; } else { nFail += 1; }
+        io:println(pad(ep, 38)
+            + pad(r.legacyStatus.toString() + "/" + r.candidateStatus.toString(), 14)
+            + pad((ok ? "PASS" : "FAIL"), 7) + r.detail);
+    }
+    string summary = "result: " + nPass.toString() + " pass, "
+        + nFail.toString() + " fail";
+    io:println(summary);
 }
