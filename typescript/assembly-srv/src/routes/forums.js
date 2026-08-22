@@ -563,7 +563,32 @@ forumsRouter.get('/comments/:id', async (req, res, next) => {
     if (result.rows.length === 0) throw new NotFoundError('Comment not found');
     res.json(result.rows[0]);
   } catch (err) { next(err); }
-});forumsRouter.delete('/comments/:id', async (req, res, next) => {
+});
+
+// PUT /forums/comments/:id — edit a comment's body. Body: { body (**req**) }.
+// Soft-adjacent semantics: keeps created timestamp, bumps updated.
+forumsRouter.put('/comments/:id', async (req, res, next) => {
+  try {
+    const { body } = req.body;
+    if (!body || !String(body).trim()) {
+      throw new BadRequestError('body is required');
+    }
+    const result = await pool.query(
+      `UPDATE assembly.comments
+       SET text = $2, updated = now()
+       WHERE id = $1
+         AND (expiration_dt = 'infinity'::timestamptz OR expiration_dt > now())
+       RETURNING id, post_id, parent_id, text AS body, role, model,
+                 created AS "createdAt", updated`,
+      [req.params.id, String(body)]
+    );
+    if (result.rows.length === 0) throw new NotFoundError('Comment not found');
+    invalidateThreadListCache();
+    res.json(result.rows[0]);
+  } catch (err) { next(err); }
+});
+
+forumsRouter.delete('/comments/:id', async (req, res, next) => {
   try {
     const result = await pool.query(
       'SELECT * FROM assembly.soft_delete_comment($1)',
