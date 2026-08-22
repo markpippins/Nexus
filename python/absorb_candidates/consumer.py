@@ -26,6 +26,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import re
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))            # this pkg's parent
@@ -71,14 +72,26 @@ CANDIDATE_SCHEMA = {
 
 SYSTEM_PROMPT = """You are a Software Archaeologist and Technical Analyst.
 Extract actionable engineering intent ("Specification Candidates") from this
-chunk of a developer chat transcript. Rules:
+chunk of a developer chat transcript.
+
+OUTPUT CONTRACT — use EXACTLY these keys, no others:
+{"candidates": [{
+    "title": str,                       # concise action-oriented title
+    "status": "Proposed" | "Agreed" | "Under Discussion" | "Superseded",
+    "intent_description": str,          # WHAT is wanted (never use "intent")
+    "requirements": [str],
+    "implementation_notes": [str],      # HOW it will be built; ARRAY of strings
+    "open_questions": [str],
+    "code_snippets": [{"language": str, "purpose": str, "raw_code": str}]
+}]}
+
+Rules:
 1. Deduplicate intent: capture the final resolved state when a topic evolves.
-2. Separate WHAT is wanted (intent) from HOW it will be built (implementation notes).
-3. Extract code word-for-word into code_snippets; never truncate; note language.
-4. Flag unresolved questions, disagreements, and follow-ups as open_questions.
-5. Absolute precision: keep version numbers, stack choices, and constraints exact.
-Return JSON matching the schema. If the chunk contains no actionable intent,
-return {"candidates": []}."""
+2. Separate WHAT is wanted (intent_description) from HOW (implementation_notes).
+3. Extract code word-for-word into code_snippets.raw_code; never truncate.
+4. Flag unresolved questions/disagreements as open_questions.
+5. Absolute precision: keep version numbers, stack choices, constraints exact.
+If the chunk contains no actionable intent, return {"candidates": []}."""
 
 
 # ── HTTP helpers ─────────────────────────────────────────────────────
@@ -97,8 +110,171 @@ def _post_json(url: str, body: dict, timeout: int = 180) -> dict:
         raise AbsorbError("E_TRANSIENT_LLM_UNAVAILABLE" if "11434" in url else "E_TRANSIENT_NETWORK", str(e)[:160])
 
 
-def ollama_chat(model: str, chunk_text: str) -> list[dict]:
-    """Structured extraction via local Ollama. Returns validated candidate dicts."""
+# ── Tackle configbundle resolution (Rover lineage) ───────────────────
+
+def _tackle_call(tool: str, args: dict) -> dict:
+    req = urllib.request.Request(
+        "http://localhost:3400/",
+        data=json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                         "params": {"name": tool, "arguments": args}}).encode(),
+        headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        d = json.loads(r.read())
+    return json.loads(d["result"]["content"][0]["text"])
+
+
+def resolve_llm_target(role_config: str = "Rover") -> dict:
+    """Resolve {base_url, model, api_key} from a tackle AI role config.
+
+    Follows the Rover-lineage configbundle (cb-Rover-mod-deepseek-v4-pro /
+    'rover-nemotron-3-super-free-nvidia'): role -> model -> provider
+    endpoint. API key comes from opencode's auth store keyed by the
+    provider's opencodeProvider name — never logged.
+    """
+    rc = _tackle_call("get_ai_role_config", {"role": role_config})
+    model_id, provider_id = rc["model_id"], rc["provider_id"]
+    model = _tackle_call("get_ai_model", {"id": model_id})
+    ident = model.get("model_identifier") or model.get("ident") or model_id
+    prov = _tackle_call("get_ai_provider", {"id": provider_id})
+    p = prov.get("provider", prov)
+    base_url = (p.get("endpoint_url") or "").rstrip("/")
+    try:
+        cfg = json.loads(p.get("config_json") or "{}")
+    except json.JSONDecodeError:
+        cfg = {}
+    provider_name = cfg.get("opencodeProvider", "")
+    api_key = ""
+    try:
+        auth = json.load(open(Path.home() / ".local/share/opencode/auth.json"))
+        api_key = (auth.get(provider_name) or {}).get("key", "")
+    except Exception:
+        pass
+    if not base_url or not api_key:
+        raise AbsorbError(
+            "E_CONFIG_LLM_TARGET_INCOMPLETE",
+            f"role '{role_config}': base_url={bool(base_url)} key={bool(api_key)} "
+            f"(provider '{provider_name}')",
+        )
+    return {"kind": "openai", "base_url": base_url, "model": ident,
+            "api_key": api_key, "role_config": role_config}
+
+
+def llm_extract(target: dict, chunk_text: str) -> list[dict]:
+    """Dispatch extraction to the resolved target (OpenAI-compatible today)."""
+    body = {
+        "model": target["model"],
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": f"<transcript_chunk>\n{chunk_text}\n</transcript_chunk>"},
+        ],
+        "temperature": 0.1,
+        "max_tokens": 4096,
+        "response_format": {"type": "json_object"},
+    }
+    headers = {"Content-Type": "application/json",
+               "Authorization": f"Bearer {target['api_key']}"}
+    t0 = time.time()
+    resp = None
+    last_err: Exception | None = None
+    for attempt in range(3):                       # NIM throws occasional 500s
+        req = urllib.request.Request(f"{target['base_url']}/chat/completions",
+                                     data=json.dumps(body).encode(), headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=600) as r:
+                resp = json.loads(r.read().decode())
+            break
+        except urllib.error.HTTPError as e:
+            text = e.read().decode() if e.fp else ""
+            if e.code < 500:
+                raise AbsorbError("E_PERMANENT_LLM_HTTP", f"{e.code}: {text[:160]}")
+            last_err = AbsorbError("E_TRANSIENT_LLM_HTTP", f"{e.code}: {text[:120]}")
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            last_err = AbsorbError("E_TRANSIENT_NETWORK", str(e)[:160])
+        time.sleep(2 ** attempt * 1.5)
+    if resp is None:
+        raise last_err or AbsorbError("E_TRANSIENT_LLM_HTTP", "no response")
+    content = resp["choices"][0]["message"]["content"]
+    parsed = _loads_loose(content)
+    out = [n for n in (normalize_candidate(c) for c in parsed.get("candidates", [])) if n]
+    sys.stderr.write(f"    [llm] {target['model']} {time.time()-t0:.0f}s "
+                     f"({resp.get('usage', {}).get('total_tokens', '?')} tok)\n")
+    return out
+
+
+def _loads_loose(content: str) -> dict:
+    """Parse model output tolerantly. Observed failure modes: prose-wrapped
+    JSON, code fences, stray leading/trailing braces (NIM nemotron-3-super).
+    Strategy: direct parse -> fence strip -> raw_decode scan from every '{'
+    until one yields a complete dict."""
+    text = content.strip()
+    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    dec = json.JSONDecoder()
+    idx = text.find("{")
+    while idx != -1:
+        try:
+            obj, _end = dec.raw_decode(text, idx)
+            if isinstance(obj, dict):
+                return obj
+        except json.JSONDecodeError:
+            pass
+        idx = text.find("{", idx + 1)
+    # No complete object anywhere: if the output doesn't end with '}', it was
+    # almost certainly cut by max_tokens — RETRYABLE (transient). Never mark
+    # consumed on truncation; the next hourly run retries it.
+    if not text.endswith("}"):
+        raise AbsorbError("E_TRANSIENT_LLM_TRUNCATED",
+                          f"len={len(content)} tail={text[-80:]!r}")
+    tail = content.strip()[-160:]
+    raise AbsorbError("E_PERMANENT_LLM_BAD_JSON",
+                      f"head={content[:80]!r} tail={tail!r} len={len(content)}")
+
+
+def normalize_candidate(c: dict) -> dict | None:
+    """Coerce model-specific field naming/shapes to the canonical candidate
+    schema (models drift: 'intent' vs 'intent_description', string vs array
+    notes, 'code' vs 'raw_code'). Returns None if unusable."""
+    if not isinstance(c, dict):
+        return None
+    title = c.get("title") or c.get("name")
+    intent = (c.get("intent_description") or c.get("intent")
+              or c.get("description") or "")
+    if not title or not str(intent).strip():
+        # derive a title from the first sentence of the intent
+        if not str(intent).strip():
+            return None
+        title = str(intent).split(". ")[0][:80]
+    def as_list(v):
+        if v is None: return []
+        return v if isinstance(v, list) else [str(v)]
+    snippets = []
+    for snip in (c.get("code_snippets") or []):
+        if isinstance(snip, dict) and (snip.get("raw_code") or snip.get("code")):
+            snippets.append({
+                "language": snip.get("language", ""),
+                "purpose": snip.get("purpose", ""),
+                "raw_code": snip.get("raw_code") or snip.get("code", ""),
+            })
+    return {
+        "title": str(title)[:300],
+        "status": c.get("status", "Proposed"),
+        "intent_description": str(intent),
+        "requirements": as_list(c.get("requirements")),
+        "implementation_notes": as_list(c.get("implementation_notes")),
+        "open_questions": as_list(c.get("open_questions")),
+        "code_snippets": snippets,
+    }
+
+
+def ollama_chat(model: str, chunk_text: str, timeout: int = 900) -> list[dict]:
+    """Structured extraction via local Ollama. Returns validated candidate dicts.
+
+    CPU-only inference reality (measured): warm short prompts ~4s, but a
+    12-20k-char chunk generating 1-2k JSON tokens takes minutes. Timeout must
+    be generous; num_predict bounds runaway generation."""
     body = {
         "model": model,
         "messages": [
@@ -107,19 +283,12 @@ def ollama_chat(model: str, chunk_text: str) -> list[dict]:
         ],
         "format": CANDIDATE_SCHEMA,          # Ollama structured output
         "stream": False,
-        "options": {"temperature": 0.1},
+        "options": {"temperature": 0.1, "num_predict": 2048},
     }
-    resp = _post_json("http://localhost:11434/api/chat", body)
+    resp = _post_json("http://localhost:11434/api/chat", body, timeout=timeout)
     content = resp.get("message", {}).get("content", "")
-    try:
-        parsed = json.loads(content)
-    except json.JSONDecodeError:
-        raise AbsorbError("E_PERMANENT_LLM_BAD_JSON", content[:200])
-    out = []
-    for c in parsed.get("candidates", []):
-        if isinstance(c, dict) and c.get("title") and c.get("intent_description"):
-            out.append(c)
-    return out
+    parsed = _loads_loose(content)
+    return [n for n in (normalize_candidate(c) for c in parsed.get("candidates", [])) if n]
 
 
 # ── Document selection + chunking ────────────────────────────────────
@@ -138,7 +307,7 @@ def pending_documents(limit: int | None) -> list[dict]:
         WHERE w.profile_id=%s AND w.profile_version=%s
           AND w.source_fingerprint = d.id::text)
       GROUP BY d.id, d.title, content_hash, harvest_id
-      ORDER BY d.created_at
+      ORDER BY d.created_at DESC
       LIMIT %s"""
     return pg_fetchall(sql, (CONSUMER_PROFILE, CONSUMER_VERSION, limit or 10**9))
 
@@ -176,22 +345,34 @@ def post_candidate(harvest_id: str, cand: dict, profile_tag: str) -> str:
         for s in (cand.get("code_snippets") or [])
     ]
     status, body = None, None
+    # The DB status column is a PIPELINE lifecycle state (pending/linked/
+    # useful/rejected/promoted/superseded) — NOT the model's alignment
+    # status. New candidates enter as the DB default; alignment travels
+    # as a tag.
+    align = str(cand.get("status") or "").strip()
+    align_tag = ("alignment:" + align.lower().replace(" ", "-")) if align else ""
     data = json.dumps({
         "harvestId": harvest_id,
         "title": str(cand["title"])[:300],
-        "status": cand.get("status", "Proposed"),
         "intentDescription": cand.get("intent_description", ""),
         "implementationNotes": [str(x) for x in (cand.get("implementation_notes") or [])],
         "requirements": [str(x) for x in (cand.get("requirements") or [])],
         "openQuestions": [str(x) for x in (cand.get("open_questions") or [])],
         "codeSnippets": snippets,
-        "tags": ["absorb", profile_tag, "candidate-chunking"],
+        "tags": list(dict.fromkeys(
+            [t for t in ["absorb", profile_tag, "candidate-chunking", align_tag] if t])),
     }).encode()
     req = urllib.request.Request(f"{NEBULA_API}/harvest-candidates", data=data,
                                  headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        body = json.loads(r.read().decode())
-        return body.get("id") or ""
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            body = json.loads(r.read().decode())
+            return body.get("id") or ""
+    except urllib.error.HTTPError as e:
+        text = e.read().decode() if e.fp else ""
+        raise AbsorbError(
+            "E_PERMANENT_CANDIDATE_REJECTED" if e.code < 500 else "E_TRANSIENT_NEBULA",
+            f"{e.code}: {text[:200]} | payload_status={cand.get('status')!r}")
 
 
 def mark_consumed(document_id: str) -> None:
@@ -207,9 +388,16 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="absorb-candidates")
     sub = ap.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("consume", help="extract candidates from unconsumed documents")
-    c.add_argument("--limit", type=int, default=5)
-    c.add_argument("--model", default="qwen2.5-coder:latest")
-    c.add_argument("--chunk-chars", type=int, default=40000)
+    c.add_argument("--limit", type=int, default=5,
+                   help="batch size; hourly cadence uses 5 most-recent")
+    c.add_argument("--backend", choices=["tackle", "ollama"], default="tackle",
+                   help="tackle = Rover-lineage configbundle via tackle-srv (default); "
+                        "ollama = local fallback")
+    c.add_argument("--model", default="qwen2.5-coder:latest",
+                   help="only used with --backend ollama")
+    c.add_argument("--role-config", default="Rover",
+                   help="tackle AI role config driving the tackle backend")
+    c.add_argument("--chunk-chars", type=int, default=12000)
     c.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
 
@@ -225,8 +413,14 @@ def main(argv=None) -> int:
                 continue
             found = []
             t0 = time.time()
+            target = None
+            if args.backend == "tackle":
+                target = resolve_llm_target(args.role_config)
             for i, ch in enumerate(chunks):
-                found.extend(ollama_chat(args.model, ch))
+                if target:
+                    found.extend(llm_extract(target, ch))
+                else:
+                    found.extend(ollama_chat(args.model, ch))
             wrote = 0
             for cand in found:
                 cid = post_candidate(d["harvest_id"], cand, "absorb")
@@ -239,6 +433,10 @@ def main(argv=None) -> int:
         except AbsorbError as err:
             failed += 1
             print(f"  ✗ {label} — [{err.error_code}] ({err.error_class}) {err.message[:120]}")
+        except Exception as err:  # never let one doc kill the batch
+            failed += 1
+            print(f"  ✗ {label} — [E_PERMANENT_UNEXPECTED] {type(err).__name__}: {str(err)[:120]}")
+            mark_consumed(d["id"])
             # transient → do not watermark; retried next invocation
             if err.error_class == "permanent":
                 mark_consumed(d["id"])  # permanent failures don't block the queue

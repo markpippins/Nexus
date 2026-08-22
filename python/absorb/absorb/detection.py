@@ -19,7 +19,9 @@ def _sig_chatgpt_export_markdown(path: str) -> float:
     if p.suffix.lower() != ".md":
         return 0.0
     try:
-        head = p.open("r", errors="replace").read(4096)
+        # 64KB window: long frontmatter or a large first message can push
+        # '## User'/'## Assistant' markers past a smaller scan.
+        head = p.open("r", errors="replace").read(65536)
     except OSError:
         return 0.0
     score = 0.0

@@ -81,23 +81,57 @@ def pg():
     conn = pg_conn()
     try:
         yield conn
-        conn.commit()
+        try:
+            conn.commit()
+        except psycopg2.InterfaceError:
+            _drop_conn()   # cleanup must never mask the original error path
     except Exception:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            _drop_conn()
         raise
 
 
+def _drop_conn():
+    global _CONN
+    if _CONN is not None:
+        try:
+            _CONN.close()
+        except Exception:
+            pass
+        _CONN = None
+
+
+def _is_stale(err: Exception) -> bool:
+    return isinstance(err, (psycopg2.InterfaceError, psycopg2.OperationalError))
+
+
 def pg_fetchall(sql: str, params=()) -> list[dict]:
-    with pg() as conn:
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute(sql, params)
-        return [dict(r) for r in cur.fetchall()]
+    """With one stale-connection retry: long-idle singletons get dropped by
+    the server (or transit restarts); first touch then fails mid-query."""
+    for attempt in (1, 2):
+        try:
+            with pg() as conn:
+                cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                cur.execute(sql, params)
+                return [dict(r) for r in cur.fetchall()]
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as err:
+            _drop_conn()
+            if attempt == 2 or not _is_stale(err):
+                raise
 
 
 def pg_execute(sql: str, params=()) -> None:
-    with pg() as conn:
-        cur = conn.cursor()
-        cur.execute(sql, params)
+    for attempt in (1, 2):
+        try:
+            with pg() as conn:
+                conn.cursor().execute(sql, params)
+                return
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as err:
+            _drop_conn()
+            if attempt == 2 or not _is_stale(err):
+                raise
 
 
 def jdump(obj) -> str:

@@ -26,7 +26,11 @@ sources:
     follow_symlinks: false
 
 detect:
-  confidence_threshold: 0.85
+  # 0.75 rationale: frontmatter(0.35)+title(0.2)+create_time(0.15)=0.70 is the
+  # floor for ANY chat-export file; turn markers supply the rest. Two real
+  # exports scored 0.80 under 0.85 (big first message pushed '## Assistant'
+  # out of the scan window) and fail_early correctly refused them.
+  confidence_threshold: 0.75
   fallback: fail_early        # curated single-format profile: surface problems loudly
 
 enrich:
