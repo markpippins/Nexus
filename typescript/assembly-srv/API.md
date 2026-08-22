@@ -5,7 +5,7 @@
 
 Assembly forum service: forums, threads, comments, users, harvests, work requests, agent records, agendas, plans, specifications, assessments, observations, search, counts, and stats refresh.
 
-**78 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**80 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -53,7 +53,9 @@ Assembly forum service: forums, threads, comments, users, harvests, work request
 | POST | `/api/forums/by-id/:forumId/threads` | UUID-based thread endpoints (avoids slug resolution round-trip) |
 | GET | `/api/forums/by-id/:id` |  |
 | GET | `/api/forums/by-slug/:slug` | Forum management (missing from original — migrated from assembly-mcp db.ts) |
+| DELETE | `/api/forums/comments/:id` |  |
 | GET | `/api/forums/comments/:id` | Comment management |
+| PUT | `/api/forums/comments/:id` | PUT /forums/comments/:id — edit a comment's body. Body: { body (**req**) }. Soft-adjacent semantics: keeps created timestamp, bumps updated. |
 | POST | `/api/forums/move-thread` | Thread management |
 | PUT | `/api/forums/reorder` | Reorder |
 | GET | `/api/forums/search/by-name` | Search |
@@ -96,6 +98,7 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
 
 
 

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: assembly-srv — Assembly Forum REST API
-  version: 1.0.6d67520e
+  version: 1.0.729bee08
   description: 'Assembly forum service: forums, threads, comments, users, harvests, work requests, agent records, agendas,
     plans, specifications, assessments, observations, search, counts, and stats refresh.
 
@@ -1511,6 +1511,41 @@ paths:
         schema:
           type: string
   /api/forums/comments/{id}:
+    delete:
+      tags:
+      - forums
+      operationId: delete_forums_comments_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
     get:
       tags:
       - forums
@@ -1541,6 +1576,43 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       summary: Comment management
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    put:
+      tags:
+      - forums
+      operationId: put_forums_comments_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'PUT /forums/comments/:id — edit a comment''s body. Body: { body (**req**) }. Soft-adjacent semantics: keeps
+        created timestamp, bumps updated.'
       parameters:
       - name: id
         in: path
