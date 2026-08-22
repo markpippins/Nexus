@@ -3,7 +3,7 @@ import { FileSystemNode, Mount } from '../models/file-system.model.js';
 import { FsService } from './fs.service.js';
 import { BrokerProfile } from '../models/broker-profile.model.js';
 
-export class RemoteFileSystemService implements FileSystemProvider {
+export class SecureFileSystemService implements FileSystemProvider {
   private mounts: Mount[] = [];
 
   constructor(

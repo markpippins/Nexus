@@ -220,7 +220,7 @@ export class IdeaStreamComponent {
     if (path.length === 0) return false;
     const root = path[0];
     const sessionName = this.localConfigService.sessionName();
-    return root === sessionName || root === 'File Systems';
+    return root === sessionName || root === 'File Systems' || root === 'Files';
   });
 
   // --- Refresh trigger ---
@@ -256,7 +256,7 @@ export class IdeaStreamComponent {
       if (path.length > 0) {
         provider = this.getProvider()(path);
         // For remote paths ["File Systems", gateway, ...] strip first 2 segments;
-        // for local/other paths strip only 1.
+        // for Files/local/other paths strip only 1.
         const isRemote = path[0] === 'File Systems' && path.length > 2;
         providerPath = isRemote ? path.slice(2) : path.slice(1);
         isMagnetFolder = await provider.hasFile(providerPath, '.magnet');

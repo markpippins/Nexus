@@ -42,6 +42,7 @@ export class RegistryServerProvider implements TreeProvider {
             nodeId.startsWith('service-') ||
             nodeId.startsWith('users') ||
             nodeId.startsWith('search') ||
+            nodeId.startsWith('files') ||
             nodeId.startsWith('filesystems') ||
             nodeId.startsWith('platform') ||
             nodeId.startsWith('platform-dictionary-') ||
@@ -53,6 +54,16 @@ export class RegistryServerProvider implements TreeProvider {
         if (nodeId === 'root') {
             const terrainUrl = this.localConfigService.terrainServerUrl();
             return [
+                {
+                    id: 'files',
+                    name: 'Files',
+                    type: NodeType.FOLDER,
+                    icon: 'folder_open',
+                    hasChildren: true,
+                    operations: [],
+                    metadata: { directFs: true },
+                    lastUpdated: new Date()
+                },
                 {
                     id: 'filesystems',
                     name: 'File Systems',
