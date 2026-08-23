@@ -3837,10 +3837,18 @@ export function createRoutes(pool: Pool): Router {
     }
   });
   // GET /api/harvest-candidates — list candidates, filterable by harvest or hierarchy
+  // Sweep-tooling extras (to-do 7e2d116f): ?completed=true|false, ?status=<value>,
+  // and an endpoint-local page cap of 1000 (global default stays 100) so a
+  // sweep can pull the full ~100+ candidate set in one call. `total` is always
+  // returned so callers know when more pages exist.
   router.get('/harvest-candidates', async (req: Request, res: Response) => {
     try {
       const { harvestId, systemId, subsystemId, featureId } = req.query;
+      const { completed, status } = req.query;
       const { offset, limit, page, pageSize } = parsePagination(req.query);
+      const requestedSize = parseInt(String(req.query.pageSize ?? req.query.limit ?? ''), 10);
+      const effPageSize = !isNaN(requestedSize) ? Math.min(1000, Math.max(1, requestedSize)) : pageSize;
+      const effOffset = page > 1 ? (page - 1) * effPageSize : offset;
 
       const clauses: string[] = [];
       const vals: any[] = [];
@@ -3849,6 +3857,8 @@ export function createRoutes(pool: Pool): Router {
       if (systemId) { clauses.push(`hc.system_id = $${i++}`); vals.push(systemId); }
       if (subsystemId) { clauses.push(`hc.subsystem_id = $${i++}`); vals.push(subsystemId); }
       if (featureId) { clauses.push(`hc.feature_id = $${i++}`); vals.push(featureId); }
+      if (completed === 'true' || completed === 'false') { clauses.push(`hc.completed = $${i++}`); vals.push(completed === 'true'); }
+      if (status) { clauses.push(`hc.status = $${i++}`); vals.push(status); }
 
       const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
 
@@ -3864,7 +3874,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
            ${where}
            ORDER BY hc.created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
-          [...vals, pageSize, offset]
+          [...vals, effPageSize, effOffset]
         ),
         pool.query(
           `SELECT COUNT(*)::int AS total
@@ -3883,7 +3893,7 @@ export function createRoutes(pool: Pool): Router {
         total,
         count: total,
         page,
-        pageSize,
+        pageSize: effPageSize,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -4017,7 +4027,12 @@ export function createRoutes(pool: Pool): Router {
   router.get('/candidates', async (req: Request, res: Response) => {
     try {
       const { harvestId, systemId, subsystemId, featureId } = req.query;
+      const { completed, status } = req.query;
       const { offset, limit, page, pageSize } = parsePagination(req.query);
+      // Same sweep-tooling cap raise as /harvest-candidates (to-do 7e2d116f).
+      const requestedSize = parseInt(String(req.query.pageSize ?? req.query.limit ?? ''), 10);
+      const effPageSize = !isNaN(requestedSize) ? Math.min(1000, Math.max(1, requestedSize)) : pageSize;
+      const effOffset = page > 1 ? (page - 1) * effPageSize : offset;
 
       const clauses: string[] = [];
       const vals: any[] = [];
@@ -4026,6 +4041,8 @@ export function createRoutes(pool: Pool): Router {
       if (systemId) { clauses.push(`hc.system_id = $${i++}`); vals.push(systemId); }
       if (subsystemId) { clauses.push(`hc.subsystem_id = $${i++}`); vals.push(subsystemId); }
       if (featureId) { clauses.push(`hc.feature_id = $${i++}`); vals.push(featureId); }
+      if (completed === 'true' || completed === 'false') { clauses.push(`hc.completed = $${i++}`); vals.push(completed === 'true'); }
+      if (status) { clauses.push(`hc.status = $${i++}`); vals.push(status); }
 
       const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
 
@@ -4041,7 +4058,7 @@ export function createRoutes(pool: Pool): Router {
            LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
            ${where}
            ORDER BY hc.created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
-          [...vals, pageSize, offset]
+          [...vals, effPageSize, effOffset]
         ),
         pool.query(
           `SELECT COUNT(*)::int AS total
@@ -4054,7 +4071,7 @@ export function createRoutes(pool: Pool): Router {
 
       const items = dataResult.rows.map(camelCaseRow);
       const total = parseInt(countResult.rows[0].total, 10);
-      res.json({ items, total, page, pageSize, limit, offset });
+      res.json({ items, total, page, pageSize: effPageSize, limit: effPageSize, offset: effOffset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -5273,8 +5290,19 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
+      // Hydrate camelCase relation fields at parity with what MCP consumers
+      // expect — the raw rows are snake_case, which left REST consumers
+      // reading sourceType/relType/targetType as null. snake_case keys are
+      // kept for backward compatibility with existing callers.
       res.json({
-        items: dataResult.rows.map((r: any) => toEpochMs(r, 'created_at')),
+        items: dataResult.rows.map((r: any) => ({
+          ...toEpochMs(r, 'created_at'),
+          sourceType: r.source_type,
+          sourceId: r.source_id,
+          targetType: r.target_type,
+          targetId: r.target_id,
+          relType: r.rel_type,
+        })),
         total: parseInt(countResult.rows[0].total, 10),
         page,
         pageSize,
@@ -5290,7 +5318,14 @@ export function createRoutes(pool: Pool): Router {
       const { id } = req.params;
       const { rows: [row] } = await pool.query('SELECT * FROM nebula.cross_references WHERE id = $1', [id]);
       if (!row) return res.status(404).json({ error: 'Cross-reference not found' });
-      res.json(toEpochMs(row, 'created_at'));
+      res.json({
+        ...toEpochMs(row, 'created_at'),
+        sourceType: row.source_type,
+        sourceId: row.source_id,
+        targetType: row.target_type,
+        targetId: row.target_id,
+        relType: row.rel_type,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
