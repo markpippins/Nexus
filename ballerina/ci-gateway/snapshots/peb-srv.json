@@ -1,0 +1,1345 @@
+{
+ "components": {
+  "schemas": {
+   "Error": {
+    "additionalProperties": true,
+    "properties": {
+     "error": {
+      "description": "Machine-readable error code (e.g. not_found, validation_failed).",
+      "type": "string"
+     },
+     "message": {
+      "description": "Human-readable error detail.",
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "JsonBody": {
+    "additionalProperties": true,
+    "description": "Generic JSON body (fields are service-specific).",
+    "type": "object"
+   }
+  }
+ },
+ "info": {
+  "description": "Push Event Bus: decisions, transactions, fleet health, events, entities, state, traces, and the SSE event stream.\n\nEndpoint inventory generated from source route registrations by `nexus/tools/api-docs/`. Request/response bodies are generic; field-level contracts live in the service code and its README.",
+  "title": "peb-srv \u2014 Push Event Bus API",
+  "version": "1.0.f3a84f8e"
+ },
+ "openapi": "3.0.3",
+ "paths": {
+  "/api/peb/decisions": {
+   "get": {
+    "operationId": "get_peb_decisions",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "List decisions GET /api/peb/decisions?status=&author_id=&adr_number=&affected_key=&limit=&offset=",
+    "tags": [
+     "peb"
+    ]
+   },
+   "post": {
+    "operationId": "post_peb_decisions",
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "Create decision (ADR) POST /api/peb/decisions Body: { title, author_id, summary?, affected_keys?, entropy_class?, parent_decision_id?, rollb",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/decisions/next-number": {
+   "get": {
+    "operationId": "get_peb_decisions_next_number",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "Get next ADR number GET /api/peb/decisions/next-number",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/decisions/{id}": {
+   "get": {
+    "operationId": "get_peb_decisions_id",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "Get decision by ID GET /api/peb/decisions/:id",
+    "tags": [
+     "peb"
+    ]
+   },
+   "patch": {
+    "operationId": "patch_peb_decisions_id",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "Update decision PATCH /api/peb/decisions/:id Body: { title?, summary?, status?, affected_keys?, entropy_class?, parent_decision_id? }",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/decisions/{id}/chain": {
+   "get": {
+    "operationId": "get_peb_decisions_id_chain",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "Chain traversal GET /api/peb/decisions/:id/chain?direction=ancestry|rollback",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/decisions/{id}/supersede": {
+   "post": {
+    "operationId": "post_peb_decisions_id_supersede",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "Supersede a decision POST /api/peb/decisions/:id/supersede Body: { summary, author_id, affected_keys? } Creates a new decision that supersed",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/entities/{entity_id}/capabilities": {
+   "get": {
+    "operationId": "get_peb_entities_entity_id_capabilities",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "entity_id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "Convenience: capabilities for an entity (list, with a status rollup) Not in the spec but useful for the UI to ground the gap view.",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/entities/{entity_id}/capability-gap": {
+   "get": {
+    "operationId": "get_peb_entities_entity_id_capability_gap",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "entity_id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "AND (c.expires_at IS NULL OR c.expires_at > v.created_at) gap_status: \"active\" : a live grant was in-window when the attempt fired \"lapsed\" ",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/events": {
+   "get": {
+    "operationId": "get_peb_events",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "GET /api/peb/events?since=<cursor>&event_type=&plan_id=&agent_role=&limit=&offset=",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/events/stream": {
+   "get": {
+    "operationId": "get_peb_events_stream",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "stream to plan_id / agent_role. Implementation note: we use a poll loop (1s) against the DB to surface new governance_events rows. A more el",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/events/{receipt_id}": {
+   "get": {
+    "operationId": "get_peb_events_receipt_id",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "receipt_id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "GET /api/peb/events/{receipt_id}",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/events/{receipt_id}/replay": {
+   "post": {
+    "operationId": "post_peb_events_receipt_id_replay",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "receipt_id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "POST /api/peb/events/{receipt_id}/replay Spec: sets replayed_at, re-runs downstream effects. Implemented as: stamp replayed_at = now() (idem",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/health/circuit-breakers": {
+   "get": {
+    "operationId": "get_peb_health_circuit_breakers",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "GET /api/peb/health/circuit-breakers Spec: role_circuit_breaker, tripped-first sort",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/health/entropy": {
+   "get": {
+    "operationId": "get_peb_health_entropy",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "GET /api/peb/health/entropy?group_by=entropy_class Spec: decisions.entropy_class over time \u2014 churn/stability signal.",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/health/violations/summary": {
+   "get": {
+    "operationId": "get_peb_health_violations_summary",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "GET /api/peb/health/violations/summary?window=24h&group_by=severity|violation_type|entity_id",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/state/{key}/diff": {
+   "get": {
+    "operationId": "get_peb_state_key_diff",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "(state_delta[K] overwrites prior value if present, removed markers null out a key from prior content). - Compare the two reconstructed snaps",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/state/{key}/versions": {
+   "get": {
+    "operationId": "get_peb_state_key_versions",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "dashboards that just want the version timeline. State diff: walk transactions that touched K in order, replay state_delta patches in order t",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/traces/{id}/tree": {
+   "get": {
+    "operationId": "get_peb_traces_id_tree",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "A trace lives in `peb.traces` and may have a `parent_trace_id` pointing at another trace (could be in a different transaction). We return th",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/transactions": {
+   "get": {
+    "operationId": "get_peb_transactions",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "GET /api/peb/transactions?entity_id=&tool_name=&admission_result=&since=&limit=&offset=",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/transactions/{id}": {
+   "get": {
+    "operationId": "get_peb_transactions_id",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "GET /api/peb/transactions/{id}",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/api/peb/transactions/{id}/lineage": {
+   "get": {
+    "operationId": "get_peb_transactions_id_lineage",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "traces tree rooted at this transaction (via parent_trace_id), each node carrying confidence and rejected_alternatives any violations raised,",
+    "tags": [
+     "peb"
+    ]
+   }
+  },
+  "/health": {
+   "get": {
+    "operationId": "get_health",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "tags": [
+     "health"
+    ]
+   }
+  }
+ },
+ "servers": [
+  {
+   "url": "http://localhost:3111"
+  }
+ ],
+ "tags": [
+  {
+   "name": "health"
+  },
+  {
+   "name": "peb"
+  }
+ ],
+ "x-generated-by": "nexus/tools/api-docs/gen_openapi.py"
+}

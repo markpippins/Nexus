@@ -1,0 +1,5287 @@
+{
+ "components": {
+  "schemas": {
+   "Error": {
+    "properties": {
+     "error": {
+      "description": "Machine-readable error code (not_found, add_failed, duplicate_active_key, update_failed, list_failed, get_failed, soft_delete_failed, resolve_failed, meta_failed)",
+      "type": "string"
+     },
+     "message": {
+      "description": "Human-readable detail",
+      "type": "string"
+     }
+    },
+    "required": [
+     "error",
+     "message"
+    ],
+    "type": "object"
+   },
+   "Health": {
+    "properties": {
+     "pid": {
+      "type": "integer"
+     },
+     "port": {
+      "type": "integer"
+     },
+     "service": {
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "timestamp": {
+      "format": "date-time",
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "conceptList": {
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/conceptRow"
+      },
+      "type": "array"
+     },
+     "table": {
+      "enum": [
+       "concept"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "table",
+     "count",
+     "items"
+    ],
+    "type": "object"
+   },
+   "conceptRow": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "description": {
+      "type": "string"
+     },
+     "detected_at": {
+      "type": "string"
+     },
+     "effective_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "id": {
+      "format": "uuid",
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "conceptUpdate": {
+    "properties": {
+     "p_description": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_name": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "conceptWrite": {
+    "properties": {
+     "p_description": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_name": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "p_name"
+    ],
+    "type": "object"
+   },
+   "concept_relationshipList": {
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/concept_relationshipRow"
+      },
+      "type": "array"
+     },
+     "table": {
+      "enum": [
+       "concept_relationship"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "table",
+     "count",
+     "items"
+    ],
+    "type": "object"
+   },
+   "concept_relationshipRow": {
+    "properties": {
+     "confidence": {
+      "type": "number"
+     },
+     "created_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "detected_at": {
+      "type": "string"
+     },
+     "effective_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "evidence_notes": {
+      "type": "string"
+     },
+     "evidence_source": {
+      "type": "string"
+     },
+     "evidence_type": {
+      "type": "string"
+     },
+     "expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "from_concept_id": {
+      "type": "string"
+     },
+     "id": {
+      "format": "uuid",
+      "type": "string"
+     },
+     "notes": {
+      "type": "string"
+     },
+     "path": {
+      "type": "string"
+     },
+     "relationship_type": {
+      "type": "string"
+     },
+     "to_concept_id": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "concept_relationshipUpdate": {
+    "properties": {
+     "p_confidence": {
+      "type": "number"
+     },
+     "p_evidence_notes": {
+      "type": "string"
+     },
+     "p_evidence_source": {
+      "type": "string"
+     },
+     "p_evidence_type": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_from_concept_id": {
+      "type": "string"
+     },
+     "p_notes": {
+      "type": "string"
+     },
+     "p_path": {
+      "type": "string"
+     },
+     "p_relationship_type": {
+      "type": "string"
+     },
+     "p_to_concept_id": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "concept_relationshipWrite": {
+    "properties": {
+     "p_confidence": {
+      "type": "number"
+     },
+     "p_evidence_notes": {
+      "type": "string"
+     },
+     "p_evidence_source": {
+      "type": "string"
+     },
+     "p_evidence_type": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_from_concept_id": {
+      "type": "string"
+     },
+     "p_notes": {
+      "type": "string"
+     },
+     "p_path": {
+      "type": "string"
+     },
+     "p_relationship_type": {
+      "type": "string"
+     },
+     "p_to_concept_id": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "p_from_concept_id",
+     "p_to_concept_id",
+     "p_relationship_type"
+    ],
+    "type": "object"
+   },
+   "consumer_operationList": {
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/consumer_operationRow"
+      },
+      "type": "array"
+     },
+     "table": {
+      "enum": [
+       "consumer_operation"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "table",
+     "count",
+     "items"
+    ],
+    "type": "object"
+   },
+   "consumer_operationRow": {
+    "properties": {
+     "consumer_name": {
+      "type": "string"
+     },
+     "created_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "detected_at": {
+      "type": "string"
+     },
+     "effective_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "id": {
+      "format": "uuid",
+      "type": "string"
+     },
+     "notes": {
+      "type": "string"
+     },
+     "operation": {
+      "type": "string"
+     },
+     "representation_id": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "consumer_operationUpdate": {
+    "properties": {
+     "p_consumer_name": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_notes": {
+      "type": "string"
+     },
+     "p_operation": {
+      "type": "string"
+     },
+     "p_representation_id": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "consumer_operationWrite": {
+    "properties": {
+     "p_consumer_name": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_notes": {
+      "type": "string"
+     },
+     "p_operation": {
+      "type": "string"
+     },
+     "p_representation_id": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "p_representation_id",
+     "p_consumer_name",
+     "p_operation"
+    ],
+    "type": "object"
+   },
+   "drift_findingList": {
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/drift_findingRow"
+      },
+      "type": "array"
+     },
+     "table": {
+      "enum": [
+       "drift_finding"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "table",
+     "count",
+     "items"
+    ],
+    "type": "object"
+   },
+   "drift_findingRow": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "description": {
+      "type": "string"
+     },
+     "detected_at": {
+      "type": "string"
+     },
+     "effective_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "id": {
+      "format": "uuid",
+      "type": "string"
+     },
+     "observation_id": {
+      "type": "string"
+     },
+     "resolved_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "severity": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "drift_findingUpdate": {
+    "properties": {
+     "p_description": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_observation_id": {
+      "type": "string"
+     },
+     "p_resolved_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_severity": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "drift_findingWrite": {
+    "properties": {
+     "p_description": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_observation_id": {
+      "type": "string"
+     },
+     "p_resolved_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_severity": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "p_observation_id",
+     "p_description",
+     "p_severity"
+    ],
+    "type": "object"
+   },
+   "identity_strategyList": {
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/identity_strategyRow"
+      },
+      "type": "array"
+     },
+     "table": {
+      "enum": [
+       "identity_strategy"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "table",
+     "count",
+     "items"
+    ],
+    "type": "object"
+   },
+   "identity_strategyRow": {
+    "properties": {
+     "canonical_key_description": {
+      "type": "string"
+     },
+     "concept_id": {
+      "type": "string"
+     },
+     "created_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "detected_at": {
+      "type": "string"
+     },
+     "effective_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "id": {
+      "format": "uuid",
+      "type": "string"
+     },
+     "notes": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "identity_strategyUpdate": {
+    "properties": {
+     "p_canonical_key_description": {
+      "type": "string"
+     },
+     "p_concept_id": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_notes": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "identity_strategyWrite": {
+    "properties": {
+     "p_canonical_key_description": {
+      "type": "string"
+     },
+     "p_concept_id": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_notes": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "p_concept_id",
+     "p_canonical_key_description"
+    ],
+    "type": "object"
+   },
+   "owning_subsystemList": {
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/owning_subsystemRow"
+      },
+      "type": "array"
+     },
+     "table": {
+      "enum": [
+       "owning_subsystem"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "table",
+     "count",
+     "items"
+    ],
+    "type": "object"
+   },
+   "owning_subsystemRow": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "description": {
+      "type": "string"
+     },
+     "detected_at": {
+      "type": "string"
+     },
+     "effective_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "id": {
+      "format": "int32",
+      "type": "integer"
+     },
+     "name": {
+      "type": "string"
+     },
+     "path": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "owning_subsystemUpdate": {
+    "properties": {
+     "p_description": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_id": {
+      "description": "Required \u2014 stable smallint lookup key (caller-supplied)",
+      "format": "int32",
+      "type": "integer"
+     },
+     "p_name": {
+      "type": "string"
+     },
+     "p_new_id": {
+      "description": "Required for update \u2014 the new smallint key",
+      "type": "number"
+     },
+     "p_path": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "owning_subsystemWrite": {
+    "properties": {
+     "p_description": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_id": {
+      "description": "Required \u2014 stable smallint lookup key (caller-supplied)",
+      "format": "int32",
+      "type": "integer"
+     },
+     "p_name": {
+      "type": "string"
+     },
+     "p_new_id": {
+      "description": "Required for update \u2014 the new smallint key",
+      "type": "number"
+     },
+     "p_path": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "p_id",
+     "p_name"
+    ],
+    "type": "object"
+   },
+   "relationship_typeList": {
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/relationship_typeRow"
+      },
+      "type": "array"
+     },
+     "table": {
+      "enum": [
+       "relationship_type"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "table",
+     "count",
+     "items"
+    ],
+    "type": "object"
+   },
+   "relationship_typeRow": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "description": {
+      "type": "string"
+     },
+     "detected_at": {
+      "type": "string"
+     },
+     "effective_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "id": {
+      "format": "uuid",
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "notes": {
+      "type": "string"
+     },
+     "scope": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "relationship_typeUpdate": {
+    "properties": {
+     "p_description": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_name": {
+      "type": "string"
+     },
+     "p_new_name": {
+      "description": "Required for update \u2014 the new relationship type name",
+      "type": "string"
+     },
+     "p_notes": {
+      "type": "string"
+     },
+     "p_scope": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "relationship_typeWrite": {
+    "properties": {
+     "p_description": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_name": {
+      "type": "string"
+     },
+     "p_new_name": {
+      "description": "Required for update \u2014 the new relationship type name",
+      "type": "string"
+     },
+     "p_notes": {
+      "type": "string"
+     },
+     "p_scope": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "p_name",
+     "p_description"
+    ],
+    "type": "object"
+   },
+   "representationList": {
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/representationRow"
+      },
+      "type": "array"
+     },
+     "table": {
+      "enum": [
+       "representation"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "table",
+     "count",
+     "items"
+    ],
+    "type": "object"
+   },
+   "representationRow": {
+    "properties": {
+     "concept_id": {
+      "type": "string"
+     },
+     "created_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "detected_at": {
+      "type": "string"
+     },
+     "effective_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "id": {
+      "format": "uuid",
+      "type": "string"
+     },
+     "label": {
+      "type": "string"
+     },
+     "owner": {
+      "type": "string"
+     },
+     "owning_subsystem_id": {
+      "type": "number"
+     },
+     "raw_metadata": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "schema_name": {
+      "type": "string"
+     },
+     "table_name": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "representationUpdate": {
+    "properties": {
+     "p_concept_id": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_label": {
+      "type": "string"
+     },
+     "p_owner": {
+      "type": "string"
+     },
+     "p_owning_subsystem_id": {
+      "description": "owning subsystem smallint id",
+      "type": "number"
+     },
+     "p_raw_metadata": {
+      "additionalProperties": true,
+      "description": "JSONB metadata",
+      "type": "object"
+     },
+     "p_schema_name": {
+      "type": "string"
+     },
+     "p_table_name": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "representationWrite": {
+    "properties": {
+     "p_concept_id": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_label": {
+      "type": "string"
+     },
+     "p_owner": {
+      "type": "string"
+     },
+     "p_owning_subsystem_id": {
+      "description": "owning subsystem smallint id",
+      "type": "number"
+     },
+     "p_raw_metadata": {
+      "additionalProperties": true,
+      "description": "JSONB metadata",
+      "type": "object"
+     },
+     "p_schema_name": {
+      "type": "string"
+     },
+     "p_table_name": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "p_concept_id",
+     "p_label",
+     "p_owning_subsystem_id"
+    ],
+    "type": "object"
+   },
+   "representation_identityList": {
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/representation_identityRow"
+      },
+      "type": "array"
+     },
+     "table": {
+      "enum": [
+       "representation_identity"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "table",
+     "count",
+     "items"
+    ],
+    "type": "object"
+   },
+   "representation_identityRow": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "detected_at": {
+      "type": "string"
+     },
+     "effective_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "id": {
+      "format": "uuid",
+      "type": "string"
+     },
+     "identity_expression": {
+      "type": "string"
+     },
+     "identity_strategy_id": {
+      "type": "string"
+     },
+     "notes": {
+      "type": "string"
+     },
+     "representation_id": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "representation_identityUpdate": {
+    "properties": {
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_identity_expression": {
+      "type": "string"
+     },
+     "p_identity_strategy_id": {
+      "type": "string"
+     },
+     "p_notes": {
+      "type": "string"
+     },
+     "p_representation_id": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "representation_identityWrite": {
+    "properties": {
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_identity_expression": {
+      "type": "string"
+     },
+     "p_identity_strategy_id": {
+      "type": "string"
+     },
+     "p_notes": {
+      "type": "string"
+     },
+     "p_representation_id": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "p_representation_id",
+     "p_identity_strategy_id",
+     "p_identity_expression"
+    ],
+    "type": "object"
+   },
+   "representation_relationshipList": {
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/representation_relationshipRow"
+      },
+      "type": "array"
+     },
+     "table": {
+      "enum": [
+       "representation_relationship"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "table",
+     "count",
+     "items"
+    ],
+    "type": "object"
+   },
+   "representation_relationshipRow": {
+    "properties": {
+     "confidence": {
+      "type": "number"
+     },
+     "created_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "detected_at": {
+      "type": "string"
+     },
+     "effective_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "evidence_notes": {
+      "type": "string"
+     },
+     "evidence_source": {
+      "type": "string"
+     },
+     "evidence_type": {
+      "type": "string"
+     },
+     "expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "from_representation_id": {
+      "type": "string"
+     },
+     "id": {
+      "format": "uuid",
+      "type": "string"
+     },
+     "notes": {
+      "type": "string"
+     },
+     "relationship_type": {
+      "type": "string"
+     },
+     "to_representation_id": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "representation_relationshipUpdate": {
+    "properties": {
+     "p_confidence": {
+      "type": "number"
+     },
+     "p_evidence_notes": {
+      "type": "string"
+     },
+     "p_evidence_source": {
+      "type": "string"
+     },
+     "p_evidence_type": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_from_representation_id": {
+      "type": "string"
+     },
+     "p_notes": {
+      "type": "string"
+     },
+     "p_relationship_type": {
+      "type": "string"
+     },
+     "p_to_representation_id": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "representation_relationshipWrite": {
+    "properties": {
+     "p_confidence": {
+      "type": "number"
+     },
+     "p_evidence_notes": {
+      "type": "string"
+     },
+     "p_evidence_source": {
+      "type": "string"
+     },
+     "p_evidence_type": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_from_representation_id": {
+      "type": "string"
+     },
+     "p_notes": {
+      "type": "string"
+     },
+     "p_relationship_type": {
+      "type": "string"
+     },
+     "p_to_representation_id": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "p_from_representation_id",
+     "p_to_representation_id",
+     "p_relationship_type"
+    ],
+    "type": "object"
+   },
+   "snapshotList": {
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/snapshotRow"
+      },
+      "type": "array"
+     },
+     "table": {
+      "enum": [
+       "snapshot"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "table",
+     "count",
+     "items"
+    ],
+    "type": "object"
+   },
+   "snapshotRow": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "created_by": {
+      "type": "string"
+     },
+     "detected_at": {
+      "type": "string"
+     },
+     "effective_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "id": {
+      "format": "uuid",
+      "type": "string"
+     },
+     "label": {
+      "type": "string"
+     },
+     "notes": {
+      "type": "string"
+     },
+     "parent_id": {
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "version": {
+      "type": "number"
+     }
+    },
+    "type": "object"
+   },
+   "snapshotUpdate": {
+    "properties": {
+     "p_created_by": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_label": {
+      "type": "string"
+     },
+     "p_notes": {
+      "type": "string"
+     },
+     "p_parent_id": {
+      "type": "string"
+     },
+     "p_status": {
+      "type": "string"
+     },
+     "p_version": {
+      "type": "number"
+     }
+    },
+    "type": "object"
+   },
+   "snapshotWrite": {
+    "properties": {
+     "p_created_by": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_label": {
+      "type": "string"
+     },
+     "p_notes": {
+      "type": "string"
+     },
+     "p_parent_id": {
+      "type": "string"
+     },
+     "p_status": {
+      "type": "string"
+     },
+     "p_version": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "p_label",
+     "p_version",
+     "p_created_by"
+    ],
+    "type": "object"
+   },
+   "snapshot_observationList": {
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/snapshot_observationRow"
+      },
+      "type": "array"
+     },
+     "table": {
+      "enum": [
+       "snapshot_observation"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "table",
+     "count",
+     "items"
+    ],
+    "type": "object"
+   },
+   "snapshot_observationRow": {
+    "properties": {
+     "audit_reason": {
+      "type": "string"
+     },
+     "completed_fix_ref": {
+      "type": "string"
+     },
+     "created_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "detected_at": {
+      "type": "string"
+     },
+     "effective_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "id": {
+      "format": "uuid",
+      "type": "string"
+     },
+     "is_completed_fix": {
+      "type": "boolean"
+     },
+     "lifecycle_state": {
+      "type": "string"
+     },
+     "representation_id": {
+      "type": "string"
+     },
+     "safe_to_retire": {
+      "type": "boolean"
+     },
+     "snapshot_id": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "snapshot_observationUpdate": {
+    "properties": {
+     "p_audit_reason": {
+      "type": "string"
+     },
+     "p_completed_fix_ref": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_is_completed_fix": {
+      "type": "boolean"
+     },
+     "p_lifecycle_state": {
+      "type": "string"
+     },
+     "p_representation_id": {
+      "type": "string"
+     },
+     "p_safe_to_retire": {
+      "type": "boolean"
+     },
+     "p_snapshot_id": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "snapshot_observationWrite": {
+    "properties": {
+     "p_audit_reason": {
+      "type": "string"
+     },
+     "p_completed_fix_ref": {
+      "type": "string"
+     },
+     "p_expired_at": {
+      "format": "date-time",
+      "nullable": true,
+      "type": "string"
+     },
+     "p_is_completed_fix": {
+      "type": "boolean"
+     },
+     "p_lifecycle_state": {
+      "type": "string"
+     },
+     "p_representation_id": {
+      "type": "string"
+     },
+     "p_safe_to_retire": {
+      "type": "boolean"
+     },
+     "p_snapshot_id": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "p_snapshot_id",
+     "p_representation_id",
+     "p_lifecycle_state"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ "info": {
+  "description": "REST API over the semantics.* Postgres schema \u2014 the type-level semantic topology legend of the Nexus platform. Append-only, expire-not-delete: writes go through stored procedures, PATCH supersedes (new id + superseded_id), DELETE soft-expires. This document is GENERATED from src/tables.ts \u2014 re-run `npm run openapi:gen` after table changes.",
+  "title": "semantics-srv REST API",
+  "version": "1.0.0"
+ },
+ "openapi": "3.0.3",
+ "paths": {
+  "/api/concept": {
+   "get": {
+    "operationId": "listConcept",
+    "parameters": [
+     {
+      "description": "Max rows (clamped to 500)",
+      "in": "query",
+      "name": "limit",
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Row offset",
+      "in": "query",
+      "name": "offset",
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Also return rows with expired_at set",
+      "in": "query",
+      "name": "includeExpired",
+      "schema": {
+       "default": false,
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/conceptList"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "list_failed"
+     }
+    },
+    "summary": "List active rows in semantics.concept (concept (class))",
+    "tags": [
+     "concept"
+    ]
+   },
+   "post": {
+    "operationId": "addConcept",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/conceptWrite"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/conceptRow"
+        }
+       }
+      },
+      "description": "Created"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "add_failed / duplicate_active_key / FK violation"
+     }
+    },
+    "summary": "Add a row to semantics.concept via add_ proc (concept (class))",
+    "tags": [
+     "concept"
+    ]
+   }
+  },
+  "/api/concept/{id}": {
+   "delete": {
+    "operationId": "softDeleteConcept",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "properties": {
+          "deleted": {
+           "description": "1 on first delete, 0 if already expired/missing",
+           "type": "integer"
+          },
+          "id": {
+           "type": "string"
+          },
+          "table": {
+           "enum": [
+            "concept"
+           ],
+           "type": "string"
+          }
+         },
+         "required": [
+          "table",
+          "id",
+          "deleted"
+         ],
+         "type": "object"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "soft_delete_failed"
+     }
+    },
+    "summary": "Soft-delete (expire) a row in semantics.concept \u2014 expire-not-delete, idempotent",
+    "tags": [
+     "concept"
+    ]
+   },
+   "get": {
+    "operationId": "getConcept",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/conceptRow"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "get_failed"
+     }
+    },
+    "summary": "Get a single row from semantics.concept by id",
+    "tags": [
+     "concept"
+    ]
+   },
+   "patch": {
+    "operationId": "updateConcept",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/conceptUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "allOf": [
+          {
+           "$ref": "#/components/schemas/conceptRow"
+          },
+          {
+           "properties": {
+            "superseded_id": {
+             "description": "id of the expired row",
+             "type": "string"
+            }
+           },
+           "required": [
+            "superseded_id"
+           ],
+           "type": "object"
+          }
+         ]
+        }
+       }
+      },
+      "description": "OK \u2014 new row with superseded_id"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "duplicate_active_key / update_failed"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found \u2014 no active row"
+     }
+    },
+    "summary": "Append-only replace on semantics.concept \u2014 expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id",
+    "tags": [
+     "concept"
+    ]
+   }
+  },
+  "/api/concept_relationship": {
+   "get": {
+    "operationId": "listConcept_relationship",
+    "parameters": [
+     {
+      "description": "Max rows (clamped to 500)",
+      "in": "query",
+      "name": "limit",
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Row offset",
+      "in": "query",
+      "name": "offset",
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Also return rows with expired_at set",
+      "in": "query",
+      "name": "includeExpired",
+      "schema": {
+       "default": false,
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/concept_relationshipList"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "list_failed"
+     }
+    },
+    "summary": "List active rows in semantics.concept_relationship (concept relationship (legal pipeline shape between classes))",
+    "tags": [
+     "concept_relationship"
+    ]
+   },
+   "post": {
+    "operationId": "addConcept_relationship",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/concept_relationshipWrite"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/concept_relationshipRow"
+        }
+       }
+      },
+      "description": "Created"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "add_failed / duplicate_active_key / FK violation"
+     }
+    },
+    "summary": "Add a row to semantics.concept_relationship via add_ proc (concept relationship (legal pipeline shape between classes))",
+    "tags": [
+     "concept_relationship"
+    ]
+   }
+  },
+  "/api/concept_relationship/{id}": {
+   "delete": {
+    "operationId": "softDeleteConcept_relationship",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "properties": {
+          "deleted": {
+           "description": "1 on first delete, 0 if already expired/missing",
+           "type": "integer"
+          },
+          "id": {
+           "type": "string"
+          },
+          "table": {
+           "enum": [
+            "concept_relationship"
+           ],
+           "type": "string"
+          }
+         },
+         "required": [
+          "table",
+          "id",
+          "deleted"
+         ],
+         "type": "object"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "soft_delete_failed"
+     }
+    },
+    "summary": "Soft-delete (expire) a row in semantics.concept_relationship \u2014 expire-not-delete, idempotent",
+    "tags": [
+     "concept_relationship"
+    ]
+   },
+   "get": {
+    "operationId": "getConcept_relationship",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/concept_relationshipRow"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "get_failed"
+     }
+    },
+    "summary": "Get a single row from semantics.concept_relationship by id",
+    "tags": [
+     "concept_relationship"
+    ]
+   },
+   "patch": {
+    "operationId": "updateConcept_relationship",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/concept_relationshipUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "allOf": [
+          {
+           "$ref": "#/components/schemas/concept_relationshipRow"
+          },
+          {
+           "properties": {
+            "superseded_id": {
+             "description": "id of the expired row",
+             "type": "string"
+            }
+           },
+           "required": [
+            "superseded_id"
+           ],
+           "type": "object"
+          }
+         ]
+        }
+       }
+      },
+      "description": "OK \u2014 new row with superseded_id"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "duplicate_active_key / update_failed"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found \u2014 no active row"
+     }
+    },
+    "summary": "Append-only replace on semantics.concept_relationship \u2014 expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id",
+    "tags": [
+     "concept_relationship"
+    ]
+   }
+  },
+  "/api/consumer_operation": {
+   "get": {
+    "operationId": "listConsumer_operation",
+    "parameters": [
+     {
+      "description": "Max rows (clamped to 500)",
+      "in": "query",
+      "name": "limit",
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Row offset",
+      "in": "query",
+      "name": "offset",
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Also return rows with expired_at set",
+      "in": "query",
+      "name": "includeExpired",
+      "schema": {
+       "default": false,
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/consumer_operationList"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "list_failed"
+     }
+    },
+    "summary": "List active rows in semantics.consumer_operation (consumer operation (who touches a representation and how))",
+    "tags": [
+     "consumer_operation"
+    ]
+   },
+   "post": {
+    "operationId": "addConsumer_operation",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/consumer_operationWrite"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/consumer_operationRow"
+        }
+       }
+      },
+      "description": "Created"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "add_failed / duplicate_active_key / FK violation"
+     }
+    },
+    "summary": "Add a row to semantics.consumer_operation via add_ proc (consumer operation (who touches a representation and how))",
+    "tags": [
+     "consumer_operation"
+    ]
+   }
+  },
+  "/api/consumer_operation/{id}": {
+   "delete": {
+    "operationId": "softDeleteConsumer_operation",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "properties": {
+          "deleted": {
+           "description": "1 on first delete, 0 if already expired/missing",
+           "type": "integer"
+          },
+          "id": {
+           "type": "string"
+          },
+          "table": {
+           "enum": [
+            "consumer_operation"
+           ],
+           "type": "string"
+          }
+         },
+         "required": [
+          "table",
+          "id",
+          "deleted"
+         ],
+         "type": "object"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "soft_delete_failed"
+     }
+    },
+    "summary": "Soft-delete (expire) a row in semantics.consumer_operation \u2014 expire-not-delete, idempotent",
+    "tags": [
+     "consumer_operation"
+    ]
+   },
+   "get": {
+    "operationId": "getConsumer_operation",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/consumer_operationRow"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "get_failed"
+     }
+    },
+    "summary": "Get a single row from semantics.consumer_operation by id",
+    "tags": [
+     "consumer_operation"
+    ]
+   },
+   "patch": {
+    "operationId": "updateConsumer_operation",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/consumer_operationUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "allOf": [
+          {
+           "$ref": "#/components/schemas/consumer_operationRow"
+          },
+          {
+           "properties": {
+            "superseded_id": {
+             "description": "id of the expired row",
+             "type": "string"
+            }
+           },
+           "required": [
+            "superseded_id"
+           ],
+           "type": "object"
+          }
+         ]
+        }
+       }
+      },
+      "description": "OK \u2014 new row with superseded_id"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "duplicate_active_key / update_failed"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found \u2014 no active row"
+     }
+    },
+    "summary": "Append-only replace on semantics.consumer_operation \u2014 expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id",
+    "tags": [
+     "consumer_operation"
+    ]
+   }
+  },
+  "/api/drift_finding": {
+   "get": {
+    "operationId": "listDrift_finding",
+    "parameters": [
+     {
+      "description": "Max rows (clamped to 500)",
+      "in": "query",
+      "name": "limit",
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Row offset",
+      "in": "query",
+      "name": "offset",
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Also return rows with expired_at set",
+      "in": "query",
+      "name": "includeExpired",
+      "schema": {
+       "default": false,
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/drift_findingList"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "list_failed"
+     }
+    },
+    "summary": "List active rows in semantics.drift_finding (drift finding (finding against a snapshot observation))",
+    "tags": [
+     "drift_finding"
+    ]
+   },
+   "post": {
+    "operationId": "addDrift_finding",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/drift_findingWrite"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/drift_findingRow"
+        }
+       }
+      },
+      "description": "Created"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "add_failed / duplicate_active_key / FK violation"
+     }
+    },
+    "summary": "Add a row to semantics.drift_finding via add_ proc (drift finding (finding against a snapshot observation))",
+    "tags": [
+     "drift_finding"
+    ]
+   }
+  },
+  "/api/drift_finding/{id}": {
+   "delete": {
+    "operationId": "softDeleteDrift_finding",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "properties": {
+          "deleted": {
+           "description": "1 on first delete, 0 if already expired/missing",
+           "type": "integer"
+          },
+          "id": {
+           "type": "string"
+          },
+          "table": {
+           "enum": [
+            "drift_finding"
+           ],
+           "type": "string"
+          }
+         },
+         "required": [
+          "table",
+          "id",
+          "deleted"
+         ],
+         "type": "object"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "soft_delete_failed"
+     }
+    },
+    "summary": "Soft-delete (expire) a row in semantics.drift_finding \u2014 expire-not-delete, idempotent",
+    "tags": [
+     "drift_finding"
+    ]
+   },
+   "get": {
+    "operationId": "getDrift_finding",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/drift_findingRow"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "get_failed"
+     }
+    },
+    "summary": "Get a single row from semantics.drift_finding by id",
+    "tags": [
+     "drift_finding"
+    ]
+   },
+   "patch": {
+    "operationId": "updateDrift_finding",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/drift_findingUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "allOf": [
+          {
+           "$ref": "#/components/schemas/drift_findingRow"
+          },
+          {
+           "properties": {
+            "superseded_id": {
+             "description": "id of the expired row",
+             "type": "string"
+            }
+           },
+           "required": [
+            "superseded_id"
+           ],
+           "type": "object"
+          }
+         ]
+        }
+       }
+      },
+      "description": "OK \u2014 new row with superseded_id"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "duplicate_active_key / update_failed"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found \u2014 no active row"
+     }
+    },
+    "summary": "Append-only replace on semantics.drift_finding \u2014 expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id",
+    "tags": [
+     "drift_finding"
+    ]
+   }
+  },
+  "/api/drift_finding/{id}/resolve": {
+   "post": {
+    "operationId": "resolveDriftFinding",
+    "parameters": [
+     {
+      "description": "Drift finding uuid",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "p_resolved_at": {
+          "description": "ISO timestamp; defaults to now()",
+          "format": "date-time",
+          "nullable": true,
+          "type": "string"
+         }
+        },
+        "type": "object"
+       }
+      }
+     },
+     "required": false
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "properties": {
+          "id": {
+           "format": "uuid",
+           "type": "string"
+          },
+          "resolved": {
+           "description": "1 on first resolve, 0 if already resolved/expired/missing",
+           "type": "integer"
+          }
+         },
+         "required": [
+          "id",
+          "resolved"
+         ],
+         "type": "object"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "resolve_failed"
+     }
+    },
+    "summary": "Transition a drift finding from detected \u2192 resolved (idempotent)",
+    "tags": [
+     "drift_finding"
+    ]
+   }
+  },
+  "/api/identity_strategy": {
+   "get": {
+    "operationId": "listIdentity_strategy",
+    "parameters": [
+     {
+      "description": "Max rows (clamped to 500)",
+      "in": "query",
+      "name": "limit",
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Row offset",
+      "in": "query",
+      "name": "offset",
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Also return rows with expired_at set",
+      "in": "query",
+      "name": "includeExpired",
+      "schema": {
+       "default": false,
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/identity_strategyList"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "list_failed"
+     }
+    },
+    "summary": "List active rows in semantics.identity_strategy (identity strategy (what identity means for a concept))",
+    "tags": [
+     "identity_strategy"
+    ]
+   },
+   "post": {
+    "operationId": "addIdentity_strategy",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/identity_strategyWrite"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/identity_strategyRow"
+        }
+       }
+      },
+      "description": "Created"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "add_failed / duplicate_active_key / FK violation"
+     }
+    },
+    "summary": "Add a row to semantics.identity_strategy via add_ proc (identity strategy (what identity means for a concept))",
+    "tags": [
+     "identity_strategy"
+    ]
+   }
+  },
+  "/api/identity_strategy/{id}": {
+   "delete": {
+    "operationId": "softDeleteIdentity_strategy",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "properties": {
+          "deleted": {
+           "description": "1 on first delete, 0 if already expired/missing",
+           "type": "integer"
+          },
+          "id": {
+           "type": "string"
+          },
+          "table": {
+           "enum": [
+            "identity_strategy"
+           ],
+           "type": "string"
+          }
+         },
+         "required": [
+          "table",
+          "id",
+          "deleted"
+         ],
+         "type": "object"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "soft_delete_failed"
+     }
+    },
+    "summary": "Soft-delete (expire) a row in semantics.identity_strategy \u2014 expire-not-delete, idempotent",
+    "tags": [
+     "identity_strategy"
+    ]
+   },
+   "get": {
+    "operationId": "getIdentity_strategy",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/identity_strategyRow"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "get_failed"
+     }
+    },
+    "summary": "Get a single row from semantics.identity_strategy by id",
+    "tags": [
+     "identity_strategy"
+    ]
+   },
+   "patch": {
+    "operationId": "updateIdentity_strategy",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/identity_strategyUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "allOf": [
+          {
+           "$ref": "#/components/schemas/identity_strategyRow"
+          },
+          {
+           "properties": {
+            "superseded_id": {
+             "description": "id of the expired row",
+             "type": "string"
+            }
+           },
+           "required": [
+            "superseded_id"
+           ],
+           "type": "object"
+          }
+         ]
+        }
+       }
+      },
+      "description": "OK \u2014 new row with superseded_id"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "duplicate_active_key / update_failed"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found \u2014 no active row"
+     }
+    },
+    "summary": "Append-only replace on semantics.identity_strategy \u2014 expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id",
+    "tags": [
+     "identity_strategy"
+    ]
+   }
+  },
+  "/api/meta": {
+   "get": {
+    "operationId": "meta",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "properties": {
+          "procs": {
+           "type": "integer"
+          },
+          "schema": {
+           "enum": [
+            "semantics"
+           ],
+           "type": "string"
+          },
+          "service": {
+           "type": "string"
+          },
+          "tables": {
+           "items": {
+            "properties": {
+             "active": {
+              "description": "rows with expired_at IS NULL",
+              "type": "integer"
+             },
+             "idAuto": {
+              "type": "boolean"
+             },
+             "idType": {
+              "enum": [
+               "uuid",
+               "smallint"
+              ],
+              "type": "string"
+             },
+             "label": {
+              "type": "string"
+             },
+             "table": {
+              "type": "string"
+             },
+             "total": {
+              "type": "integer"
+             }
+            },
+            "required": [
+             "table",
+             "label",
+             "idType",
+             "idAuto",
+             "active",
+             "total"
+            ],
+            "type": "object"
+           },
+           "type": "array"
+          },
+          "writableParams": {
+           "additionalProperties": {
+            "items": {
+             "type": "string"
+            },
+            "type": "array"
+           },
+           "type": "object"
+          }
+         },
+         "required": [
+          "service",
+          "schema",
+          "tables",
+          "procs",
+          "writableParams"
+         ],
+         "type": "object"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "meta_failed"
+     }
+    },
+    "summary": "Schema overview \u2014 every table with active/total counts, stored-proc count, and writable p_* params per table",
+    "tags": [
+     "system"
+    ]
+   }
+  },
+  "/api/owning_subsystem": {
+   "get": {
+    "operationId": "listOwning_subsystem",
+    "parameters": [
+     {
+      "description": "Max rows (clamped to 500)",
+      "in": "query",
+      "name": "limit",
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Row offset",
+      "in": "query",
+      "name": "offset",
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Also return rows with expired_at set",
+      "in": "query",
+      "name": "includeExpired",
+      "schema": {
+       "default": false,
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/owning_subsystemList"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "list_failed"
+     }
+    },
+    "summary": "List active rows in semantics.owning_subsystem (owning subsystem (fleet))",
+    "tags": [
+     "owning_subsystem"
+    ]
+   },
+   "post": {
+    "operationId": "addOwning_subsystem",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/owning_subsystemWrite"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/owning_subsystemRow"
+        }
+       }
+      },
+      "description": "Created"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "add_failed / duplicate_active_key / FK violation"
+     }
+    },
+    "summary": "Add a row to semantics.owning_subsystem via add_ proc (owning subsystem (fleet))",
+    "tags": [
+     "owning_subsystem"
+    ]
+   }
+  },
+  "/api/owning_subsystem/{id}": {
+   "delete": {
+    "operationId": "softDeleteOwning_subsystem",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "int32",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "properties": {
+          "deleted": {
+           "description": "1 on first delete, 0 if already expired/missing",
+           "type": "integer"
+          },
+          "id": {
+           "format": "int32",
+           "type": "integer"
+          },
+          "table": {
+           "enum": [
+            "owning_subsystem"
+           ],
+           "type": "string"
+          }
+         },
+         "required": [
+          "table",
+          "id",
+          "deleted"
+         ],
+         "type": "object"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "soft_delete_failed"
+     }
+    },
+    "summary": "Soft-delete (expire) a row in semantics.owning_subsystem \u2014 expire-not-delete, idempotent",
+    "tags": [
+     "owning_subsystem"
+    ]
+   },
+   "get": {
+    "operationId": "getOwning_subsystem",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "int32",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/owning_subsystemRow"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "get_failed"
+     }
+    },
+    "summary": "Get a single row from semantics.owning_subsystem by id",
+    "tags": [
+     "owning_subsystem"
+    ]
+   },
+   "patch": {
+    "operationId": "updateOwning_subsystem",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "int32",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/owning_subsystemUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "allOf": [
+          {
+           "$ref": "#/components/schemas/owning_subsystemRow"
+          },
+          {
+           "properties": {
+            "superseded_id": {
+             "description": "id of the expired row",
+             "type": "string"
+            }
+           },
+           "required": [
+            "superseded_id"
+           ],
+           "type": "object"
+          }
+         ]
+        }
+       }
+      },
+      "description": "OK \u2014 new row with superseded_id"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "duplicate_active_key / update_failed"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found \u2014 no active row"
+     }
+    },
+    "summary": "Append-only replace on semantics.owning_subsystem \u2014 expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id",
+    "tags": [
+     "owning_subsystem"
+    ]
+   }
+  },
+  "/api/relationship_type": {
+   "get": {
+    "operationId": "listRelationship_type",
+    "parameters": [
+     {
+      "description": "Max rows (clamped to 500)",
+      "in": "query",
+      "name": "limit",
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Row offset",
+      "in": "query",
+      "name": "offset",
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Also return rows with expired_at set",
+      "in": "query",
+      "name": "includeExpired",
+      "schema": {
+       "default": false,
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/relationship_typeList"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "list_failed"
+     }
+    },
+    "summary": "List active rows in semantics.relationship_type (relationship type (vocabulary of legal edge types))",
+    "tags": [
+     "relationship_type"
+    ]
+   },
+   "post": {
+    "operationId": "addRelationship_type",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/relationship_typeWrite"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/relationship_typeRow"
+        }
+       }
+      },
+      "description": "Created"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "add_failed / duplicate_active_key / FK violation"
+     }
+    },
+    "summary": "Add a row to semantics.relationship_type via add_ proc (relationship type (vocabulary of legal edge types))",
+    "tags": [
+     "relationship_type"
+    ]
+   }
+  },
+  "/api/relationship_type/{id}": {
+   "delete": {
+    "operationId": "softDeleteRelationship_type",
+    "parameters": [
+     {
+      "description": "Relationship type name (or uuid) \u2014 matches on either",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "properties": {
+          "deleted": {
+           "description": "1 on first delete, 0 if already expired/missing",
+           "type": "integer"
+          },
+          "id": {
+           "type": "string"
+          },
+          "table": {
+           "enum": [
+            "relationship_type"
+           ],
+           "type": "string"
+          }
+         },
+         "required": [
+          "table",
+          "id",
+          "deleted"
+         ],
+         "type": "object"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "soft_delete_failed"
+     }
+    },
+    "summary": "Soft-delete (expire) a row in semantics.relationship_type \u2014 expire-not-delete, idempotent",
+    "tags": [
+     "relationship_type"
+    ]
+   },
+   "get": {
+    "operationId": "getRelationship_type",
+    "parameters": [
+     {
+      "description": "Relationship type name (or uuid) \u2014 matches on either",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/relationship_typeRow"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "get_failed"
+     }
+    },
+    "summary": "Get a single row from semantics.relationship_type by id",
+    "tags": [
+     "relationship_type"
+    ]
+   },
+   "patch": {
+    "operationId": "updateRelationship_type",
+    "parameters": [
+     {
+      "description": "Relationship type name (or uuid) \u2014 matches on either",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/relationship_typeUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "allOf": [
+          {
+           "$ref": "#/components/schemas/relationship_typeRow"
+          },
+          {
+           "properties": {
+            "superseded_id": {
+             "description": "id of the expired row",
+             "type": "string"
+            }
+           },
+           "required": [
+            "superseded_id"
+           ],
+           "type": "object"
+          }
+         ]
+        }
+       }
+      },
+      "description": "OK \u2014 new row with superseded_id"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "duplicate_active_key / update_failed"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found \u2014 no active row"
+     }
+    },
+    "summary": "Append-only replace on semantics.relationship_type \u2014 expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id",
+    "tags": [
+     "relationship_type"
+    ]
+   }
+  },
+  "/api/representation": {
+   "get": {
+    "operationId": "listRepresentation",
+    "parameters": [
+     {
+      "description": "Max rows (clamped to 500)",
+      "in": "query",
+      "name": "limit",
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Row offset",
+      "in": "query",
+      "name": "offset",
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Also return rows with expired_at set",
+      "in": "query",
+      "name": "includeExpired",
+      "schema": {
+       "default": false,
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/representationList"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "list_failed"
+     }
+    },
+    "summary": "List active rows in semantics.representation (representation (physical form of a concept))",
+    "tags": [
+     "representation"
+    ]
+   },
+   "post": {
+    "operationId": "addRepresentation",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/representationWrite"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/representationRow"
+        }
+       }
+      },
+      "description": "Created"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "add_failed / duplicate_active_key / FK violation"
+     }
+    },
+    "summary": "Add a row to semantics.representation via add_ proc (representation (physical form of a concept))",
+    "tags": [
+     "representation"
+    ]
+   }
+  },
+  "/api/representation/{id}": {
+   "delete": {
+    "operationId": "softDeleteRepresentation",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "properties": {
+          "deleted": {
+           "description": "1 on first delete, 0 if already expired/missing",
+           "type": "integer"
+          },
+          "id": {
+           "type": "string"
+          },
+          "table": {
+           "enum": [
+            "representation"
+           ],
+           "type": "string"
+          }
+         },
+         "required": [
+          "table",
+          "id",
+          "deleted"
+         ],
+         "type": "object"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "soft_delete_failed"
+     }
+    },
+    "summary": "Soft-delete (expire) a row in semantics.representation \u2014 expire-not-delete, idempotent",
+    "tags": [
+     "representation"
+    ]
+   },
+   "get": {
+    "operationId": "getRepresentation",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/representationRow"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "get_failed"
+     }
+    },
+    "summary": "Get a single row from semantics.representation by id",
+    "tags": [
+     "representation"
+    ]
+   },
+   "patch": {
+    "operationId": "updateRepresentation",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/representationUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "allOf": [
+          {
+           "$ref": "#/components/schemas/representationRow"
+          },
+          {
+           "properties": {
+            "superseded_id": {
+             "description": "id of the expired row",
+             "type": "string"
+            }
+           },
+           "required": [
+            "superseded_id"
+           ],
+           "type": "object"
+          }
+         ]
+        }
+       }
+      },
+      "description": "OK \u2014 new row with superseded_id"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "duplicate_active_key / update_failed"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found \u2014 no active row"
+     }
+    },
+    "summary": "Append-only replace on semantics.representation \u2014 expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id",
+    "tags": [
+     "representation"
+    ]
+   }
+  },
+  "/api/representation_identity": {
+   "get": {
+    "operationId": "listRepresentation_identity",
+    "parameters": [
+     {
+      "description": "Max rows (clamped to 500)",
+      "in": "query",
+      "name": "limit",
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Row offset",
+      "in": "query",
+      "name": "offset",
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Also return rows with expired_at set",
+      "in": "query",
+      "name": "includeExpired",
+      "schema": {
+       "default": false,
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/representation_identityList"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "list_failed"
+     }
+    },
+    "summary": "List active rows in semantics.representation_identity (representation identity (how a form expresses its concept's identity))",
+    "tags": [
+     "representation_identity"
+    ]
+   },
+   "post": {
+    "operationId": "addRepresentation_identity",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/representation_identityWrite"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/representation_identityRow"
+        }
+       }
+      },
+      "description": "Created"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "add_failed / duplicate_active_key / FK violation"
+     }
+    },
+    "summary": "Add a row to semantics.representation_identity via add_ proc (representation identity (how a form expresses its concept's identity))",
+    "tags": [
+     "representation_identity"
+    ]
+   }
+  },
+  "/api/representation_identity/{id}": {
+   "delete": {
+    "operationId": "softDeleteRepresentation_identity",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "properties": {
+          "deleted": {
+           "description": "1 on first delete, 0 if already expired/missing",
+           "type": "integer"
+          },
+          "id": {
+           "type": "string"
+          },
+          "table": {
+           "enum": [
+            "representation_identity"
+           ],
+           "type": "string"
+          }
+         },
+         "required": [
+          "table",
+          "id",
+          "deleted"
+         ],
+         "type": "object"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "soft_delete_failed"
+     }
+    },
+    "summary": "Soft-delete (expire) a row in semantics.representation_identity \u2014 expire-not-delete, idempotent",
+    "tags": [
+     "representation_identity"
+    ]
+   },
+   "get": {
+    "operationId": "getRepresentation_identity",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/representation_identityRow"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "get_failed"
+     }
+    },
+    "summary": "Get a single row from semantics.representation_identity by id",
+    "tags": [
+     "representation_identity"
+    ]
+   },
+   "patch": {
+    "operationId": "updateRepresentation_identity",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/representation_identityUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "allOf": [
+          {
+           "$ref": "#/components/schemas/representation_identityRow"
+          },
+          {
+           "properties": {
+            "superseded_id": {
+             "description": "id of the expired row",
+             "type": "string"
+            }
+           },
+           "required": [
+            "superseded_id"
+           ],
+           "type": "object"
+          }
+         ]
+        }
+       }
+      },
+      "description": "OK \u2014 new row with superseded_id"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "duplicate_active_key / update_failed"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found \u2014 no active row"
+     }
+    },
+    "summary": "Append-only replace on semantics.representation_identity \u2014 expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id",
+    "tags": [
+     "representation_identity"
+    ]
+   }
+  },
+  "/api/representation_relationship": {
+   "get": {
+    "operationId": "listRepresentation_relationship",
+    "parameters": [
+     {
+      "description": "Max rows (clamped to 500)",
+      "in": "query",
+      "name": "limit",
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Row offset",
+      "in": "query",
+      "name": "offset",
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Also return rows with expired_at set",
+      "in": "query",
+      "name": "includeExpired",
+      "schema": {
+       "default": false,
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/representation_relationshipList"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "list_failed"
+     }
+    },
+    "summary": "List active rows in semantics.representation_relationship (representation relationship (fidelity/lineage between forms))",
+    "tags": [
+     "representation_relationship"
+    ]
+   },
+   "post": {
+    "operationId": "addRepresentation_relationship",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/representation_relationshipWrite"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/representation_relationshipRow"
+        }
+       }
+      },
+      "description": "Created"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "add_failed / duplicate_active_key / FK violation"
+     }
+    },
+    "summary": "Add a row to semantics.representation_relationship via add_ proc (representation relationship (fidelity/lineage between forms))",
+    "tags": [
+     "representation_relationship"
+    ]
+   }
+  },
+  "/api/representation_relationship/{id}": {
+   "delete": {
+    "operationId": "softDeleteRepresentation_relationship",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "properties": {
+          "deleted": {
+           "description": "1 on first delete, 0 if already expired/missing",
+           "type": "integer"
+          },
+          "id": {
+           "type": "string"
+          },
+          "table": {
+           "enum": [
+            "representation_relationship"
+           ],
+           "type": "string"
+          }
+         },
+         "required": [
+          "table",
+          "id",
+          "deleted"
+         ],
+         "type": "object"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "soft_delete_failed"
+     }
+    },
+    "summary": "Soft-delete (expire) a row in semantics.representation_relationship \u2014 expire-not-delete, idempotent",
+    "tags": [
+     "representation_relationship"
+    ]
+   },
+   "get": {
+    "operationId": "getRepresentation_relationship",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/representation_relationshipRow"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "get_failed"
+     }
+    },
+    "summary": "Get a single row from semantics.representation_relationship by id",
+    "tags": [
+     "representation_relationship"
+    ]
+   },
+   "patch": {
+    "operationId": "updateRepresentation_relationship",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/representation_relationshipUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "allOf": [
+          {
+           "$ref": "#/components/schemas/representation_relationshipRow"
+          },
+          {
+           "properties": {
+            "superseded_id": {
+             "description": "id of the expired row",
+             "type": "string"
+            }
+           },
+           "required": [
+            "superseded_id"
+           ],
+           "type": "object"
+          }
+         ]
+        }
+       }
+      },
+      "description": "OK \u2014 new row with superseded_id"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "duplicate_active_key / update_failed"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found \u2014 no active row"
+     }
+    },
+    "summary": "Append-only replace on semantics.representation_relationship \u2014 expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id",
+    "tags": [
+     "representation_relationship"
+    ]
+   }
+  },
+  "/api/snapshot": {
+   "get": {
+    "operationId": "listSnapshot",
+    "parameters": [
+     {
+      "description": "Max rows (clamped to 500)",
+      "in": "query",
+      "name": "limit",
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Row offset",
+      "in": "query",
+      "name": "offset",
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Also return rows with expired_at set",
+      "in": "query",
+      "name": "includeExpired",
+      "schema": {
+       "default": false,
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/snapshotList"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "list_failed"
+     }
+    },
+    "summary": "List active rows in semantics.snapshot (snapshot (per-baseline judgment record))",
+    "tags": [
+     "snapshot"
+    ]
+   },
+   "post": {
+    "operationId": "addSnapshot",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/snapshotWrite"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/snapshotRow"
+        }
+       }
+      },
+      "description": "Created"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "add_failed / duplicate_active_key / FK violation"
+     }
+    },
+    "summary": "Add a row to semantics.snapshot via add_ proc (snapshot (per-baseline judgment record))",
+    "tags": [
+     "snapshot"
+    ]
+   }
+  },
+  "/api/snapshot/{id}": {
+   "delete": {
+    "operationId": "softDeleteSnapshot",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "properties": {
+          "deleted": {
+           "description": "1 on first delete, 0 if already expired/missing",
+           "type": "integer"
+          },
+          "id": {
+           "type": "string"
+          },
+          "table": {
+           "enum": [
+            "snapshot"
+           ],
+           "type": "string"
+          }
+         },
+         "required": [
+          "table",
+          "id",
+          "deleted"
+         ],
+         "type": "object"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "soft_delete_failed"
+     }
+    },
+    "summary": "Soft-delete (expire) a row in semantics.snapshot \u2014 expire-not-delete, idempotent",
+    "tags": [
+     "snapshot"
+    ]
+   },
+   "get": {
+    "operationId": "getSnapshot",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/snapshotRow"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "get_failed"
+     }
+    },
+    "summary": "Get a single row from semantics.snapshot by id",
+    "tags": [
+     "snapshot"
+    ]
+   },
+   "patch": {
+    "operationId": "updateSnapshot",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/snapshotUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "allOf": [
+          {
+           "$ref": "#/components/schemas/snapshotRow"
+          },
+          {
+           "properties": {
+            "superseded_id": {
+             "description": "id of the expired row",
+             "type": "string"
+            }
+           },
+           "required": [
+            "superseded_id"
+           ],
+           "type": "object"
+          }
+         ]
+        }
+       }
+      },
+      "description": "OK \u2014 new row with superseded_id"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "duplicate_active_key / update_failed"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found \u2014 no active row"
+     }
+    },
+    "summary": "Append-only replace on semantics.snapshot \u2014 expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id",
+    "tags": [
+     "snapshot"
+    ]
+   }
+  },
+  "/api/snapshot_observation": {
+   "get": {
+    "operationId": "listSnapshot_observation",
+    "parameters": [
+     {
+      "description": "Max rows (clamped to 500)",
+      "in": "query",
+      "name": "limit",
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Row offset",
+      "in": "query",
+      "name": "offset",
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Also return rows with expired_at set",
+      "in": "query",
+      "name": "includeExpired",
+      "schema": {
+       "default": false,
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/snapshot_observationList"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "list_failed"
+     }
+    },
+    "summary": "List active rows in semantics.snapshot_observation (snapshot observation (per-baseline judgment on a representation))",
+    "tags": [
+     "snapshot_observation"
+    ]
+   },
+   "post": {
+    "operationId": "addSnapshot_observation",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/snapshot_observationWrite"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/snapshot_observationRow"
+        }
+       }
+      },
+      "description": "Created"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "add_failed / duplicate_active_key / FK violation"
+     }
+    },
+    "summary": "Add a row to semantics.snapshot_observation via add_ proc (snapshot observation (per-baseline judgment on a representation))",
+    "tags": [
+     "snapshot_observation"
+    ]
+   }
+  },
+  "/api/snapshot_observation/{id}": {
+   "delete": {
+    "operationId": "softDeleteSnapshot_observation",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "properties": {
+          "deleted": {
+           "description": "1 on first delete, 0 if already expired/missing",
+           "type": "integer"
+          },
+          "id": {
+           "type": "string"
+          },
+          "table": {
+           "enum": [
+            "snapshot_observation"
+           ],
+           "type": "string"
+          }
+         },
+         "required": [
+          "table",
+          "id",
+          "deleted"
+         ],
+         "type": "object"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "soft_delete_failed"
+     }
+    },
+    "summary": "Soft-delete (expire) a row in semantics.snapshot_observation \u2014 expire-not-delete, idempotent",
+    "tags": [
+     "snapshot_observation"
+    ]
+   },
+   "get": {
+    "operationId": "getSnapshot_observation",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/snapshot_observationRow"
+        }
+       }
+      },
+      "description": "OK"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "get_failed"
+     }
+    },
+    "summary": "Get a single row from semantics.snapshot_observation by id",
+    "tags": [
+     "snapshot_observation"
+    ]
+   },
+   "patch": {
+    "operationId": "updateSnapshot_observation",
+    "parameters": [
+     {
+      "description": "Row id (uuid, or smallint for owning_subsystem)",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/snapshot_observationUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "allOf": [
+          {
+           "$ref": "#/components/schemas/snapshot_observationRow"
+          },
+          {
+           "properties": {
+            "superseded_id": {
+             "description": "id of the expired row",
+             "type": "string"
+            }
+           },
+           "required": [
+            "superseded_id"
+           ],
+           "type": "object"
+          }
+         ]
+        }
+       }
+      },
+      "description": "OK \u2014 new row with superseded_id"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "duplicate_active_key / update_failed"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "not_found \u2014 no active row"
+     }
+    },
+    "summary": "Append-only replace on semantics.snapshot_observation \u2014 expires the row with the given id and inserts a NEW version with a NEW id; response includes superseded_id",
+    "tags": [
+     "snapshot_observation"
+    ]
+   }
+  },
+  "/health": {
+   "get": {
+    "operationId": "health",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Health"
+        }
+       }
+      },
+      "description": "OK"
+     }
+    },
+    "summary": "Health check",
+    "tags": [
+     "system"
+    ]
+   }
+  }
+ },
+ "servers": [
+  {
+   "description": "local semantics-srv",
+   "url": "http://localhost:3160"
+  }
+ ],
+ "tags": [
+  {
+   "description": "Health + schema introspection",
+   "name": "system"
+  },
+  {
+   "description": "owning subsystem (fleet)",
+   "name": "owning_subsystem"
+  },
+  {
+   "description": "concept (class)",
+   "name": "concept"
+  },
+  {
+   "description": "representation (physical form of a concept)",
+   "name": "representation"
+  },
+  {
+   "description": "representation relationship (fidelity/lineage between forms)",
+   "name": "representation_relationship"
+  },
+  {
+   "description": "consumer operation (who touches a representation and how)",
+   "name": "consumer_operation"
+  },
+  {
+   "description": "identity strategy (what identity means for a concept)",
+   "name": "identity_strategy"
+  },
+  {
+   "description": "representation identity (how a form expresses its concept's identity)",
+   "name": "representation_identity"
+  },
+  {
+   "description": "snapshot (per-baseline judgment record)",
+   "name": "snapshot"
+  },
+  {
+   "description": "snapshot observation (per-baseline judgment on a representation)",
+   "name": "snapshot_observation"
+  },
+  {
+   "description": "concept relationship (legal pipeline shape between classes)",
+   "name": "concept_relationship"
+  },
+  {
+   "description": "relationship type (vocabulary of legal edge types)",
+   "name": "relationship_type"
+  },
+  {
+   "description": "drift lifecycle",
+   "name": "drift_finding"
+  }
+ ]
+}

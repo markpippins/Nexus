@@ -1,0 +1,859 @@
+{
+ "components": {
+  "schemas": {
+   "Error": {
+    "additionalProperties": true,
+    "properties": {
+     "error": {
+      "description": "Machine-readable error code (e.g. not_found, validation_failed).",
+      "type": "string"
+     },
+     "message": {
+      "description": "Human-readable error detail.",
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "JsonBody": {
+    "additionalProperties": true,
+    "description": "Generic JSON body (fields are service-specific).",
+    "type": "object"
+   }
+  }
+ },
+ "info": {
+  "description": "Read-only API over the execution schema: requests, leases, attempts, receipts, integrity scans, and cross-schema lineage.\n\nEndpoint inventory generated from source route registrations by `nexus/tools/api-docs/`. Request/response bodies are generic; field-level contracts live in the service code and its README.",
+  "title": "execution-srv \u2014 Execution Observability API",
+  "version": "1.0.c57a2049"
+ },
+ "openapi": "3.0.3",
+ "paths": {
+  "/api/execution/attempts": {
+   "get": {
+    "operationId": "get_execution_attempts",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "tags": [
+     "execution"
+    ]
+   }
+  },
+  "/api/execution/health": {
+   "get": {
+    "operationId": "get_execution_health",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "Health inline \u2014 GET /api/execution/health Lightweight entry point distinct from /health (the root-level check). Returns just the live counts",
+    "tags": [
+     "execution"
+    ]
+   }
+  },
+  "/api/execution/health/by-executor": {
+   "get": {
+    "operationId": "get_execution_health_by_executor",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "5. FLEET VIEW GET /api/execution/health/by-executor?executor_id= What is this executor currently holding / running. Returns active leases + ",
+    "tags": [
+     "execution"
+    ]
+   }
+  },
+  "/api/execution/health/integrity-scan": {
+   "get": {
+    "operationId": "get_execution_health_integrity_scan",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "GET /api/execution/health/integrity-scan Same shape as Vision's check_receipt_integrity() \u2014 a named, growing list of specific pathologies, e",
+    "tags": [
+     "execution"
+    ]
+   }
+  },
+  "/api/execution/health/status-distribution": {
+   "get": {
+    "operationId": "get_execution_health_status_distribution",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "GET /api/execution/health/status-distribution Count of requests per status, leases per status, attempts per status \u2014 the drift-over-time sig",
+    "tags": [
+     "execution"
+    ]
+   }
+  },
+  "/api/execution/leases": {
+   "get": {
+    "operationId": "get_execution_leases",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "tags": [
+     "execution"
+    ]
+   }
+  },
+  "/api/execution/leases/stale": {
+   "get": {
+    "operationId": "get_execution_leases_stale",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "2. LEASE INTEGRITY \u2014 the expiry gap, made visible GET /api/execution/leases/stale Active leases whose expires_at < now() \u2014 the enforcement g",
+    "tags": [
+     "execution"
+    ]
+   }
+  },
+  "/api/execution/leases/{id}/lifecycle": {
+   "get": {
+    "operationId": "get_execution_leases_id_lifecycle",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "GET /api/execution/leases/{id}/lifecycle acquired_at \u2192 expires_at \u2192 released_at, actual vs promised. Computes how long the lease was actuall",
+    "tags": [
+     "execution"
+    ]
+   }
+  },
+  "/api/execution/receipts": {
+   "get": {
+    "operationId": "get_execution_receipts",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "tags": [
+     "execution"
+    ]
+   }
+  },
+  "/api/execution/receipts/{id}/pipeline-origin": {
+   "get": {
+    "operationId": "get_execution_receipts_id_pipeline_origin",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "Follows lineage_original_id \u2192 vision.receipts.id and returns both records side by side, explicitly labeled by which audit trail each came fr",
+    "tags": [
+     "execution"
+    ]
+   }
+  },
+  "/api/execution/requests": {
+   "get": {
+    "operationId": "get_execution_requests",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "GET /api/execution/receipts ?type=&search=&limit=20&offset=0 Each returns { total, limit, offset, items: [...] } with DB-native column shape",
+    "tags": [
+     "execution"
+    ]
+   }
+  },
+  "/api/execution/requests/{id}/attempts": {
+   "get": {
+    "operationId": "get_execution_requests_id_attempts",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "4. ATTEMPT/LEASE/REQUEST TREE GET /api/execution/requests/{id}/attempts Every attempt for this request, each attempt's lease, chronological.",
+    "tags": [
+     "execution"
+    ]
+   }
+  },
+  "/api/execution/requests/{id}/receipts/lineage": {
+   "get": {
+    "operationId": "get_execution_requests_id_receipts_lineage",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "GET /api/execution/requests/{id}/receipts/lineage Split by lineage_source: native vs backfilled vs unknown.",
+    "tags": [
+     "execution"
+    ]
+   }
+  },
+  "/api/execution/requests/{id}/state": {
+   "get": {
+    "operationId": "get_execution_requests_id_state",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "GET /api/execution/requests/{id}/state Returns the request, its current lease (if any), its latest attempt, and all of its receipts \u2014 the \"w",
+    "tags": [
+     "execution"
+    ]
+   }
+  },
+  "/health": {
+   "get": {
+    "operationId": "get_health",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "Health Check Two-level health: process-up + DB-reachable. The integrity-scan endpoint (/api/execution/health/integrity-scan) is the deeper c",
+    "tags": [
+     "health"
+    ]
+   }
+  }
+ },
+ "servers": [
+  {
+   "url": "http://localhost:3110"
+  }
+ ],
+ "tags": [
+  {
+   "name": "execution"
+  },
+  {
+   "name": "health"
+  }
+ ],
+ "x-generated-by": "nexus/tools/api-docs/gen_openapi.py"
+}
