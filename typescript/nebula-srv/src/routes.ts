@@ -1765,7 +1765,7 @@ export function createRoutes(pool: Pool): Router {
                   p.updated_at AS "modifiedAt"
            FROM nebula.implementation_plans p
            ${where}
-           ORDER BY p.updated_at DESC
+           ORDER BY p.updated_at DESC, p.id DESC
            LIMIT $${i} OFFSET $${i+1}`,
           [...vals, pageSize, offset]
         ),
@@ -2728,7 +2728,7 @@ export function createRoutes(pool: Pool): Router {
                  h.docklang
           FROM nebula.harvests h
           ${where}
-          ORDER BY ${sortExpr[sort]} ${sortDir} NULLS LAST
+          ORDER BY ${sort === 'created_at' ? `h.created_at ${sortDir} NULLS LAST, h.id ${sortDir}` : `${sortExpr[sort]} ${sortDir} NULLS LAST`}
           LIMIT $${pi} OFFSET $${pi + 1}
         ) s`;
 
@@ -3064,7 +3064,9 @@ export function createRoutes(pool: Pool): Router {
       const [dataResult, countResult] = await Promise.all([
         pool.query(
           `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description,
-                  hc.status, hc.completed, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
+                  hc.status, hc.completed, hc.tags, hc.open_questions,
+                  hc.implementation_notes, hc.code_snippets,
+                  hc.system_id, hc.subsystem_id, hc.feature_id,
                   hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
                   h.source_filename AS harvest_source,
                   cr.created_at AS linked_at
@@ -3108,7 +3110,9 @@ export function createRoutes(pool: Pool): Router {
       const [dataResult, countResult] = await Promise.all([
         pool.query(
           `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description,
-                  hc.status, hc.completed, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
+                  hc.status, hc.completed, hc.tags, hc.open_questions,
+                  hc.implementation_notes, hc.code_snippets,
+                  hc.system_id, hc.subsystem_id, hc.feature_id,
                   hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
                   h.source_filename AS harvest_source
            FROM nebula.harvest_candidates hc
@@ -3145,7 +3149,9 @@ export function createRoutes(pool: Pool): Router {
       const [dataResult, countResult] = await Promise.all([
         pool.query(
           `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description,
-                  hc.status, hc.completed, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
+                  hc.status, hc.completed, hc.tags, hc.open_questions,
+                  hc.implementation_notes, hc.code_snippets,
+                  hc.system_id, hc.subsystem_id, hc.feature_id,
                   hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
                   h.source_filename AS harvest_source
            FROM nebula.harvest_candidates hc
@@ -3182,7 +3188,9 @@ export function createRoutes(pool: Pool): Router {
       const [dataResult, countResult] = await Promise.all([
         pool.query(
           `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description,
-                  hc.status, hc.completed, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
+                  hc.status, hc.completed, hc.tags, hc.open_questions,
+                  hc.implementation_notes, hc.code_snippets,
+                  hc.system_id, hc.subsystem_id, hc.feature_id,
                   hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
                   h.source_filename AS harvest_source
            FROM nebula.harvest_candidates hc
@@ -3847,6 +3855,7 @@ export function createRoutes(pool: Pool): Router {
       const [dataResult, countResult] = await Promise.all([
         pool.query(
           `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description, hc.status, hc.tags,
+                  hc.implementation_notes, hc.code_snippets, hc.open_questions,
                   hc.system_id, hc.subsystem_id, hc.feature_id,
                   hc.work_request_id, hc.completed,
                   hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
@@ -3915,6 +3924,7 @@ export function createRoutes(pool: Pool): Router {
       const [dataResult, countResult] = await Promise.all([
         pool.query(
           `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description, hc.status, hc.tags,
+                  hc.implementation_notes, hc.code_snippets, hc.open_questions,
                   hc.system_id, hc.subsystem_id, hc.feature_id,
                   hc.work_request_id, hc.completed,
                   hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
@@ -4699,7 +4709,7 @@ export function createRoutes(pool: Pool): Router {
         pool.query(
           `SELECT ${columns}
            FROM nebula.agent_records ${where}
-           ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
+           ORDER BY created_at DESC, id DESC LIMIT $${i} OFFSET $${i + 1}`,
           [...vals, pageSize, offset]
         ),
         pool.query(
@@ -7240,7 +7250,7 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
 
       const [dataResult, countResult] = await Promise.all([
         pool.query(
-          `SELECT * FROM execution.receipts ${where} ORDER BY issued_at DESC LIMIT $${i++} OFFSET $${i}`,
+          `SELECT * FROM execution.receipts ${where} ORDER BY issued_at DESC, id DESC LIMIT $${i++} OFFSET $${i}`,
           [...filterParams, pageSize, offset]
         ),
         pool.query(
