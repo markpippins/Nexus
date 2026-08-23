@@ -177,7 +177,7 @@ function getGeminiClient(): GoogleGenAI | null {
   });
 }
 
-const TACKLE_MODE = (process.env.VITE_TACKLE_MODE || 'mock').toLowerCase();
+const TACKLE_MODE = (process.env.VITE_TACKLE_MODE || 'live').toLowerCase(); // LAC: live default, mock = explicit opt-in
 
 function createLiveProxy(targetUrl: string) {
   const url = new URL(targetUrl);
