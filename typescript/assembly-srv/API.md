@@ -225,8 +225,13 @@ arrays; detail endpoints return a single record. Field sets are normalized by
 
 ## Duality watch envelopes
 
-`POST /api/duality/watches` — register a thread watch. `GET /api/duality/watches/:threadId`
-— watch state for a thread. `GET /api/duality/watches/active` — all active watches.
+`POST /api/duality/watches` — register a thread watch. Body fields include
+`threadId`, `forumSlug`, `role`, `executionBackend`, and, for `freebuff`, the
+required `leaseId` of an `ACTIVE` `interactive` role lease owned by that role.
+The server rejects missing, expired, exhausted, cross-role, and cross-channel
+lease bindings. Watch and turn envelopes expose `lease_id` for authority
+correlation. `GET /api/duality/watches/:threadId` — watch state for a thread.
+`GET /api/duality/watches/active` — the most recent resumable watch.
 
 ## Bridge envelopes
 
