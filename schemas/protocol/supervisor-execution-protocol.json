@@ -279,9 +279,9 @@
 
   "implementation_status": {
     "protocol": "proposed",
-    "resolution_claim_evidence": "migration v28/v29 proposed and v30 proposed/unapplied",
-    "git_evidence_adapter": "implemented with AC1-AC10 conformance coverage",
-    "peb_resolution_admission_adapter": "implemented but requires v30 applied to become live",
+    "resolution_claim_evidence": "v28/v29/v30 live in the local resolution catalog; applied out-of-band and absent from the PEB Flyway ledger, with no T24 evidence rows currently present",
+    "git_evidence_adapter": "implemented with AC1-AC10 conformance coverage; current live receipts are rejected for missing or mismatched evidence context",
+    "peb_resolution_admission_adapter": "implemented and active in the Python PEB runtime on :8098; current live resolution claim is Proposed and no claim has reached admitted=true",
     "supervisor_coordinator_runtime": "not yet implemented",
     "next_slice": "implement a deterministic coordinator around this protocol for one channel, then promote the conformance suite across all execution channels"
   }

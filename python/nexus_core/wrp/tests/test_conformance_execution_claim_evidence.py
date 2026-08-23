@@ -1,9 +1,10 @@
 """wr-conf-020: SOL execution-claim/evidence integration conformance.
 
-The suite applies the unapplied resolution v28/v29 migrations inside each
-PostgreSQL test transaction, exercises the real tables/constraints/triggers,
-and rolls the transaction back. The live database is never left with the
-proposed schema changes.
+The suite applies the tracked resolution v28/v29/v30 migrations inside each
+isolated PostgreSQL test transaction, exercises the real tables, constraints,
+triggers, and admission function, and rolls the transaction back. The live
+catalog already contains these migrations; the test transaction keeps fixture
+runs isolated and never changes live data.
 
 Covered authority boundaries:
 

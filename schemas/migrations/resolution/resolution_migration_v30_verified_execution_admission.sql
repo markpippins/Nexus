@@ -18,8 +18,10 @@
 -- lifecycles are still independently migrated.  p_peb_transaction_id is a
 -- correlation key supplied by PEB and conflicting reuse is rejected.
 --
--- Unapplied additive migration.  It requires v28/v29 to have been applied in
--- the same database before the function can be called.
+-- Additive migration applied in the local resolution catalog after v28/v29.
+-- The PEB Flyway ledger does not own resolution migrations; live status is
+-- established by catalog verification. The function remains fail-closed when
+-- claim/evidence context or independent verification is missing.
 -- =============================================================================
 
 BEGIN;

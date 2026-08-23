@@ -21,8 +21,11 @@
 -- this avoids inventing cross-schema FKs and preserves identifiers from
 -- Freebuff, harness, Wind, Duality, and future execution channels.
 --
--- Review revision (unapplied): semantic disposition is kept separate from
--- PEB settlement, and execution-context correlation is explicit on evidence.
+-- Review revision: semantic disposition is kept separate from PEB settlement,
+-- and execution-context correlation is explicit on evidence. This migration
+-- is live in the local resolution catalog; the separate PEB Flyway ledger does
+-- not record resolution migrations, so live status is established by catalog
+-- verification rather than a Flyway row.
 -- Idempotent for schema evolution: CREATE IF NOT EXISTS, guarded indexes,
 -- guarded vocabulary inserts, and replaceable trigger function.
 -- =============================================================================
