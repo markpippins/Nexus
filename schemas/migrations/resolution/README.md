@@ -15,9 +15,9 @@ This is the tracked copy that gets applied to the `nexus` database's
 
 | File | What it is |
 |---|---|
-| `resolution_schema_consolidated.sql` | Full schema dump (pg_dump) — **current canonical schema state** |
+| `resolution_schema_consolidated.sql` | Base full schema dump (pg_dump); apply the post-dump v28-v33 chain below to reach the current live contract |
 | `resolution_data_consolidated.sql` | Full data dump (pg_dump) — **current canonical seed data** |
-| `resolution_migration_v{3,4,5,6,7,11,12,13,17,18,19,20,21,22,23,23b,24b,28,29,30}.sql` | Incremental migrations (v3 → v30) |
+| `resolution_migration_v{3,4,5,6,7,11,12,13,17,18,19,20,21,22,23,23b,24b,28,29,30,31,32,33}.sql` | Incremental migrations (v3 → v33) |
 | `resolution_evaluate_proposition_v1.sql` | Proposition evaluation function (disposition fast path) |
 | `resolution_comparator_v1.sql` | Cross-representation disagreement detection (`detect_disagreement`) |
 | `resolution_authority_resolution_v1.sql` | Authority resolution via verified statement |
@@ -44,6 +44,7 @@ psql -h localhost -U pguser -d nexus -v ON_ERROR_STOP=1 \
   -f schemas/migrations/resolution/resolution_schema_consolidated.sql
 psql -h localhost -U pguser -d nexus -v ON_ERROR_STOP=1 \
   -f schemas/migrations/resolution/resolution_data_consolidated.sql
+# 3. apply the ordered post-dump chain through v33, including v31/v32/v33
 ```
 
 Notes:
@@ -51,9 +52,13 @@ Notes:
   markers are no-ops on local psql 17.10 (verified).
 - The `resolution` schema is a SOL sandbox — "zero blast radius to
   production" per its own comment. No external schema depends on it.
-- Last applied: 2026-08-20 (v28 execution claims + evidence vocabulary, v29 T24
-  graph-edge evidence bridge, v30 verified execution admission bridge, applied as
-  incremental migrations on top of v24b; consolidated dump refreshed).
+- Last verified live chain: v28 execution claims + evidence vocabulary, v29 T24
+  graph-edge evidence bridge, v30 verified execution admission bridge, v31 frame
+  dimensions, v32 context-aware proposition evaluation, and v33 unambiguous sweep
+  overloads. v28-v33 are incremental migrations on top of v24b. The consolidated
+  dump is a base recovery artifact and does not yet include the v31-v33 delta;
+  apply the ordered migrations after restoring it, or regenerate the dump from
+  the live catalog before using it as a full recovery source.
 
 ## Related
 
