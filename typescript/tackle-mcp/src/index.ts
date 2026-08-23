@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { spawn } from "child_process";
 import { loadEnv } from "./env";
+import type { AppError } from "./errors";
 import {
   getAIConfigSnapshot,
   getAIProviders,
@@ -106,8 +107,25 @@ app.post("/", express.json(), async (req, res) => {
         respondError(-32601, `Method not found: ${method}`);
     }
   } catch (err: any) {
-    console.error(`[MCP] Error in ${method}:`, err.message);
-    respondError(-32603, err.message || "Internal error");
+    // AppErrors are plain objects shaped {error:{code,message,details}} —
+    // err.message is undefined for them, which used to mask every tool
+    // failure (incl. INVALID_ARGUMENTS) as -32603 "Internal error".
+    // Surface structured errors faithfully with a proper JSON-RPC code.
+    const appErr = err && err.error && err.error.code ? (err as AppError) : null;
+    const message = appErr
+      ? `${appErr.error.code}: ${appErr.error.message}`
+      : err instanceof Error
+        ? err.message
+        : String(err);
+    console.error(`[MCP] Error in ${method}:`, message);
+    const code =
+      appErr &&
+      (appErr.error.code === "INVALID_ARGUMENTS" ||
+        appErr.error.code === "TOOL_NOT_FOUND" ||
+        appErr.error.code === "NOT_FOUND")
+        ? -32602 // invalid params / unknown tool per JSON-RPC 2.0
+        : -32603;
+    respondError(code, message);
   }
 });
 
