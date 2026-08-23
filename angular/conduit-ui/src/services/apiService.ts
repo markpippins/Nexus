@@ -56,16 +56,15 @@ const STORAGE_KEYS = {
 };
 
 class ApiService {
+  // The environment-selected mode is authoritative at startup: the server
+  // reports its CONDUIT_LIVE_MODE via /api/status and the client follows it
+  // (initializeMode). We do NOT restore a persisted localStorage override at
+  // boot, so a stale mock selection can never mask a live .env. The in-UI
+  // toggle still switches the session.
   private useMock: boolean = true;
   private liveModeDetected: boolean | null = null; // null = not yet checked
 
   constructor() {
-    const storedMock = localStorage.getItem(STORAGE_KEYS.USE_MOCK);
-    if (storedMock !== null) {
-      this.useMock = storedMock === 'true';
-    } else {
-      this.useMock = true;
-    }
     this.initLocalStorage();
   }
 
@@ -279,9 +278,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch('/');
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('Backend offline, fallback to mock root', e);
+        throw friendlyFetchError(e);
       }
     }
     return { service: 'WRP Kernel Runtime (Mock)', version: '0.1.0', docs: '/docs' };
@@ -291,9 +291,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch('/healthz');
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('Healthz offline', e);
+        throw friendlyFetchError(e);
       }
     }
     return { status: 'alive' };
@@ -303,9 +304,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch('/readyz');
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('Readyz offline', e);
+        throw friendlyFetchError(e);
       }
     }
     return { status: 'ready', kernel_version: 42 };
@@ -315,9 +317,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch('/metrics');
-        if (res.ok) return await res.text();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.text();
       } catch (e) {
-        console.warn('Metrics offline', e);
+        throw friendlyFetchError(e);
       }
     }
     return `# HELP kernel_requests_total Total HTTP requests\nkernel_requests_total 128\n# HELP kernel_version Current version\nkernel_version 42`;
@@ -327,9 +330,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch('/api/status');
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('Status endpoint offline', e);
+        throw friendlyFetchError(e);
       }
     }
     return JSON.parse(localStorage.getItem(STORAGE_KEYS.STATUS) || JSON.stringify(INITIAL_SYSTEM_STATUS));
@@ -378,9 +382,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch('/delta/state');
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /delta/state offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const receipts = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
@@ -400,9 +405,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(`/state?view=${view}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /state offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const receipts = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
@@ -422,9 +428,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(`/state/identity/${encodeURIComponent(identityId)}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /state/identity offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const identities: any[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.IDENTITIES) || '[]');
@@ -443,9 +450,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(`/state/receipt/${encodeURIComponent(receiptId)}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /state/receipt offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const receipts: ReceiptItem[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
@@ -459,9 +467,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(`/state/receipts-by-plan/${formatted}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /state/receipts-by-plan offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const receipts: ReceiptItem[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
@@ -473,9 +482,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(`/state/graph?cursor=${encodeURIComponent(cursor)}&limit=${limit}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /state/graph offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const identities: any[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.IDENTITIES) || '[]');
@@ -510,9 +520,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(`/state/plan/${formatted}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /state/plan offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const receipts: ReceiptItem[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
@@ -536,9 +547,10 @@ class ApiService {
       try {
         const url = version !== undefined ? `/state/lineage?version=${version}&limit=${limit}` : `/state/lineage?limit=${limit}`;
         const res = await fetch(url);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /state/lineage offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const events: LineageEventItem[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.LINEAGE) || '[]');
@@ -551,9 +563,10 @@ class ApiService {
       try {
         const url = version !== undefined ? `/replay?version=${version}` : '/replay';
         const res = await fetch(url);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /replay offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const v = version ?? 42;
@@ -573,9 +586,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(`/replay/compare?version=${version}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /replay/compare offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const match = version === 42;
@@ -601,9 +615,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(`/admin/identities?cursor=${encodeURIComponent(cursor)}&limit=${limit}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /admin/identities offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const identities = JSON.parse(localStorage.getItem(STORAGE_KEYS.IDENTITIES) || '[]');
@@ -650,9 +665,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch('/admin/consistency');
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /admin/consistency offline', e);
+        throw friendlyFetchError(e);
       }
     }
     return {
@@ -674,9 +690,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(runningOnly ? '/api/sessions?running_only=true' : '/api/sessions');
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /api/sessions offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const sessions: KernelSession[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || '[]');
@@ -687,9 +704,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(`/api/sessions/stale?threshold_seconds=${thresholdSeconds}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /api/sessions/stale offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const sessions: KernelSession[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || '[]');
@@ -741,9 +759,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch('/api/breaker');
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /api/breaker offline', e);
+        throw friendlyFetchError(e);
       }
     }
     return JSON.parse(localStorage.getItem(STORAGE_KEYS.BREAKER) || '{}');
@@ -810,9 +829,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch('/api/breaker/failure-recovery');
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /api/breaker/failure-recovery offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const breaker: BreakerStateResponse = JSON.parse(localStorage.getItem(STORAGE_KEYS.BREAKER) || '{}');
@@ -857,9 +877,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(`/api/receipts/${formatted}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /api/receipts offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const receipts: ReceiptItem[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
@@ -918,9 +939,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch('/health');
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /health offline', e);
+        throw friendlyFetchError(e);
       }
     }
     return { status: 'ok', port: 3104, db: 'up', timestamp: new Date().toISOString() };
@@ -930,9 +952,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch('/workflows');
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /workflows offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const sessions = await this.getSessions(true);
@@ -965,9 +988,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(`/tickets/lineage/${formatted}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /tickets/lineage offline', e);
+        throw friendlyFetchError(e);
       }
     }
     return {
@@ -994,9 +1018,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(`/tokens/plan/${formatted}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /tokens/plan offline', e);
+        throw friendlyFetchError(e);
       }
     }
     return { plan_id: formatted, total_tokens: 3600, receipts: 2 };
@@ -1006,9 +1031,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(`/tokens/role/${encodeURIComponent(role)}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /tokens/role offline', e);
+        throw friendlyFetchError(e);
       }
     }
     return { role, total_tokens: 4200, receipts: 3 };
@@ -1018,9 +1044,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(`/tokens/ticket/${encodeURIComponent(ticketId)}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /tokens/ticket offline', e);
+        throw friendlyFetchError(e);
       }
     }
     return { ticket_id: ticketId, tokens_used: 1500 };
@@ -1030,9 +1057,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch('/config/cron');
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /config/cron offline', e);
+        throw friendlyFetchError(e);
       }
     }
     return { cron: '*/3 * * * *', intervalMinutes: 3, description: 'Pipeline cron interval', timestamp: new Date().toISOString() };
@@ -1053,9 +1081,10 @@ class ApiService {
         if (planId) queryParams.set('planId', planId);
         if (eventType) queryParams.set('eventType', eventType);
         const res = await fetch(`/governance/events?${queryParams.toString()}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /governance/events offline', e);
+        throw friendlyFetchError(e);
       }
     }
     return {
@@ -1081,9 +1110,10 @@ class ApiService {
       try {
         const url = status ? `/vision/work-requests?status=${encodeURIComponent(status)}` : '/vision/work-requests';
         const res = await fetch(url);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /vision/work-requests offline', e);
+        throw friendlyFetchError(e);
       }
     }
     return {
@@ -1119,9 +1149,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(`/vision/work-requests/${encodeURIComponent(id)}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /vision/work-requests/:id offline', e);
+        throw friendlyFetchError(e);
       }
     }
     return {
@@ -1163,9 +1194,10 @@ class ApiService {
     if (!this.useMock) {
       try {
         const res = await fetch(`/vision/receipts?planId=${encodeURIComponent(formatted)}`);
-        if (res.ok) return await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
       } catch (e) {
-        console.warn('GET /vision/receipts offline', e);
+        throw friendlyFetchError(e);
       }
     }
     const receipts = await this.getFormattedReceipts(formatted);
