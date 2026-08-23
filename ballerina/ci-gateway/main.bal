@@ -124,4 +124,20 @@ service /gateway on new http:Listener(port) {
             data: res
         };
     }
+
+    // ---- Drift sentinel (helpers in drift.bal) ----
+
+    // Probe all configured targets now and return the full report.
+    resource function get driftCheck() returns json {
+        return reportToJson(runDriftCheck());
+    }
+
+    // Last cached report (from the most recent drift/check call).
+    resource function get driftStatus() returns json {
+        DriftReport? r = lastDriftReport();
+        if r is () {
+            return { status: "never-run", hint: "GET /gateway/driftStatus" };
+        }
+        return reportToJson(r);
+    }
 }

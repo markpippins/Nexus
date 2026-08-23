@@ -1,0 +1,345 @@
+{
+ "components": {
+  "schemas": {
+   "Error": {
+    "additionalProperties": true,
+    "properties": {
+     "error": {
+      "description": "Machine-readable error code (e.g. not_found, validation_failed).",
+      "type": "string"
+     },
+     "message": {
+      "description": "Human-readable error detail.",
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "JsonBody": {
+    "additionalProperties": true,
+    "description": "Generic JSON body (fields are service-specific).",
+    "type": "object"
+   }
+  }
+ },
+ "info": {
+  "description": "Reads prompt templates and active tasks from PostgreSQL and populates the Redis prompt:* / task:* caches for live agents.\n\nEndpoint inventory generated from source route registrations by `nexus/tools/api-docs/`. Request/response bodies are generic; field-level contracts live in the service code and its README.",
+  "title": "tackle-prompt-sync-srv \u2014 Prompt + Task Registry Sync",
+  "version": "1.0.ac230a8e"
+ },
+ "openapi": "3.0.3",
+ "paths": {
+  "/health": {
+   "get": {
+    "operationId": "get_health",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "Health check",
+    "tags": [
+     "health"
+    ]
+   }
+  },
+  "/prompt/{role}/{slug}": {
+   "get": {
+    "operationId": "get_prompt_role_slug",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "role",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "slug",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "tags": [
+     "prompt"
+    ]
+   }
+  },
+  "/prompts/{role}": {
+   "get": {
+    "operationId": "get_prompts_role",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "role",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "tags": [
+     "prompts"
+    ]
+   }
+  },
+  "/refresh": {
+   "post": {
+    "operationId": "post_refresh",
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "tags": [
+     "refresh"
+    ]
+   }
+  },
+  "/tasks/{role}": {
+   "get": {
+    "operationId": "get_tasks_role",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "role",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "tags": [
+     "tasks"
+    ]
+   }
+  }
+ },
+ "servers": [
+  {
+   "url": "http://localhost:3501"
+  }
+ ],
+ "tags": [
+  {
+   "name": "health"
+  },
+  {
+   "name": "prompt"
+  },
+  {
+   "name": "prompts"
+  },
+  {
+   "name": "refresh"
+  },
+  {
+   "name": "tasks"
+  }
+ ],
+ "x-generated-by": "nexus/tools/api-docs/gen_openapi.py"
+}

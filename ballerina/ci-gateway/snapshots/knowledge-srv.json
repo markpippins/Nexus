@@ -1,0 +1,544 @@
+{
+ "components": {
+  "schemas": {
+   "Error": {
+    "additionalProperties": true,
+    "properties": {
+     "error": {
+      "description": "Machine-readable error code (e.g. not_found, validation_failed).",
+      "type": "string"
+     },
+     "message": {
+      "description": "Human-readable error detail.",
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "JsonBody": {
+    "additionalProperties": true,
+    "description": "Generic JSON body (fields are service-specific).",
+    "type": "object"
+   }
+  }
+ },
+ "info": {
+  "description": "Knowledge graph surface: entities by section, relation edges, cross-references, migrations, and summary.\n\nEndpoint inventory generated from source route registrations by `nexus/tools/api-docs/`. Request/response bodies are generic; field-level contracts live in the service code and its README.",
+  "title": "knowledge-srv \u2014 Knowledge Graph REST API",
+  "version": "1.0.94052059"
+ },
+ "openapi": "3.0.3",
+ "paths": {
+  "/": {
+   "get": {
+    "operationId": "get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "Root health check",
+    "tags": [
+     "root"
+    ]
+   }
+  },
+  "/health": {
+   "get": {
+    "operationId": "get_health",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "tags": [
+     "health"
+    ]
+   }
+  },
+  "/knowledge/cross-references": {
+   "get": {
+    "operationId": "get_knowledge_cross_references",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "graph_cross_references GET /knowledge/cross-references?map_name=&source_section=&target_id=&limit=&offset=",
+    "tags": [
+     "knowledge"
+    ]
+   }
+  },
+  "/knowledge/edges": {
+   "get": {
+    "operationId": "get_knowledge_edges",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "graph_edges GET /knowledge/edges?source_section=&source_id=&target_section=&target_id=&relation_type=&limit=&offset=",
+    "tags": [
+     "knowledge"
+    ]
+   }
+  },
+  "/knowledge/entities": {
+   "get": {
+    "operationId": "get_knowledge_entities",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "graph_entities GET /knowledge/entities?section=&entity_type=&status=&search=&limit=&offset=",
+    "tags": [
+     "knowledge"
+    ]
+   }
+  },
+  "/knowledge/entities/{section}/{entity_id}": {
+   "get": {
+    "operationId": "get_knowledge_entities_section_entity_id",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "section",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "entity_id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "GET /knowledge/entities/:section/:entity_id",
+    "tags": [
+     "knowledge"
+    ]
+   }
+  },
+  "/knowledge/entities/{section}/{entity_id}/relations": {
+   "get": {
+    "operationId": "get_knowledge_entities_section_entity_id_relations",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "section",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "entity_id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "GET /knowledge/entities/:section/:entity_id/relations",
+    "tags": [
+     "knowledge"
+    ]
+   }
+  },
+  "/knowledge/migrations": {
+   "get": {
+    "operationId": "get_knowledge_migrations",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "graph_migrations GET /knowledge/migrations?limit=",
+    "tags": [
+     "knowledge"
+    ]
+   }
+  },
+  "/knowledge/summary": {
+   "get": {
+    "operationId": "get_knowledge_summary",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "summary GET /knowledge/summary",
+    "tags": [
+     "knowledge"
+    ]
+   }
+  }
+ },
+ "servers": [
+  {
+   "url": "http://localhost:3109"
+  }
+ ],
+ "tags": [
+  {
+   "name": "health"
+  },
+  {
+   "name": "knowledge"
+  },
+  {
+   "name": "root"
+  }
+ ],
+ "x-generated-by": "nexus/tools/api-docs/gen_openapi.py"
+}
