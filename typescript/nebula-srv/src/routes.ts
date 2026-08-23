@@ -3923,6 +3923,34 @@ export function createRoutes(pool: Pool): Router {
   const RECORD_MATCH_LIMIT = 5;
   const RECORD_MATCH_MIN_SIMILARITY = 0.55;
 
+  // ── Archive-pointer resolution (planner to-do 3c204f0c / sweep-tooling 6/6) ──
+  // Historical conduit plans (e.g. 1058, 1234) are not in nebula.implementation_plans;
+  // their history lives only as filesystem projections under audit/IMPLEMENTATION_PLANS/.
+  // Xref targets that don't resolve to a live plan row resolve instead to an explicit
+  // archive pointer (status 'archived:<relative-path>') so sweeps deterministically find
+  // the projection. Pointers are data, not authority — DB-first doctrine intact.
+  const PLAN_ARCHIVE_ROOT = process.env.NEBULA_PLAN_ARCHIVE_ROOT
+    || '/home/codex/dev/nexus/audit/IMPLEMENTATION_PLANS';
+  const PLAN_ARCHIVE_DIRS = ['completed', 'active', 'pending', 'planning', 'proposed'];
+
+  function resolvePlanArchivePointer(planNumber: string): string | null {
+    try {
+      // Token match with delimiters so '105' never matches '1058-...'.
+      // Try both raw and zero-padded forms (files pad to 4 digits).
+      const tokens = [...new Set([planNumber, planNumber.padStart(4, '0')])];
+      const tokenRes = tokens.map((t) => new RegExp(`(^|-)${t}(-|\\.md$)`, 'i'));
+      for (const dir of PLAN_ARCHIVE_DIRS) {
+        const dirPath = path.join(PLAN_ARCHIVE_ROOT, dir);
+        if (!fs.existsSync(dirPath)) continue;
+        const hit = fs.readdirSync(dirPath).find((f) => f.endsWith('.md') && tokenRes.some((re) => re.test(f)));
+        if (hit) return `${dir}/${hit}`;
+      }
+    } catch {
+      // Best-effort: an unreadable archive falls through to 'unresolved'.
+    }
+    return null;
+  }
+
   async function computeCandidateCompletion(client: any, id: string): Promise<any | null> {
     const { rows: [cand] } = await client.query(
       'SELECT id, title, status, completed FROM nebula.harvest_candidates WHERE id = $1', [id]
@@ -3930,16 +3958,30 @@ export function createRoutes(pool: Pool): Router {
     if (!cand) return null;
 
     // Plans spawned by this candidate (target_id holds the plan number/ref).
-    const plans = await client.query(
-      `SELECT ip.plan_number AS number, ip.status
+    // Live plans resolve to their nebula status; historical ones resolve to an
+    // explicit archive pointer (sweep-tooling 6/6) or 'unresolved' as last resort.
+    const xrefTargets = await client.query(
+      `SELECT cr.target_id AS number
          FROM nebula.cross_references cr
-         JOIN nebula.implementation_plans ip ON ip.plan_number::text = cr.target_id
         WHERE cr.source_type = 'harvest_candidate'
           AND cr.source_id = $1
           AND cr.rel_type = 'ag:spawns_plan'
           AND cr.valid_until = '9999-12-31 00:00:00+00'::timestamptz`,
       [id]
     );
+    const plans: any[] = [];
+    for (const t of xrefTargets.rows) {
+      const { rows: live } = await client.query(
+        'SELECT ip.plan_number AS number, ip.status FROM nebula.implementation_plans ip WHERE ip.plan_number::text = $1 LIMIT 1',
+        [t.number]
+      );
+      if (live.length > 0) {
+        plans.push({ number: live[0].number, status: live[0].status });
+      } else {
+        const pointer = resolvePlanArchivePointer(String(t.number));
+        plans.push({ number: t.number, status: pointer ? `archived:${pointer}` : 'unresolved' });
+      }
+    }
 
     // Work request folded state via the candidate's direct WR link.
     const workRequests = await client.query(
@@ -3967,7 +4009,8 @@ export function createRoutes(pool: Pool): Router {
     }
 
     const DONE_PLAN_STATUSES = new Set(['completed', 'archived']);
-    const planCompleted = plans.rows.some((p: any) => DONE_PLAN_STATUSES.has(String(p.status || '').toLowerCase()));
+    const planCompleted = plans.some((p: any) => String(p.status || '').toLowerCase().startsWith('archived:')
+      || DONE_PLAN_STATUSES.has(String(p.status || '').toLowerCase()));
     const wrCompleted = workRequests.rows.some((w: any) =>
       ['settled'].includes(String(w.foldedState || '').toLowerCase()));
 
@@ -3975,7 +4018,7 @@ export function createRoutes(pool: Pool): Router {
       candidateId: cand.id,
       title: cand.title,
       status: cand.status,
-      plans: plans.rows.map((p: any) => ({ number: p.number, status: p.status })),
+      plans,
       workRequests: workRequests.rows,
       recordMatches,
       completed: Boolean(cand.completed) || planCompleted || wrCompleted,

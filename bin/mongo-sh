@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# bin/mongo-sh — agent-discoverable mongo shell into atomic-mongodb
+# ==================================================================
+#
+# Sweep-tooling 5/6 residual (planner to-do d6db2b90, consolidated with
+# integration to-do 7b0d775d): give agents a deterministic exec path into
+# the MongoDB container without hardcoding credentials in command history.
+#
+# Credentials come from SPRING_DATA_MONGODB_URI in nexus/.env (single source
+# of record — see architect record ea9167c6). The container ships the legacy
+# `mongo` shell (MongoDB 4.4); mongosh is not installed anywhere.
+#
+# Usage
+# -----
+#     bin/mongo-sh                     # interactive shell against nexus db
+#     bin/mongo-sh --eval 'db.stats()' # one-off command (passed through)
+#
+# Exit codes
+# ----------
+#   0/1/2 — mongoreplica of the mongo shell exit code
+#   3     — configuration error (.env missing or URI unparseable)
+
+set -euo pipefail
+
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+NEXUS_ROOT="$(cd "$BIN_DIR/.." && pwd)"
+ENV_FILE="$NEXUS_ROOT/.env"
+CONTAINER="${MONGO_CONTAINER:-atomic-mongodb}"
+SHELL_BIN="${MONGO_SHELL_BIN:-mongo}"
+
+[ -f "$ENV_FILE" ] || { echo "mongo-sh: $ENV_FILE not found" >&2; exit 3; }
+
+URI="$(grep -E '^SPRING_DATA_MONGODB_URI=' "$ENV_FILE" | head -1 | cut -d= -f2-)"
+[ -n "$URI" ] || { echo "mongo-sh: SPRING_DATA_MONGODB_URI not set in $ENV_FILE" >&2; exit 3; }
+
+# Parse mongodb://user:pass@host[:port]/db?...  (URL-decode %XX minimalities)
+decoded="$(printf '%b' "${URI//%/\\x}")"
+creds="$(printf '%s' "$decoded" | sed -E 's#^mongodb(\\+srv)?://##; s#@.*##')"
+user="$(printf '%s' "$creds" | cut -d: -f1)"
+pass="$(printf '%s' "$creds" | cut -d: -f2-)"
+db="$(printf '%s' "$decoded" | sed -E 's#.*/([^/?]+)(\?.*)?$#\1#')"
+
+[ -n "$user" ] && [ -n "$pass" ] && [ -n "$db" ] \
+    || { echo "mongo-sh: could not parse user/pass/db from URI" >&2; exit 3; }
+
+exec docker exec -i "$CONTAINER" "$SHELL_BIN" \
+    -u "$user" -p "$pass" --authenticationDatabase admin "$db" "$@"
