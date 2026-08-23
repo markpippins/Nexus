@@ -236,6 +236,10 @@
         <module>user-access-service</module>
         <module>user-creation-service</module>
         <module>user-service</module>
+        <!-- losm-host-service pins its OWN parent (spring-boot-starter-parent
+             4.0.6 + Spring AI 2.0.0-M8); aggregation is not inheritance, so
+             the Boot 3.5-managed deps above do not leak into it. -->
+        <module>losm-host-service</module>
         <module>shrapnel-data</module>
         <module>../atlas</module>
     </modules>
