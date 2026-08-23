@@ -67,6 +67,27 @@
 			<artifactId>spring-ai-starter-model-openai</artifactId>
 		</dependency>
 
+		<!-- Registry duplication: JDBC access to the tackle schema -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-jdbc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<!-- The OFFICIAL openai-java SDK (wrapped by Spring AI's OpenAiChatModel
+		     M8) still initializes on Jackson 2 (com.fasterxml), which Boot 4
+		     no longer ships alongside its Jackson 3 (tools.jackson) stack.
+		     Different packages -> safe coexistence. -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+			<version>2.19.0</version>
+			<scope>runtime</scope>
+		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
