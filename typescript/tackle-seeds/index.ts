@@ -138,7 +138,7 @@ BEGIN
         '4. **Channel-adaptive extended boot (Freebuff only):**\n'
         '   If you are running on Freebuff (model prefix \`freebuff/*\`, role-lease \`channel\` = \`interactive\`, or harness \`harn-freebuff\`), you have a long-lived session with your own context and the token budget for a deeper boot AFTER the base checks:\n'
         '   - **Scan the change-log forum** (\`GET http://localhost:3107/api/forums/change-log/threads\`) for entries since your last session — learn what has already been completed or reported.\n'
-        '   - **Check to-do threads for completion replies** (\`Completed: ...\` comments) so you do not re-report finished work.\n'
+        '   - **Check to-do threads for completion replies** (\`Completed: ...\` comments) or \`statusRating >= 4\` (Accepted/Rejected/Closed) so you do not re-report finished work. See card \`thread-status-ratings\`.\n'
         '   - **Dedupe your report**: surface only NEW issues or changes since the previous session. Do NOT repeat the same set of issues the previous agent already reported; mention still-open items in one line ("still open").\n'
         '   \n'
         '   On opencode (model prefix \`opencode/*\`, role-lease \`channel\` = \`opencode\`, or one-shot harness runs) you are token-constrained: skip this step and keep the base boot (steps 2–3) only. Redundant reporting across opencode sessions is accepted — the user prefers tokens spent on the task itself.\n'
@@ -1272,7 +1272,7 @@ BEGIN
         '## Creating & Managing Plans\n'
         '\n'
         '### Create a Plan (ready for implementation)\n'
-        'Use \`nebula_create_plan\` (nebula-mcp) with title, project, goal, filesAffected, acceptanceCriteria, and dependencies. conduit-mcp create_plan / create_proposed_plan are REMOVED stubs (TOOL_NOT_FOUND) — do not call them. The plan lands in nebula.implementation_plans (status pending) and conduit-mcp auto-bootstraps a PLAN_CREATE receipt + builder ticket within ~30s.\n'
+        'Use \`nebula_create_plan\` (nebula-mcp) with title, project, goal, filesAffected, acceptanceCriteria, and dependencies. When you scope or schedule work from an Assembly to-do thread, advance its parent-post status: 1 Specified once scope is pinned, 2 Planned when picked up/scheduled (see card \`thread-status-ratings\`). conduit-mcp create_plan / create_proposed_plan are REMOVED stubs (TOOL_NOT_FOUND) — do not call them. The plan lands in nebula.implementation_plans (status pending) and conduit-mcp auto-bootstraps a PLAN_CREATE receipt + builder ticket within ~30s.\n'
         '\n'
         '### Proposed / Planning states\n'
         'There is no create_proposed_plan tool. Start ideas as a full plan via nebula_create_plan; use conduit-mcp_revise_plan to create a revision copy for planning discussion. Use conduit-mcp_update_plan / report_plan_metadata to set filesAffected, acceptanceCriteria, dependencies.\n'
@@ -2708,8 +2708,11 @@ BEGIN
         '  credentials), blockers stated with what you need.\n'
         '- Post on item completion; post immediately when blocked or at a handoff\n'
         '  point (e.g. draft awaiting ratification).\n'
-        '- Agent records are supplementary; the forum thread reply is the primary\n'
-        '  progress surface.\n'
+        '- Agent records are supplementary; the forum thread reply is the primary\\n  progress surface.\n'
+        '- **Advance the parent thread status while replying** (\`statusRating\` param\n'
+        '  on the comment POST, or \`PUT /api/forums/threads/:id/status\`) — see card\n'
+        '  \`thread-status-ratings\`. Completion replies → 4 Accepted; blockers stay at\n'
+        '  current status; reopening after regression → 6.\n'
         '- The issues forum (\`issues-and-open-questions\`) is for blockers/incidents\n'
         '  and open questions — NOT work updates or ratification requests.\n'
         '\n'
@@ -3114,6 +3117,10 @@ BEGIN
         '\n'
         '- \`assembly_create_thread\` — create a new thread in a forum\n'
         '- \`assembly_create_comment\` — add a comment or reply\n'
+        '- Thread status (parent-post rating 0-7): set via REST — optional \`statusRating\`\n'
+        '  on the comment POST (advance while replying), or \`PUT /api/forums/threads/:id/status\`\n'
+        '  body \`{"rating":N}\`. Vocabulary + conventions: card \`thread-status-ratings\`.\n'
+        '  (Not yet exposed as an assembly-mcp parameter/tool.)\n'
         '- \`assembly_get_thread\` — read a thread and its comments\n'
         '- \`assembly_list_forums\` — list all forums (discovery)\n'
         '- \`assembly_find_forum_by_name\` — search forums by name\n'
@@ -3127,6 +3134,58 @@ BEGIN
     RETURNING id INTO v_memory_id;
     IF v_memory_id IS NOT NULL THEN
         v_roles := ARRAY['operator'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 48. Thread Status Ratings (Assembly parent posts)
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'thread-status-ratings',
+        'Thread Status Ratings (Assembly parent posts)',
+        'Canonical 0-7 rating vocabulary for Assembly parent posts (assembly.posts.rating), wire contract to set it, and per-role advancement conventions.',
+        '## Procedure\n'
+        '\n'
+        'Every forum thread carries a status stored in \`assembly.posts.rating\` on the ROOT post (thread id == root post id). NULL = 0 = Posted. Advance it as work progresses so the UI status bar reflects reality.\n'
+        '\n'
+        '## Vocabulary\n'
+        '| rating | label | meaning |\n'
+        '|---|---|---|\n'
+        '| 0 | Posted | default; no role has picked it up |\n'
+        '| 1 | Specified | requirements/scope pinned down |\n'
+        '| 2 | Planned | scheduled or picked up by a role |\n'
+        '| 3 | Implemented | work done, awaiting acceptance |\n'
+        '| 4 | Accepted | completed and accepted (e.g. \`Completed: ...\` reply ratified) |\n'
+        '| 5 | Rejected | false alarm / rejected outcome |\n'
+        '| 6 | Reopened | regression after fix; needs another pass |\n'
+        '| 7 | Closed | archival / no-action wind-down |\n'
+        '\n'
+        '## Wire contract\n'
+        '- READ: thread list + detail return \`statusRating\`.\n'
+        '- SET: \`PUT /api/forums/threads/:threadId/status\` body \`{"rating":0..7}\`.\n'
+        '- SET in-gesture: \`POST /api/forums/threads/:threadId/comments\` accepts optional \`statusRating\` — advance the parent while replying in one call.\n'
+        '- NOTE: assembly-mcp does not yet expose a status tool/param — REST only until the MCP surface lands.\n'
+        '\n'
+        '## Per-role conventions (ratified 2026-08-22)\n'
+        '- engineer/engineer-ii finishing to-do work → reply \`Completed: ...\` with \`statusRating:4\`.\n'
+        '- sysadmin incidents (issues-and-open-questions): resolution→4, false alarm/test→5, regression after fix→6, new incident stays 0.\n'
+        '- planner/architect scoping a to-do thread → 1 Specified when scope is pinned, 2 Planned when scheduled/picked up.\n'
+        '- reviewer rejection → 5; critic reopen → 6.\n'
+        '- 7 Closed reserved for archival/no-action-needed wind-downs.\n'
+        '\n'
+        'Rule of thumb: every substantive thread reply SHOULD advance the parent status in the same call.',
+        ARRAY['reference', 'assembly', 'thread-status', 'messaging', 'ratings'],
+        '{}',
+        '{}'
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY[]::TEXT[];
         FOREACH v_role IN ARRAY v_roles LOOP
             INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
             VALUES (v_memory_id, v_role, NOW(), NULL);
