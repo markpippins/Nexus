@@ -46,11 +46,11 @@ export default class ApiService extends Service {
             bodyParsers: {
               json: {
                 strict: false,
-                limit: "1MB",
+                limit: "5mb", // parity with legacy tier (raised for transcript docklang payloads)
               },
               urlencoded: {
                 extended: true,
-                limit: "1MB",
+                limit: "5mb",
               },
             },
 
