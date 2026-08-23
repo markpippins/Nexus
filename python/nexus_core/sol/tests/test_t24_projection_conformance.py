@@ -112,7 +112,7 @@ class TestC3ProvenanceGap(unittest.TestCase):
         result = project_edge(self.edge)
         claim = result["execution_claim"]
         self.assertEqual(claim["proposition"], "Pending")
-        self.assertIsNotTrue(result.get("accepted", False))
+        self.assertFalse(result.get("accepted", False))
 
 
 class TestC4ControlledPredicates(unittest.TestCase):
