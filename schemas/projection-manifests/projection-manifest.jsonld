@@ -122,8 +122,8 @@
       "generator": "manual",
       "outputPath": "python/rover/schemas.py",
       "lifecycle": "on-schema-change",
-      "active": true,
-      "comment": "HAND-MAINTAINED, not TypeSpec-generated: the rover spec models MCP request/response types, not the harvest schemas in this file. Digest-locked against silent edits.",
+      "active": false,
+      "comment": "RETIRED with rover (SPEC absorb supersession): the output artifact no longer exists on disk and nothing consumes it. Kept as a tombstoned manifest row for provenance; do not reactivate without re-creating python/rover/schemas.py and re-locking the digest.",
       "verify": {
         "mode": "digest",
         "algorithm": "sha256",

@@ -2,16 +2,32 @@
   "$schema": "https://nexus.local/schema/validation/authority/authority-matrix/v1",
   "version": 1,
   "description": "Single-canonical-authority registry. Each entry declares the ONE authoritative artifact for a semantic domain, the legacy definitions it supersedes, and the derived projections it generates. This is data, not code: tools/authority/check_authority.py reads it and enforces the invariant that no semantic domain has more than one authority.",
-
   "semantic_class_keys": {
-    "execution_state": ["execution_state", "state"],
-    "ir_layer": ["metadata.mode"],
-    "pipeline_intent": ["intent_source", "PIPELINE_INTENT"],
-    "decision": ["decision", "result", "score"],
-    "runtime_snapshot": ["snapshot", "snapshot_ref"],
-    "execution_status": ["status", "current_run"]
+    "execution_state": [
+      "execution_state",
+      "state"
+    ],
+    "ir_layer": [
+      "metadata.mode"
+    ],
+    "pipeline_intent": [
+      "intent_source",
+      "PIPELINE_INTENT"
+    ],
+    "decision": [
+      "decision",
+      "result",
+      "score"
+    ],
+    "runtime_snapshot": [
+      "snapshot",
+      "snapshot_ref"
+    ],
+    "execution_status": [
+      "status",
+      "current_run"
+    ]
   },
-
   "authorities": [
     {
       "domain": "work_request",
@@ -25,7 +41,9 @@
           "note": "Pre-WRP draft schema, superseded by the canonical WorkRequest IR and deleted from the working tree (D-2026-08-16-003). Tombstone is the durable provenance record; do not resurrect."
         }
       ],
-      "projections": ["schemas/ontology/core/work-request.jsonld"],
+      "projections": [
+        "schemas/ontology/core/work-request.jsonld"
+      ],
       "note": "Canonical WorkRequest IR (3-layer, 11-state). Splits intent vs event-derived state: `metadata.mode` is the 3-layer IR mode (ir_layer: INTENT/BINDING/EXECUTION-BOUND), while `execution_state` + `status` are event-derived runtime state (execution_state/execution_status). The pre-WRP draft .agents/schema/work_request.schema.json was superseded and deleted; it is recorded as a tombstoned superseded artifact (durable provenance, no resurrection). schemas/ontology/core/work-request.jsonld is the JSON-LD graph form."
     },
     {
@@ -42,7 +60,9 @@
       "canonical": "schemas/validation/wrp/wrp-event.schema.json",
       "kind": "json-schema",
       "superseded": [],
-      "projections": ["schemas/ontology/core/event.jsonld"],
+      "projections": [
+        "schemas/ontology/core/event.jsonld"
+      ],
       "note": "WRP lifecycle event envelope (additive-only versioning). schemas/ontology/core/event.jsonld is the JSON-LD graph form."
     },
     {
@@ -58,7 +78,9 @@
       "canonical": "python/peb-kernel/src/peb_kernel/domain.py",
       "kind": "runtime",
       "superseded": [],
-      "projections": ["python/peb-kernel/generated/org/nexus/peb/models/_models.py"],
+      "projections": [
+        "python/peb-kernel/generated/org/nexus/peb/models/_models.py"
+      ],
       "note": "Pure PEB domain types (no framework/db imports). The TypeSpec-generated client models are a projection; TypeSpec provenance reconciliation is tracked separately."
     },
     {
@@ -66,7 +88,9 @@
       "canonical": "go/wrp/ccnf-ref/ccnf/types.go",
       "kind": "oracle",
       "superseded": [],
-      "projections": ["rust/wrp/ccnf-verifier/src/ccnf/mod.rs"],
+      "projections": [
+        "rust/wrp/ccnf-verifier/src/ccnf/mod.rs"
+      ],
       "note": "Go CCNF reference is the authority oracle. The Rust ccnf-verifier is the cross-language conformance projection."
     },
     {
@@ -74,7 +98,9 @@
       "canonical": "schemas/ontology/core/knowledge-graph.jsonld",
       "kind": "json-ld",
       "superseded": [],
-      "projections": ["schemas/projection-manifests/knowledge-graph.sql"],
+      "projections": [
+        "schemas/projection-manifests/knowledge-graph.sql"
+      ],
       "note": "Canonical graph type definition. The SQL projection is regenerated from it. GraphSnapshot/VectorSnapshot (knowledge-graph.jsonld, extensions/vector-snapshot.jsonld) and graph-data backups (graph/nexus-knowledge-graph.json.bak/.pre-rebuild) are GENERATED PROJECTIONS — point-in-time artifacts that never carry canonical authority."
     },
     {
@@ -84,6 +110,13 @@
       "superseded": [],
       "projections": [],
       "note": "Canonical coordination contract for leased execution. The Supervisor coordinates grants, attempts, claims, evidence, SOL evaluation, settlement requests, and recovery, but PEB/kernel owns admission and settlement, SOL/resolution owns semantic evaluation, lease infrastructure owns lease lifecycle, and projections have no authority."
+    },
+    {
+      "domain": "sol_ir",
+      "canonical": "schemas/migrations/resolution",
+      "kind": "postgres-schema-chain",
+      "projections": [],
+      "note": "Physical anchor: schemas/migrations/resolution (the versioned DDL chain that defines resolution.concept/attribute/relationship/expression/rule/verified_statement + v28/v29 proposition layer; live authority is the applied PostgreSQL resolution schema). D-2026-08-23-B: the resolution schema IS the SOL IR substrate and the canonical logical authority (L1 in the four-layer model). Serializers: JSON-LD ontology (schemas/ontology/, L2) and canonical-JSON; evaluators: SQL today. Downstream forms - TypeSpec/JSON Schema/CUE service-contract projections (L3) and python/ir, CCNF, ProjectionIR, Mongo snapshots, graph exports (L4) - are receipt-carrying projections with NO reverse authority path. Logical authority ownership: DBA+architect (schema chain); nothing named sol-ir outside resolution.* may claim operational authority."
     }
   ]
 }

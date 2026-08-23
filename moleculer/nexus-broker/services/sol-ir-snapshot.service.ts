@@ -4,7 +4,11 @@ import { Pool } from "pg";
 import { MongoClient } from "mongodb";
 
 /**
- * SOL IR sync service (Wave 0.4).
+ * SOL IR SNAPSHOT service (renamed per D-2026-08-23-B W0.4).
+ *
+ * Formerly solir.service.ts. This is a one-way Mongo PROJECTION consumer —
+ * nothing named sol-ir here is operational authority; the canonical SOL IR
+ * substrate is the resolution schema (see authority-matrix.json domain sol_ir).
  *
  * Periodically snapshots the canonical resolution state (PostgreSQL:
  * nebula.observations_history / nebula.assessments_history — per
@@ -56,7 +60,7 @@ export default class SolIrService extends Service {
     super(broker);
 
     this.parseServiceSchema({
-      name: "solir",
+      name: "sol-ir-snapshot",
 
       actions: {
         snapshot: {
