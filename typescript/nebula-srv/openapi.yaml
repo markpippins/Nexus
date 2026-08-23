@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: nebula-srv — Nebula Knowledge-Graph API
-  version: 1.0.82db4bc8
+  version: 1.0.1bf389e9
   description: 'Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge
     graph, and cross-references.
 
@@ -2776,6 +2776,42 @@ paths:
         required: true
         schema:
           type: string
+  /api/harvest-candidates/{id}/completion:
+    get:
+      tags:
+      - harvest-candidates
+      operationId: get_harvest_candidates_id_completion
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
   /api/harvest-candidates/{id}/dependencies:
     get:
       tags:
@@ -2888,6 +2924,38 @@ paths:
         required: true
         schema:
           type: string
+  /api/harvest-candidates/completion-sweep:
+    post:
+      tags:
+      - harvest-candidates
+      operationId: post_harvest_candidates_completion_sweep
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'Batch variant: POST /api/harvest-candidates/completion-sweep { ids: [...] } Missing/unknown ids are reported
+        per-id rather than failing the '
   /api/harvest-candidates/discover:
     post:
       tags:

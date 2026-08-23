@@ -5,7 +5,7 @@
 
 Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge graph, and cross-references.
 
-**222 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**224 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -89,9 +89,11 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | POST | `/api/harvest-candidates` | POST /api/harvest-candidates — create a standalone candidate (e.g. manually linked). When systemId is set, auto-upserts a harvest_context info tab on the target system. |
 | GET | `/api/harvest-candidates/:id` | GET /api/harvest-candidates/:id — full candidate with all fields |
 | PATCH | `/api/harvest-candidates/:id` | PATCH /api/harvest-candidates/:id — update candidate (primarily for linking to hierarchy) When systemId is set, auto-upserts the candidate's intent into a harvest_context info tab. |
+| GET | `/api/harvest-candidates/:id/completion` |  |
 | GET | `/api/harvest-candidates/:id/dependencies` | CANDIDATE DEPENDENCIES sub-resource GET /api/harvest-candidates/:id/dependencies |
 | POST | `/api/harvest-candidates/:id/promote` | POST /api/harvest-candidates/:id/promote — mark candidate as useful |
 | POST | `/api/harvest-candidates/:id/spawn-plan` | POST /api/harvest-candidates/:id/spawn-plan — full flow: link candidate to system, create a requirement derived from the candidate, and optionally cross-reference a conduit plan — all in one atomic transaction. |
+| POST | `/api/harvest-candidates/completion-sweep` | Batch variant: POST /api/harvest-candidates/completion-sweep { ids: [...] } Missing/unknown ids are reported per-id rather than failing the batch. |
 | POST | `/api/harvest-candidates/discover` | HARVEST CANDIDATE DISCOVERY — semantic search against project hierarchy POST /api/harvest-candidates/discover — match unlinked candidates to systems/subsystems/features via semantic search, flagging undocumented projects below confidence threshold. |
 | POST | `/api/harvest-candidates/promote-to-plan` | POST /api/harvest-candidates/promote-to-plan — collate useful candidates into a conduit plan |
 | GET | `/api/harvests` | HARVESTS — database-first harvest pipeline output GET /api/harvests — list all harvests with sort/filter support + pagination sort options: candidate_count, code_blocks, turns, block_density, collaboration, created_at |
@@ -240,6 +242,7 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
 
 
 
