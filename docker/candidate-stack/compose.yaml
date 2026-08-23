@@ -1,0 +1,67 @@
+# Candidate stack — adonisjs edge + moleculer broker as a GROUP.
+#
+# The cutover gate requires this group to boot and pass health checks on
+# the local machine first (devops mandate #3), then run as a warm standby
+# group elsewhere via ansible.
+#
+#   docker compose -f docker/candidate-stack/compose.yaml up -d --build
+#
+# Secrets live in .env next to this file (gitignored): APP_KEY, PG_*,
+# REDIS_*. Postgres stays external for now (host PG via host-gateway);
+# a containerized PG joins when the group moves to vanadium.
+
+name: candidate-stack
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: cand-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries: 6
+
+  broker:
+    build: ../../moleculer/nexus-broker
+    image: candidate/broker:0.1.0
+    container_name: cand-broker
+    restart: unless-stopped
+    environment:
+      SERVICE_PORT: "4080"
+    ports:
+      - "14080:4080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4080/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  control-edge:
+    build: ../../adonisjs/nexus-control-edge
+    image: candidate/control-edge:0.1.0
+    container_name: cand-control-edge
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      broker:
+        condition: service_started
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8082"
+      REDIS_HOST: redis
+      PG_HOST: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - .env
+    ports:
+      - "18082:8082"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8082/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

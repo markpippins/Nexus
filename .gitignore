@@ -119,3 +119,4 @@ tools/api-docs/certs/
 
 # CIR-1 scan output — ephemeral diagnostic (tools/cir1/scan.py), regenerate on demand
 cir1_ref_index.txt
+docker/candidate-stack/.env
