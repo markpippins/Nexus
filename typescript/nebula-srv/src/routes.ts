@@ -2492,10 +2492,10 @@ export function createRoutes(pool: Pool): Router {
       if (requirements && Array.isArray(requirements)) {
         for (const r of requirements) {
           await client.query(
-            `INSERT INTO requirements (id, system_id, subsystem_id, feature_id, title, description, status, priority, start_date, completion_date)
-             SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+            `INSERT INTO requirements (id, system_id, subsystem_id, feature_id, title, description, status, priority, start_date, completion_date, candidate_id)
+             SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
              WHERE NOT EXISTS (SELECT 1 FROM nebula.requirements_history WHERE id = $1 AND recorded_until_dt = '9999-12-31 23:59:59+00')`,
-            [r.id, r.systemId, r.subsystemId, r.featureId || null, r.title, r.description || '', r.status || 'Backlog', r.priority || 'Medium', r.startDate || null, r.completionDate || null]
+            [r.id, r.systemId, r.subsystemId, r.featureId || null, r.title, r.description || '', r.status || 'Backlog', r.priority || 'Medium', r.startDate || null, r.completionDate || null, r.candidateId || null]
           );
         }
       }
@@ -2950,21 +2950,18 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
-  // POST /api/harvest-candidates/promote-to-plan — collate useful candidates into a conduit plan
-  router.post('/harvest-candidates/promote-to-plan', async (req: Request, res: Response) => {
-    try {
-      const { candidateIds, project = 'nexus', goal } = req.body;
-      if (!candidateIds || !Array.isArray(candidateIds) || candidateIds.length === 0) {
-        return res.status(400).json({ error: 'candidateIds (array of UUIDs) is required' });
-      }
-      const { rows: [result] } = await pool.query(
-        'SELECT plan_id, plan_title, plan_goal, candidates_used, status_results FROM nebula.candidates_to_plan($1::uuid[], $2, $3)',
-        [candidateIds, project, goal || null]
-      );
-      res.json({ ok: true, ...result });
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
-    }
+  // POST /api/harvest-candidates/promote-to-plan — RETIRED (architect ruling on
+  // to-do e68449f2): the backing nebula.candidates_to_plan() procedure was dropped
+  // in a migration and must NOT be resurrected — spawn_plan_from_candidate is the
+  // canonical promotion path (MCP-surfaced, sets requirements.candidate_id).
+  // This route now fails loudly so callers migrate instead of 400-ing mysteriously.
+  router.post('/harvest-candidates/promote-to-plan', async (_req: Request, res: Response) => {
+    res.status(410).json({
+      error: 'promote-to-plan was retired: its backing procedure (nebula.candidates_to_plan) no longer exists and will not be restored.',
+      useInstead: 'POST /api/harvest-candidates/:id/spawn-plan',
+      mcpTool: 'nebula_spawn_plan_from_candidate',
+      rationale: 'Single canonical promotion flow; the legacy parallel route created two competing promotion paths. See architect ruling on to-do e68449f2.',
+    });
   });
 
   // POST /api/harvests — create a new harvest record AND unpack candidates
