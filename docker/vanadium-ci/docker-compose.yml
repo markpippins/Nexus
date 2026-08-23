@@ -44,6 +44,10 @@ services:
     volumes:
       - /home/codex/vd-jenkins-home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
+      # V3 (ruling 1b940913): repo is authoritative for JCasC. The bind mount
+      # makes UI edits write through to the host dir; export back to git in
+      # the same session (or revert) per ruling.
+      - ./casc:/var/jenkins_home/casc:rw
     environment:
       CASC_JENKINS_CONFIG: /var/jenkins_home/casc
       JAVA_OPTS: "-Xmx1g -Djava.awt.headless=true -Djenkins.install.runSetupWizard=false"
