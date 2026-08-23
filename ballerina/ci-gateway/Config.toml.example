@@ -1,0 +1,15 @@
+# Copy to Config.toml (gitignored!) and fill in real values.
+#
+# Jenkins: basic auth admin + API token.
+# Sonar:   SonarQube tokens authenticate as the username with an EMPTY
+#          password ("token:"). Ballerina's built-in basic auth rejects
+#          empty passwords, so sonarAuthBasic carries the pre-encoded value:
+#            sonarAuthBasic = base64("<SONAR_TOKEN>:")
+# Regenerate it whenever the Sonar token rotates.
+
+port = 9095
+jenkinsBase = "http://192.168.1.82:8080"
+jenkinsUser = "admin"
+jenkinsToken = "<JENKINS_API_TOKEN>"
+sonarBase = "http://192.168.1.82:9000"
+sonarAuthBasic = "<base64 of SONAR_TOKEN + ':'>"
