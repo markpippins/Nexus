@@ -4,7 +4,7 @@
  */
 import * as http from "http";
 
-const NEBULA_SRV_URL = "http://localhost:3101";
+const NEBULA_SRV_URL = process.env.NEBULA_SRV_URL || "http://localhost:3101";
 
 function httpGet(path: string): Promise<any> {
   return new Promise((resolve, reject) => {

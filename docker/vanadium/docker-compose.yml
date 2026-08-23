@@ -28,6 +28,34 @@ services:
       HEARTBEAT_REGISTRY_URL: ${HEARTBEAT_REGISTRY_URL:-}
     ports:
     - ${TACKLE_HOST_PORT:-3410}:3410
+
+  tackle-mcp:
+    build:
+      context: ../../typescript
+      dockerfile: tackle-mcp/Dockerfile
+    container_name: vd-tackle-mcp
+    restart: unless-stopped
+    environment:
+      PORT: 3400
+      TACKLE_SRV_URL: http://tackle:3410
+      # Deployment convention: prompt-sync populates titanium Redis; the
+      # persona cache must be read from the same instance (ruling X2 batch).
+      MEMORY_REDIS_URL: ${MEMORY_REDIS_URL:-redis://redis:6379}
+      TACKLE_PG_DSN: ${TACKLE_PG_DSN}
+      CONDUIT_PG_DSN: ${CONDUIT_PG_DSN}
+    ports:
+      - "${TACKLE_MCP_HOST_PORT:-3400}:3400"
+
+  timeclock:
+    build:
+      context: ../../python/timeclock
+      dockerfile: Dockerfile
+    container_name: vd-timeclock
+    restart: unless-stopped
+    environment:
+      CONDUIT_PG_DSN: ${CONDUIT_PG_DSN}
+    ports:
+      - "${TIMECLOCK_HOST_PORT:-3600}:3600"
   kernel:
     build:
       context: ../../typescript
@@ -91,8 +119,8 @@ services:
       PG_DATABASE: ${PG_DB_NAME:-nexus}
       PG_USER: ${PG_USER:-pguser}
       PG_PASSWORD: ${PG_PASS:-pgpass}
-      NEBULA_URL: ${NEBULA_URL:-http://legacy-nebula:3101}
-      CONDUIT_MCP_URL: ${CONDUIT_MCP_URL:-http://legacy-conduit:3100}
+      NEBULA_URL: ${NEBULA_URL:-http://nebula:3101}
+      CONDUIT_MCP_URL: ${CONDUIT_MCP_URL:-}
       NEXUS_PG_DSN: ${NEXUS_PG_DSN}
     volumes:
     - ${HARNESS_WORK_DIR:-./work}:/nexus
@@ -174,11 +202,25 @@ services:
     container_name: vd-conduit
     restart: unless-stopped
     environment:
-      CONDUIT_SRV_PORT: ${CONDUIT_HOST_PORT:-3104}
+      CONDUIT_SRV_PORT: 3104
       CONDUIT_PG_DSN: ${CONDUIT_PG_DSN}
       HEARTBEAT_REGISTRY_URL: ${HEARTBEAT_REGISTRY_URL:-}
     ports:
-    - ${CONDUIT_HOST_PORT:-3104}:3104
+    # conduit-srv REST keeps native :3104; documented :3100 canon belongs to
+    # conduit-mcp below (ruling X2, docs/mcp-transport-matrix.md).
+    - ${CONDUIT_SRV_HOST_PORT:-3104}:3104
+
+  conduit-mcp:
+    build:
+      context: ../../typescript
+      dockerfile: conduit-mcp/Dockerfile
+    container_name: vd-conduit-mcp
+    restart: unless-stopped
+    environment:
+      PORT: 3100
+      CONDUIT_PG_DSN: ${CONDUIT_PG_DSN}
+    ports:
+    - ${CONDUIT_MCP_HOST_PORT:-3100}:3100
   knowledge:
     build:
       context: ../../typescript
@@ -210,6 +252,18 @@ services:
       PG_DB_NAME: ${PG_DB_NAME}
     ports:
     - ${NEBULA_HOST_PORT:-3101}:3101
+
+  nebula-mcp:
+    build:
+      context: ../../typescript
+      dockerfile: nebula-mcp/Dockerfile
+    container_name: vd-nebula-mcp
+    restart: unless-stopped
+    environment:
+      NEBULA_MCP_PORT: 3102
+      NEBULA_SRV_URL: http://nebula:3101
+    ports:
+    - ${NEBULA_MCP_HOST_PORT:-3102}:3102
   semantics:
     build:
       context: ../../typescript

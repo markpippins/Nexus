@@ -16,6 +16,16 @@ def _build_dsn() -> str:
     """Build a SQLAlchemy DSN from environment or defaults."""
     raw = os.environ.get("CONDUIT_PG_DSN", "")
     if raw:
+        # Accept both DSN styles seen in deploy .env files:
+        #   URI:     postgres://user:pass@host:port/db
+        #   keyword: host=... port=... user=... password=... dbname=...
+        if "://" in raw:
+            uri = raw
+            if uri.startswith("postgres://"):
+                uri = "postgresql://" + uri[len("postgres://"):]
+            if uri.startswith("postgresql://"):
+                uri = uri.replace("postgresql://", "postgresql+psycopg2://", 1)
+            return uri
         parts = dict(p.split("=", 1) for p in raw.strip().split())
         host = parts.get("host", "localhost")
         port = parts.get("port", "5432")

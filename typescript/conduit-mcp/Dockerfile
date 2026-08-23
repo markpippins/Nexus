@@ -1,0 +1,24 @@
+# syntax=docker/dockerfile:1
+# conduit-mcp — receipt-first pipeline authority MCP (streamable HTTP, :3100).
+# Packaged for the vanadium deployment per architect ruling X2 (2026-08-23):
+# documented ports are authoritative — the transport matrix assigns :3100 to
+# conduit-mcp (GET /state, JSON-RPC POST /); conduit-srv REST stays on :3104.
+FROM node:20-bookworm AS build
+WORKDIR /app/conduit-mcp
+COPY conduit-mcp/package.json ./
+RUN npm install --no-package-lock
+COPY conduit-mcp/tsconfig.json ./
+COPY conduit-mcp/src ./src
+RUN npm run build && npm prune --omit=dev
+
+FROM node:20-bookworm-slim AS runtime
+ENV NODE_ENV=production
+WORKDIR /app/conduit-mcp
+COPY --from=build /app/conduit-mcp/package.json ./
+COPY --from=build /app/conduit-mcp/node_modules ./node_modules
+COPY --from=build /app/conduit-mcp/dist ./dist
+
+ENV PORT=3100
+EXPOSE 3100
+
+CMD ["node", "dist/index.js"]
