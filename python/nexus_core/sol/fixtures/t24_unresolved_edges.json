@@ -1,0 +1,127 @@
+{
+  "fixture": "t24-unresolved-edges-golden",
+  "source_decision": "D-2026-08-23-A",
+  "conformance": "C2 (round-trip: preserved Evidence + IdentityResolution=unresolved + Pending claim; zero silent drops)",
+  "captured_from": "knowledge.graph_edges WHERE resolution='unresolved'",
+  "captured_at": "2026-08-23",
+  "expected_for_each_edge": {
+    "IdentityResolution.state": "unresolved",
+    "claim_proposition": "Pending",
+    "target_section": null,
+    "target_id_preserved": true,
+    "unresolved_reason": "target_not_found",
+    "evidence_preserved": true,
+    "forbidden": [
+      "Rejected",
+      "Asserted",
+      "Accepted",
+      "deletion"
+    ]
+  },
+  "edges": [
+    {
+      "id": "2af70497-3abf-43ff-a5bf-fbaef240b1c0",
+      "source_section": "plans",
+      "source_id": "0077",
+      "target_section": null,
+      "target_id": "0070",
+      "relation_type": "depends_on",
+      "properties": {},
+      "source_migration_id": "cc187661-d6ce-4b1b-a683-a069ada1c649",
+      "resolution": "unresolved",
+      "unresolved_reason": "target_not_found",
+      "created_at": "2026-08-14T17:32:24.173764+00:00"
+    },
+    {
+      "id": "3976fe19-ed32-4b86-9efe-6ad2903d1822",
+      "source_section": "plans",
+      "source_id": "1020",
+      "target_section": null,
+      "target_id": "8085",
+      "relation_type": "depends_on",
+      "properties": {},
+      "source_migration_id": "cc187661-d6ce-4b1b-a683-a069ada1c649",
+      "resolution": "unresolved",
+      "unresolved_reason": "target_not_found",
+      "created_at": "2026-08-14T17:32:24.173764+00:00"
+    },
+    {
+      "id": "4298d188-18ce-471b-9187-63690a326f3b",
+      "source_section": "plans",
+      "source_id": "1020",
+      "target_section": null,
+      "target_id": "8081",
+      "relation_type": "depends_on",
+      "properties": {},
+      "source_migration_id": "cc187661-d6ce-4b1b-a683-a069ada1c649",
+      "resolution": "unresolved",
+      "unresolved_reason": "target_not_found",
+      "created_at": "2026-08-14T17:32:24.173764+00:00"
+    },
+    {
+      "id": "51a62dca-74b1-4b31-8a22-2bd5f40de164",
+      "source_section": "plans",
+      "source_id": "1021",
+      "target_section": null,
+      "target_id": "4222",
+      "relation_type": "depends_on",
+      "properties": {},
+      "source_migration_id": "cc187661-d6ce-4b1b-a683-a069ada1c649",
+      "resolution": "unresolved",
+      "unresolved_reason": "target_not_found",
+      "created_at": "2026-08-14T17:32:24.173764+00:00"
+    },
+    {
+      "id": "5cf147f9-b171-4522-9fad-fcd5ca1adf15",
+      "source_section": "plans",
+      "source_id": "031",
+      "target_section": null,
+      "target_id": "3100",
+      "relation_type": "depends_on",
+      "properties": {},
+      "source_migration_id": "cc187661-d6ce-4b1b-a683-a069ada1c649",
+      "resolution": "unresolved",
+      "unresolved_reason": "target_not_found",
+      "created_at": "2026-08-14T17:32:24.173764+00:00"
+    },
+    {
+      "id": "71bb4e07-b44c-4e1e-b6c9-0996f1e23c76",
+      "source_section": "plans",
+      "source_id": "1020",
+      "target_section": null,
+      "target_id": "3000",
+      "relation_type": "depends_on",
+      "properties": {},
+      "source_migration_id": "cc187661-d6ce-4b1b-a683-a069ada1c649",
+      "resolution": "unresolved",
+      "unresolved_reason": "target_not_found",
+      "created_at": "2026-08-14T17:32:24.173764+00:00"
+    },
+    {
+      "id": "a5f0c1e0-3389-4151-b284-ef03e6c08efc",
+      "source_section": "plans",
+      "source_id": "058",
+      "target_section": null,
+      "target_id": "3100",
+      "relation_type": "depends_on",
+      "properties": {},
+      "source_migration_id": "cc187661-d6ce-4b1b-a683-a069ada1c649",
+      "resolution": "unresolved",
+      "unresolved_reason": "target_not_found",
+      "created_at": "2026-08-14T17:32:24.173764+00:00"
+    },
+    {
+      "id": "ee2a2e33-b3c0-4382-a492-ea9fb253081d",
+      "source_section": "plans",
+      "source_id": "032",
+      "target_section": null,
+      "target_id": "3100",
+      "relation_type": "depends_on",
+      "properties": {},
+      "source_migration_id": "cc187661-d6ce-4b1b-a683-a069ada1c649",
+      "resolution": "unresolved",
+      "unresolved_reason": "target_not_found",
+      "created_at": "2026-08-14T17:32:24.173764+00:00"
+    }
+  ]
+}

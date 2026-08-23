@@ -1,0 +1,23 @@
+{
+  "fixture": "t24-provenance-gap",
+  "source_decision": "D-2026-08-23-A condition C3",
+  "conformance": "absent source_migration_id yields explicit PROVENANCE_UNRESOLVED finding; never authoritative acceptance",
+  "base_edge": "2af70497-3abf-43ff-a5bf-fbaef240b1c0",
+  "expected": {
+    "provenance_finding": "PROVENANCE_UNRESOLVED",
+    "claim_proposition": "Pending",
+    "authoritative_acceptance": false
+  },
+  "edge": {
+    "id": "2af70497-3abf-43ff-a5bf-fbaef240b1c0-prov-gap-synthetic",
+    "source_section": "plans",
+    "source_id": "0077",
+    "target_section": null,
+    "target_id": "0070",
+    "relation_type": "depends_on",
+    "properties": {},
+    "resolution": "unresolved",
+    "unresolved_reason": "target_not_found",
+    "created_at": "2026-08-14T17:32:24.173764+00:00"
+  }
+}
