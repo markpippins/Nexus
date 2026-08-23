@@ -19,6 +19,9 @@ import ballerina/lang.runtime;
 
 configurable string legacyBase = ?;
 configurable string candidateBase = ?;
+// Endpoint set is per-run config — different target pairs share
+// different contract surfaces (see Config.toml).
+configurable string[] endpoints = ?;
 
 public type ParityResult record {|
     string endpoint;
@@ -129,13 +132,6 @@ function pad(string s, int width) returns string {
 public function main() returns error? {
     http:Client legacy = check new (legacyBase);
     http:Client candidate = check new (candidateBase);
-
-    string[] endpoints = [
-        "/health",
-        "/procedures/engineer",
-        "/procedures/architect",
-        "/procedure/nonexistent-slug-probe"
-    ];
 
     io:println("parity baseline: legacy=" + legacyBase + "  candidate=" + candidateBase);
     io:println(pad("endpoint", 38) + pad("status", 14) + "shape  detail");
