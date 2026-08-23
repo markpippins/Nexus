@@ -3904,6 +3904,114 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // ── Completion-sweep tooling (planner fc9ebf7b / architect 83d2fd5c) ──────
+  // Per candidate: linked plans (ag:spawns_plan cross-ref → plan status),
+  // linked work requests (folded state), title-similar agent records,
+  // and an aggregate `completed` verdict. Replaces planners' hand-rolled
+  // completion sweeps with one call. DBA owns indexes (pg_trgm etc.);
+  // the interface is stable under index hardening.
+  const RECORD_MATCH_LIMIT = 5;
+  const RECORD_MATCH_MIN_SIMILARITY = 0.55;
+
+  async function computeCandidateCompletion(client: any, id: string): Promise<any | null> {
+    const { rows: [cand] } = await client.query(
+      'SELECT id, title, status, completed FROM nebula.harvest_candidates WHERE id = $1', [id]
+    );
+    if (!cand) return null;
+
+    // Plans spawned by this candidate (target_id holds the plan number/ref).
+    const plans = await client.query(
+      `SELECT ip.plan_number AS number, ip.status
+         FROM nebula.cross_references cr
+         JOIN nebula.implementation_plans ip ON ip.plan_number::text = cr.target_id
+        WHERE cr.source_type = 'harvest_candidate'
+          AND cr.source_id = $1
+          AND cr.rel_type = 'ag:spawns_plan'
+          AND cr.valid_until = '9999-12-31 00:00:00+00'::timestamptz`,
+      [id]
+    );
+
+    // Work request folded state via the candidate's direct WR link.
+    const workRequests = await client.query(
+      `SELECT wr.wr_id AS "wrId", wr.status AS "foldedState"
+         FROM nebula.harvest_candidates hc
+         JOIN vision.work_requests wr ON wr.wr_id = hc.work_request_id::text
+        WHERE hc.id = $1 AND hc.work_request_id IS NOT NULL`,
+      [id]
+    );
+
+    // Title-similar agent records (pg_trgm). Optional enrichment; empty is fine.
+    let recordMatches: any[] = [];
+    if (cand.title) {
+      const recs = await client.query(
+        `SELECT ar.id AS "recordId", ar.title,
+                public.similarity(ar.title, $1::text) AS score
+           FROM nebula.agent_records ar
+          WHERE ar.title OPERATOR(public.%) $1::text
+             OR public.similarity(ar.title, $1::text) > $2
+          ORDER BY public.similarity(ar.title, $1::text) DESC
+          LIMIT $3`,
+        [cand.title, RECORD_MATCH_MIN_SIMILARITY, RECORD_MATCH_LIMIT]
+      );
+      recordMatches = recs.rows;
+    }
+
+    const DONE_PLAN_STATUSES = new Set(['completed', 'archived']);
+    const planCompleted = plans.rows.some((p: any) => DONE_PLAN_STATUSES.has(String(p.status || '').toLowerCase()));
+    const wrCompleted = workRequests.rows.some((w: any) =>
+      ['settled'].includes(String(w.foldedState || '').toLowerCase()));
+
+    return {
+      candidateId: cand.id,
+      title: cand.title,
+      status: cand.status,
+      plans: plans.rows.map((p: any) => ({ number: p.number, status: p.status })),
+      workRequests: workRequests.rows,
+      recordMatches,
+      completed: Boolean(cand.completed) || planCompleted || wrCompleted,
+    };
+  }
+
+  router.get('/harvest-candidates/:id/completion', async (req: Request, res: Response) => {
+    try {
+      const result = await computeCandidateCompletion(pool, String(req.params.id));
+      if (!result) return res.status(404).json({ error: 'Harvest candidate not found' });
+      res.json(result);
+    } catch (err: any) {
+      // 22P02 (invalid uuid/text representation) → treat as not found
+      if (err?.code === '22P02') return res.status(404).json({ error: 'Harvest candidate not found' });
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Batch variant: POST /api/harvest-candidates/completion-sweep { ids: [...] }
+  // Missing/unknown ids are reported per-id rather than failing the batch.
+  router.post('/harvest-candidates/completion-sweep', async (req: Request, res: Response) => {
+    try {
+      const ids: unknown = req.body?.ids;
+      if (!Array.isArray(ids) || ids.length === 0 ||
+          !ids.every((v) => typeof v === 'string' && v.length > 0)) {
+        return res.status(400).json({ error: 'body must be { ids: string[] } (non-empty)' });
+      }
+      if (ids.length > 500) {
+        return res.status(400).json({ error: 'batch limited to 500 ids' });
+      }
+      const results: any[] = [];
+      for (const id of ids as string[]) {
+        try {
+          const r = await computeCandidateCompletion(pool, id);
+          results.push(r ?? { candidateId: id, missing: true });
+        } catch (e: any) {
+          results.push({ candidateId: id, error: e.message });
+        }
+      }
+      res.json({ count: results.length, completedCount: results.filter((r) => r.completed === true).length, results });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+
   // ── /candidates alias — mirrors /harvest-candidates for Assembly UI ──────
 
   router.get('/candidates', async (req: Request, res: Response) => {
