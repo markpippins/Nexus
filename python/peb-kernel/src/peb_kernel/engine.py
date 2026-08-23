@@ -123,6 +123,27 @@ class PebViolationEngine:
         )
         return self.store.save_violation(violation)
 
+    def record_capability_rejection(
+        self, transaction: PebTransaction, reason: str
+    ) -> PebViolation:
+        """Record an admission denied by the capability registry gate."""
+        declared = (
+            transaction.input.get("capability_attempted")
+            if isinstance(transaction.input, Mapping)
+            else None
+        )
+        violation = PebViolation(
+            id=uuid4(),
+            transaction_id=transaction.id,
+            violation_type=ViolationType.AUTHORITY_LEAKAGE,
+            severity=ViolationSeverity.HARD,
+            entity_id=transaction.entity_id,
+            capability_attempted=declared if isinstance(declared, str) else "unknown",
+            context={"reason": reason, "input": transaction.input},
+            resolution=ViolationResolution.REJECTED,
+        )
+        return self.store.save_violation(violation)
+
 
 class PebGovernanceEngine:
     """Coordinates validation, audit persistence, violation persistence, and notifications."""
@@ -194,6 +215,27 @@ class PebGovernanceEngine:
                         transaction, execution_admission_reason
                     )
 
+            capability_denial_reason = self._capability_gate(request)
+            capability_denied = False
+            if capability_denial_reason is not None and transaction.admission_result != AdmissionResult.REJECTED:
+                transaction.admission_result = AdmissionResult.REJECTED
+                capability_denied = True
+                self.violation_engine.record_capability_rejection(transaction, capability_denial_reason)
+
+            # Kernel linkage (V4__kernel_semantic_kernel_link): every governance
+            # decision is recorded as a kernel transition event and correlated
+            # onto the persisted transaction. Best-effort — a kernel-side
+            # failure degrades to the legacy NULL-linkage state with a logged
+            # warning rather than blocking admission.
+            try:
+                self.store.record_kernel_event(transaction)
+            except Exception:
+                log.warning(
+                    "Kernel event linkage failed for transaction %s",
+                    transaction.id,
+                    exc_info=True,
+                )
+
             self.transaction_engine.commit_transaction(transaction)
             if bypass_validator:
                 self.violation_engine.ingest(transaction)
@@ -206,6 +248,10 @@ class PebGovernanceEngine:
         if not execution_admission_passed:
             return AdmissionResponse.denied(
                 f"Execution claim admission denied: {execution_admission_reason}"
+            )
+        if capability_denied:
+            return AdmissionResponse.denied(
+                f"Admission denied by capability registry: {capability_denial_reason}"
             )
         if validator_passed:
             message = {
@@ -223,6 +269,35 @@ class PebGovernanceEngine:
             and isinstance(request.input, Mapping)
             and isinstance(request.input.get("execution_claim"), Mapping)
         )
+
+    def _capability_gate(self, request: PebTransaction) -> str | None:
+        """Consult the capability registry when it is populated.
+
+        Enforcement policy (increment 1, to-do de9585fa):
+          - empty registry → no gating (admission behaviour unchanged);
+          - a transaction that DECLARES ``capability_attempted`` which is not
+            an active registered capability → denied with an authority
+            violation.
+        Undeclared capabilities are logged but not yet denied — mandatory
+        capability declarations need an architect ruling before they can gate
+        live traffic.
+        """
+        try:
+            with self.store.transaction():
+                registered = self.store.list_capabilities()
+        except Exception:
+            log.warning("Capability registry read failed; skipping gate", exc_info=True)
+            return None
+        # Empty registry → admission behaviour unchanged (opt-in enforcement).
+        if not registered or not isinstance(request.input, Mapping):
+            return None
+        active = {c.capability for c in registered if c.active}
+        declared = request.input.get("capability_attempted")
+        if not isinstance(declared, str) or not declared:
+            return None
+        if declared in active:
+            return None
+        return f"CAPABILITY_NOT_GRANTED:{declared}"
 
     def _notify_adapters(self, transaction: PebTransaction, path: AdmissionPath) -> None:
         if self.conduit_adapter is not None and path is not AdmissionPath.UNKNOWN:

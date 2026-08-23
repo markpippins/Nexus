@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from .domain import AdmissionPath, PebTransaction, PebStateHash, MalformedAdmissionRequest
+from .domain import AdmissionPath, PebCapability, PebTransaction, PebStateHash, MalformedAdmissionRequest
 from .engine import PebGovernanceEngine
 from .ports import PebStore
 
@@ -43,6 +43,76 @@ class AdmissionController:
             return ApiResult(422, {"message": f"Malformed admission request: {exc}"})
 
         return ApiResult(200 if response.admitted else 422, response.to_dict())
+
+    def register_capability(self, payload: Mapping[str, Any] | None) -> ApiResult:
+        """Register (grant) a capability in the PEB registry."""
+        from datetime import datetime as _dt
+
+        if not isinstance(payload, Mapping):
+            return ApiResult(400, {"message": "capability body required"})
+        capability = payload.get("capability") or payload.get("name")
+        entity_id = payload.get("entityId") or payload.get("entity_id")
+        if not isinstance(capability, str) or not capability.strip():
+            return ApiResult(400, {"message": "capability (string) is required"})
+        if not isinstance(entity_id, str) or not entity_id.strip():
+            return ApiResult(400, {"message": "entityId (string) is required"})
+        expires_at = payload.get("expiresAt") or payload.get("expires_at")
+        parsed_expiry = None
+        if isinstance(expires_at, str) and expires_at:
+            try:
+                parsed_expiry = _dt.fromisoformat(expires_at.replace("Z", "+00:00"))
+            except ValueError:
+                return ApiResult(400, {"message": f"invalid expiresAt: {expires_at}"})
+        record = PebCapability(
+            entity_id=entity_id,
+            capability=capability,
+            granted_by=(
+                payload.get("grantedBy")
+                if isinstance(payload.get("grantedBy"), str)
+                else None
+            ),
+            expires_at=parsed_expiry,
+            active=bool(payload.get("active", True)),
+        )
+        store = self.governance_engine.store
+        try:
+            with store.transaction():
+                saved = store.save_capability(record)
+                active_count = sum(
+                    1 for c in store.list_capabilities() if c.active
+                )
+        except Exception as exc:
+            return ApiResult(503, {"message": f"capability registry write failed: {exc}"})
+        return ApiResult(201, {
+            "id": str(saved.id),
+            "entityId": saved.entity_id,
+            "capability": saved.capability,
+            "active": saved.active,
+            "activeCapabilities": active_count,
+        })
+
+    def list_capabilities(self) -> ApiResult:
+        store = self.governance_engine.store
+        try:
+            with store.transaction():
+                caps = store.list_capabilities()
+        except Exception as exc:
+            return ApiResult(503, {"message": f"capability registry read failed: {exc}"})
+        return ApiResult(200, {
+            "items": [
+                {
+                    "id": str(c.id),
+                    "entityId": c.entity_id,
+                    "capability": c.capability,
+                    "grantedBy": c.granted_by,
+                    "expiresAt": c.expires_at.isoformat() if c.expires_at else None,
+                    "createdAt": c.created_at.isoformat() if c.created_at else None,
+                    "active": c.active,
+                }
+                for c in caps
+            ],
+            "total": len(caps),
+        })
 
     def state_hash(self) -> ApiResult:
         """Build the PebStateResponse envelope served at GET /api/v1/peb/state/hash.
@@ -149,6 +219,16 @@ def create_app(store: PebStore | None = None, controller: AdmissionController | 
     @app.get("/api/v1/peb/state/hash")
     def state_hash():
         result = controller.state_hash()
+        return JSONResponse(status_code=result.status_code, content=result.body)
+
+    @app.post("/api/v1/peb/capabilities")
+    def register_capability(payload: dict[str, Any] | None = None):
+        result = controller.register_capability(payload)
+        return JSONResponse(status_code=result.status_code, content=result.body)
+
+    @app.get("/api/v1/peb/capabilities")
+    def list_capabilities():
+        result = controller.list_capabilities()
         return JSONResponse(status_code=result.status_code, content=result.body)
 
     return app

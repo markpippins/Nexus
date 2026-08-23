@@ -115,6 +115,13 @@ class InMemoryPebStore:
         self._capabilities[capability.id] = capability
         return capability
 
+    def list_capabilities(self) -> list[PebCapability]:
+        return list(self._capabilities.values())
+
+    def record_kernel_event(self, transaction: PebTransaction) -> PebTransaction | None:
+        """In-memory store has no kernel linkage — tests only."""
+        return None
+
     def list_states(self) -> list[PebState]:
         return list(self._states.values())
 
@@ -294,6 +301,73 @@ class PostgresPebStore:
              capability.expires_at, capability.created_at, capability.active),
         )
         return capability
+
+    def list_capabilities(self) -> list[PebCapability]:
+        cursor = self._connection().cursor()
+        cursor.execute(
+            """SELECT id, entity_id, capability, granted_by, expires_at, created_at, active
+               FROM peb.capabilities ORDER BY created_at"""
+        )
+        return [
+            PebCapability(
+                id=row[0], entity_id=row[1], capability=row[2], granted_by=row[3],
+                expires_at=row[4], created_at=row[5], active=row[6],
+            )
+            for row in cursor.fetchall()
+        ]
+
+    def record_kernel_event(self, transaction: PebTransaction) -> PebTransaction | None:
+        """Record the governance decision as a kernel transition event and link
+        it onto the transaction (V4__kernel_semantic_kernel_link semantics).
+
+        Called INSIDE the admission transaction so the PEB row and the kernel
+        event commit atomically.
+
+        Event-type mapping note: V4 envisioned transition.committed/rejected,
+        but the kernel's ratified policy rules now forbid no-op
+        ``transition.committed`` events (they require from_status/to_status on
+        a state aggregate PEB admissions don't have). We therefore record:
+          - ALLOWED  → observation.captured  (the kernel observes the decision)
+          - REJECTED → policy.violated       (with violation_type + severity,
+                                              as required by kernel policy)
+        Both carry the full decision context in the payload. Deviation from
+        V4's letter documented on to-do de9585fa for architect review.
+        """
+        if transaction.admission_result is None:
+            return None
+        allowed = transaction.admission_result.value == "ALLOWED"
+        event_type = "observation.captured" if allowed else "policy.violated"
+        payload = {
+            "toolName": transaction.tool_name,
+            "entityId": transaction.entity_id,
+            "admissionResult": transaction.admission_result.value,
+            "idempotencyKey": transaction.idempotency_key,
+        }
+        if not allowed:
+            payload["violation_type"] = "ADMISSION_REJECTED"
+            payload["severity"] = "HIGH"
+        cursor = self._connection().cursor()
+        cursor.execute(
+            """SELECT event_id, event_type
+               FROM kernel.sys_transition(
+                   %s::kernel.event_type,
+                   %s, %s, %s, %s::jsonb, %s)""",
+            (
+                event_type,
+                "peb_transaction",
+                str(transaction.id),
+                "peb-kernel",
+                self._json(payload),
+                transaction.tool_name,
+            ),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        transaction.kernel_event_id = row[0] if isinstance(row[0], UUID) else UUID(str(row[0]))
+        transaction.kernel_event_type = str(row[1])
+        return transaction
+
 
     def list_states(self) -> list[PebState]:
         cursor = self._connection().cursor()
