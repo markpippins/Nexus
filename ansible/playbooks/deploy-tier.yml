@@ -69,12 +69,19 @@
     # (its prebuilt dist/node_modules are gitignored and absent from a fresh
     # clone — W2 backlog). Legacy images already on the host are reused;
     # flip to `up -d --build` once terrain source is recovered.
+    #
+    # --scale terrain-ts=0: skip the unbuildable service until then.
+    #
+    # NO --remove-orphans: this host runs OTHER compose projects (X2 MCP
+    # front doors: vd-conduit-mcp/vd-tackle-mcp/vd-nebula-mcp/vd-timeclock,
+    # CI stack) — remove-orphans would stop them. Learned 2026-08-24.
     - name: Bring up the tier (base manifest + W2 override)
       ansible.builtin.command:
         cmd: >-
           docker compose
           {% for f in compose_files %}-f {{ f }} {% endfor %}
-          up -d --no-build --remove-orphans
+          up -d --no-build
+          --scale terrain-ts=0
         chdir: "{{ compose_dir }}"
       register: compose_up
       changed_when: compose_up.stdout != ''

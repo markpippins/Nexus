@@ -165,7 +165,7 @@ services:
     restart: unless-stopped
     environment:
       PORT: ${ASSEMBLY_HOST_PORT:-3107}
-      NEXUS_PG_DSN: ${NEXUS_PG_DSN}
+      ASSEMBLY_PG_DSN: ${ASSEMBLY_PG_DSN}
     ports:
       - "${ASSEMBLY_HOST_PORT:-3107}:3107"
   conduit:
@@ -187,6 +187,12 @@ services:
     restart: unless-stopped
     environment:
       PORT: ${KNOWLEDGE_HOST_PORT:-3109}
+      # knowledge-srv reads standard node-postgres envs (src/db/client.ts)
+      PGHOST: ${PG_HOST}
+      PGPORT: ${PG_PORT}
+      PGDATABASE: ${PG_DB_NAME}
+      PGUSER: ${PG_USER}
+      PGPASSWORD: ${PG_PASS}
     ports:
       - "${KNOWLEDGE_HOST_PORT:-3109}:3109"
   nebula:
@@ -197,6 +203,12 @@ services:
     restart: unless-stopped
     environment:
       NEBULA_PORT: ${NEBULA_HOST_PORT:-3101}
+      # nebula-srv reads PG_HOST style (src/index.ts)
+      PG_HOST: ${PG_HOST}
+      PG_PORT: ${PG_PORT}
+      PG_USER: ${PG_USER}
+      PG_PASSWORD: ${PG_PASS}
+      PG_DB_NAME: ${PG_DB_NAME}
     ports:
       - "${NEBULA_HOST_PORT:-3101}:3101"
   semantics:
@@ -227,6 +239,12 @@ services:
     restart: unless-stopped
     environment:
       PORT: ${VOYAGER_HOST_PORT:-3114}
+      # voyager-srv accepts both styles (src/db.ts)
+      PG_HOST: ${PG_HOST}
+      PG_PORT: ${PG_PORT}
+      PG_USER: ${PG_USER}
+      PG_PASSWORD: ${PG_PASS}
+      PG_DB_NAME: ${PG_DB_NAME}
     ports:
       - "${VOYAGER_HOST_PORT:-3114}:3114"
   service-registry:
