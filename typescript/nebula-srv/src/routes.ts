@@ -4809,11 +4809,32 @@ export function createRoutes(pool: Pool): Router {
   // ════════════════════════════════════════════════════════════════
 
   // GET /api/agent-records — list records with optional filters and pagination
+  // GET /api/agent-records/:id — full single record INCLUDING content.
+  // Fixes finding 6d731551: REST had no content-bearing read (list omits
+  // content; ?id= was fuzzy search), so REST-only consumers misread
+  // persisted records as empty.
+  router.get('/agent-records/:id', async (req: Request, res: Response) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, record_type, role, model, title, source_path, tags, content,
+                system_id, subsystem_id, feature_id, plan_ref, candidate_id,
+                requirement_id, created_at, recorded_on_dt, level, visibility_scope
+         FROM nebula.agent_records WHERE id = $1`,
+        [req.params.id]
+      );
+      if (!rows.length) return res.status(404).json({ error: 'Agent record not found' });
+      res.json(rows[0]);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   router.get('/agent-records', async (req: Request, res: Response) => {
     try {
       const { type, role, systemId, subsystemId, featureId, planRef, tag, search, createdAfter, createdBefore, level, visibilityScope } = req.query;
       // Pagination: support both REST convention (page/pageSize) and the
       // MCP client convention (limit/offset, used by nebula-mcp tools).
+
       const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
       const limitParam = parseInt(String(req.query.limit ?? ''), 10);
       const offsetParam = parseInt(String(req.query.offset ?? ''), 10);
@@ -4827,6 +4848,17 @@ export function createRoutes(pool: Pool): Router {
       const clauses: string[] = [];
       const vals: any[] = [];
       let i = 1;
+
+      // Exact id filter (finding 6d731551): ?id=<uuid> previously behaved
+      // as fuzzy search and returned unrelated rows. Exact match wins;
+      // includeContent defaults on for single-record lookups.
+      if (req.query.id) {
+        clauses.push(`id = $${i++}`);
+        vals.push(req.query.id);
+        if (req.query.includeContent === undefined) {
+          (req.query as any).includeContent = 'true';
+        }
+      }
 
       if (type) { clauses.push(`record_type = $${i++}`); vals.push(type); }
       if (role) { clauses.push(`role = $${i++}`); vals.push(role); }
