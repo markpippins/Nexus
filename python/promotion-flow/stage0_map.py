@@ -21,6 +21,54 @@ from promotion_common import (
 
 APPLY_THRESHOLD = 0.80  # curated similarity needed to write a mapping
 
+# ── Structural match normalization (mapper ruling 8596d726) ─────────
+# Discovery responses have drifted between shapes over time; every known
+# variant normalizes here so downstream logic sees one contract:
+#   {candidate_id, system_id, subsystem_id, name, similarity}
+# Unknown/None fields stay None — callers decide eligibility by ids only
+# (Gap C identity frame), never by display strings.
+
+def _norm_name(v):
+    if not isinstance(v, str):
+        return ""
+    n = v.strip()
+    return "" if n.lower() in ("(none)", "none", "null") else n
+
+
+def _pick(d, *keys):
+    for k in keys:
+        if isinstance(d, dict) and d.get(k) not in (None, ""):
+            return d[k]
+    return None
+
+
+def normalize_match(cand_id, top):
+    """Map any historical discover 'top hit' shape to the canonical tuple."""
+    ent = top.get("entity") if isinstance(top, dict) else None
+    ent = ent if isinstance(ent, dict) else {}
+    nested_sys = ent.get("system") if isinstance(ent.get("system"), dict) else {}
+    nested_sub = ent.get("subsystem") if isinstance(ent.get("subsystem"), dict) else {}
+
+    # Entity IS a bare system row when it carries plain 'id' but no explicit
+    # system-id field and no nested system object.
+    bare_system = ("id" in ent
+                   and not any(k in ent for k in ("systemId", "system_id", "system")))
+    sys_id = _pick(ent, "systemId", "system_id")
+    if sys_id is None and "system" in ent:
+        sys_id = nested_sys.get("id")
+    elif sys_id is None and bare_system:
+        sys_id = ent.get("id")
+    sub_id = _pick(ent, "subsystemId", "subsystem_id") or nested_sub.get("id")
+
+    name = _norm_name(_pick(top, "name", "label") or _pick(ent, "name", "title"))
+    sim = _pick(top, "similarity", "score")
+    try:
+        sim = float(sim) if sim is not None else 0.0
+    except (TypeError, ValueError):
+        sim = 0.0
+    return {"candidate_id": cand_id, "system_id": sys_id,
+            "subsystem_id": sub_id, "name": name, "similarity": sim}
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -41,9 +89,13 @@ def main():
         log(f"cpf query failed: {st}")
         return 1
     rows = data.get("data") or []
+    # Gap C (2f1202a): identity frame — a candidate is UNMAPPED iff it
+    # lacks a resolvable system id; the name string is display-only.
+    def _has_system(r):
+        return bool(r.get("system_id") or r.get("systemId"))
     unmapped = [
         r for r in rows
-        if (not r.get("system_name") or r.get("system_name") == "(none)")
+        if not _has_system(r)
         and r.get("status") not in ("promoted", "discarded")
     ]
     unmapped.sort(key=lambda r: str(r.get("createdAt") or ""))
@@ -67,11 +119,11 @@ def main():
         if not top:
             unmatched += 1
             continue
-        sim = float(top.get("similarity") or 0)
-        target = top.get("entity") or {}
-        sys_id, sub_id = target.get("systemId"), target.get("subsystemId")
-        label = f"{top.get('name')} (sim {sim:.2f})"
-        if sim >= args.threshold and (sys_id or sub_id):
+        nm = normalize_match(cand_id, top)
+        sim = nm["similarity"]
+        sys_id, sub_id = nm["system_id"], nm["subsystem_id"]
+        label = f"{nm['name'] or '(unnamed)'} (sim {sim:.2f})"
+        if sim >= args.threshold and sys_id:
             applied.append({"id": cand_id, "label": label, "systemId": sys_id,
                             "subsystemId": sub_id, "similarity": sim})
         else:
