@@ -67,6 +67,68 @@ _EXPR_AND_ID       = "pg:expr:and"
 _ASSEMBLY_URL = "http://localhost:3107"
 _PLANNER_UUID = "fd49d7c3-3e9c-4c82-8729-967fdef563e4"
 
+# ── Governed threshold (kiro #4 Gap B; ruling 64392cdc) ─────────────
+# Active value = latest resolution.governance_threshold row with
+# effective_from <= now(). Falls back to the seeded literal when the
+# table is absent or the DB is unreachable, so the gate degrades to the
+# historical behavior rather than erroring.
+
+_THRESHOLD_NAME = "promotion_min_readiness"
+_THRESHOLD_DEFAULT = 0.7
+_PSQL = ["docker", "exec", "-i", "pgvector_db",
+         "psql", "-U", "pguser", "-d", "nexus", "-t", "-A", "-q"]
+
+
+def load_min_readiness() -> float:
+    """Active promotion_min_readiness from the governed threshold table."""
+    import subprocess
+    sql = (
+        "SELECT value FROM resolution.governance_threshold "
+        f"WHERE name='{_THRESHOLD_NAME}' AND effective_from <= now() "
+        "ORDER BY effective_from DESC LIMIT 1;"
+    )
+    try:
+        out = subprocess.run(_PSQL + ["-c", sql], capture_output=True,
+                             text=True, timeout=10).stdout.strip()
+        return float(out) if out else _THRESHOLD_DEFAULT
+    except Exception as e:  # table missing / docker down → historical bar
+        log_threshold_fallback(e)
+        return _THRESHOLD_DEFAULT
+
+
+def log_threshold_fallback(err: Exception) -> None:
+    print(f"[gate] threshold fallback to {_THRESHOLD_DEFAULT}: {err}")
+
+
+def record_execution_evidence(*, evidence_kind: str, source_system: str,
+                              subject_ref: str, payload: dict,
+                              context_kind: str = "provenance") -> bool:
+    """Append-only provenance write into resolution.execution_evidence.
+
+    Evidence failures are LOGGED but never block the gate decision path —
+    the fail-closed verdict itself is returned independently.
+    """
+    import subprocess
+    sql = (
+        "INSERT INTO resolution.execution_evidence "
+        "(context_kind, source_system, evidence_kind, subject_ref, payload) "
+        "VALUES ('%s','%s','%s','%s','%s'::jsonb);" %
+        (context_kind.replace("'", "''"),
+         source_system.replace("'", "''"),
+         evidence_kind.replace("'", "''"),
+         subject_ref.replace("'", "''"),
+         json.dumps(payload).replace("'", "''"))
+    )
+    try:
+        r = subprocess.run(_PSQL + ["-c", sql], capture_output=True,
+                           text=True, timeout=10)
+        return r.returncode == 0
+    except Exception as e:
+        print(f"[gate] evidence write failed (non-blocking): {e}")
+        return False
+
+_MIN_READINESS = load_min_readiness()   # governed bar (Gap B)
+
 # ── Singleton state ─────────────────────────────────────────────────
 
 _interp = None   # ResolutionInterpreter
@@ -218,7 +280,7 @@ def _build() -> None:
         Operator.GTE,
         "boolean",
         _expr_ref(_READINESS_ATTR_ID, "numeric"),
-        _expr_lit(0.7, "numeric"),
+        _expr_lit(_MIN_READINESS, "numeric"),
     )
 
     # ── Assertion 3: planner_questions = false ──────────────────
@@ -285,21 +347,40 @@ def _planner_has_questions(thread_id: str) -> bool:
     it crosses an external data boundary (Assembly comments).  The result
     feeds into the ``planner_questions`` boolean attribute on the entity.
     """
+    import datetime as _dt
+    reachable, planner_posted, result = False, False, False
     try:
         url = f"{_ASSEMBLY_URL}/api/forums/threads/{thread_id}"
         req = urllib.request.Request(url, method="GET")
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read())
+        reachable = True
         comments = data.get("comments") or []
         for c in comments:
             author = c.get("postedById") or (c.get("author") or {}).get("id") or ""
             if author == _PLANNER_UUID:
-                return True
-        return False
+                planner_posted = True
+                break
+        result = planner_posted
     except Exception:
-        # Assembly unreachable → assume no questions (fail-open:
-        # loss of Assembly visibility should not block promotion)
-        return False
+        # Gap A hardening (2f31102a): Assembly unreachable now fails
+        # CLOSED — treat as "questions exist" so loss of visibility
+        # blocks promotion instead of waving it through.
+        result = True
+
+    record_execution_evidence(
+        evidence_kind="http_preflight",
+        source_system="assembly-srv",
+        subject_ref=thread_id,
+        payload={
+            "reachable": reachable,
+            "thread_id": thread_id,
+            "planner_posted": planner_posted,
+            "checked_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+            "fail_closed": not reachable,
+        },
+    )
+    return result
 
 
 # ── Public API ───────────────────────────────────────────────────────
@@ -370,9 +451,9 @@ def evaluate_candidate_ready(
     # Build specific reasons
     if status in ("promoted", "discarded", "rejected"):
         return (False, f"candidate status={status} — already processed")
-    if float(readiness) < 0.7:
+    if float(readiness) < _MIN_READINESS:
         return (False,
-                f"compilation_readiness {float(readiness):.2f} below 0.7 threshold")
+                f"compilation_readiness {float(readiness):.2f} below {_MIN_READINESS} threshold")
     if planner_q:
         return (False, "planner has questions — explicit approval required")
     return (False, "candidate is not promotion-ready")
