@@ -176,7 +176,9 @@ async function main() {
     res.end(JSON.stringify({ error: "Not found. Available: GET /sse, POST /messages, POST / (streamable HTTP), DELETE / (streamable HTTP), GET /health" }));
   });
 
-  httpServer.listen(PORT, () => {
+  // G4 decommission (df8ff49d): loopback default; edge is the LAN surface.
+  const BIND_HOST = process.env.BIND_HOST || "127.0.0.1";
+  httpServer.listen(Number(PORT), BIND_HOST, () => {
     console.error(`nebula-mcp SSE server listening on http://localhost:${PORT}`);
     console.error(`  SSE endpoint:    http://localhost:${PORT}/sse`);
     console.error(`  Messages:        POST http://localhost:${PORT}/messages?sessionId=<id>`);

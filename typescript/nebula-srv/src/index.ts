@@ -74,8 +74,11 @@ async function start() {
     process.exit(1);
     return;
   }
-  server = app.listen(PORT, () => {
-    console.log(`nebula-srv listening on http://localhost:${PORT}`);
+  // G4 decommission (df8ff49d edge-monopoly): default bind is loopback;
+    // LAN exposure must come from the control-edge (:8082), not this service.
+  const BIND_HOST = process.env.BIND_HOST || "127.0.0.1";
+  server = app.listen(Number(PORT), BIND_HOST, () => {
+    console.log(`nebula-srv listening on http://${BIND_HOST}:${PORT}`);
     sweepRoleLeases();
     setInterval(sweepRoleLeases, 10 * 60 * 1000).unref();
   });
