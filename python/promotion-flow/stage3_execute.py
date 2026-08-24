@@ -29,15 +29,10 @@ from promotion_gate import evaluate_candidate_ready
 ENGINEER_AUTHORS = {"engineer", "engineer-ii", "promotion-flow/0005", None, ""}
 
 STRIKE_RE = re.compile(r"STRIKE\s+([0-9a-f]{8}|[0-9a-f-]{36})", re.I)
+APPROVE_RE = re.compile(r"\bAPPROVE\b", re.I)  # DETECTOR-only: never approves (C2)
 MAP_RE = re.compile(
     r"MAP\s+([0-9a-f]{8}|[0-9a-f-]{36})\s*(?:->|→|:)\s*(.+?)\s*(?:::|->|—)\s*(.+)", re.I
 )
-APPROVE_RE = re.compile(r"\bAPPROVE\b", re.I)
-
-# Decision-card replies (decision e4e9082e / procedure card `decision-cards`):
-# the UI mirrors the final card state in a `**Agreed selection:**` reply where
-# the chosen radio line is marked (x). Option labels embed the candidate short
-# id, so the choice is attributable even if only the selected line is quoted.
 AGREED_HEADER_RE = re.compile(r"\*\*Agreed selection:\*\*", re.I)
 AGREED_RADIO_RE = re.compile(r"-\s+\(x\)\s+(.*)", re.I)
 CARD_ID_RE = re.compile(r"([0-9a-f]{8}|[0-9a-f-]{36})")
@@ -49,14 +44,21 @@ def parse_card_reply(body):
 
     Returns dict short_id -> verdict, where verdict is
     ('approve'|'strike', remap_or_None).
+
+    Cross-card isolation: each **Agreed selection:** block is its own
+    card section.  The short ID extracted from the radio line MUST match
+    within the same block — we do NOT scan the whole comment body for
+    remap text, which would mis-attribute across cards.
     """
     verdicts = {}
     if not AGREED_HEADER_RE.search(body):
         return verdicts
-    # Work on the text after the LAST header (multiple cards may be mirrored).
+    # Each header delimits one card section.
     sections = AGREED_HEADER_RE.split(body)
     for section in sections[1:]:
-        for line in section.splitlines():
+        section_lines = section.splitlines()
+        sid = None
+        for line in section_lines:
             m = AGREED_RADIO_RE.search(line)
             if not m:
                 continue
@@ -67,13 +69,20 @@ def parse_card_reply(body):
             sid = idm.group(1).lower()
             low = chosen.lower()
             if low.startswith("other") or "other:" in low or "remap" in low:
-                # Other = remap: mapping text rides on the chosen line, e.g.
-                #   - (x) Other for abc12345 — remap as "System :: Subsystem"
-                # Extract the System :: Subsystem pair only — prefer a quoted
-                # span; else take whatever follows "remap as".
-                qm = re.search(r'["\u201c](.+?)\s*::\s*(.+?)["\u201d]', chosen)
-                am = re.search(r'remap\s+as\s+(.+)$', chosen, re.I)
-                cm = re.match(r'\s*-\s*\([xX]\)\s*Other:\s*(.+)$', chosen, re.I)
+                # Other = remap: mapping text rides on the chosen line.
+                # Search ONLY within this section's text for the mapping
+                # (the card ID was validated as belonging to this section
+                # above, so the remap text is scoped).
+                section_text = " :: ".join(section_lines)
+                qm = re.search(r'["\u201c](.+?)\s*::\s*(.+?)["\u201d]', section_text)
+                if not qm:
+                    qm = re.search(r'["\u201c](.+?)\s*::\s*(.+?)["\u201d]', chosen)
+                am = re.search(r'remap\s+as\s+(.+)$', section_text, re.I)
+                if not am:
+                    am = re.search(r'remap\s+as\s+(.+)$', chosen, re.I)
+                cm = re.match(r'\s*-\s*\([xX]\)\s*Other:\s*(.+)$', section_text, re.I)
+                if not cm:
+                    cm = re.match(r'\s*-\s*\([xX]\)\s*Other:\s*(.+)$', chosen, re.I)
                 seg = qm.groups() if qm else (
                     tuple(p.strip().strip('"“”') for p in am.group(1).split("::", 1))
                     if (am and "::" in am.group(1)) else
@@ -86,12 +95,8 @@ def parse_card_reply(body):
             elif "strike" in low:
                 verdicts[sid] = ("strike", None)
             elif "sandbox" in low:
-                # Amendment 2 (3adcda46): Sandbox = greenfield track, no
-                # requirement row, no mapping needed (ruling c26ca340).
                 verdicts[sid] = ("sandbox", None)
             elif "approve" in low or "requirement" in low:
-                # "Requirement" is the amended-2 label for promote-as-mapped;
-                # legacy "approve" kept for backward compatibility.
                 verdicts[sid] = ("approve", None)
     return verdicts
 
@@ -207,7 +212,16 @@ def parse_verdicts(manifest, systems):
         if author in ENGINEER_AUTHORS or cid in seen:
             continue
         body = c.get("body") or ""
-        has_signal = bool(APPROVE_RE.search(body) or STRIKE_RE.search(body) or MAP_RE.search(body))
+        # C2 fix: card replies often contain NO prose keyword (e.g.
+        # "- (x) abc12345: Requirement"), so the Agreed-selection header
+        # itself counts as signal. APPROVE_RE here is DETECTOR-only.
+        has_signal = bool(
+            APPROVE_RE.search(body)
+            or STRIKE_RE.search(body)
+            or MAP_RE.search(body)
+            or AGREED_HEADER_RE.search(body)
+            or AGREED_RADIO_RE.search(body)
+        )
         if not has_signal:
             continue
         new_comments.append(cid)
@@ -231,25 +245,36 @@ def parse_verdicts(manifest, systems):
                     items[full]["systemId"], items[full]["subsystemId"] = sid, subid
                     items[full]["system_name"] = sys_n.strip()
                     items[full]["subsystem_name"] = sub_n.strip()
+                    items[full]["approved_by"] = author      # resumption criterion 2
+                    items[full]["approved_at"] = now_iso()
                     approved.add(full)
-                    log(f"card remap {short} -> {sys_n.strip()} :: {sub_n.strip()}")
+                    log(f"card remap {short} -> {sys_n.strip()} :: {sub_n.strip()} (by {author})")
                 else:
                     log(f"WARNING: card remap target unresolvable for {short}: {remap}")
             elif verdict == "sandbox":
                 # Sandbox track: no mapping prerequisite (blocker-free by
                 # qualification); destination carried on the item.
                 items[full]["card_destination"] = "sandbox"
+                items[full]["approved_by"] = author          # resumption criterion 2
+                items[full]["approved_at"] = now_iso()
                 approved.add(full)
-                log(f"card sandbox {short}")
+                log(f"card sandbox {short} (by {author})")
             elif verdict == "approve":
                 # Approve-as-mapped / Requirement: only promotable when actually mapped.
                 if items[full].get("system_name") and items[full]["system_name"] != "(none)":
                     items[full]["card_destination"] = "requirement"
+                    items[full]["approved_by"] = author      # resumption criterion 2
+                    items[full]["approved_at"] = now_iso()
                     approved.add(full)
                 else:
                     log(f"card requirement {short} ignored — unmapped (needs Other/remap)")
 
-        # ── Legacy prose commands still honored (backward compat) ──
+        # ── Legacy prose STRIKE / MAP (backward compat) ───────────
+        # C2 hardening (audit 8bfe6519, pre-resume blocker ce916b34):
+        # prose APPROVE is REMOVED ENTIRELY. No substring/negation
+        # heuristic can distinguish "approve" as a verdict from prose
+        # mention ("I do not approve", "approval pending", quoted cards).
+        # Approval happens ONLY via structured decision-card sections.
         for m in STRIKE_RE.finditer(body):
             ref = m.group(1).lower()
             for full, item in items.items():
@@ -268,9 +293,20 @@ def parse_verdicts(manifest, systems):
                         log(f"remapped {ref} -> {sys_n} :: {sub_n}")
                     else:
                         log(f"WARNING: cannot resolve mapping target '{sys_n} :: {sub_n}' for {ref}")
-        if APPROVE_RE.search(body):
-            for full in items:
-                approved.add(full)
+        # ── Legacy prose APPROVE (non-carded, backward compat) ──
+        # Only honored when (a) the word APPROVE stands alone,
+        # (b) no negation precedes it, and (c) it is NOT embedded
+        # in card reply text (decision cards use the structured
+        # parse above, not prose keyword matching).
+        # Also: prose-only APPROVE in a comment that ALSO carries
+        # decision cards is ambiguous — skip the prose path.
+
+        # ══ REMOVED (C2 backdoor — audit 8bfe6519 / blocker ce916b34) ══
+        # Prose APPROVE no longer promotes ANYTHING, heuristic or not.
+        # The prior negator/hedge sentence-scan was still a keyword
+        # classifier ("approved by nobody present" would slip through);
+        # acceptance requires verdicts keyed on structured card sections
+        # ONLY. Approvals arrive exclusively via **Agreed selection:** blocks.
     final = [
         items[i] for i in sorted(approved - struck)
         if not items[i].get("struck")
