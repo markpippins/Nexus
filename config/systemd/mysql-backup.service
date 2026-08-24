@@ -1,0 +1,15 @@
+[Unit]
+# Nightly MySQL (Kodi shared library) backup: mysqldump all DBs -> gzip,
+# integrity gates, manifest, retention, success stamp + failure incident.
+# Per architect decision 13600407 (2026-08-09): systemd user timers are the
+# single OS-level substrate; cron stays retired.
+Description=MySQL nightly backup (all DBs, verified)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/codex/dev/nexus/bin/mysql-backup.sh
+User=codex
+Group=codex
+TimeoutStartSec=1h

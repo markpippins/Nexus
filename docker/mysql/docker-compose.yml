@@ -1,0 +1,48 @@
+# docker/mysql/docker-compose.yml
+# MySQL 8.0 for the KODI shared library (Option A in the KODI integration
+# analysis, Mildred forum thread a22c34ca-7e5b-4f51-8677-35cac5ebe666).
+#
+# This supersedes the bare `docker run` in scripts/bash/start-mysql.sh:
+#   - data lives in a named volume (survives container recreation)
+#   - restart: unless-stopped (auto-restart on boot/crash)
+#   - healthcheck so compose/systemd can gate on readiness
+#   - ./init/*.sql runs automatically on FIRST boot of an empty volume
+#     (recreates the kodi schema/user — idempotent)
+#   - port bound to loopback only (Kodi runs on this host; change to
+#     0.0.0.0:3306 only if you add LAN frontends AND rotate the passwords)
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f
+#   docker compose ps
+name: nexus-mysql
+
+services:
+  kodi-mysql:
+    image: mysql:8.0
+    container_name: my-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        - CMD
+        - mysqladmin
+        - ping
+        - -h
+        - 127.0.0.1
+        - -uroot
+        - -p${MYSQL_ROOT_PASSWORD:-rootpass}
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  mysql-data:
+    name: nexus-mysql-data

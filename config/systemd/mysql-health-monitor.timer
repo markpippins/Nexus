@@ -1,0 +1,13 @@
+[Unit]
+Description=MySQL Health Monitor timer — checks MySQL every 5min
+Documentation=https://github.com/codex/nexus/wiki/mysql-health-monitor
+After=network.target
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+Persistent=true
+RandomizedDelaySec=30s
+
+[Install]
+WantedBy=timers.target
