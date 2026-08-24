@@ -1,7 +1,10 @@
 # docker/vanadium — the vanadium failover tier manifest.
 # Operator scope 2026-08-22: the 17 .directory-marked typescript servers
-# + jvm/spring/service-registry (+ service-broker and jvm/spring/peb-kernel
-# once built). Container names prefixed vd-; host ports via *_HOST_PORT env
+# + jvm/spring/service-registry. W1-W3 rulings (2026-08-23, f17d973d)
+# added: service-broker as SINGLE-CONTAINER monolith facade (W1) and the
+# PYTHON peb-kernel image — NOT a JVM kernel build (W3). terrain-ts runs
+# host-networked on vanadium via docker-compose.vanadium.yml (W2).
+# Container names prefixed vd-; host ports via *_HOST_PORT env
 # so the same file serves local smoke tests (offset ports) and vanadium.
 name: nexus-vanadium-tier
 
@@ -240,6 +243,38 @@ services:
       SPRING_DATA_REDIS_HOST: ${REGISTRY_REDIS_HOST:-172.17.0.1}
     ports:
       - "${REGISTRY_HOST_PORT:-8085}:8085"
+  # W1 (f17d973d): single-container monolith facade — no module split.
+  broker:
+    image: nexus-vanadium/broker-gateway
+    build:
+      context: ../../jvm
+      dockerfile: spring/service-broker/broker-gateway/Dockerfile
+    container_name: vd-broker
+    restart: unless-stopped
+    depends_on:
+      - service-registry
+    environment:
+      GATEWAY_PG_URL: jdbc:postgresql://${PG_HOST}:${PG_PORT}/${PG_DB_NAME}?currentSchema=gateway
+      SPRING_DATASOURCE_USERNAME: ${PG_USER}
+      SPRING_DATASOURCE_PASSWORD: ${PG_PASS}
+      SPRING_DATA_MONGODB_URI: ${SPRING_DATA_MONGODB_URI}
+      SPRING_DATA_REDIS_HOST: ${BROKER_REDIS_HOST:-172.17.0.1}
+      SERVICE_REGISTRY_URL: http://vd-service-registry:8085
+    ports:
+      - "${BROKER_HOST_PORT:-8081}:8081"
+  # W3 (f17d973d): PYTHON peb-kernel IS the failover-tier target; the JVM
+  # peb-bootstrap stays decommissioned — do not build it for vanadium.
+  peb-kernel:
+    image: nexus-vanadium/peb-kernel
+    build:
+      context: ../../python/peb-kernel
+    container_name: vd-peb-kernel
+    restart: unless-stopped
+    environment:
+      PEB_DATABASE_URL: postgresql://${PG_USER}:${PG_PASS}@${PG_HOST}:${PG_PORT}/${PG_DB_NAME}
+      PEB_PORT: ${PEB_KERNEL_PORT:-8098}
+    ports:
+      - "${PEB_KERNEL_HOST_PORT:-8098}:8098"
   redis:
     image: redis:7-alpine
     container_name: vd-redis
