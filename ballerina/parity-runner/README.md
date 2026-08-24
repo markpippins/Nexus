@@ -4,7 +4,7 @@ One generated-client test suite, executed against **two live stacks**:
 
 | Target | Where | Purpose |
 |---|---|---|
-| `legacy`  | vanadium (rehomed TS tier, `192.168.1.82`) | reference behavior |
+| `legacy`  | vanadium (rehomed TS tier, `192.168.1.209`) | reference behavior |
 | `candidate` | local adonisjs/moleculer (replacement stack) | cutover candidate |
 
 The runner issues the **same read-only requests** to both, then diffs:
@@ -29,7 +29,7 @@ Regenerate after spec changes only; toolchain versions pinned.
 
 ```toml
 [parity]
-legacyBase   = "http://192.168.1.82:3107"   # assembly-srv on vanadium
+legacyBase   = "http://192.168.1.209:3107"   # assembly-srv on vanadium
 candidateBase = "http://localhost:3107"
 ```
 

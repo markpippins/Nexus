@@ -1,6 +1,6 @@
 # Vanadium Failover Tier — Bring-Up Briefing
 
-**Audience:** engineers on the vanadium host (192.168.1.82, Raspberry Pi 5, aarch64, Debian 13, Docker 29.x). This assumes **no prior knowledge of Nexus**. Read top to bottom; every command has been verified from titanium unless marked otherwise.
+**Audience:** engineers on the vanadium host (192.168.1.209, Raspberry Pi 5, aarch64, Debian 13, Docker 29.x). This assumes **no prior knowledge of Nexus**. Read top to bottom; every command has been verified from titanium unless marked otherwise.
 
 ## What you are deploying
 
@@ -123,8 +123,8 @@ So "updating locally" = making sure each deployed service knows your registry's 
 Add to `~/nexus/docker/vanadium/.env`, then `docker compose up -d` (recreates containers):
 
 ```
-HEARTBEAT_REGISTRY_URL=http://192.168.1.82:8085
-REGISTRY_URL=http://192.168.1.82:8085
+HEARTBEAT_REGISTRY_URL=http://192.168.1.209:8085
+REGISTRY_URL=http://192.168.1.209:8085
 ```
 
 (Variable names vary slightly per service — both spellings above cover the current code paths. Services without heartbeat config simply won't register yet; that's fine.)
