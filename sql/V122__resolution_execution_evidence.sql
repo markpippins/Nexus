@@ -1,24 +1,28 @@
--- V122: resolution.execution_evidence — provenance rows for gate preflight checks
--- Ruling 64392cdc: execution_evidence gets its OWN resolution table.
--- Scope item: kiro survey #4 Gap A (2f1202a / todo e7451e65 item 1).
--- Writers MUST treat this as append-only provenance; no updates.
+-- V122: execution_evidence — WITHDRAWN AS DDL; converted to contract verification.
+--
+-- DISCOVERY (2026-08-24, on apply): resolution.execution_evidence ALREADY
+-- EXISTS in its canonical V116-family form — richer than the sketch this
+-- file originally proposed: deterministic evidence_key (unique-while-
+-- active), source_system+evidence_kind+source_hash content-dedup index,
+-- bitemporal recorded_*/valid_* columns, immutability trigger, and FKs
+-- from execution_admission_receipt / execution_claim_evidence /
+-- t24_graph_edge_evidence.
+--
+-- The gate's http_preflight writer (promotion_gate.record_execution_evidence)
+-- targets THAT contract. This file therefore only VERIFIES the required
+-- surface and registers adoption in resolution.migration_ledger. No schema
+-- change is made here.
 
-CREATE SCHEMA IF NOT EXISTS resolution;
-
-CREATE TABLE IF NOT EXISTS resolution.execution_evidence (
-    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    context_kind   text NOT NULL,                -- e.g. 'provenance'
-    source_system  text NOT NULL,                -- e.g. 'assembly-srv'
-    evidence_kind  text NOT NULL,                -- e.g. 'http_preflight'
-    subject_ref    text,                         -- batch_id / candidate id / thread id
-    payload        jsonb NOT NULL DEFAULT '{}'::jsonb,
-    recorded_at    timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_exec_evidence_subject
-    ON resolution.execution_evidence (subject_ref, recorded_at DESC);
-CREATE INDEX IF NOT EXISTS idx_exec_evidence_kind
-    ON resolution.execution_evidence (evidence_kind, recorded_at DESC);
-
-COMMENT ON TABLE resolution.execution_evidence IS
-    'Append-only provenance/evidence rows produced by governed preflight checks (gate hardening, 2026-08-24).';
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='resolution' AND table_name='execution_evidence'
+      AND column_name IN ('evidence_key','source_system','evidence_kind',
+                          'source_ref','source_hash','context_kind','payload')
+    GROUP BY table_name
+    HAVING count(*) = 7
+  ) THEN
+    RAISE EXCEPTION 'resolution.execution_evidence missing required gate-writer columns';
+  END IF;
+END $$;

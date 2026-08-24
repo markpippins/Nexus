@@ -105,27 +105,50 @@ def record_execution_evidence(*, evidence_kind: str, source_system: str,
                               context_kind: str = "provenance") -> bool:
     """Append-only provenance write into resolution.execution_evidence.
 
-    Evidence failures are LOGGED but never block the gate decision path —
-    the fail-closed verdict itself is returned independently.
+    Targets the CANONICAL V116-family contract (discovered on V122 apply):
+      evidence_key  deterministic unique-while-active key
+      source_ref    jsonb carrying the subject pointer(s)
+      source_hash   sha256 of the canonical payload -> content-dedup index
+                    (source_system, evidence_kind, source_hash) makes repeat
+                    checks idempotent via ON CONFLICT DO NOTHING
+    Evidence failures are LOGGED but never block the gate decision path.
     """
+    import datetime as _dt
+    import hashlib
     import subprocess
+
+    canon = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    src_hash = hashlib.sha256(canon.encode()).hexdigest()
+    ev_key = f"gate:{evidence_kind}:{subject_ref}:{src_hash[:12]}"
     sql = (
         "INSERT INTO resolution.execution_evidence "
-        "(context_kind, source_system, evidence_kind, subject_ref, payload) "
-        "VALUES ('%s','%s','%s','%s','%s'::jsonb);" %
-        (context_kind.replace("'", "''"),
-         source_system.replace("'", "''"),
-         evidence_kind.replace("'", "''"),
-         subject_ref.replace("'", "''"),
-         json.dumps(payload).replace("'", "''"))
-    )
+        "(evidence_key, evidence_kind, source_system, source_ref, source_hash,"
+        " captured_at, captured_by, context_kind, payload) VALUES ("
+        "%(key)s, %(kind)s, %(sys)s, %(ref)s::jsonb, %(hash)s, "
+        "now(), %(by)s, %(ctx)s, %(payload)s::jsonb) "
+        "ON CONFLICT (source_system, evidence_kind, source_hash) DO NOTHING;"
+    ) % {
+        "key": _sql_lit(ev_key), "kind": _sql_lit(evidence_kind),
+        "sys": _sql_lit(source_system),
+        "ref": _sql_lit(json.dumps({"subject": subject_ref})),
+        "hash": _sql_lit(src_hash), "by": _sql_lit("engineer-ii/promotion-gate"),
+        "ctx": _sql_lit(context_kind), "payload": _sql_lit(canon),
+    }
     try:
         r = subprocess.run(_PSQL + ["-c", sql], capture_output=True,
                            text=True, timeout=10)
-        return r.returncode == 0
+        if r.returncode != 0:
+            print(f"[gate] evidence write failed (non-blocking): "
+                  f"{(r.stderr or '').strip()[:200]}")
+            return False
+        return True
     except Exception as e:
         print(f"[gate] evidence write failed (non-blocking): {e}")
         return False
+
+
+def _sql_lit(v: str) -> str:
+    return "'" + str(v).replace("'", "''") + "'"
 
 _MIN_READINESS = load_min_readiness()   # governed bar (Gap B)
 
@@ -407,8 +430,9 @@ def evaluate_candidate_ready(
     from SOLScript.solscript.models import Entity  # type: ignore[import-untyped]
 
     # ── Resolve system mapping ─────────────────────────────────
-    system_name = candidate.get("system_name") or "(none)"
-    has_mapping = system_name != "(none)"
+    # Gap C: identity frame — mapping means a bound system id
+    has_mapping = bool(candidate.get("system_id") or candidate.get("systemId")
+                       or candidate.get("attributes", {}).get("system_id"))
     system_mapped = "true" if has_mapping else "false"
 
     # ── Pre-flight: planner questions ──────────────────────────
