@@ -1,10 +1,12 @@
 #!/usrbin/env python3
 """Stage 3 — gated executor (plan 0005 / D-2026-08-23-D).
 
-Scans open promotion batches, parses operator gate verdicts from their
-planning-forum threads (APPROVE / STRIKE <id> / MAP <id> -> Sys :: Sub),
-then promotes approved items EXCLUSIVELY via
-POST /api/harvest-candidates/:id/spawn-plan.
+Scans open promotion batches, parses operator/planner gate verdicts from
+their planning-forum threads (decision cards per e4e9082e as amended by
+319defa5: Requirement / Sandbox / Strike / Other=remap; legacy prose
+APPROVE / STRIKE / MAP still honored), then executes approved items via:
+  - destination requirement: POST /api/harvest-candidates/:id/spawn-requirement
+  - destination sandbox: greenfield scaffold under nexus/sandbox/<short>-<slug>/
 
 Guarantees: per-item failure isolation with partial-batch commit;
 idempotent skip of already-promoted candidates; single-writer (only this
@@ -16,6 +18,7 @@ Usage: stage3_execute.py [--dry-run] [--batch <id>]
 import argparse
 import re
 import sys
+from pathlib import Path
 
 from promotion_common import (
     FORUM, NEBULA, agent_record, forum_comment, forum_post, get, inbox_ping,
@@ -30,6 +33,67 @@ MAP_RE = re.compile(
     r"MAP\s+([0-9a-f]{8}|[0-9a-f-]{36})\s*(?:->|→|:)\s*(.+?)\s*(?:::|->|—)\s*(.+)", re.I
 )
 APPROVE_RE = re.compile(r"\bAPPROVE\b", re.I)
+
+# Decision-card replies (decision e4e9082e / procedure card `decision-cards`):
+# the UI mirrors the final card state in a `**Agreed selection:**` reply where
+# the chosen radio line is marked (x). Option labels embed the candidate short
+# id, so the choice is attributable even if only the selected line is quoted.
+AGREED_HEADER_RE = re.compile(r"\*\*Agreed selection:\*\*", re.I)
+AGREED_RADIO_RE = re.compile(r"-\s+\(x\)\s+(.*)", re.I)
+CARD_ID_RE = re.compile(r"([0-9a-f]{8}|[0-9a-f-]{36})")
+MAPPING_TEXT_RE = re.compile(r"(.+?)\s*::\s*(.+)")
+
+
+def parse_card_reply(body):
+    """Parse one comment's Agreed-selection blocks.
+
+    Returns dict short_id -> verdict, where verdict is
+    ('approve'|'strike', remap_or_None).
+    """
+    verdicts = {}
+    if not AGREED_HEADER_RE.search(body):
+        return verdicts
+    # Work on the text after the LAST header (multiple cards may be mirrored).
+    sections = AGREED_HEADER_RE.split(body)
+    for section in sections[1:]:
+        for line in section.splitlines():
+            m = AGREED_RADIO_RE.search(line)
+            if not m:
+                continue
+            chosen = m.group(1)
+            idm = CARD_ID_RE.search(chosen)
+            if not idm:
+                continue
+            sid = idm.group(1).lower()
+            low = chosen.lower()
+            if low.startswith("other") or "other:" in low or "remap" in low:
+                # Other = remap: mapping text rides on the chosen line, e.g.
+                #   - (x) Other for abc12345 — remap as "System :: Subsystem"
+                # Extract the System :: Subsystem pair only — prefer a quoted
+                # span; else take whatever follows "remap as".
+                qm = re.search(r'["\u201c](.+?)\s*::\s*(.+?)["\u201d]', chosen)
+                am = re.search(r'remap\s+as\s+(.+)$', chosen, re.I)
+                cm = re.match(r'\s*-\s*\([xX]\)\s*Other:\s*(.+)$', chosen, re.I)
+                seg = qm.groups() if qm else (
+                    tuple(p.strip().strip('"“”') for p in am.group(1).split("::", 1))
+                    if (am and "::" in am.group(1)) else
+                    (tuple(p.strip() for p in cm.group(1).split("::", 1))
+                     if (cm and "::" in cm.group(1)) else None)
+                )
+                if seg:
+                    verdicts[sid] = ("remap", f"{seg[0].strip()} :: {seg[1].strip()}")
+                # Other without mapping text: not actionable — operator must re-answer
+            elif "strike" in low:
+                verdicts[sid] = ("strike", None)
+            elif "sandbox" in low:
+                # Amendment 2 (3adcda46): Sandbox = greenfield track, no
+                # requirement row, no mapping needed (ruling c26ca340).
+                verdicts[sid] = ("sandbox", None)
+            elif "approve" in low or "requirement" in low:
+                # "Requirement" is the amended-2 label for promote-as-mapped;
+                # legacy "approve" kept for backward compatibility.
+                verdicts[sid] = ("approve", None)
+    return verdicts
 
 
 # ── Gate-state guard (required by halt c19018b3) ────────────────────
@@ -149,6 +213,43 @@ def parse_verdicts(manifest, systems):
         new_comments.append(cid)
         seen.append(cid)
         log(f"verdict from {author}: {body[:80]!r}")
+
+        # ── Decision-card replies first (e4e9082e format) ──────────
+        card = parse_card_reply(body)
+        for short, (verdict, remap) in card.items():
+            full = next((k for k in items if k.lower().startswith(short)), None)
+            if not full:
+                log(f"WARNING: card verdict for unknown candidate {short}")
+                continue
+            if verdict == "strike":
+                struck.add(full)
+                items[full]["struck"] = True
+            elif verdict == "remap" and remap:
+                sys_n, sub_n = remap.split("::", 1)
+                sid, subid = resolve_mapping(sys_n, sub_n, systems)
+                if sid:
+                    items[full]["systemId"], items[full]["subsystemId"] = sid, subid
+                    items[full]["system_name"] = sys_n.strip()
+                    items[full]["subsystem_name"] = sub_n.strip()
+                    approved.add(full)
+                    log(f"card remap {short} -> {sys_n.strip()} :: {sub_n.strip()}")
+                else:
+                    log(f"WARNING: card remap target unresolvable for {short}: {remap}")
+            elif verdict == "sandbox":
+                # Sandbox track: no mapping prerequisite (blocker-free by
+                # qualification); destination carried on the item.
+                items[full]["card_destination"] = "sandbox"
+                approved.add(full)
+                log(f"card sandbox {short}")
+            elif verdict == "approve":
+                # Approve-as-mapped / Requirement: only promotable when actually mapped.
+                if items[full].get("system_name") and items[full]["system_name"] != "(none)":
+                    items[full]["card_destination"] = "requirement"
+                    approved.add(full)
+                else:
+                    log(f"card requirement {short} ignored — unmapped (needs Other/remap)")
+
+        # ── Legacy prose commands still honored (backward compat) ──
         for m in STRIKE_RE.finditer(body):
             ref = m.group(1).lower()
             for full, item in items.items():
@@ -198,11 +299,63 @@ def promote(item, systems):
         "priority": "Medium",
         "status": "Backlog",
     }
-    st, resp = post(f"{NEBULA}/api/harvest-candidates/{cid}/spawn-plan", payload, timeout=90)
+    st, resp = post(f"{NEBULA}/api/harvest-candidates/{cid}/spawn-requirement", payload, timeout=90)
     if st in (200, 201):
         patch(f"{NEBULA}/api/harvest-candidates/{cid}", {"status": "promoted"})
         return "promoted", resp
-    return "failed", f"spawn-plan HTTP {st}: {json_trunc(resp)}"
+    if st == 410:
+        return "failed", "spawn endpoint returned 410 (verb renamed?) — update stage3 URL"
+    return "failed", f"spawn-requirement HTTP {st}: {json_trunc(resp)}"
+
+
+SANDBOX_ROOT = Path("/home/codex/dev/nexus/sandbox")
+
+
+def scaffold_sandbox(item):
+    """Sandbox-track execution (ruling c26ca340; amendment 3adcda46 item 3).
+
+    Builds the greenfield directory skeleton for a blocker-free candidate:
+    nexus/sandbox/<short8>-<slug>/ with PROVENANCE.md (candidate id, CPF,
+    track compliance) and README.md stating claimed behavior + adoption path.
+    Constraint compliance: self-contained, no mainline imports written here,
+    nothing outside the sandbox dir is touched.
+    """
+    short = item["id"][:8]
+    slug = re.sub(r"[^a-z0-9]+", "-", (item.get("title") or "candidate").lower()).strip("-")[:40]
+    root = SANDBOX_ROOT / f"{short}-{slug or 'candidate'}"
+    if root.exists():
+        return "skipped-sandbox-exists", str(root)
+    try:
+        root.mkdir(parents=True)
+    except OSError as e:
+        return "failed", f"sandbox mkdir: {e}"
+    cpf = f"{item.get('readiness', 0):.2f}"
+    (root / "PROVENANCE.md").write_text(
+        f"# Provenance — sandbox artifact `{short}`\n\n"
+        f"- candidate id: {item['id']}\n"
+        f"- source batch thread: see promotion-flow manifest\n"
+        f"- CPF readiness at gate: {cpf}\n"
+        f"- qualification: blocker-free (zero linked open questions) per c26ca340\n"
+        f"- destination chosen via operator/planner decision card (decision 319defa5)\n"
+        f"- constraints: self-contained; zero mainline imports; no shared config/secrets\n"
+        f"- adoption: evaluated later per greenfield ruling — nothing promoted to requirements\n",
+        encoding="utf-8",
+    )
+    (root / "README.md").write_text(
+        f"# {item.get('title') or short}\n\n"
+        f"Sandbox-track build-out for harvest candidate `{item['id']}`.\n\n"
+        f"## Claimed behavior\n\n"
+        f"(To be implemented here — this scaffold only establishes provenance "
+        f"and intent. Implementation is time-boxed and must stay self-contained.)\n\n"
+        f"## Intent (from harvest)\n\n"
+        f"{(item.get('intent_description') or item.get('description') or '(none captured)').strip()}\n\n"
+        f"## Adoption path\n\n"
+        f"Facts-on-the-ground first: if this proves useful, a follow-up proposal "
+        f"migrates it into the mainline with review. Rejection leaves this directory "
+        f"in place as history.\n",
+        encoding="utf-8",
+    )
+    return "sandboxed", str(root)
 
 
 def json_trunc(x, n=300):
@@ -290,25 +443,33 @@ def main():
             continue
 
         reqs_before = corpus_counts()
-        results = {"promoted": [], "skipped": [], "failed": []}
+        results = {"promoted": [], "skipped": [], "failed": [], "sandboxed": []}
         for item in approved:
-            outcome, detail = promote(item, systems)
+            if item.get("card_destination") == "sandbox":
+                outcome, detail = scaffold_sandbox(item)
+            else:
+                outcome, detail = promote(item, systems)
             entry = f"`{item['id'][:8]}` {item.get('title','')[:50]}"
-            results[outcome if outcome != 'skipped-promoted' else 'skipped'].append(
+            key = {"skipped-promoted": "skipped", "skipped-sandbox-exists": "skipped"}.get(outcome, outcome)
+            results.setdefault(key, []).append(
                 entry + (f" — {detail}" if detail else "")
             )
-            if outcome == "promoted":
+            if outcome in ("promoted", "sandboxed"):
                 for c in manifest["candidates"]:
                     if c["id"] == item["id"]:
                         c["promoted"] = True
+                        if outcome == "sandboxed":
+                            c["sandbox_path"] = detail
             log(f"  {outcome}: {entry}")
         reqs_after = corpus_counts()
 
         executed = len(results["promoted"])
+        sandboxes = len(results.get("sandboxed", []))
         summary = (
             f"# Stage-3 execution — batch `{bid}`\n\n"
-            f"- promoted: **{executed}** via spawn_plan_from_candidate\n"
-            f"- skipped (already promoted): {len(results['skipped'])}\n"
+            f"- promoted: **{executed}** via spawn_requirement_from_candidate\n"
+            f"- sandboxed: **{sandboxes}** scaffolded under nexus/sandbox/ (ruling c26ca340)\n"
+            f"- skipped (already promoted/scaffolded): {len(results['skipped'])}\n"
             f"- failed: {len(results['failed'])}\n"
             + ("\n".join(f"  - {f}" for f in results['failed']) + "\n" if results['failed'] else "")
             + f"- struck earlier / never approved are untouched\n"

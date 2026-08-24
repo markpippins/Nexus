@@ -66,6 +66,64 @@ def attach_discovery_proposals(candidates):
             )
 
 
+def open_question_count(candidate_id):
+    """Zero means sandbox-track eligible (ruling c26ca340: blocker-free)."""
+    st, data = get(f"{NEBULA}/api/harvest-candidates/{candidate_id}")
+    if st != 200 or not data:
+        return None
+    try:
+        oq = json.loads(data.get("open_questions") or "[]")
+        return len(oq) if isinstance(oq, list) else 0
+    except Exception:
+        return 0
+
+
+def suggest_destination(c, oq_count):
+    """Pre-suggest destination per item where determinable (work order item 4).
+    sandbox = blocker-free greenfield (no mapping + zero open questions);
+    requirements = mapped to an existing system/subsystem."""
+    if oq_count is None:
+        return "requirements (?)"
+    if oq_count > 0:
+        return f"requirements ({oq_count} open question(s) block sandbox)"
+    if c.get("system_name") and c["system_name"] != "(none)":
+        return "requirements"
+    return "sandbox"
+
+
+def render_decision_cards(candidates):
+    """Render the batch body as per-item radio DECISION CARDS
+    (decision e4e9082e; procedure card `decision-cards`).
+
+    Every option line embeds the candidate short-id so a mirrored
+    `**Agreed selection:**` reply is attributable even when the UI quotes
+    only the chosen line. Other carries 'System :: Subsystem' free text.
+    """
+    blocks = []
+    for c in candidates:
+        cid = str(c["id"])
+        short = cid[:8]
+        oq = open_question_count(cid)
+        dest = suggest_destination(c, oq)
+        mapped = c.get("system_name") and c["system_name"] != "(none)"
+        mapping = f"{c.get('system_name')} :: {c.get('subsystem_name')}" if mapped else "(unmapped)"
+        suggested = ""
+        if not mapped and c.get("proposed_target"):
+            suggested = f" — suggested: {c['proposed_target']}"
+        header = (
+            f"**Card `{short}`** — {c.get('title','')[:70]} "
+            f"(CPF {c['compilation_readiness']:.2f} | mapping: {mapping} | "
+            f"dest: {dest}){suggested}"
+        )
+        blocks.append(
+            f"{header}\n"
+            f"- ( ) {short}: Approve as mapped\n"
+            f"- ( ) {short}: Strike\n"
+            f"- ( ) Other for {short} — remap as \"System :: Subsystem\"\n"
+        )
+    return "\n".join(blocks)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
@@ -78,40 +136,27 @@ def main():
         return 0
     attach_discovery_proposals(candidates)
 
-    batch_id = uuid.uuid4().hex[:8]
-    lines = ["| candidate | CPF | mapping | note | status |",
-             "|---|---|---|---|---|"]
-    for c in candidates:
-        cid = str(c["id"])
-        mapped = c.get("system_name") and c["system_name"] != "(none)"
-        if mapped:
-            mapping = f"{c.get('system_name')} :: {c.get('subsystem_name')}"
-            note = "confirmed"
-        else:
-            mapping = "(none)"
-            note = f"⚠️ needs MAP — suggested: {c.get('proposed_target', 'no match')}"
-        lines.append(
-            f"| `{cid[:8]}` {c.get('title','')[:55]} "
-            f"| {c['compilation_readiness']:.2f} "
-            f"| {mapping} | {note} | {c.get('status') or 'pending'} |"
-        )
+    import json  # noqa: F401  (used by open_question_count)
 
+    batch_id = uuid.uuid4().hex[:8]
+
+    cards = render_decision_cards(candidates)
     body = (
         f"**Promotion batch `{batch_id}`** — {len(candidates)} candidate(s) at readiness >= 0.7. "
-        f"Per D-2026-08-23-D this thread is the operator gate.\n\n"
-        + "\n".join(lines)
-        + "\n\n**Gate commands (reply on this thread):**\n"
-        "- `APPROVE` — approve every listed item not struck (mapped-only are promoted)\n"
-        "- `STRIKE <id-prefix>` — remove an item from the batch\n"
-        "- `MAP <id-prefix> -> System :: Subsystem` — confirm/correct a mapping; "
-        "unmapped items are NEVER promoted without this\n\n"
-        "No requirement rows exist until you approve. Executor runs with per-item failure isolation."
+        f"Per D-2026-08-23-D + amendment e4e9082e this thread is the operator gate, "
+        f"rendered as per-item DECISION CARDS. One click per card; no prose required.\n\n"
+        f"{cards}\n"
+        f"**Legend:** *Approve as mapped* promotes the candidate via its existing/confirmed mapping. "
+        f"*Strike* removes it from the batch. *Other* remaps — type the target as `System :: Subsystem`. "
+        f"Suggested destinations follow ruling c26ca340 (blocker-free unmapped items → sandbox track)."
     )
+
     manifest = {
         "batch_id": batch_id,
         "created_at": now_iso(),
         "thread_title": f"[promotion-batch {batch_id}] {len(candidates)} candidates ready for gate",
         "forum": "planning",
+        "card_format": True,
         "candidates": [
             {
                 "id": c["id"],
