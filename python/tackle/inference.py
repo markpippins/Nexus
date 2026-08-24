@@ -21,12 +21,17 @@ Usage::
 
 import json
 import logging
+import os
+import subprocess
 import time
 import urllib.error
 import urllib.request
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from tackle.db import get_role_config, get_fallback_models
+
+OPENCODE_BIN = os.environ.get("OPENCODE_BIN", "/home/codex/.opencode/bin/opencode")
+OPENCODE_CLI_TIMEOUT_SECONDS = int(os.environ.get("OPENCODE_CLI_TIMEOUT_SECONDS", "300"))
 
 _log = logging.getLogger("tackle.inference")
 
@@ -221,6 +226,63 @@ _PROVIDER_CALLERS = {
 }
 
 
+def _call_opencode_cli(
+    model: str,
+    messages: list[Dict[str, str]],
+) -> Optional[str]:
+    """Invoke the opencode CLI harness for a role whose config resolves to
+    provider_type='opencode'.
+
+    Previously these entries were SKIPPED entirely — which made the operator
+    messagebox permanently broken whenever the whole chain was opencode-typed
+    ("all models for this role are currently unavailable"). The harvest
+    pipeline already proves the CLI path works: ``opencode run -m <model>
+    --pure <prompt>``.
+
+    System-prompt injection is not supported by the run subcommand, so the
+    system message is prepended to the prompt body.
+    """
+    prompt_parts = [m["content"] for m in messages if m.get("content")]
+    prompt = "\n\n".join(prompt_parts)
+    # The CLI requires fully-qualified model ids (provider/model). Role configs
+    # frequently store bare ids ("x-preview-f-free"); a bare id makes the CLI
+    # die with an opaque UnknownError JSON blob.
+    if model and "/" not in model:
+        model = f"opencode/{model}"
+    cmd = [OPENCODE_BIN, "run"]
+    if model:
+        cmd += ["-m", model]
+    cmd += ["--pure", prompt]
+    last_err = None
+    for attempt in range(2):  # one retry — CLI occasionally transient-fails
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=OPENCODE_CLI_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            _log.warning("opencode CLI timed out after %ds (model=%s)", OPENCODE_CLI_TIMEOUT_SECONDS, model)
+            return None
+        except FileNotFoundError:
+            _log.error("opencode binary not found at %s", OPENCODE_BIN)
+            return None
+        if result.returncode == 0:
+            text = (result.stdout or "").strip()
+            if text:
+                return text
+            _log.warning("opencode CLI returned empty output (model=%s)", model)
+            return None
+        last_err = (result.stderr or result.stdout or "")[-300:]
+        _log.warning(
+            "opencode CLI exit %d (attempt %d/2, model=%s): %s",
+            result.returncode, attempt + 1, model, last_err,
+        )
+        time.sleep(3)
+    return None
+
+
 def _call_provider(
     provider_type: str,
     model: str,
@@ -231,6 +293,8 @@ def _call_provider(
     max_tokens: int = 8192,
 ) -> Optional[str]:
     """Dispatch to the appropriate provider caller."""
+    if provider_type == "opencode":
+        return _call_opencode_cli(model, messages)
     caller = _PROVIDER_CALLERS.get(provider_type)
     if caller is None:
         _log.warning("Unsupported provider type: %s (model=%s)", provider_type, model)
@@ -285,14 +349,20 @@ def call_llm(
     api_key = cfg.get("api_key", "") or ""
     endpoint_url = cfg.get("endpoint_url", "") or ""
 
-    # If the primary is an opencode harness (CLI-based), skip to fallbacks.
-    # Direct HTTP callers need a real HTTP provider.
+    # If the primary is an opencode harness (CLI-based), it is now INVOKED
+    # via _call_opencode_cli (see _call_provider) rather than skipped —
+    # skipping made roles with an all-opencode chain permanently unable to
+    # answer ("all models for this role are currently unavailable").
     if provider_type == "opencode":
         _log.info(
             "Primary provider is 'opencode' (CLI harness) for role=%s — "
-            "skipping to fallback chain",
-            role,
+            "invoking CLI (%s)",
+            role, model_id,
         )
+        result = _call_opencode_cli(model_id, messages)
+        if result is not None:
+            return result
+        _log.warning("Primary opencode CLI failed for role=%s", role)
     else:
         _log.info(
             "Calling primary: provider=%s model=%s role=%s",
@@ -320,11 +390,6 @@ def call_llm(
         fb_type = fb.get("provider_type", "")
         fb_model = fb.get("model_identifier", "")
 
-        # Skip opencode-harness fallbacks too
-        if fb_type == "opencode":
-            _log.info("Skipping opencode fallback: %s/%s", fb_type, fb_model)
-            continue
-
         fb_key = fb.get("api_key", "") or api_key
         fb_url = fb.get("endpoint_url", "") or endpoint_url
         fb_harness = fb.get("harness_name", "")
@@ -333,11 +398,15 @@ def call_llm(
             "Trying fallback: provider=%s model=%s harness=%s role=%s",
             fb_type, fb_model, fb_harness, role,
         )
-        result = _call_with_retry(
-            fb_type, fb_model, messages,
-            fb_key, fb_url, temperature, max_tokens,
-            max_retries,
-        )
+        if fb_type == "opencode":
+            # CLI harness fallback — single attempt, no HTTP retry loop.
+            result = _call_opencode_cli(fb_model, messages)
+        else:
+            result = _call_with_retry(
+                fb_type, fb_model, messages,
+                fb_key, fb_url, temperature, max_tokens,
+                max_retries,
+            )
         if result is not None:
             return result
         _log.warning("Fallback %s/%s failed for role=%s", fb_type, fb_model, role)
