@@ -14,7 +14,10 @@ import {
   Filter,
   ShieldCheck,
   Cpu,
-  Radio
+  Radio,
+  Rocket,
+  Gauge,
+  Workflow
 } from 'lucide-react';
 import { System } from '../types';
 import { registryApi } from '../lib/api';
@@ -26,7 +29,10 @@ export type ActiveTab =
   | 'deployments'
   | 'systems'
   | 'frameworks-libraries'
-  | 'lookup-tables';
+  | 'lookup-tables'
+  | 'jenkins'
+  | 'sonarqube'
+  | 'ballerina';
 
 interface SidebarNavProps {
   activeTab: ActiveTab;
@@ -117,6 +123,39 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
           id: 'lookup-tables' as ActiveTab,
           label: 'Lookup Tables',
           icon: ListFilter,
+          badge: null
+        }
+      ]
+    },
+    {
+      title: 'CI/CD PIPELINES',
+      items: [
+        {
+          id: 'jenkins' as ActiveTab,
+          label: 'Jenkins Builds',
+          icon: Rocket,
+          badge: null
+        }
+      ]
+    },
+    {
+      title: 'CODE QUALITY',
+      items: [
+        {
+          id: 'sonarqube' as ActiveTab,
+          label: 'SonarQube Quality',
+          icon: Gauge,
+          badge: null
+        }
+      ]
+    },
+    {
+      title: 'INTEGRATION PLATFORM',
+      items: [
+        {
+          id: 'ballerina' as ActiveTab,
+          label: 'Ballerina Integrations',
+          icon: Workflow,
           badge: null
         }
       ]

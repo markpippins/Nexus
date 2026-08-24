@@ -23,7 +23,13 @@ import {
   MetricPoint,
   PlatformAggregateState,
   Environment,
-  HealthStatus
+  HealthStatus,
+  JenkinsJob,
+  JenkinsBuild,
+  SonarProject,
+  SonarMetricPoint,
+  BallerinaPackage,
+  BallerinaService
 } from '../types';
 
 import {
@@ -34,7 +40,13 @@ import {
   mockFrameworks,
   mockLibraries,
   mockLookups,
-  mockAggregateState
+  mockAggregateState,
+  mockJenkinsJobs,
+  mockJenkinsBuilds,
+  mockSonarProjects,
+  mockSonarMetrics,
+  mockBallerinaPackages,
+  mockBallerinaServices
 } from './mockData';
 
 // Storage keys
@@ -892,5 +904,105 @@ export const registryApi = {
       };
     }
     return fetchJson(`${currentBaseUrl}/metrics/${entityType}/${encodeURIComponent(entityId)}`);
+  },
+
+  // --- JENKINS CI/CD ---
+  getJenkinsJobs: async (params?: {
+    search?: string;
+    status?: string;
+  }): Promise<JenkinsJob[]> => {
+    if (currentMode === 'mock') {
+      let items = [...mockJenkinsJobs];
+      if (params?.search) {
+        const s = params.search.toLowerCase();
+        items = items.filter(j => j.name.toLowerCase().includes(s));
+      }
+      if (params?.status && params.status !== 'all') {
+        items = items.filter(j => j.status === params.status);
+      }
+      return items;
+    }
+    const query = new URLSearchParams();
+    if (params?.search) query.append('search', params.search);
+    if (params?.status) query.append('status', params.status);
+    return fetchJson<JenkinsJob[]>(`${flatBaseUrl()}/jenkins/jobs?${query.toString()}`);
+  },
+
+  getJenkinsBuilds: async (jobId: string): Promise<JenkinsBuild[]> => {
+    if (currentMode === 'mock') {
+      return mockJenkinsBuilds[jobId] || [];
+    }
+    return fetchJson<JenkinsBuild[]>(`${flatBaseUrl()}/jenkins/jobs/${encodeURIComponent(jobId)}/builds`);
+  },
+
+  // --- SONARQUBE CODE QUALITY ---
+  getSonarProjects: async (params?: {
+    search?: string;
+    gate?: string;
+  }): Promise<SonarProject[]> => {
+    if (currentMode === 'mock') {
+      let items = [...mockSonarProjects];
+      if (params?.search) {
+        const s = params.search.toLowerCase();
+        items = items.filter(p => p.name.toLowerCase().includes(s) || p.key.toLowerCase().includes(s));
+      }
+      if (params?.gate && params.gate !== 'all') {
+        items = items.filter(p => p.gate === params.gate);
+      }
+      return items;
+    }
+    const query = new URLSearchParams();
+    if (params?.search) query.append('search', params.search);
+    if (params?.gate) query.append('gate', params.gate);
+    return fetchJson<SonarProject[]>(`${flatBaseUrl()}/sonar/projects?${query.toString()}`);
+  },
+
+  getSonarMetrics: async (projectId: string): Promise<SonarMetricPoint[]> => {
+    if (currentMode === 'mock') {
+      return mockSonarMetrics[projectId] || [];
+    }
+    return fetchJson<SonarMetricPoint[]>(`${flatBaseUrl()}/sonar/projects/${encodeURIComponent(projectId)}/metrics`);
+  },
+
+  // --- BALLERINA INTEGRATION PLATFORM ---
+  getBallerinaPackages: async (params?: {
+    search?: string;
+  }): Promise<BallerinaPackage[]> => {
+    if (currentMode === 'mock') {
+      let items = [...mockBallerinaPackages];
+      if (params?.search) {
+        const s = params.search.toLowerCase();
+        items = items.filter(p =>
+          p.name.toLowerCase().includes(s) ||
+          p.org.toLowerCase().includes(s) ||
+          `${p.org}/${p.name}`.toLowerCase().includes(s)
+        );
+      }
+      return items;
+    }
+    const query = new URLSearchParams();
+    if (params?.search) query.append('search', params.search);
+    return fetchJson<BallerinaPackage[]>(`${flatBaseUrl()}/ballerina/packages?${query.toString()}`);
+  },
+
+  getBallerinaServices: async (params?: {
+    search?: string;
+    status?: string;
+  }): Promise<BallerinaService[]> => {
+    if (currentMode === 'mock') {
+      let items = [...mockBallerinaServices];
+      if (params?.search) {
+        const s = params.search.toLowerCase();
+        items = items.filter(svc => svc.name.toLowerCase().includes(s) || svc.endpoint.toLowerCase().includes(s));
+      }
+      if (params?.status && params.status !== 'all') {
+        items = items.filter(svc => svc.status === params.status);
+      }
+      return items;
+    }
+    const query = new URLSearchParams();
+    if (params?.search) query.append('search', params.search);
+    if (params?.status) query.append('status', params.status);
+    return fetchJson<BallerinaService[]>(`${flatBaseUrl()}/ballerina/services?${query.toString()}`);
   }
 };
