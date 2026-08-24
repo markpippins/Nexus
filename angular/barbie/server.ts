@@ -1348,18 +1348,46 @@ app.get("/api/v1/registry/metrics/:entityType/:entityId", (req, res) => {
 });
 
 // --- VITE MIDDLEWARE & SERVE INTEGRATION ---
+
+// Server-authoritative client config. When a real backend is proxied,
+// the served index.html gets an injected bootstrap script so the UI
+// runs live regardless of stale localStorage on the browser side.
+function injectConfig(html: string): string {
+  if (!BACKEND_URL) return html;
+  const cfg = `<script>window.__BARBIE_CONFIG__=${JSON.stringify({ apiMode: "live" })};</script>`;
+  return html.includes("<head>")
+    ? html.replace("<head>", `<head>\n    ${cfg}`)
+    : cfg + html;
+}
+
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
+    if (BACKEND_URL) {
+      // Dev-with-backend: inject through vite's transform of index.html.
+      app.use((req, res, next) => {
+        if (req.method !== "GET" || req.path.startsWith("/api")) return next();
+        const send = res.send.bind(res);
+        res.send = (body: any) => {
+          if (typeof body === "string" && body.includes("<div id=\"root\">")) {
+            return send(injectConfig(body));
+          }
+          return send(body);
+        };
+        next();
+      });
+    }
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    const indexHtml = injectConfig(require("fs").readFileSync(path.join(distPath, "index.html"), "utf8"));
+    app.use(express.static(distPath, { index: false })); // hashed assets only; / handled below with config injection
     app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      if (req.path.startsWith("/api")) return res.status(404).json({ error: "Not found" });
+      res.type("html").send(indexHtml);
     });
   }
 

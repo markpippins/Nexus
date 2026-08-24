@@ -41,9 +41,19 @@ import {
 const STORAGE_MODE_KEY = 'platform_api_mode';
 const STORAGE_URL_KEY = 'platform_api_base_url';
 
-// Live mode is authoritative by default (matches BACKEND_URL proxy in
-// server.ts). Mock is an explicit dev opt-in via localStorage.
-let currentMode: 'live' | 'mock' = (localStorage.getItem(STORAGE_MODE_KEY) as 'live' | 'mock') || 'live';
+// Server-injected bootstrap config (see injectConfig in server.ts).
+// When present it is AUTHORITATIVE: the express proxy knows a real
+// backend is in front of us, so stale localStorage cannot flip the UI
+// back into mock mode.
+const SERVER_CONFIG = (typeof window !== 'undefined' && (window as any).__BARBIE_CONFIG__) ||
+  (undefined as { apiMode?: 'live' | 'mock' } | undefined);
+
+function storedMode(): 'live' | 'mock' | null {
+  const v = localStorage.getItem(STORAGE_MODE_KEY);
+  return v === 'live' || v === 'mock' ? v : null;
+}
+
+let currentMode: 'live' | 'mock' = SERVER_CONFIG?.apiMode ?? storedMode() ?? 'live';
 let currentBaseUrl: string = localStorage.getItem(STORAGE_URL_KEY) || '/api/v1/registry';
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
@@ -231,6 +241,7 @@ export const registryApi = {
   // Mode & Configuration Controls
   getApiMode: (): 'live' | 'mock' => currentMode,
   setApiMode: (mode: 'live' | 'mock') => {
+    if (SERVER_CONFIG?.apiMode) return; // server-authoritative — ignore toggle
     currentMode = mode;
     localStorage.setItem(STORAGE_MODE_KEY, mode);
   },
