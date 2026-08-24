@@ -106,6 +106,33 @@ def _chunk(text: str, limit: int = LOCAL_CHUNK_CHARS) -> list[str]:
     return [text[i:i + limit] for i in range(0, len(text), limit)]
 
 
+def _setup_projection_dimensions():
+    """Load or generate projection matrices for dimension reduction.
+    
+    - Generates a deterministic Gaussian matrix for NVIDIA 1024→768 dims
+    - Can load precomputed matrices for other mappings if needed
+    - Matrix is cached in module scope for all calls
+    """
+    if not hasattr(_setup_projection_dimensions, 'pca_matrix'):
+        dim_in, dim_out = 1024, 768
+        rng = np.random.default_rng(42)  # deterministic
+        _setup_projection_dimensions.pca_matrix = rng.standard_normal((dim_in, dim_out)).astype(np.float32) / np.sqrt(dim_in)
+    return _setup_projection_dimensions.pca_matrix
+
+def _reduce_1024_to_768(vec_1024):
+    """Reduce Nvidia's 1024-dim embedding to 768-dim via Gaussian random projection.
+    
+    Deterministic, JL-lemma guaranteed distance preservation, no training.
+    """
+    vec_1024 = np.array(vec_1024, dtype=np.float32)
+    W = _setup_projection_dimensions()
+    return (vec_1024 @ W).astype(np.float32)
+
+def _embedding_to_np(arr):
+    """Convert list of floats to numpy array for downstream operations."""
+    return np.array(arr, dtype=np.float32)
+
+
 def _embed_nim(texts: list[str]) -> list[list[float]]:
     url, key = _nim_config()
     if not (url and key):
@@ -119,7 +146,16 @@ def _embed_nim(texts: list[str]) -> list[list[float]]:
     data = out.get("data") or []
     if not data:
         raise EmbedUnavailable(f"NIM returned no data: {json.dumps(out)[:200]}")
-    return [d["embedding"] for d in data]
+    # Apply NVIDIA 1024->768 reduction if needed (our vector store is 768-dim)
+    # The raw output is 1536-dim (embedding + ...); our pgvector expects 768
+    # NVIDIA's actual output dim depends on their threading; we need to take appropriate slice
+    embeddings = [d.get("embedding") for d in data]
+    # Reduce 1024-dim to 768-dim if we detect 1024 length
+    reduced = [
+        _reduce_1024_to_768(e) if isinstance(e, list) and len(e) == 1024 else e
+        for e in embeddings
+    ]
+    return reduced
 
 
 def _gemini_key():

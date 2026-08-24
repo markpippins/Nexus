@@ -23,6 +23,7 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import subprocess
 import sys
 import time
@@ -44,8 +45,12 @@ logging.basicConfig(
 log = logging.getLogger("unified_search")
 
 # ── Config ─────────────────────────────────────────────────────
-OLLAMA_URL = "http://localhost:11434"
-EMBED_MODEL = "nomic-embed-text"
+# Embedding provider is governed by embed_client.py (decision 8ae276bf):
+# NVIDIA NIM -> OpenRouter -> local ollama fallback.  These constants
+# are legacy defaults; the actual embed call uses embed_client.embed_one()
+# which reads its own env-driven provider chain.
+OLLAMA_URL = os.environ.get('EMBED_OLLAMA_URL', 'http://localhost:11434')
+EMBED_MODEL = os.environ.get('EMBED_MODEL', 'nomic-embed-text')
 DOCKER_PSQL = [
     "docker", "exec", "-i", "pgvector_db",
     "psql", "-U", "pguser", "-d", "nexus",
