@@ -16,6 +16,184 @@ const PORT = parseInt(process.env.PORT || '3010', 10);
 // unset (local dev without a backend).
 const BACKEND_URL = process.env.BACKEND_URL || '';
 
+// ── Read-only federation across registries ──────────────────────
+// FEDERATED_BACKEND_URLS is a comma-separated list of additional
+// service-registry instances to merge into READ responses, e.g.:
+//   FEDERATED_BACKEND_URLS=vd@http://192.168.1.209:8085
+// (optional "label@" prefix; defaults to the URL hostname).
+//
+// Semantics:
+//  - GETs on entity lists + aggregate are merged: primary first,
+//    then each federated source. Remote rows get `_source` tags and
+//    namespaced ids (`<label>-<id>`) so they never collide.
+//  - All writes go to the PRIMARY backend (BACKEND_URL) only.
+//  - A federated source being down degrades honestly: it is skipped
+//    and reported in `meta.federation`, never faked.
+
+const FEDERATED = (process.env.FEDERATED_BACKEND_URLS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean)
+  .map((entry) => {
+    const m = entry.match(/^(?:([^@]+)@)?(https?:\/\/.+)$/);
+    if (!m) return null;
+    let label = m[1] || "";
+    if (!label) {
+      try { label = new URL(m[2]).hostname; } catch { return null; }
+    }
+    return { url: m[2].replace(/\/$/, ""), label };
+  })
+  .filter((x): x is { url: string; label: string } => x !== null);
+
+const MERGEABLE_PATH =
+  /^\/api\/v1\/(services|servers|systems|frameworks|libraries|deployments)$/;
+const MERGEABLE_EXTRA = [
+  "/api/v1/registry/aggregate",
+  "/api/v1/registry/services/with-hosted",
+];
+
+function fetchWithTimeout(url: string, ms = 12000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { headers: { "Content-Type": "application/json" }, signal: controller.signal })
+    .finally(() => clearTimeout(timer));
+}
+
+if (FEDERATED.length > 0) {
+  console.log(`[barbie] Federation enabled: ${FEDERATED.map((f) => `${f.label}@${f.url}`).join(", ")} (read-only)`);
+
+  app.use("/api", async (req, res, next) => {
+    const pathOnly = req.originalUrl.split("?")[0];
+    const isAggregate = MERGEABLE_EXTRA.includes(pathOnly);
+    if (req.method !== "GET" || (!MERGEABLE_PATH.test(pathOnly) && !isAggregate)) {
+      return next();
+    }
+
+    // Pull ALL rows from every source in parallel (sources may cap
+    // per_page — e.g. vanadium caps at 20 — so walk pages until the
+    // source's reported total is satisfied).
+    async function fetchSource(base: string) {
+      try {
+        const q = new URLSearchParams(req.query as Record<string, string>);
+        q.set("page", "0");
+        q.set("per_page", "1000");
+        const r = await fetchWithTimeout(`${base}${pathOnly}?${q.toString()}`);
+        if (!r.ok) return { ok: false as const, status: r.status };
+        return { ok: true as const, body: await r.json() };
+      } catch (err: any) {
+        return { ok: false as const, status: 0, error: String(err?.message || err) };
+      }
+    }
+
+    // Multi-page variant for entity-list merges.
+    async function fetchAllRows(base: string) {
+      const q = new URLSearchParams(req.query as Record<string, string>);
+      let perPageCap = 1000;
+      const rows: any[] = [];
+      let total = Infinity;
+      for (let page = 0; page < 50; page++) {
+        q.set("page", String(page));
+        q.set("per_page", String(perPageCap));
+        const r = await fetchWithTimeout(`${base}${pathOnly}?${q.toString()}`);
+        if (!r.ok) return { ok: false as const, status: r.status };
+        const body = await r.json();
+        const arr: any[] = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
+        rows.push(...arr);
+        if (!Array.isArray(body)) {
+          const meta = body?.meta ?? {};
+          if (Number(meta.total) > 0) total = Number(meta.total);
+          if (Number(meta.per_page) > 0) perPageCap = Math.min(perPageCap, Number(meta.per_page));
+        }
+        if (arr.length === 0 || rows.length >= total) break;
+      }
+      return { ok: true as const, rows };
+    }
+
+    const results = await Promise.all([
+      fetchSource(BACKEND_URL),
+      ...FEDERATED.map((f) => fetchSource(f.url)),
+    ]);
+    const sources = [{ url: BACKEND_URL, label: "primary" }, ...FEDERATED];
+
+    const federationMeta = sources.map((s, i) => ({
+      source: s.label,
+      url: s.url,
+      ok: results[i].ok,
+      ...(results[i].ok ? {} : { status: (results[i] as any).status }),
+    }));
+
+    if (!results[0].ok) {
+      // Primary must be healthy — keep live-authoritative posture.
+      return res.status(502).json({ error: "Primary registry backend unreachable", federation: federationMeta });
+    }
+
+    if (isAggregate) {
+      type Agg = Record<string, any>;
+      const aggs: Agg[] = results.filter(r => r.ok).map(r => (r as any).body as Agg);
+      const sum = (k: string) => aggs.reduce((n, a) => n + Number(a?.[k] ?? 0), 0);
+      const merged: Agg = {
+        totalSystems: sum("totalSystems"),
+        totalServices: sum("totalServices"),
+        totalServers: sum("totalServers"),
+        totalDeployments: sum("totalDeployments"),
+        healthyCount: sum("healthyCount"),
+        degradedCount: sum("degradedCount"),
+        criticalCount: sum("criticalCount"),
+        offlineCount: sum("offlineCount"),
+        avgLatencyMs: aggs.some(a => Number(a?.totalServices ?? 0) > 0)
+          ? Math.round(aggs.reduce((n, a) => n + Number(a?.avgLatencyMs ?? 0) * Number(a?.totalServices ?? 0), 0)
+              / Math.max(1, sum("totalServices")))
+          : 0,
+        totalRps: sum("totalRps"),
+        activeIncidentsCount: sum("activeIncidentsCount"),
+        overallHealthPercent: (() => {
+          const total = sum("totalServices") || sum("healthyCount") + sum("degradedCount") + sum("criticalCount") + sum("offlineCount");
+          return total > 0 ? Math.round((sum("healthyCount") / total) * 100) : 0;
+        })(),
+        nodes: aggs.flatMap((a, i) => (Array.isArray(a?.nodes) ? a.nodes : []).map((n: any) => ({ ...n, _source: sources[i].label }))),
+        edges: aggs.flatMap((a, i) => (Array.isArray(a?.edges) ? a.edges : []).map((e: any) => ({ ...e, _source: sources[i].label }))),
+      };
+      return res.json({ ...merged, meta: { federation: federationMeta } });
+    }
+
+    // Plain entity list merge with namespaced remote ids.
+    const searchQ = String(req.query.search ?? "").toLowerCase();
+    const statusQ = String(req.query.status ?? "").toLowerCase();
+    const rowResults = await Promise.all([
+      fetchAllRows(BACKEND_URL),
+      ...FEDERATED.map((f) => fetchAllRows(f.url)),
+    ]);
+    let items: any[] = [];
+    rowResults.forEach((r, i) => {
+      if (!r.ok) return;
+      const tag = sources[i].label;
+      items = items.concat(
+        (r as any).rows.map((row: any) =>
+          i === 0 ? row : { ...row, id: `${tag}-${row.id}`, _source: tag }
+        )
+      );
+    });
+
+    if (searchQ) items = items.filter((x) => JSON.stringify(x?.name ?? "").toLowerCase().includes(searchQ));
+    if (statusQ) items = items.filter((x) => String(x?.status ?? "").toLowerCase() === statusQ);
+
+    const page = Math.max(0, parseInt(String(req.query.page ?? "0"), 10) || 0);
+    const perPage = Math.min(1000, Math.max(1, parseInt(String(req.query.per_page ?? "50"), 10) || 50));
+    const start = page * perPage;
+    return res.json({
+      data: items.slice(start, start + perPage),
+      meta: {
+        page,
+        per_page: perPage,
+        total: items.length,
+        last_page: perPage > 0 ? Math.ceil(items.length / perPage) : 0,
+        federation: federationMeta,
+      },
+    });
+  });
+}
+
+
 if (BACKEND_URL) {
   console.log(`[barbie] Proxy enabled: /api/* → ${BACKEND_URL}`);
 

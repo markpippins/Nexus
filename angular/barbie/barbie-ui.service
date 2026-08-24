@@ -9,6 +9,7 @@ ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/node /home/codex/dev/nexus
 Environment=PORT=3010
 Environment=NODE_ENV=production
 Environment=BACKEND_URL=http://localhost:8085
+Environment=FEDERATED_BACKEND_URLS=vd@http://192.168.1.209:8085
 Restart=on-failure
 RestartSec=5
 
