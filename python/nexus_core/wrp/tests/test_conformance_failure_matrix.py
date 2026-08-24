@@ -146,6 +146,9 @@ def _http_get(url: str):
 def _setup_thread_and_watch(role: str = TEST_WATCH_ROLE, backend: str = "freebuff"):
     """Create a duality-sessions thread + session_watch row.
 
+    Freebuff watches are bound to an existing ACTIVE interactive lease. The
+    failure-matrix tests intentionally use a real authority row rather than
+    relying on the subscriber's removed role-level fallback.
     Returns (thread_id, poster_id).
     """
     forum_id = str(_db_scalar(
@@ -165,11 +168,21 @@ def _setup_thread_and_watch(role: str = TEST_WATCH_ROLE, backend: str = "freebuf
         (thread_id, "wr-conf-018 test", "Conformance test thread.",
          poster_id, forum_id, TEST_POSTER_ROLE, "9999-12-31"),
     )
+    lease_id = None
+    if backend == "freebuff":
+        lease_id = _db_scalar(
+            "SELECT id FROM tackle.role_leases "
+            "WHERE role = %s AND channel = 'interactive' AND status = 'ACTIVE' "
+            "ORDER BY created_at DESC LIMIT 1", (role,)
+        )
+        if not lease_id:
+            _db_exec("DELETE FROM assembly.posts WHERE id = %s::uuid", (thread_id,))
+            pytest.skip(f"no active interactive lease available for {role}")
     _db_exec(
         "INSERT INTO duality.session_watches "
-        "(thread_id, forum_slug, role, execution_backend, max_turns) "
-        "VALUES (%s::uuid, %s, %s, %s, %s)",
-        (thread_id, FORUM_SLUG, role, backend, 20),
+        "(thread_id, forum_slug, role, execution_backend, lease_id, max_turns) "
+        "VALUES (%s::uuid, %s, %s, %s, %s::uuid, %s)",
+        (thread_id, FORUM_SLUG, role, backend, lease_id, 20),
     )
     return thread_id, poster_id
 

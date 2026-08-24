@@ -77,6 +77,7 @@ ASSEMBLY_URL = os.environ.get("ASSEMBLY_URL", "http://localhost:3107")
 
 TEST_ROLE = "architect"
 TEST_POSTER_ROLE = "engineer"
+_CREATED_FIXTURE_LEASES: set[str] = set()
 
 
 # ── DB helpers ──────────────────────────────────────────────────────
@@ -116,6 +117,49 @@ def _db_scalar(query: str, params=None):
 
 # ── Test fixture helpers ────────────────────────────────────────────
 
+def _http_get(url: str):
+    try:
+        with urllib.request.urlopen(url, timeout=15) as resp:
+            return resp.status, json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        try:
+            return exc.code, json.loads(exc.read().decode('utf-8', 'replace'))
+        except Exception:
+            return exc.code, {"error": str(exc)}
+
+
+def _active_interactive_lease(role: str) -> tuple[str, bool] | tuple[None, bool]:
+    """Return an ACTIVE interactive lease for the fixture role.
+
+    The second tuple member records whether this helper created it, so teardown
+    never revokes a lease owned by another test or operator.
+    """
+    status, data = _http_get(
+        f"{os.environ.get('NEBULA_URL', 'http://localhost:3101')}/api/role-leases"
+        f"?role={role}&channel=interactive&status=ACTIVE"
+    )
+    if status == 200:
+        items = data.get("items", [])
+        if items:
+            return str(items[0]["id"]), False
+    req = urllib.request.Request(
+        f"{os.environ.get('NEBULA_URL', 'http://localhost:3101')}/api/role-leases/issue",
+        data=json.dumps({
+            "role": role,
+            "channel": "interactive",
+            "model": "freebuff/deepseek-v4-flash",
+            "budgetUnits": 20,
+            "ttlSeconds": 300,
+        }).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        lease_id = str(json.loads(resp.read())["id"])
+    _CREATED_FIXTURE_LEASES.add(lease_id)
+    return lease_id, True
+
+
 def _setup_thread_and_watch(role: str = TEST_ROLE, backend: str = "freebuff"):
     """Create a duality-sessions thread + session_watch row.
 
@@ -140,11 +184,14 @@ def _setup_thread_and_watch(role: str = TEST_ROLE, backend: str = "freebuff"):
          eng_id, forum_id, TEST_POSTER_ROLE, "9999-12-31"),
     )
 
+    lease_id = None
+    if backend == "freebuff":
+        lease_id, _created = _active_interactive_lease(role)
     _db_exec(
         "INSERT INTO duality.session_watches "
-        "(thread_id, forum_slug, role, execution_backend, max_turns) "
-        "VALUES (%s::uuid, %s, %s, %s, %s)",
-        (thread_id, FORUM_SLUG, role, backend, 20),
+        "(thread_id, forum_slug, role, execution_backend, lease_id, max_turns) "
+        "VALUES (%s::uuid, %s, %s, %s, %s::uuid, %s)",
+        (thread_id, FORUM_SLUG, role, backend, lease_id, 20),
     )
 
     return thread_id, eng_id
@@ -175,17 +222,33 @@ def _post_comment(thread_id: str, role: str, text: str, poster_id: str) -> str:
 
 
 def _teardown(thread_id: str) -> None:
-    """Remove test data: events + turns + watch + comments + thread."""
-    _db_exec("DELETE FROM duality.session_events WHERE thread_id = %s::uuid",
-             (thread_id,))
+    """Remove test data and revoke a fixture-created lease if identifiable."""
+    lease_ids = [str(row[0]) for row in _db_rows(
+        "SELECT lease_id FROM duality.session_watches "
+        "WHERE thread_id = %s::uuid AND lease_id IS NOT NULL", (thread_id,)
+    )]
+    _db_exec("DELETE FROM duality.session_events WHERE thread_id = %s::uuid", (thread_id,))
     _db_exec("DELETE FROM duality.session_turns WHERE thread_id = %s::uuid",
              (thread_id,))
     _db_exec("DELETE FROM duality.session_watches WHERE thread_id = %s::uuid",
              (thread_id,))
     _db_exec("DELETE FROM assembly.comments WHERE post_id = %s::uuid",
              (thread_id,))
-    _db_exec("DELETE FROM assembly.posts WHERE id = %s::uuid",
-             (thread_id,))
+    _db_exec("DELETE FROM assembly.posts WHERE id = %s::uuid", (thread_id,))
+    nebula = os.environ.get("NEBULA_URL", "http://localhost:3101")
+    for lease_id in lease_ids:
+        if lease_id not in _CREATED_FIXTURE_LEASES:
+            continue
+        _CREATED_FIXTURE_LEASES.discard(lease_id)
+        try:
+            req = urllib.request.Request(
+                f"{nebula}/api/role-leases/{lease_id}/revoke",
+                data=b"{}", headers={"Content-Type": "application/json"}, method="POST",
+            )
+            urllib.request.urlopen(req, timeout=15).read()
+        except Exception:
+            pass
+
 
 
 # ── NATS subscriber (background thread) ─────────────────────────────
@@ -266,6 +329,8 @@ class TestAc1EventDelivery(unittest.TestCase):
             self.assertEqual(event.get("thread_id"), thread_id)
             self.assertEqual(event.get("role"), TEST_ROLE)
             self.assertEqual(event.get("comment_role"), TEST_POSTER_ROLE)
+            self.assertIsInstance(event.get("lease_id"), str)
+            self.assertIsInstance(event.get("turn_id"), str)
             self.assertIn("timestamp", event)
         finally:
             _teardown(thread_id)
@@ -313,9 +378,12 @@ class TestAc2PayloadCorrectness(unittest.TestCase):
             self.assertIn("T", event["timestamp"])
             self.assertIn("Z", event["timestamp"])
 
-            # No extra keys
-            allowed_keys = {"event_type", "thread_id", "role",
-                            "comment_role", "timestamp"}
+            self.assertIsInstance(event.get("lease_id"), str)
+            uuid.UUID(event["lease_id"])
+            self.assertIsInstance(event.get("turn_id"), str)
+            uuid.UUID(event["turn_id"])
+            allowed_keys = {"event_type", "thread_id", "role", "comment_role",
+                            "lease_id", "turn_id", "timestamp"}
             self.assertTrue(set(event.keys()).issubset(allowed_keys),
                             f"unexpected keys: {set(event.keys()) - allowed_keys}")
         finally:
@@ -451,7 +519,7 @@ class TestAc0SchemaSmoke(unittest.TestCase):
         cols = {r[0] for r in rows}
         required = {
             "id", "thread_id", "forum_slug", "role", "execution_backend",
-            "max_turns", "turn_count", "status",
+            "lease_id", "max_turns", "turn_count", "status",
         }
         missing = required - cols
         self.assertFalse(missing, f"session_watches missing columns: {missing}")
@@ -519,9 +587,9 @@ class TestAc0SchemaSmoke(unittest.TestCase):
         )
         cols = {r[0] for r in rows}
         required = {
-            "id", "thread_id", "watch_id", "role", "execution_backend",
+            "id", "thread_id", "watch_id", "lease_id", "role", "execution_backend",
             "state", "request_comment_id", "response_comment_id",
-            "subscriber_id", "job_id", "execution_plan_version",
+            "subscriber_id", "job_id", "execution_plan_version", "lease_id",
             "failure_detail", "accepted_at", "running_at", "completed_at",
             "failed_at", "timed_out_at", "cancelled_at",
         }
