@@ -177,7 +177,7 @@ function getGeminiClient(): GoogleGenAI | null {
   });
 }
 
-const TACKLE_MODE = (process.env.VITE_TACKLE_MODE || 'mock').toLowerCase();
+const TACKLE_MODE = (process.env.VITE_TACKLE_MODE || 'live').toLowerCase(); // LAC: live default, mock = explicit opt-in
 
 function createLiveProxy(targetUrl: string) {
   const url = new URL(targetUrl);
@@ -251,13 +251,14 @@ async function startServer() {
     // They are registered BEFORE the catch-all proxy so the UI doesn't break.
     // Endpoints that now exist on tackle-srv (logs, health/*, memory/*) proxy through naturally.
 
-    // Seed defaults — now exists on tackle-srv, proxy it
+    // Seed defaults — now exists on tackle-srv, proxy it. Live failures stay
+    // errors: an unreachable backend must not report fake "seeded" success.
     app.post('/config/ai/seed-defaults', (req: Request, res: Response) => {
       const body = JSON.stringify(req.body || {});
       fetch(`${target}/config/ai/seed-defaults`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body
       }).then(r => r.json().then(data => res.status(r.status).json(data)))
-        .catch(() => res.json({ status: 'seeded', timestamp: new Date().toISOString() }));
+        .catch(() => res.status(502).json({ error: 'Tackle backend unreachable for seed-defaults' }));
     });
 
     // Config resolve for a role — now exists on tackle-srv, proxy it
@@ -279,12 +280,13 @@ async function startServer() {
 
     // Memory refresh & check-since — now proxied to tackle-srv
 
-    // Session kill — now exists on tackle-srv, proxy it
+    // Session kill — now exists on tackle-srv, proxy it. Live failures stay
+    // errors: a failed kill must not report fake success.
     app.post('/sessions/:sessionId/kill', (req: Request, res: Response) => {
       const { sessionId } = req.params;
       fetch(`${target}/sessions/${sessionId}/kill`, { method: 'POST' })
         .then(r => r.json().then(data => res.status(r.status).json(data)))
-        .catch(() => res.json({ killed: true, sessionId, pids: [0], timestamp: new Date().toISOString() }));
+        .catch(() => res.status(502).json({ error: 'Tackle backend unreachable for session kill' }));
     });
 
     // Catch-all proxy for everything else → tackle-srv

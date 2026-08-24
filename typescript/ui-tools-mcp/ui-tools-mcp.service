@@ -17,7 +17,9 @@ Environment=NODE_ENV=production
 Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr/bin:/bin
 
 # ── Executable ─────────────────────────────────────────────────────────
-ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/npx tsx src/index.ts
+# Use the project-local tsx binary directly — `npx` cannot run here because
+# ProtectHome=read-only makes the npm cache (~/.npm) unwritable (EROFS).
+ExecStart=/home/codex/dev/nexus/typescript/ui-tools-mcp/node_modules/.bin/tsx src/index.ts
 ExecReload=/bin/kill -HUP $MAINPID
 
 # ── Restart behavior ───────────────────────────────────────────────────

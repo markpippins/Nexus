@@ -14,7 +14,9 @@ description: |
   static analysis rather than runtime verification.
   Data access: nebula_list_agent_records (filter role:critic)
   Data persistence: nebula_create_agent_record
-  Inbox: nebula_list_agent_records filtered by tags containing "to:critic"
+  Inbox: nebula_get_inbox {"role":"critic"} (or nexus/bin/check-inbox.sh
+  --role critic) — records tagged ["to:critic"] since the stored pointer;
+  REST fallback on :3101 (not :3102 — JSON-RPC only).
 mode: primary
 permission:
   read: allow

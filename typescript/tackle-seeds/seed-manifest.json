@@ -1,5 +1,5 @@
 {
-  "card_count": 41,
+  "card_count": 48,
   "cards": [
     {
       "body_md": "## Agent Config Role Definition\n\nEach agent role .md file (in .opencode/agents/) MUST include a message block in its frontmatter:\n\n```yaml\n---\nassumes_role: <role>\nmessage:\n  inbox_query:\n    - tags contain \"to:<role>\"\n    - tags contain \"status:open\"\n  record_types: [list of valid record types for this role]\n  auto_present: true\n  enrich_context: true\n---\n```\n\n### Fields\n- assumes_role: The role this agent config activates (engineer, architect, planner, etc.)\n- inbox_query: Tag filters for inbox querying\n- record_types: Valid agent record types this role may write\n- auto_present: Whether to surface inbox items on every turn start\n- enrich_context: Whether to load linked system/subsystem/plan data on boot\n\n### Valid record_type values\nreport, analysis, assessment, inspection, prompt, response, engineering_log, architecture_note, decision",
@@ -35,7 +35,7 @@
       ]
     },
     {
-      "body_md": "## Procedure\n\nOn role activation (every session start):\n\n1. **Ensure projection target directories exist:**\n   ```\n   mkdir -p nexus/audit/{PROMPTS,RESPONSES,PLANS/pending,IMPLEMENTATION_PLANS/active,CHANGES/committed,ENGINEERING/reports,...}\n   find nexus/audit -type d -empty -not -path '*/.git/*' -exec touch {}/.gitkeep \\;\n   ```\n   These are on-demand projection targets, not the canonical store.\n\n2. **Base boot \u2014 Assembly forum checks (all channels):**\n   - **Issues forum** (R13): `GET http://localhost:3107/api/forums/issues-and-open-questions/threads` \u2014 surface unresolved issues before proceeding.\n   - **To Do forum** (R16): `GET http://localhost:3107/api/forums/to-do/threads` \u2014 surface open todos (Engineer: undertake UI-only items missing a completion reply).\n   - **Inbox** (R17): use `nebula_list_agent_records` filtered for tags containing `\"to:<your_role>\"` and `\"status:open\"` (or the single-call `nebula_get_inbox`) \u2014 present new messages.\n   - If nebula-mcp is unreachable, surface this as a blocking infrastructure issue \u2014 do not silently proceed without checking the inbox.\n\n3. **Query nebula projection config** to verify current role\u2192folder assignments. Read `nexus/audit/AGENT_FOLDER_MAP.md` as a static reference copy.\n\n4. **Channel-adaptive extended boot (Freebuff only):**\n   If you are running on Freebuff (model prefix `freebuff/*`, role-lease `channel` = `interactive`, or harness `harn-freebuff`), you have a long-lived session with your own context and the token budget for a deeper boot AFTER the base checks:\n   - **Scan the change-log forum** (`GET http://localhost:3107/api/forums/change-log/threads`) for entries since your last session \u2014 learn what has already been completed or reported.\n   - **Check to-do threads for completion replies** (`Completed: ...` comments) so you do not re-report finished work.\n   - **Dedupe your report**: surface only NEW issues or changes since the previous session. Do NOT repeat the same set of issues the previous agent already reported; mention still-open items in one line (\"still open\").\n   \n   On opencode (model prefix `opencode/*`, role-lease `channel` = `opencode`, or one-shot harness runs) you are token-constrained: skip this step and keep the base boot (steps 2\u20133) only. Redundant reporting across opencode sessions is accepted \u2014 the user prefers tokens spent on the task itself.\n\n5. **Present any new items** to the user before proceeding with their request.\n",
+      "body_md": "## Procedure\n\nOn role activation (every session start):\n\n1. **Ensure projection target directories exist:**\n   ```\n   mkdir -p nexus/audit/{PROMPTS,RESPONSES,PLANS/pending,IMPLEMENTATION_PLANS/active,CHANGES/committed,ENGINEERING/reports,...}\n   find nexus/audit -type d -empty -not -path '*/.git/*' -exec touch {}/.gitkeep \\;\n   ```\n   These are on-demand projection targets, not the canonical store.\n\n2. **Base boot \u2014 Assembly forum checks (all channels):**\n   - **Issues forum** (R13): `GET http://localhost:3107/api/forums/issues-and-open-questions/threads` \u2014 surface unresolved issues before proceeding.\n   - **To Do forum** (R16): `GET http://localhost:3107/api/forums/to-do/threads` \u2014 surface open todos (Engineer: undertake UI-only items missing a completion reply).\n   - **Inbox** (R17): use `nebula_list_agent_records` filtered for tags containing `\"to:<your_role>\"` and `\"status:open\"` (or the single-call `nebula_get_inbox`) \u2014 present new messages.\n   - If nebula-mcp is unreachable, surface this as a blocking infrastructure issue \u2014 do not silently proceed without checking the inbox.\n\n3. **Query nebula projection config** to verify current role\u2192folder assignments. Read `nexus/audit/AGENT_FOLDER_MAP.md` as a static reference copy.\n\n4. **Channel-adaptive extended boot (Freebuff only):**\n   If you are running on Freebuff (model prefix `freebuff/*`, role-lease `channel` = `interactive`, or harness `harn-freebuff`), you have a long-lived session with your own context and the token budget for a deeper boot AFTER the base checks:\n   - **Scan the change-log forum** (`GET http://localhost:3107/api/forums/change-log/threads`) for entries since your last session \u2014 learn what has already been completed or reported.\n   - **Check to-do threads for completion replies** (`Completed: ...` comments) or `statusRating >= 4` (Accepted/Rejected/Closed) so you do not re-report finished work. See card `thread-status-ratings`.\n   - **Dedupe your report**: surface only NEW issues or changes since the previous session. Do NOT repeat the same set of issues the previous agent already reported; mention still-open items in one line (\"still open\").\n   \n   On opencode (model prefix `opencode/*`, role-lease `channel` = `opencode`, or one-shot harness runs) you are token-constrained: skip this step and keep the base boot (steps 2\u20133) only. Redundant reporting across opencode sessions is accepted \u2014 the user prefers tokens spent on the task itself.\n\n5. **Present any new items** to the user before proceeding with their request.\n",
       "mcp_tools": [
         "nebula_list_agent_records",
         "nebula_create_agent_record",
@@ -54,7 +54,7 @@
         "reviewer",
         "topologist"
       ],
-      "sha256": "bd6589270775bfdd183ddd3fd4531ca9c60401a470c96d28445c04d97467c305",
+      "sha256": "64a890ab65da7107c39472a158441bfa473e2dbcc465d8c9152a0ac10071b1ac",
       "slug": "bootstrap-self-update",
       "summary": "On activation: base boot (inbox + issues forum + to-do forum); Freebuff adds change-log scan + completion dedupe.",
       "tags": [
@@ -176,6 +176,80 @@
         "turn boundary",
         "perceptual cycle",
         "reconciliation"
+      ]
+    },
+    {
+      "body_md": "## Procedure\nDecision cards are the Assembly analogue of the CLI `ask_user` contract: interactive markdown blocks you emit in a thread (or comment) so the user can answer with a structured click instead of free prose. The Assembly UI renders them; the user's selection is written back as a durable `**Agreed selection:**` reply you can parse deterministically.\n\n### When to emit\nUse a decision card when the question has a **bounded set of choices** and the answer changes what you do next:\n- single decision between options -> radio single-choice\n- pick any subset -> checkbox multi-select\n- approval / sign-off gates, branch decisions, plan acceptance, option A/B/C, \"how should I proceed\"\n\nDo NOT use a card for open-ended questions (ask in prose), or when the answer is obvious (just proceed). If the user replies in prose instead of clicking, treat the prose as the answer - the card is a convenience, never a blocker.\n\n### Syntax to emit\nCheckbox (multi-select) block - one `- [ ]` line per option:\n```\nWhich of these should I include?\n- [ ] option one\n- [ ] option two\n- [ ] option three\n```\n\nRadio (single-choice) block - `- ( )` lines; pre-select with `- (x)` if one is the default:\n```\nHow should we proceed?\n- ( ) Option A\n- ( ) Option B\n- (x) Option C (default)\n```\n\n\"Other\" escape hatch - any option line whose label starts with **Other** (case-insensitive) opens a free-text field when selected; the typed value lands in the reply as `Other: <text>`:\n```\n- ( ) Option A\n- ( ) Other\n```\n\nRules:\n- Keep one decision per card; keep options short.\n- A block is interactive only if EVERY line in it is a choice line - never mix prose into a choice block (use a blank line to separate prose from the list).\n- The `[ ]`/`[x]` and `( )`/`(x)` markers must come right after `- ` or `* ` at the start of the line.\n\n### How to read the reply\nAfter the user submits, the UI posts a reply beginning with `**Agreed selection:**` that mirrors the final visual state of the card:\n- checkbox: `- [x] option` = agreed, `- [ ] option` = not agreed\n- radio: `- (x) option` = the single choice; all others stay `- ( )`\n- Other text: appended to the chosen line as `Other: <text>`\n\nParse the block after the header; treat `[x]`/`(x)` lines as the answer. A radio card yields exactly one `(x)` line. If the reply contains no `[x]`/`(x)` lines, the user submitted no selection - ask again or fall back.\n\n### Fallbacks\n- Card UI unavailable (plain markdown in a non-interactive client): the card renders as ordinary list text - still readable; the user can reply with prose.\n- User replies in prose instead of clicking: treat the prose as the answer.\n- No selection made: re-ask with a tighter card or proceed with the default.",
+      "mcp_tools": [],
+      "roles": [
+        "analyst",
+        "architect",
+        "builder",
+        "critic",
+        "devops",
+        "engineer",
+        "engineer-ii",
+        "inspector",
+        "planner",
+        "reviewer",
+        "tester",
+        "topologist"
+      ],
+      "sha256": "78004cf43324305899fdf87d325b43c37e4d39fd751e505ba9a3c61b17806b07",
+      "slug": "decision-cards",
+      "summary": "When to emit interactive decision cards in Assembly threads (checkbox multi-select, radio single-choice, Other free-text) and how to parse the **Agreed selection:** reply.",
+      "tags": [
+        "decision",
+        "ask-user",
+        "interactive",
+        "assembly",
+        "choice",
+        "agreement"
+      ],
+      "title": "Decision Cards (ask-user vocabulary)",
+      "triggers": [
+        "decision needed",
+        "bounded choice",
+        "approval gate",
+        "branch decision",
+        "ask user",
+        "offer options",
+        "choose one",
+        "select",
+        "how should I proceed"
+      ]
+    },
+    {
+      "body_md": "\n## Purpose\n\nOperational conventions for the Devops role. Load when starting work or\nwhen reporting progress. Complements the persona (tackle.prompts\n`devops/opencode-persona` v3).\n\n## Mission Charter (binding, from user)\n\n1. **Containerization (LEAD):** containerize the legacy `typescript/*-srv`\n   services so they can run **as a group elsewhere** (warm failover standbys\n   on a second machine). Dockerfiles, compose, images, group lifecycle.\n2. **Ansible failover maintenance:** work with the other machine(s) via\n   ansible \u2014 playbooks, inventory, idempotent provisioning, standby health.\n3. **Cutover oversight (GATED):** oversee cutover to `python/peb-kernel` and\n   the adonisjs/moleculer stack. **DO NOT cut over until containerization is\n   tested locally** (group starts, health checks pass, failover works on the\n   local machine first). The local container test is the gate.\n\n## Thread-Reply Convention (MANDATORY)\n\n- Work specified in a forum thread (checklist/dispatch/task) \u2192 reply to\n  **that thread** with progress updates as comments.\n- Per-checklist-item progress (`[x]`), deliverables **by path** (never paste\n  credentials), blockers stated with what you need.\n- Post on item completion; post immediately when blocked or at a handoff\n  point (e.g. draft awaiting ratification).\n- Agent records are supplementary; the forum thread reply is the primary\\n  progress surface.\n- **Advance the parent thread status while replying** (`statusRating` param\n  on the comment POST, or `PUT /api/forums/threads/:id/status`) \u2014 see card\n  `thread-status-ratings`. Completion replies \u2192 4 Accepted; blockers stay at\n  current status; reopening after regression \u2192 6.\n- The issues forum (`issues-and-open-questions`) is for blockers/incidents\n  and open questions \u2014 NOT work updates or ratification requests.\n\n## Escalation Process (R12)\n\n1. Try restart/config fix first.\n2. Record `[\"to:architect\",\"type:escalation\"]` \u2014 problem, tried, state.\n3. If unresolvable and blocking: also POST to Assembly\n   `issues-and-open-questions` with `role` + `model` fields, using the\n   devops Assembly user UUID (assembly-srv :3107).\n4. DB changes route to **DBA** (`[\"to:dba\",\"type:db-change\",...]`); you own\n   migration mechanics, the DBA owns DDL.\n\n## End-of-Turn Inbox Check (MANDATORY, R17)\n\n- Preferred: `nexus/bin/check-inbox.sh --role devops` (or `nebula_get_inbox`\n  MCP `{\"role\":\"devops\",\"limit\":20}`).\n- Fallback: nebula REST :3101 \u2014 GET pointer, query records\n  `role=devops&createdAfter=<pointer_iso>`, PUT pointer after surfacing.\n- Surface items to the user; do NOT silently act on inbox items.\n- If nebula-srv unreachable, surface as blocking infra issue.\n",
+      "mcp_tools": [
+        "nebula_get_inbox",
+        "nebula_create_agent_record",
+        "nebula_list_agent_records"
+      ],
+      "roles": [
+        "devops",
+        "sysadmin"
+      ],
+      "sha256": "6966fb44bef3a04af66812eb3b53a5b952376b9fde27ef93f5c6af414886d505",
+      "slug": "devops-operations-conventions",
+      "summary": "Mission charter + mandatory thread-reply convention, R12 escalation, and R17 inbox check for the devops role.",
+      "tags": [
+        "devops",
+        "operations",
+        "conventions",
+        "thread-reply",
+        "escalation",
+        "inbox"
+      ],
+      "title": "DevOps Operations Conventions (thread-reply, escalation, inbox)",
+      "triggers": [
+        "devops conventions",
+        "thread reply",
+        "escalate",
+        "inbox check",
+        "containerization",
+        "ansible",
+        "cutover"
       ]
     },
     {
@@ -320,7 +394,7 @@
       ]
     },
     {
-      "body_md": "# Investigation resources: knowledge graph, audit DB, cross-refs\n\n## When to use this card\n\nYou are investigating an inventory / baseline question (e.g. T01): what\nentities exist, what audit trail exists, or how is X linked to Y. Answer\nfrom the database-first resources below \u2014 not by scanning filesystem\ndirectories.\n\n## 1. Knowledge graph (knowledge-srv, port 3109)\n\nServes the `knowledge` schema (knowledge.postgres: graph_entities,\ngraph_edges, graph_cross_references, graph_migrations).\n\nREST endpoints (all GET):\n\n- `/knowledge/summary` \u2014 entity/edge/cross-ref counts by section and\n  relation type. Live state: 2539 entities, 31 edges, 13 cross-refs,\n  15 migrations. Sections include work_requests (1897), plans (419),\n  types (41), gaps_and_blockers (41), actors (39), rules (32),\n  architectural_observations (26), decisions (16), topology (13),\n  epistemic_types (8), state_machines (4), boundaries (3).\n- `/knowledge/entities` \u2014 all graph entities\n- `/knowledge/entities/:section/:entity_id` \u2014 single entity\n- `/knowledge/entities/:section/:entity_id/relations` \u2014 outgoing edges\n- `/knowledge/edges` \u2014 all edges\n- `/knowledge/cross-references` \u2014 graph-level cross-references\n- `/knowledge/migrations` \u2014 migration history\n\n## 2. Canonical audit database (nebula agent records)\n\nThe database is the ONLY canonical audit trail (filesystem audit dirs are\nderived projections). Query via nebula-mcp tools:\n\n- `nebula_list_agent_records` \u2014 filters: role, type, tag(s) (AND\n  conjunction), search, createdAfter/createdBefore (ISO 8601), level,\n  visibilityScope, planRef, limit/offset.\n- `nebula_get_agent_record` \u2014 full content of one record.\n- `nebula_create_agent_record` / `nebula_update_agent_record` \u2014 write path.\n\nRecord types: report, analysis, assessment, inspection, prompt, response,\nengineering_log, architecture_note, decision.\nLevels: 1 (raw/operational), 2 (structured), 3 (planning/architectural),\n4 (meta/system reasoning).\nVisibility: builder, architect, planner, reviewer, all.\nTag routing convention: to:, from:, status:, type:, threadRef (lower-kebab).\n\n## 3. Cross-references table (nebula.cross_references)\n\nThe join between plans, agent records, and knowledge entities. History\nlives in nebula.cross_references_history.\n\n- `nebula_list_cross_references` \u2014 filter by sourceType/sourceId,\n  targetType/targetId, relType.\n- `nebula_create_cross_reference` / `nebula_get_cross_reference` /\n  `nebula_delete_cross_reference`.\n\nrel_type taxonomy (valid values):\n\n- wrp:depends_on, wrp:implements, wrp:tracked_by, wrp:impacts_system,\n  wrp:supersedes\n- ag:references_plan, ag:same_thread_as, ag:prompted_by, ag:spawns_plan\n- kv:sourced_from, kv:informs, kv:cross_schema, kv:name_overlap,\n  kv:description_overlap\n\nThe knowledge graph also exposes its own cross-refs via\nknowledge-srv `GET /knowledge/cross-references`\n(graph_cross_references \u2014 currently 13 links).\n\n## Anti-patterns\n\n- Do not read audit/ or IMPLEMENTATION_PLANS/ markdown as operational\n  state; query the DB via nebula-mcp.\n- Do not guess rel_type strings; use the taxonomy above.\n- When a question says \"who/what references X\", start from\n  nebula.cross_references and expand via relations.\n",
+      "body_md": "# Investigation resources: knowledge graph, audit DB, cross-refs\n\n## When to use this card\n\nYou are investigating an inventory / baseline question (e.g. T01): what\nentities exist, what audit trail exists, or how is X linked to Y. Answer\nfrom the database-first resources below \u2014 not by scanning filesystem\ndirectories. Prefer the MCP tool surface over raw REST where available.\n\n## 1. Knowledge graph (knowledge-mcp \u2192 knowledge-srv :3109)\n\n`knowledge-mcp` (stdio MCP server, wired into the global opencode config)\nproxies read-only SQL to knowledge-srv (:3109), which serves the\n`knowledge` schema (graph_entities, graph_edges, graph_cross_references,\ngraph_migrations). Tools (namespaced `knowledge-mcp_*` in opencode):\n\n- `knowledge_graph_summary` \u2014 entity/edge/cross-ref/migration counts.\n  **Live state: 2380 entities, 3907 edges, 0 graph cross-refs, 19\n  migrations.** Sections: work_requests (1932), plans (448), plus types,\n  gaps_and_blockers, actors, rules, architectural_observations, decisions,\n  topology, epistemic_types, state_machines, boundaries. Relation types:\n  implements (1907), derived_from (1907), depends_on (93).\n- `knowledge_list_entities` \u2014 list entities (filters: section, entity_type,\n  status, search, limit/offset).\n- `knowledge_get_entity` \u2014 one entity + full properties JSON.\n- `knowledge_list_edges` \u2014 edges (filters: source/target section+id,\n  relation_type).\n- `knowledge_get_entity_relations` \u2014 inbound + outbound relations for an\n  entity (section + entity_id).\n- `knowledge_list_cross_references` \u2014 graph-level cross-reference maps.\n- `knowledge_list_migrations` \u2014 import/embed migration history.\n- `knowledge_semantic_search` \u2014 **unified cosine search** across four\n  pgvector embed layers: `kg` (curated entities: work_requests, plans,\n  actors), `harvest` (harvest candidates), `observation` (transcripts,\n  session logs, audit docs), `agent` (agent records). Params: query,\n  limit, layers (array), recordTypes (agent-layer filter), minSimilarity.\n  Returns provenance labels (curated / harvested / observed / agent_record)\n  so you can cite which layer a claim came from.\n\nREST equivalents on `http://localhost:3109` (all GET):\n`/knowledge/summary`, `/knowledge/entities`,\n`/knowledge/entities/:section/:entity_id`,\n`/knowledge/entities/:section/:entity_id/relations`, `/knowledge/edges`,\n`/knowledge/cross-references`, `/knowledge/migrations`.\n\n## 2. Canonical audit database (nebula agent records)\n\nThe database is the ONLY canonical audit trail (filesystem audit dirs are\nderived projections). Query via nebula-mcp tools (rover-mcp):\n\n- `nebula_list_agent_records` \u2014 filters: role, type, tag(s) (AND\n  conjunction), search, createdAfter/createdBefore (ISO 8601), level,\n  visibilityScope, planRef, limit/offset.\n- `nebula_get_agent_record` \u2014 full content of one record.\n- `nebula_create_agent_record` / `nebula_update_agent_record` \u2014 write path.\n\nRecord types: report, analysis, assessment, inspection, prompt, response,\nengineering_log, architecture_note, decision.\nLevels: 1 (raw/operational), 2 (structured), 3 (planning/architectural),\n4 (meta/system reasoning).\nVisibility: builder, architect, planner, reviewer, all.\nTag routing convention: to:, from:, status:, type:, threadRef (lower-kebab).\n\n## 3. Cross-references table (nebula.cross_references)\n\nThe join between plans, agent records, and knowledge entities. History\nlives in nebula.cross_references_history.\n\n- `nebula_list_cross_references` \u2014 filter by sourceType/sourceId,\n  targetType/targetId, relType.\n- `nebula_create_cross_reference` / `nebula_get_cross_reference` /\n  `nebula_delete_cross_reference`.\n\nrel_type taxonomy (valid values):\n\n- wrp:depends_on, wrp:implements, wrp:tracked_by, wrp:impacts_system,\n  wrp:supersedes\n- ag:references_plan, ag:same_thread_as, ag:prompted_by, ag:spawns_plan\n- kv:sourced_from, kv:informs, kv:cross_schema, kv:name_overlap,\n  kv:description_overlap\n\nThe knowledge graph also exposes its own cross-refs via\n`knowledge_list_cross_references` (graph_cross_references \u2014 currently 0\nlinks at graph level; use nebula.cross_references for the populated\nplan/record/entity joins).\n\n## 4. Evidence links (nebula evidence_links)\n\nLinks between knowledge-graph entities and harvested evidence:\n\n- `nebula_list_evidence_links` \u2014 filters: knowledgeEntityId, harvestId,\n  candidateId, linkType, provenance, confidence range.\n- `nebula_create_evidence_link` / `nebula_get_evidence_link` /\n  `nebula_delete_evidence_link` / `nebula_delete_evidence_links_by_entity`.\n\nlink_type taxonomy: supports, refines, instantiates, contradicts, supersedes,\nmentions, informs, validates.\nprovenance: auto_ingestor, manual, reconciler, llm_extracted, migration.\n\n## 5. Harvest candidates & open questions (nebula)\n\n- `nebula_list_harvest_candidates` \u2014 candidates with status (pending /\n  promoted / useful / superseded), implementationNotes, completed flag,\n  harvestId, system/subsystem/feature links.\n- `nebula_list_open_questions` / `nebula_list_question_answers` \u2014 open\n  questions (blocking flags, answered_by) and multi-role answers.\n- `nebula_list_harvests` / `nebula_get_harvest` \u2014 harvest pipeline outputs.\n\n## Recommended investigation sequence\n\n1. `knowledge_semantic_search` on the topic (all layers) to find what exists.\n2. `knowledge_graph_summary` to orient, then `knowledge_list_entities` /\n   `knowledge_get_entity` on the relevant section(s).\n3. Expand via `knowledge_list_edges` / `knowledge_get_entity_relations`.\n4. Join to nebula: `nebula_list_cross_references` (plans \u2194 records \u2194\n   entities), `nebula_list_evidence_links` (support/contradiction), then\n   `nebula_list_agent_records` for the underlying records.\n5. Cross-check candidates/open questions if the topic maps to harvest intent.\n\n## Anti-patterns\n\n- Do not read audit/ or IMPLEMENTATION_PLANS/ markdown as operational\n  state; query the DB via nebula-mcp.\n- Do not guess rel_type / link_type strings; use the taxonomies above.\n- When a question says \"who/what references X\", start from\n  nebula.cross_references and expand via relations.\n- Do not claim you \"used the knowledge graph\" when you only listed a\n  server's metadata \u2014 say which KG surfaces you actually queried.\n",
       "mcp_tools": [
         "nebula_list_agent_records",
         "nebula_get_agent_record",
@@ -334,9 +408,10 @@
         "devops",
         "engineer",
         "engineer-ii",
+        "planner",
         "topologist"
       ],
-      "sha256": "054debbbdc10f1fad0ae596d6134aecabf408d33abcd7b6893c7b45645da7365",
+      "sha256": "8a66c8daf08445f7506ed53090b41de52552a0cf924357cd4266fe4f4e1e31d8",
       "slug": "investigation-resources",
       "summary": "Where to look when investigating \"what exists / what changed / how is X linked to Y\": the knowledge graph (knowledge-srv 3109), the canonical audit database (nebula agent records, 3101), and the cross-references table (nebula.cross_references).",
       "tags": [
@@ -371,7 +446,8 @@
         "analyst",
         "architect",
         "inspector",
-        "operator"
+        "operator",
+        "planner"
       ],
       "sha256": "3ab8358ff342cb210cd124967ff45819066e5f9a8e1392dbb0d65ce8c93813c0",
       "slug": "knowledge-graph-pipeline",
@@ -398,6 +474,45 @@
         "migrate_graph",
         "KG import",
         "steward"
+      ]
+    },
+    {
+      "body_md": "# Knowledge-MCP Tool Reference (knowledge graph, read-only)\n\n## When to use this card\n\nAny task that needs to know what exists, how entities relate, what is\nalready known, or what evidence supports a claim. All knowledge-mcp tools\nare READ-ONLY (knowledge-srv :3109); writes go through nebula-mcp instead.\n\n## Server wiring\n\n- `knowledge-mcp` = stdio MCP server (dist/index.js) \u2192 REST proxy of\n  knowledge-srv `http://localhost:3109` (env `KNOWLEDGE_SRV_URL`).\n- Registered in the global opencode config, so tools are namespaced\n  `knowledge-mcp_*` (e.g. `knowledge-mcp_knowledge_semantic_search`).\n- Backend schema: `knowledge.graph_entities`, `knowledge.graph_edges`,\n  `knowledge.graph_cross_references`, `knowledge.graph_migrations`,\n  plus four pgvector embed layers.\n\n## Tool catalog (8)\n\n| Tool | Purpose | Key args |\n|------|---------|----------|\n| `knowledge_list_entities` | List entities, filterable | section, entity_type, status, search, limit (\u2264500), offset |\n| `knowledge_get_entity` | One entity + full properties JSON | section, entity_id |\n| `knowledge_list_edges` | List edges, filterable | source_section/id, target_section/id, relation_type, limit |\n| `knowledge_get_entity_relations` | Inbound + outbound relations | section, entity_id |\n| `knowledge_list_cross_references` | Graph-level cross-ref maps | map_name, source_section, target_id |\n| `knowledge_list_migrations` | Import/embed migration history | limit |\n| `knowledge_graph_summary` | Counts: entities by section, edges by relation type, migrations | \u2014 |\n| `knowledge_semantic_search` | Unified cosine search over 4 embed layers | query, limit, layers, recordTypes, minSimilarity |\n\n## knowledge_semantic_search details\n\n- Layers: `kg` (curated: work_requests, plans, actors),\n  `harvest` (harvest candidates), `observation` (transcripts, session\n  logs, audit docs), `agent` (agent records). Omit `layers` to search all.\n- `recordTypes` (agent layer only): report, engineering_log,\n  architecture_note, prompt, assessment, analysis, response, inspection,\n  decision \u2014 omit `inspection` to suppress noise.\n- `minSimilarity` (0\u20131): similarity floor, e.g. 0.55.\n- Returns merged results with provenance labels (curated / harvested /\n  observed / agent_record) \u2014 cite the layer in your findings.\n- Runs `nexus/bin/unified_semantic_search.py` with the rover venv python;\n  requires Ollama running with `nomic-embed-text` (verified available).\n\n## Typical sequence\n\n1. `knowledge_semantic_search` \u2014 topic-wide recall.\n2. `knowledge_graph_summary` \u2014 orientation (sections, relation types).\n3. `knowledge_list_entities` (filter section) \u2192 `knowledge_get_entity`.\n4. `knowledge_list_edges` / `knowledge_get_entity_relations` \u2014 expand.\n5. `knowledge_list_cross_references` \u2014 graph maps; then\n   `nebula_list_cross_references` for plan/record/entity joins.\n6. Corroborate with `nebula_list_evidence_links` and\n   `nebula_list_agent_records`.\n\n## Anti-patterns\n\n- Do NOT use these tools to write \u2014 they are read-only by design.\n- Do NOT treat `knowledge_list_*` output as canonical audit state; that\n  lives in nebula (agent records, cross_references, evidence_links).\n- Do NOT fabricate provenance \u2014 report which layer returned a result.\n- Knowledge Steward owns writes to knowledge.graph_*; all other roles\n  are read-only (see knowledge-graph-pipeline card for the write path).\n",
+      "mcp_tools": [
+        "knowledge_list_entities",
+        "knowledge_get_entity",
+        "knowledge_list_edges",
+        "knowledge_get_entity_relations",
+        "knowledge_list_cross_references",
+        "knowledge_list_migrations",
+        "knowledge_graph_summary",
+        "knowledge_semantic_search"
+      ],
+      "roles": [
+        "analyst",
+        "planner"
+      ],
+      "sha256": "7a430cdc40b5b3c8de23947af445b701a1ddc7e8d15e7236c6f77306618ec031",
+      "slug": "knowledge-mcp-tools",
+      "summary": "Catalog of the 8 knowledge-mcp tools (entities, edges, cross-refs, semantic search) \u2014 read-only KG access via knowledge-srv :3109.",
+      "tags": [
+        "reference",
+        "knowledge-graph",
+        "kg",
+        "semantic-search",
+        "tools",
+        "appendix"
+      ],
+      "title": "Knowledge-MCP Tool Reference (knowledge graph, read-only)",
+      "triggers": [
+        "knowledge graph",
+        "semantic search",
+        "knowledge-mcp",
+        "kg tools",
+        "cross references",
+        "knowledge_list",
+        "knowledge_semantic_search",
+        "investigate what exists"
       ]
     },
     {
@@ -437,7 +552,7 @@
       ]
     },
     {
-      "body_md": "## MCP Server Configuration\n\n### Conduit-mcp (port 3100)\n- Pipeline orchestration: state machine, receipts, tickets\n- All plan creation/promotion/state queries go through MCP tools\n- Never write .md files directly to nexus/graph/IMPLEMENTATION_PLANS/\n\n### Chat Server (port 3101)\n- Python: nexus/python/conduit/agent_chat.py\n- MCP server proxies /chat routes:\n  - GET /chat/config \u2014 available agent roles\n  - POST /chat/send \u2014 send message to an agent\n  - GET /chat/sessions \u2014 active sessions\n- Supports @planner, @builder, @reviewer, @critic notation\n- Spawns opencode run --agent <role> as background process\n- Streams output via SSE: /chat/stream/<id>\n\n### Health Check\n- GET /health returns server status, PID, pipeline state\n- OrphanScan section: detects soft-deleted plans with stale .md files, and filesystem artifacts with no DB row",
+      "body_md": "## MCP Server Configuration\n\n### Conduit-mcp (port 3100)\n- Pipeline orchestration: state machine, receipts, tickets\n- All plan creation/promotion/state queries go through MCP tools\n- Never write .md files directly to nexus/graph/IMPLEMENTATION_PLANS/\n- `create_plan` is DEPRECATED \u2014 create plans via `nebula_create_plan`\n  (rover-mcp/nebula-mcp); conduit issues receipts + tickets automatically\n- Read-only state: `query_conduit_state` (full pipeline state,\n  `plans.blocked` for jams), `query_nebula_backlog`, `query_nebula_systems`\n- Transport: Streamable HTTP \u2014 JSON-RPC to `POST http://localhost:3100/`\n  (there is NO `POST /tools/call` route on 3100)\n\n### Nebula-mcp / rover-mcp (nebula-srv port 3101)\n- Canonical database-first records and plans\n- `nebula_create_plan` \u2014 create implementation plans (auto plan numbers,\n  DB-canonical; never write .md first)\n- `nebula_list_agent_records`, `nebula_get_agent_record`,\n  `nebula_create_agent_record`, `nebula_update_agent_record`\n- `nebula_list_harvest_candidates`, `nebula_list_open_questions`,\n  `nebula_list_cross_references`, `nebula_list_evidence_links`\n- REST fallback on :3101 (`/api/agent-records`, `/api/harvest-candidates`,\n  `/api/open-questions`)\n\n### Knowledge-mcp (knowledge-srv port 3109)\n- Read-only knowledge graph access (stdio MCP server, global opencode\n  config; namespaced `knowledge-mcp_*` in opencode)\n- Tools: `knowledge_list_entities`, `knowledge_get_entity`,\n  `knowledge_list_edges`, `knowledge_get_entity_relations`,\n  `knowledge_list_cross_references`, `knowledge_list_migrations`,\n  `knowledge_graph_summary`, `knowledge_semantic_search`\n- Semantic search covers 4 embed layers (kg / harvest / observation /\n  agent) via pgvector + Ollama (nomic-embed-text)\n- See `knowledge-mcp-tools` and `investigation-resources` cards for usage\n\n### Chat Server (port 3101)\n- Python: nexus/python/conduit/agent_chat.py\n- MCP server proxies /chat routes:\n  - GET /chat/config \u2014 available agent roles\n  - POST /chat/send \u2014 send message to an agent\n  - GET /chat/sessions \u2014 active sessions\n- Supports @planner, @builder, @reviewer, @critic notation\n- Spawns opencode run --agent <role> as background process\n- Streams output via SSE: /chat/stream/<id>\n\n### Health Check\n- GET /health returns server status, PID, pipeline state\n- OrphanScan section: detects soft-deleted plans with stale .md files, and filesystem artifacts with no DB row\n",
       "mcp_tools": [],
       "roles": [
         "architect",
@@ -448,7 +563,7 @@
         "planner",
         "topologist"
       ],
-      "sha256": "e89b1c0d883553921da533d08c0d3ab32b8ae550f9a79174b1b8f1a124fb8cde",
+      "sha256": "0229637b1848f7deeb0a3a2b48978a7342e86578dd02e37e0278c411dabaefdd",
       "slug": "mcp-server-config",
       "summary": "Conduit-mcp server, chat server, health check, and orphan scan details.",
       "tags": [
@@ -533,6 +648,45 @@
         "activate",
         "boot",
         "nexus"
+      ]
+    },
+    {
+      "body_md": "# Post to Assembly Forums\n\n## When to use this card\n\nThe user asks you to post something to Assembly \u2014 \"post a to-do\", \"create a thread in the forum\", \"add a comment\", \"report this to the issues forum\", \"post a change log entry\", or any request that results in creating content in an Assembly forum.\n\n## Known Identities\n\n### Operator user UUID\n\n```\n6df32fa2-15eb-45a3-88a6-f11b09923a50\n```\n\nAlways use this UUID as `user_id` when posting as the operator.\n\n### Forum slug \u2192 UUID mapping\n\n| Slug                       | UUID                                   | Purpose                              |\n|----------------------------|----------------------------------------|--------------------------------------|\n| to-do                      | 836a1dec-39a7-4c97-8932-472f07fc16f5  | Action items, tasks, work to execute |\n| issues-and-open-questions  | e42e48f3-3fa6-4ecf-8914-90022bae1518  | Bugs, blockers, open questions       |\n| admin-notes                | d391c07f-6791-4dfd-a451-04151a543cce  | Internal admin notes                 |\n| change-log                 | 06bafd38-4b9a-4b3a-bfc3-4d41b31a5eb8  | System change summaries              |\n| decisions                  | 703bc0f9-faf4-4c94-a52d-8f0d4024a89b  | Architecture and design decisions    |\n| transcripts                | 191e799e-f491-49f1-8bc2-a9be0ac29dd6  | Harvested conversation transcripts   |\n| discussions                | 431cdfc9-ea42-46b7-ad2f-3be4e7f4b7d6  | General discussion                   |\n| engineering                | 0b079fef-3f6d-4463-b1a2-dc1b718412c7  | Engineering work items               |\n| planning                   | b5611775-a471-48ca-b111-56e54b9810c3  | Planning discussions                 |\n| doctrine                   | acb756b6-93fb-42c4-aac4-f7c134155f64  | Operating doctrine and governance    |\n| drift-reports              | aa39bfea-4f1d-4ee9-9be8-6c2af5a139d3  | Projection drift reports             |\n| system-operations          | d2d5f367-c3ae-466d-a75e-c9413d1502f3  | Operational status and incidents     |\n\nIf the user specifies a forum not listed above, call `assembly_list_forums` to discover its UUID, or call `assembly_find_forum_by_name` with a search term.\n\n## Procedure\n\n### Creating a new thread\n\n1. Determine the target forum. If the user said \"to-do\", use `forum_id = 836a1dec-39a7-4c97-8932-472f07fc16f5`. If the user said \"issues\", use `forum_id = e42e48f3-3fa6-4ecf-8914-90022bae1518`. Otherwise, look it up from the table above or call `assembly_list_forums`.\n\n2. Call `assembly_create_thread` with these arguments:\n   ```\n   {\n     \"title\": \"<concise title>\",\n     \"body\": \"<markdown body with the full content>\",\n     \"user_id\": \"6df32fa2-15eb-45a3-88a6-f11b09923a50\",\n     \"forum_id\": \"<forum UUID>\",\n     \"role\": \"operator\",\n     \"model\": \"operator-svc\"\n   }\n   ```\n\n3. Report the result to the user \u2014 the thread ID and which forum it was posted to.\n\n### Adding a comment to an existing thread\n\n1. Call `assembly_get_thread` with `{ \"thread_id\": \"<thread UUID>\" }` to confirm the thread exists and see existing comments.\n\n2. Call `assembly_create_comment` with:\n   ```\n   {\n     \"thread_id\": \"<thread UUID>\",\n     \"body\": \"<markdown body>\",\n     \"user_id\": \"6df32fa2-15eb-45a3-88a6-f11b09923a50\",\n     \"role\": \"operator\",\n     \"model\": \"operator-svc\"\n   }\n   ```\n\n   To reply to a specific comment, also pass `\"parent_id\": \"<comment UUID>\"`.\n\n3. Report the result.\n\n### Looking up a thread by title\n\nIf the user says \"reply to the thread about X\" or \"comment on the XYZ thread\", call `assembly_find_thread_by_title` with `{ \"title\": \"<search term>\" }` to find the thread UUID, then use `assembly_get_thread` to read it, then `assembly_create_comment` to reply.\n\n## Anti-patterns\n\n- Do NOT guess forum UUIDs \u2014 always use the known mapping above or look them up.\n- Do NOT guess the operator user UUID \u2014 always use `6df32fa2-15eb-45a3-88a6-f11b09923a50`.\n- Do NOT fabricate thread IDs from memory \u2014 always use the ID returned by the create call.\n- Do NOT post without a title \u2014 every thread requires a title.\n\n## MCP tools used\n\n- `assembly_create_thread` \u2014 create a new thread in a forum\n- `assembly_create_comment` \u2014 add a comment or reply\n- Thread status (parent-post rating 0-7): set via REST \u2014 optional `statusRating`\n  on the comment POST (advance while replying), or `PUT /api/forums/threads/:id/status`\n  body `{\"rating\":N}`. Vocabulary + conventions: card `thread-status-ratings`.\n  (Not yet exposed as an assembly-mcp parameter/tool.)\n- `assembly_get_thread` \u2014 read a thread and its comments\n- `assembly_list_forums` \u2014 list all forums (discovery)\n- `assembly_find_forum_by_name` \u2014 search forums by name\n- `assembly_find_thread_by_title` \u2014 search threads by title\n",
+      "mcp_tools": [
+        "assembly_create_thread",
+        "assembly_create_comment",
+        "assembly_get_thread",
+        "assembly_list_forums",
+        "assembly_find_forum_by_name",
+        "assembly_find_thread_by_title"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "sha256": "8448d7e7dca96d2ab5e48709b4752ce374e84cfd233c15d8ca1e735585bd3325",
+      "slug": "operator-assembly-posting",
+      "summary": "How to create threads and comments in Assembly forums. Use assembly_create_thread for new posts and assembly_create_comment for replies. Known forum slugs and the operator user UUID are listed below.",
+      "tags": [
+        "assembly",
+        "forum",
+        "thread",
+        "posting",
+        "operator",
+        "todo",
+        "to-do"
+      ],
+      "title": "Operator: Post to Assembly Forums",
+      "triggers": [
+        "post a to-do",
+        "create a thread",
+        "post to assembly",
+        "add a comment",
+        "reply to thread",
+        "post in forum",
+        "create todo",
+        "issues forum",
+        "change log",
+        "to-do item"
       ]
     },
     {
@@ -704,6 +858,46 @@
       ]
     },
     {
+      "body_md": "## Parallel Role Loop (PRL) \u2014 cross-role doctrine\n\n### Premise\nMultiple role sessions run concurrently (e.g., Architect in one terminal, Engineer in another, user supervising). **The user is NOT the message bus.** All cross-role communication flows through the corpus: nebula agent records (tag-routed, pointer-tracked) + Assembly forum threads (durable, timestamped, threaded). The inbox check is the attention filter that lets each role work independently.\n\n### The loop (every role, every turn)\n1. **Inbox check FIRST** \u2014 `nebula_get_inbox` / `nexus/bin/check-inbox.sh --role <role>`: new `to:<role>` records since pointer. Surface to the user; never silently process.\n2. **Thread sweep** \u2014 check threads you participate in (track threads, decisions forum, change-log) for new comments since your last turn.\n3. **Act** \u2014 proceed with work until a stopping point.\n4. **Stopping point \u2192 post to the thread** \u2014 every completion, blocker, decision, review, or question gets a forum post: decisions \u2192 decisions forum (R-A records auto-sync); track status \u2192 the track thread; completed work \u2192 change-log (R14).\n5. **Notify via pointer** \u2014 after posting, write a `to:<dependent-role>` agent record (short, carrying thread IDs + record IDs + commit refs) so the other role's next inbox check catches it.\n6. **Advance pointer** after surfacing (R17).\n\n### Autonomy boundary (work until blocker or decision needed)\n- Proceed autonomously until: (a) a decision is needed from another role, (b) a blocker surfaces, (c) a work unit completes.\n- At each boundary: post to the thread, notify via record, then **STOP that track**.\n- **While awaiting a decision or blocker leverage: switch to another project track** \u2014 never idle. The decision arrives via inbox on a later turn.\n\n### Communication rules\n- **Never relay via user chat.** If the user relays a message from another role, treat it as out-of-band: immediately write it into the corpus (thread + record) so the loop self-heals.\n- **Thread = durable conversation surface.** Comments, not just records. A question asked in chat is not asked until it's a thread post + routed record.\n- **Records carry pointers** \u2014 always embed thread IDs, record IDs, commit refs in content so the corpus is self-navigating.\n\n### Role-specific wiring\n- **Engineer**: proceed until blocker/decision; switch projects while awaiting; check inbox after every turn; post to the thread at every stopping point; push cadence follows review gates, never chat acks.\n- **Architect**: check inbox for rulings/requests each turn; rule in the decisions forum (decision records auto-sync to threads); reply in-thread; propagate go-aheads via `to:engineer` records with thread pointers.\n- **All roles**: R13 clock in/out; R17 end-of-turn inbox; R14 change-log after substantive work.\n\n### Why\nWithout this loop, the user becomes the relay between sessions \u2014 exactly the failure this doctrine removes. Every out-of-band message is a corpus gap: the receiving role cannot see it, the pointer cannot track it, and the audit trail is incomplete.\n\n### Enforcement\n- **Engineer**: doctrine embedded in `.opencode/agents/engineer.md` (Parallel Role Loop section) \u2014 binding at session start, not just advisory from the registry.\n- **Architect**: doctrine embedded in `.opencode/agents/architect.md` (Parallel Role Loop section).\n- Registry card stays canonical; frontmatter sections mirror it.\n\n### Future evolution \u2014 Question & Decision Cards (QDC)\nPlanned async mechanism: structured \"question cards\" and \"decision cards\"\nso the user can be involved **in real time** without relaying between\nsessions. When QDC lands:\n- PRL becomes the synchronous baseline loop.\n- QDCs carry the async path (question raised \u2192 card routed \u2192 user\n  decides in real time \u2192 decision card posted \u2192 pointer notified).\n- Cards are corpus artifacts (records + forum threads), so the audit\n  trail stays complete.\n",
+      "mcp_tools": [
+        "nebula_get_inbox",
+        "nebula_create_agent_record",
+        "nebula_set_inbox_pointer"
+      ],
+      "roles": [
+        "analyst",
+        "architect",
+        "builder",
+        "critic",
+        "engineer",
+        "inspector",
+        "planner",
+        "reviewer"
+      ],
+      "sha256": "037bc7dbf232c438da49c78d8682ab74edcdb4a67be6790f3c28260c0e844d5e",
+      "slug": "parallel-role-loop",
+      "summary": "Concurrent role sessions: user is NOT the message bus. Every turn = inbox check \u2192 thread sweep \u2192 act \u2192 post to thread \u2192 notify via to:<role> record \u2192 advance pointer. Work until blocker/decision, then switch tracks while awaiting.",
+      "tags": [
+        "parallel",
+        "cross-role",
+        "turn-protocol",
+        "messaging",
+        "doctrine",
+        "threads",
+        "inbox"
+      ],
+      "title": "Parallel Role Loop (PRL) \u2014 cross-role doctrine",
+      "triggers": [
+        "user relays a message",
+        "out-of-band message",
+        "another role asked",
+        "decision needed",
+        "awaiting decision",
+        "keep threads up to date",
+        "parallel session"
+      ]
+    },
+    {
       "body_md": "## Per-Role Outbox Table\n\n| Role | record_type | Tags | To | When |\n|------|------------|------|----|------|\n| **Planner** | prompt | type:plan | Architect | Plan needs architecture spec |\n| | prompt | type:plan | Engineer | Plan ready to implement |\n| | assessment | type:proposal | All | New work proposal |\n| | report | type:db-change | DBA | Plan needs DB change \u2014 DBA posts to Drafts forum, applies after admin approval, before builder |\n| | prompt | type:question | Analyst | Needs analysis |\n| **Architect** | decision | type:decision | Engineer | Arch decision to implement |\n| | architecture_note | type:spec_ref | Engineer | Reference spec produced |\n| | engineering_log | type:incident | Engineer | Bug/fix needed |\n| | engineering_log | type:task | Engineer | Small task |\n| | assessment | type:review | Planner | Arch review of a plan |\n| | engineering_log | type:question | Planner | Design clarification |\n| **Engineer** | engineering_log | type:task | Self | Personal backlog |\n| | engineering_log | type:question | Architect | Design question |\n| | engineering_log | type:blocker | Planner | Blocked, needs decision |\n| | report | type:implementation | Reviewer | Ready for review |\n| | analysis | type:finding | Architect | Discovered during work |\n| **Builder** | report | type:change | Reviewer | Implementation complete |\n| | engineering_log | type:blocker | Planner | Blocked on build |\n| **Reviewer** | assessment | type:approval | Archive | Approved \\u2014 done |\n| | assessment | type:rejection | Engineer | Needs fixes |\n| | inspection | type:issue | Engineer | Issue found |\n| **Analyst** | analysis | type:gap | Planner | Gap analysis |\n| | analysis | type:triage | Architect | Triaged issue |\n| | analysis | type:recommendation | Engineer | Suggestion |\n| **Critic** | inspection | type:warning | Analyst | Warning, triage first |\n| **Inspector** | inspection | type:error | Analyst | Error, triage |\n| | inspection | type:violation | Planner | Compliance violation |\n| **Archivist** | report | type:history | All | Read-only historical record |",
       "mcp_tools": [],
       "roles": [
@@ -755,6 +949,8 @@
         "inspector",
         "planner",
         "reviewer",
+        "sysadmin",
+        "tester",
         "topologist"
       ],
       "sha256": "1ffb2d1f09b684fb80ab4f87a4c9dbdd42681612c649fc863d0d49ac2f2a718c",
@@ -812,7 +1008,7 @@
       ]
     },
     {
-      "body_md": "## Creating & Managing Plans\n\n### Create a Plan (ready for implementation)\nUse `nebula_create_plan` (nebula-mcp) with title, project, goal, filesAffected, acceptanceCriteria, and dependencies. conduit-mcp create_plan / create_proposed_plan are REMOVED stubs (TOOL_NOT_FOUND) \u2014 do not call them. The plan lands in nebula.implementation_plans (status pending) and conduit-mcp auto-bootstraps a PLAN_CREATE receipt + builder ticket within ~30s.\n\n### Proposed / Planning states\nThere is no create_proposed_plan tool. Start ideas as a full plan via nebula_create_plan; use conduit-mcp_revise_plan to create a revision copy for planning discussion. Use conduit-mcp_update_plan / report_plan_metadata to set filesAffected, acceptanceCriteria, dependencies.\n\n### \u26a0 DB-Change Routing (mandatory rule)\n**Plans that require database changes go to the DBA for the DB work BEFORE a Builder starts implementation.** When creating or updating a plan whose goal, filesAffected, or acceptance criteria involve schema changes, migrations, DDL, seed/data backfills, or index changes:\n1. Write a nebula agent record tagged `[\"to:dba\", \"type:db-change\", \"planRef:<N>\", \"status:open\"]`    describing exactly which database changes are required (tables, columns,    migrations, data). Use recordType report.\n2. Put the DB change as the FIRST acceptance criterion of the plan so the builder    knows the schema must exist before implementation.\n3. The DBA posts the proposed alterations to the Assembly Drafts forum\n    (slug `draft`) and applies them ONLY after admin approval. The Builder must\n    not start implementation until the DBA completes the DB change (approval +\n    application) and the plan is still pending/ready. If a builder ticket is\n    already open for a DB-change plan, escalate via `type:escalation` to keep\n    sequencing.\n\n### Update Metadata\nUse `conduit-mcp_update_plan` or `conduit-mcp_report_plan_metadata` to set filesAffected, acceptanceCriteria, dependencies.\n\n### Revise a Plan\nUse `conduit-mcp_revise_plan` to create a revision copy (issues PLANNING on the new copy).\n\n### Issue Receipts (state transitions)\nUse `conduit-mcp_issue_receipt` with plan_id, type (PLAN_CREATE|IMPLEMENTATION|REVIEW_PASS|REVIEW_REJECT|BLOCK|PLANNING|HOLD|CANCELLED), and agent_role.\n\n### Delete a Plan\nUse `conduit-mcp_delete_plan` for soft-delete (preserves audit trail). Use `conduit-mcp_hard_delete_plan` (with title confirmation) for permanent removal.",
+      "body_md": "## Creating & Managing Plans\n\n### Create a Plan (ready for implementation)\nUse `nebula_create_plan` (nebula-mcp) with title, project, goal, filesAffected, acceptanceCriteria, and dependencies. When you scope or schedule work from an Assembly to-do thread, advance its parent-post status: 1 Specified once scope is pinned, 2 Planned when picked up/scheduled (see card `thread-status-ratings`). conduit-mcp create_plan / create_proposed_plan are REMOVED stubs (TOOL_NOT_FOUND) \u2014 do not call them. The plan lands in nebula.implementation_plans (status pending) and conduit-mcp auto-bootstraps a PLAN_CREATE receipt + builder ticket within ~30s.\n\n### Proposed / Planning states\nThere is no create_proposed_plan tool. Start ideas as a full plan via nebula_create_plan; use conduit-mcp_revise_plan to create a revision copy for planning discussion. Use conduit-mcp_update_plan / report_plan_metadata to set filesAffected, acceptanceCriteria, dependencies.\n\n### \u26a0 DB-Change Routing (mandatory rule)\n**Plans that require database changes go to the DBA for the DB work BEFORE a Builder starts implementation.** When creating or updating a plan whose goal, filesAffected, or acceptance criteria involve schema changes, migrations, DDL, seed/data backfills, or index changes:\n1. Write a nebula agent record tagged `[\"to:dba\", \"type:db-change\", \"planRef:<N>\", \"status:open\"]`    describing exactly which database changes are required (tables, columns,    migrations, data). Use recordType report.\n2. Put the DB change as the FIRST acceptance criterion of the plan so the builder    knows the schema must exist before implementation.\n3. The DBA posts the proposed alterations to the Assembly Drafts forum\n    (slug `draft`) and applies them ONLY after admin approval. The Builder must\n    not start implementation until the DBA completes the DB change (approval +\n    application) and the plan is still pending/ready. If a builder ticket is\n    already open for a DB-change plan, escalate via `type:escalation` to keep\n    sequencing.\n\n### Update Metadata\nUse `conduit-mcp_update_plan` or `conduit-mcp_report_plan_metadata` to set filesAffected, acceptanceCriteria, dependencies.\n\n### Revise a Plan\nUse `conduit-mcp_revise_plan` to create a revision copy (issues PLANNING on the new copy).\n\n### Issue Receipts (state transitions)\nUse `conduit-mcp_issue_receipt` with plan_id, type (PLAN_CREATE|IMPLEMENTATION|REVIEW_PASS|REVIEW_REJECT|BLOCK|PLANNING|HOLD|CANCELLED), and agent_role.\n\n### Delete a Plan\nUse `conduit-mcp_delete_plan` for soft-delete (preserves audit trail). Use `conduit-mcp_hard_delete_plan` (with title confirmation) for permanent removal.",
       "mcp_tools": [
         "nebula_create_plan",
         "conduit-mcp_update_plan",
@@ -828,7 +1024,7 @@
         "planner",
         "topologist"
       ],
-      "sha256": "1afb347189b8030cb301987dba650221f35a746dbce5ccb51ba3b16a01ba7359",
+      "sha256": "76a0beab5e57e10afd856663a1169eb426b781eaf1719106636c3c9b1f6a5889",
       "slug": "planner-create-plan",
       "summary": "How to create, update, and promote implementation plans (via nebula_create_plan), and route DB-change plans to the Engineer before a Builder starts.",
       "tags": [
@@ -1004,6 +1200,35 @@
         "after completing",
         "propose",
         "follow-up"
+      ]
+    },
+    {
+      "body_md": "## Procedure\nAdding a new role to the system is deterministic: edit the canonical expectations file, emit the artifacts, and verify with the end-to-end check. No undocumented parallel hand-edits.\n\n### 1. Canonical edit\nAdd the role to `nexus/config/roles/roles.json` under `roles` \u2014 the key must match the name inserted into `tackle.roles`. Inherit `roleDefaults` unless the role is special (test/alias roles override surfaces to false).\n\n### 2. Emit artifacts\nFor a full agent role, create/update:\n- **tackle.roles row** \u2014 via the seed arrays (`tackle-mcp/src/db.ts` DEFAULT_ROLES, `conduit-mcp/src/db.ts` migration defaultRoles) or a migration; the live DB is canonical.\n- **Persona prompt** \u2014 `tackle.prompts` row (role, slug `opencode-persona`, version 1) in `schemas/migrations/tackle/` (pattern: `sysadmin_persona_v1.sql`); apply to the live DB.\n- **Harness agent file** \u2014 `config/harnesses/opencode/agents/<role>.md` (frontmatter: assumes_role, permissions; pattern: `sysadmin.md`).\n- **Procedure cards** \u2014 add the role to the role lists of the relevant `tackle.memory` cards (tackle.role_memory assignments); then regenerate the seed: `python3 bin/regenerate_memory_seed.py --verify`.\n- **Assembly alias** \u2014 `assembly.users` row with alias = role name (pattern: builder seed in `assembly-migration.sql`).\n- **nebula role CHECK** \u2014 new `typescript/nebula-srv/migrations/0NN-allow-<role>.sql` mirroring `052-allow-sysadmin-dba-role.sql`; apply + replicate to Strontium.\n- **Governance** \u2014 add to `harness-srv/src/governance.ts` KNOWN_EXECUTORS only if the role issues receipts.\n\n### 3. Verify\nRun `python3 bin/verify-roles.py` \u2014 it checks every expected surface for every registered role (persona, procedure cards, assembly alias, harness file, nebula CHECK, governance). Exit 0 = all covered. Fix FAILs before closing.\n\n### 4. Close\nPost the walkthrough evidence on the role-creation thread and record an engineering log. Surface the new role to the architect for allowlist ratification if the case/naming deviates from convention.",
+      "mcp_tools": [],
+      "roles": [
+        "architect",
+        "devops",
+        "engineer",
+        "engineer-ii"
+      ],
+      "sha256": "edd50e9ef86df0d1895438fe9fd78d0de0b03d14de1c114eb0a18e4ef0ae281f",
+      "slug": "role-creation",
+      "summary": "One source-of-truth edit (config/roles/roles.json) plus generated artifacts registers a role across every surface; bin/verify-roles.py proves end-to-end coverage.",
+      "tags": [
+        "role",
+        "runbook",
+        "bootstrap",
+        "onboarding",
+        "deterministic"
+      ],
+      "title": "Role Creation (deterministic runbook)",
+      "triggers": [
+        "add a role",
+        "new role",
+        "create role",
+        "role creation",
+        "register role",
+        "onboard role"
       ]
     },
     {
@@ -1240,6 +1465,23 @@
       ]
     },
     {
+      "body_md": "## Procedure\n\nEvery forum thread carries a status stored in `assembly.posts.rating` on the ROOT post (thread id == root post id). NULL = 0 = Posted. Advance it as work progresses so the UI status bar reflects reality.\n\n## Vocabulary\n| rating | label | meaning |\n|---|---|---|\n| 0 | Posted | default; no role has picked it up |\n| 1 | Specified | requirements/scope pinned down |\n| 2 | Planned | scheduled or picked up by a role |\n| 3 | Implemented | work done, awaiting acceptance |\n| 4 | Accepted | completed and accepted (e.g. `Completed: ...` reply ratified) |\n| 5 | Rejected | false alarm / rejected outcome |\n| 6 | Reopened | regression after fix; needs another pass |\n| 7 | Closed | archival / no-action wind-down |\n\n## Wire contract\n- READ: thread list + detail return `statusRating`.\n- SET: `PUT /api/forums/threads/:threadId/status` body `{\"rating\":0..7}`.\n- SET in-gesture: `POST /api/forums/threads/:threadId/comments` accepts optional `statusRating` \u2014 advance the parent while replying in one call.\n- NOTE: assembly-mcp does not yet expose a status tool/param \u2014 REST only until the MCP surface lands.\n\n## Per-role conventions (ratified 2026-08-22)\n- engineer/engineer-ii finishing to-do work \u2192 reply `Completed: ...` with `statusRating:4`.\n- sysadmin incidents (issues-and-open-questions): resolution\u21924, false alarm/test\u21925, regression after fix\u21926, new incident stays 0.\n- planner/architect scoping a to-do thread \u2192 1 Specified when scope is pinned, 2 Planned when scheduled/picked up.\n- reviewer rejection \u2192 5; critic reopen \u2192 6.\n- 7 Closed reserved for archival/no-action-needed wind-downs.\n\nRule of thumb: every substantive thread reply SHOULD advance the parent status in the same call.",
+      "mcp_tools": [],
+      "roles": [],
+      "sha256": "b272e73a8adb8270a01b5a4d013016e7aa9f09d7c6451befb7346653b20ebb9c",
+      "slug": "thread-status-ratings",
+      "summary": "Canonical 0-7 rating vocabulary for Assembly parent posts (assembly.posts.rating), wire contract to set it, and per-role advancement conventions.",
+      "tags": [
+        "reference",
+        "assembly",
+        "thread-status",
+        "messaging",
+        "ratings"
+      ],
+      "title": "Thread Status Ratings (Assembly parent posts)",
+      "triggers": []
+    },
+    {
       "body_md": "## Procedure\n\nConversations between roles use `threadRef` (a shared UUID across messages).\n\n1. **First message**: Author writes a record with a new `threadRef` UUID and tags `[\"to:recipient\", \"status:open\", \"type:kinds\"]`.\n\n2. **Response**: Recipient writes a record with the same `threadRef`, tags `[\"to:author\", \"status:in_progress\", \"type:kinds\"]`.\n\n3. **Continuation**: Any role writes to the same thread with updated `status` and appropriate `to:` tag.\n\n4. **Querying threads**: Filter for `threadRef = \"<uuid>\"` and order by `created_at`.\n\n5. **Resolving threads**: Update all messages in the thread to `status:resolved`.\n\n## Common Thread Lifecycle\n\n1. Open \u2192 Claimed \u2192 In Progress \u2192 Resolved\n2. Open \u2192 Resolved (simple acknowledgment)\n3. Open \u2192 Escalated \u2192 (owning role decision) \u2192 Resolved",
       "mcp_tools": [
         "nebula_list_agent_records",
@@ -1379,6 +1621,6 @@
       ]
     }
   ],
-  "role_count": 332,
+  "role_count": 365,
   "schema": "tackle"
 }

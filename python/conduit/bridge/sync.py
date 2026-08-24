@@ -18,9 +18,10 @@ Caveat (BP):
     In kernel terms, it's one entry in a KernelDelta.receipts list.
     The batching unit (one poll cycle = one KernelDelta) must be stable.
 
-Table locations (discovered empirically):
-    vision.receipts      — receipt events (source of truth)
-    nebula.plans         — plan metadata (enrichment: deps, files_affected)
+Table locations:
+    nebula.receipts_unified — receipt events (canonical read surface: conduit-lineage
+                              execution.receipts UNION frozen vision.receipts; V110/V111)
+    nebula.plans            — plan metadata (enrichment: deps, files_affected)
 
 Cursor column:
     recorded_on_dt (TIMESTAMPTZ) — primary ordering key
@@ -62,10 +63,10 @@ MAX_RECEIPTS_PER_BATCH = 500
 
 # ── PG query helpers ──────────────────────────────────────────────────
 
-RECEIPT_SCHEMA = "vision"
+RECEIPT_TABLE = "nebula.receipts_unified"
 PLAN_SCHEMA = "nebula"
 
-# Columns we read from vision.receipts — must stay stable
+# Columns we read from nebula.receipts_unified — must stay canonical
 _RECEIPT_COLS = """
     id, plan_id, type, agent_role, session_id,
     summary, metadata_json, ticket_id, tokens_used,
@@ -98,7 +99,7 @@ def _get_receipts_since(
             cur.execute(
                 f"""
                 SELECT {_RECEIPT_COLS}
-                FROM {RECEIPT_SCHEMA}.receipts
+                FROM {RECEIPT_TABLE}
                 WHERE (recorded_on_dt, id) > (%s, %s)
                 ORDER BY recorded_on_dt ASC, id ASC
                 LIMIT %s
@@ -110,7 +111,7 @@ def _get_receipts_since(
             cur.execute(
                 f"""
                 SELECT {_RECEIPT_COLS}
-                FROM {RECEIPT_SCHEMA}.receipts
+                FROM {RECEIPT_TABLE}
                 ORDER BY recorded_on_dt ASC, id ASC
                 LIMIT %s
                 """,
@@ -225,7 +226,7 @@ def _conduit_receipt_to_kernel_receipt(
         plan.files_affected          → kernel_receipt["files_affected"]
 
     Args:
-        conduit_receipt: Row dict from vision.receipts.
+        conduit_receipt: Row dict from nebula.receipts_unified.
         plan_enrichment: Plan data dict (dependencies/files_affected)
                          or None if plan not found.
 
@@ -281,7 +282,7 @@ class Syncer:
 
     Orchestrates one poll cycle:
         1. Load checkpoint from disk
-        2. Query new receipts from vision.receipts
+        2. Query new receipts from nebula.receipts_unified
         3. Enrich with plan data from nebula.plans
         4. Map each receipt to kernel format
         5. Build KernelDelta payload
@@ -343,7 +344,7 @@ class Syncer:
         _log.debug("sync_once: checkpoint id=%s dt=%s",
                    self.checkpoint.last_id, self.checkpoint.last_recorded_on_dt)
 
-        # Step 2: Query new receipts from vision.receipts
+        # Step 2: Query new receipts from nebula.receipts_unified
         conn = self._get_pg()
         receipts = _get_receipts_since(
             conn,

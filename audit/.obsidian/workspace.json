@@ -37,7 +37,9 @@
               "type": "file-explorer",
               "state": {
                 "sortOrder": "alphabetical",
-                "autoReveal": false
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
               },
               "icon": "lucide-folder-closed",
               "title": "Files"
@@ -70,8 +72,7 @@
               "title": "Bookmarks"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "horizontal",
@@ -180,7 +181,7 @@
       "bases:Create new base": false
     }
   },
-  "active": "692bff87fcd16c8d",
+  "active": "8df62fd4054cbe09",
   "lastOpenFiles": [
     "IMPLEMENTATION_PLANS/active",
     "ARCHITECTURE/reports/bbec63b5-b5c8-49d0-a841-dadfc14cf723.md",

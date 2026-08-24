@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
 """
-candidate_promote.py — Candidate → IntentRecord Promotion Gate
+candidate_promote.py — Candidate Promotion Gate
 
 Takes ready harvest candidates (CPF >= threshold) and promotes them into
-the pipeline by:
+the pipeline by marking them as 'promoted'. The candidate then awaits
+downstream processing (requirement creation, agenda matching, etc.).
 
-  1. Creating an intent_record (lightweight pre-canonical intent capture)
-     linked back to the harvest candidate
-  2. Marking the candidate status = 'promoted'
+V115 removed nebula.intent_records. Promotion no longer creates an
+intermediate intent_record — candidates are linked directly to the
+pipeline via their existing harvest_candidate rows.
 
-This replaces the old flow that incorrectly created conduit implementation
-plans from raw intents. IntentRecords live in the cognitive/pre-canonical
-layer — they can later be decomposed into requirements, specs, and
-implementation plans.
-
-Traceability: harvest → candidate → intent_record → requirements → ...
+Traceability: harvest → candidate (promoted) → requirements → ...
 
 Usage:
     source /home/codex/dev/nexus/python/rover/.venv/bin/activate
@@ -38,18 +34,12 @@ import logging
 import os
 import subprocess
 import sys
-import uuid as uuidlib
 from datetime import datetime, timezone
 
 # Ensure parent dir (python/) is on path so rover.* and tackle.* are importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from rover import agenda_matcher
-from rover.event_emitter import (
-    emit_candidate_promoted,
-    emit_intent_record_created,
-    emit_agenda_item_added,
-)
+from rover.event_emitter import emit_candidate_promoted
 
 log = logging.getLogger("candidate_promote")
 
@@ -155,8 +145,8 @@ def fetch_candidate(candidate_id: str) -> dict | None:
 
 
 def check_candidate_dedup(title: str, threshold: float = 0.6) -> dict | None:
-    """Check if a candidate title duplicates an existing intent_record or
-    implementation_plan (trigram similarity).
+    """Check if a candidate title duplicates an existing implementation_plan
+    (trigram similarity).
 
     Returns a dict with match info if duplicate, None if clean.
     Uses psql() (docker exec) consistent with the rest of this script.
@@ -166,25 +156,7 @@ def check_candidate_dedup(title: str, threshold: float = 0.6) -> dict | None:
 
     escaped = title.replace("'", "''")
 
-    # Check intent_records first (most likely duplicate source)
-    sql = f"""
-        SELECT id, title, similarity(title, '{escaped}') AS score
-        FROM nebula.intent_records
-        WHERE similarity(title, '{escaped}') > {threshold}
-        ORDER BY score DESC LIMIT 1;
-    """
-    rc, out, _ = psql(sql)
-    if rc == 0 and out:
-        parts = out.split("|")
-        if len(parts) >= 3:
-            return {
-                "source": "intent_record",
-                "id": parts[0].strip(),
-                "title": parts[1].strip(),
-                "score": float(parts[2].strip()),
-            }
-
-    # Check implementation_plans
+    # Check implementation_plans (V115 removed intent_records)
     sql = f"""
         SELECT plan_number, title, similarity(title, '{escaped}') AS score
         FROM nebula.implementation_plans
@@ -205,69 +177,16 @@ def check_candidate_dedup(title: str, threshold: float = 0.6) -> dict | None:
     return None
 
 
-def create_intent_record(candidate: dict) -> str | None:
-    """Create an intent_record linked to this candidate.
+def promote_candidate(candidate: dict, dry_run: bool = False) -> dict:
+    """Promote a single candidate: mark as promoted in the database.
 
-    IntentRecords sit at the cognitive/pre-canonical layer. They are
-    lightweight, mutable, and capture raw intent. They can later be
-    decomposed into requirements.
-
-    Returns the intent_record UUID or None on failure.
+    V115 removed intent_records. Promotion now just marks the candidate
+    status = 'promoted'. Downstream processing (requirement creation,
+    agenda matching) happens separately.
     """
-    record_id = str(uuidlib.uuid4())
-    title = candidate["title"].replace("'", "''")
-    description = (candidate.get("intent_description") or "").replace("'", "''")
-    cid = candidate["id"]
-
-    # Build tags from candidate tags + source marker
-    # PostgreSQL text[] requires array literal syntax {a,b}, not JSON [a,b]
-    tags = candidate.get("tags") or []
-    all_tags = list(tags) + ["promoted-from-candidate"]
-    tags_pg = "{" + ",".join(all_tags) + "}"
-
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-
-    sql = f"""
-        INSERT INTO nebula.intent_records
-            (id, candidate_id, title, description,
-             source_type, source_ref, tags, status, metadata,
-             created_at, updated_at)
-        VALUES
-            ('{record_id}'::uuid, '{cid}'::uuid,
-             '{title}', '{description}',
-             'candidate', '{cid}',
-             '{tags_pg}'::text[],
-             'draft',
-             '{{"cpf": {candidate.get("compilation_readiness", 0.0)}}}'::jsonb,
-             '{now}', '{now}')
-        RETURNING id;
-    """
-    rc, out, err = psql(sql)
-    if rc != 0 or not out:
-        details = err[:200] if err else out[:200]
-        log.error("  Failed to create intent_record: %s", details)
-        return None
-
-    ir_id = out.strip()
-    log.info("  → IntentRecord created: %s (from candidate %s)", ir_id[:8], cid[:8])
-
-    # Cascade event: intent_record.created (caused by candidate.promoted)
-    emit_intent_record_created(
-        intent_id=ir_id,
-        source_candidate_id=cid,
-        cpf=candidate.get("compilation_readiness"),
-        source="rover.candidate_promote",
-    )
-
-    return ir_id
-
-
-def promote_candidate(candidate: dict, dry_run: bool = False, skip_agenda: bool = False) -> dict:
-    """Promote a single candidate: create intent_record → mark promoted."""
     result = {
         "candidate_id": candidate["id"],
         "title": candidate["title"],
-        "intent_record_id": None,
         "success": False,
         "error": None,
     }
@@ -275,74 +194,36 @@ def promote_candidate(candidate: dict, dry_run: bool = False, skip_agenda: bool 
     # Validate eligibility
     if not candidate.get("intent_description"):
         result["error"] = "No intent_description"
-        log.warn("  Skipping: no intent_description")
+        log.warning("  Skipping: no intent_description")
         return result
 
     cpf = candidate.get("compilation_readiness")
     if cpf is None or cpf < 0.0:
         result["error"] = f"Low CPF: {cpf}"
-        log.warn("  Skipping: CPF not computed")
+        log.warning("  Skipping: CPF not computed")
         return result
 
-    # Deduplication gate: check against intent_records and implementation_plans
+    # Deduplication gate: check against implementation_plans
     dedup_match = check_candidate_dedup(candidate["title"], threshold=0.6)
     if dedup_match:
         result["error"] = f"Duplicate of {dedup_match['source']}:{dedup_match['id']} (score={dedup_match['score']:.2f})"
         result["duplicate_of"] = dedup_match
-        log.info("  ✗ Skipped (dedup): matches %s '%s' (score=%.2f)",
+        log.info("  Skipped (dedup): matches %s '%s' (score=%.2f)",
                  dedup_match["source"], dedup_match["title"][:50], dedup_match["score"])
         return result
 
-    log.info("─" * 60)
+    log.info("-" * 60)
     log.info("Promoting: %s", candidate["title"])
     log.info("  CPF=%.3f | System=%s | Tags=%s",
              cpf, candidate.get("system_name", "?"),
              ", ".join((candidate.get("tags") or [])[:3]))
 
     if dry_run:
-        log.info("  [DRY RUN] Would create intent_record")
+        log.info("  [DRY RUN] Would mark candidate as promoted")
         result["success"] = True
         return result
 
-    # Step 1: Create intent_record (replaces old requirement + conduit plan creation)
-    ir_id = create_intent_record(candidate)
-    if not ir_id:
-        result["error"] = "IntentRecord creation failed"
-        return result
-    result["intent_record_id"] = ir_id
-
-    # Step 2.5: Match to agenda (if not skipped)
-    # Uses embedding-based semantic matching. Does NOT auto-create agendas
-    # from scans — items with no matching agenda are simply skipped.
-    if not skip_agenda:
-        match = agenda_matcher.match_intent_to_agenda(
-            ir_id, threshold=0.60, allow_new=False,
-        )
-        if match.skip:
-            log.info("  No matching agenda (best=%.3f) — skipping agenda assignment",
-                     match.score)
-            result["agenda_id"] = None
-            result["agenda_item_id"] = None
-        elif match.agenda_id:
-            log.info("  Adding to existing agenda %s...", match.agenda_id[:8])
-            iid = agenda_matcher.add_item_to_agenda(match.agenda_id, ir_id)
-            result["agenda_id"] = match.agenda_id
-            result["agenda_item_id"] = iid
-
-            # Cascade event: agenda.item_added
-            emit_agenda_item_added(
-                agenda_id=match.agenda_id,
-                item_id=iid or "",
-                source_type="intent_record",
-                source_id=ir_id,
-                source="rover.candidate_promote",
-            )
-    else:
-        log.info("  Agenda matching skipped (--skip-agenda)")
-        result["agenda_id"] = None
-        result["agenda_item_id"] = None
-
-    # Step 2: Mark candidate as promoted
+    # Mark candidate as promoted
     sql = f"""
         UPDATE nebula.harvest_candidates
         SET status = 'promoted',
@@ -352,12 +233,12 @@ def promote_candidate(candidate: dict, dry_run: bool = False, skip_agenda: bool 
     """
     rc, out, err = psql(sql)
     if rc == 0:
-        log.info("  → Candidate status → promoted")
+        log.info("  Candidate status -> promoted")
 
         # Cascade event: candidate.promoted
         emit_candidate_promoted(
             candidate_id=candidate["id"],
-            intent_record_id=ir_id,
+            intent_record_id=None,
             from_state=candidate.get("status", "unknown"),
             cpf=candidate.get("compilation_readiness"),
             source="rover.candidate_promote",
@@ -367,12 +248,12 @@ def promote_candidate(candidate: dict, dry_run: bool = False, skip_agenda: bool 
         log.warning("  Could not update candidate status: %s", details)
 
     result["success"] = True
-    log.info("  ✓ Promoted: intent_record=%s", ir_id[:8])
+    log.info("  Promoted: %s", candidate["id"][:8])
     return result
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Promote candidates to IntentRecords")
+    parser = argparse.ArgumentParser(description="Promote candidates")
     parser.add_argument("--candidate", type=str, default=None,
                         help="Single candidate UUID to promote")
     parser.add_argument("--candidates", type=str, nargs="+", default=None,
@@ -383,14 +264,12 @@ def main():
                         help="CPF threshold for --ready (default: 0.7)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be promoted without making changes")
-    parser.add_argument("--skip-agenda", action="store_true",
-                        help="Skip agenda matching step")
     parser.add_argument("--limit", type=int, default=10,
                         help="Max candidates to promote (default: 10)")
     args = parser.parse_args()
 
     log.info("=" * 60)
-    log.info("Candidate → IntentRecord Promotion Gate")
+    log.info("Candidate Promotion Gate")
     log.info("Time: %s", datetime.now().isoformat())
     log.info("Mode: %s", "DRY RUN" if args.dry_run else "LIVE")
     log.info("=" * 60)
@@ -431,7 +310,7 @@ def main():
     log.info("Candidates to promote: %d", len(candidates))
     results = []
     for c in candidates:
-        r = promote_candidate(c, dry_run=args.dry_run, skip_agenda=args.skip_agenda)
+        r = promote_candidate(c, dry_run=args.dry_run)
         results.append(r)
 
     # Summary
@@ -443,25 +322,23 @@ def main():
              len(successes), len(dedup_skips), len(failures))
 
     if dedup_skips:
-        log.info("─" * 60)
+        log.info("-" * 60)
         log.info("Dedup skipped (%d):", len(dedup_skips))
         for d in dedup_skips:
             dup = d.get("duplicate_of", {})
-            log.info("  ⊘ %s → %s:%s (score=%.2f)",
+            log.info("  %s -> %s:%s (score=%.2f)",
                      d["title"][:45], dup.get("source", "?"), dup.get("id", "?")[:8],
                      dup.get("score", 0))
 
     if failures:
-        log.info("─" * 60)
+        log.info("-" * 60)
         for f in failures:
-            log.warning("  ✗ %s — %s", f["title"][:60], f.get("error", "unknown"))
+            log.warning("  %s -- %s", f["title"][:60], f.get("error", "unknown"))
 
     if successes:
-        log.info("─" * 60)
+        log.info("-" * 60)
         for s in successes:
-            ir = s.get("intent_record_id", "?")[:8] if s.get("intent_record_id") else "-"
-            ag = s.get("agenda_id", "?")[:8] if s.get("agenda_id") else "-"
-            log.info("  ✓ %s  intent_record=%s  agenda=%s", s["title"][:50], ir, ag)
+            log.info("  %s", s["title"][:50])
 
     log.info("=" * 60)
     return 0 if not failures else 1

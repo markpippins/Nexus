@@ -1,0 +1,10 @@
+[Unit]
+Description=Run absorb ingest + candidate extraction hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

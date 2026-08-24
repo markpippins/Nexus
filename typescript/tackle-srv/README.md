@@ -181,14 +181,14 @@ proxies to `role-memory-srv` to trigger a PG → Redis sync.
 | 4 | Performance indexes on `sessions(created_at DESC, agent_role)` and `agent_scheduler(enabled, last_run_at)` |
 | 5 | Seed default circuit breaker, roles, and memory procedures (idempotent) |
 | 6 | Migrate TEXT → TIMESTAMPTZ for tackle-owned tables (shared tables handled by conduit-mcp v27) |
-| 7 | Create `tackle.prompts`, `tackle.tasks`, `tackle.role_tool_access` — loads `prompts_tasks_tool_access.sql` from `nexus/schemas/tackle/` at runtime |
-| 8 | Seed 11 prompt rows (9 personas + operator system-prompt BASE/TAIL) + 1 inspector task + `builder-fallback` and `operator` roles — loads `seed_prompts.sql` from `nexus/schemas/tackle/` at runtime |
-| 9 | `DEFAULT NOW()` on `tackle.roles.created_at` / `updated_at` — loads `roles_default_timestamps.sql` from `nexus/schemas/tackle/` at runtime |
+| 7 | Create `tackle.prompts`, `tackle.tasks`, `tackle.role_tool_access` — loads `prompts_tasks_tool_access.sql` from `nexus/schemas/migrations/tackle/` at runtime |
+| 8 | Seed 11 prompt rows (9 personas + operator system-prompt BASE/TAIL) + 1 inspector task + `builder-fallback` and `operator` roles — loads `seed_prompts.sql` from `nexus/schemas/migrations/tackle/` at runtime |
+| 9 | `DEFAULT NOW()` on `tackle.roles.created_at` / `updated_at` — loads `roles_default_timestamps.sql` from `nexus/schemas/migrations/tackle/` at runtime |
 
 ### Operational notes for v7–v9
 
-- v7–v9 load their SQL from `nexus/schemas/tackle/` at runtime via
-  `path.resolve(__dirname, "../../../schemas/tackle/<file>.sql")`. The SQL
+- v7–v9 load their SQL from `nexus/schemas/migrations/tackle/` at runtime via
+  `path.resolve(__dirname, "../../../schemas/migrations/tackle/<file>.sql")`. The SQL
   files are idempotent (CREATE TABLE IF NOT EXISTS, ON CONFLICT DO
   NOTHING/UPDATE) and self-stamp `tackle.schema_version` at the bottom.
 - `runMigrations` stamps `schema_version` after each `up()` too — that

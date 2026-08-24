@@ -45,6 +45,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import uuid
 from typing import Any
 
 # ── Path setup ──────────────────────────────────────────────────────
@@ -61,6 +62,7 @@ from cascade.conversation_coordinator import (
     OUTCOME_CONTINUE,
     OUTCOME_DELEGATE,
 )
+from cascade.sol_gate import evaluate_lease_dispatch  # SOL-framed gate (v36)
 
 # ── Configuration ───────────────────────────────────────────────────
 DATABASE_URL = os.getenv(
@@ -68,10 +70,6 @@ DATABASE_URL = os.getenv(
     "postgres://pguser:pgpass@localhost:5432/nexus",
 )
 NATS_URL = os.getenv("NATS_URL", "nats://localhost:4222")
-NATS_SUBJECT = os.getenv(
-    "INTERACTIVE_NATS_SUBJECT",
-    "nexus.duality.v1.conversation.>",
-)
 
 HARNESS_SRV_URL = os.getenv("HARNESS_SRV_URL", "http://localhost:3420")
 ASSEMBLY_URL = os.getenv("ASSEMBLY_URL", "http://localhost:3107")
@@ -172,18 +170,35 @@ def _lease_failure_reason(lease: dict[str, Any] | None) -> str:
     return "No active role lease"
 
 
-def _query_lease(pg_conn: Any, lease_id: str) -> dict[str, Any] | None:
-    """Return the active lease row, or None."""
+def _query_lease(
+    pg_conn: Any,
+    lease_id: str,
+    role: str | None = None,
+    backend: str | None = None,
+) -> dict[str, Any] | None:
+    """Return the exact active lease bound to a watch, or None.
+
+    Role and channel are checked here as a second admission boundary for
+    direct database-created watches. A lease ID alone is not authority if it
+    belongs to another role or execution channel.
+    """
     if not lease_id:
         return None
+    predicates = ["id = %s::uuid", "status = 'ACTIVE'"]
+    params: list[Any] = [lease_id]
+    if role:
+        predicates.append(f"role = %s")
+        params.append(role)
+    if backend == "freebuff":
+        predicates.append("channel = 'interactive'")
     with pg_conn.cursor() as cur:
         cur.execute(
-            """SELECT id, role, channel, model,
+            f"""SELECT id, role, channel, model,
                       budget_units, consumed_units,
                       status, window_end, expires_at
                FROM tackle.role_leases
-               WHERE id = %s::uuid AND status = 'ACTIVE'""",
-            (lease_id,),
+               WHERE {' AND '.join(predicates)}""",
+            params,
         )
         cols = [d[0] for d in cur.description]
         row = cur.fetchone()
@@ -191,29 +206,14 @@ def _query_lease(pg_conn: Any, lease_id: str) -> dict[str, Any] | None:
 
 
 def _query_active_lease_for_role(pg_conn: Any, role: str) -> dict[str, Any] | None:
-    """Return the most recent ACTIVE role lease for a role, or None.
+    """Deprecated compatibility helper; role-level fallback is forbidden.
 
-    Fallback when a watch has no lease_id (every watch created through the
-    assembly-srv POST /api/duality/watches API, which does not set the
-    column). One ACTIVE lease per role is enforced at issue time (409), so
-    this lookup is deterministic. Without a resolved lease the coordinator
-    closes the watch after one turn (R1: no active lease) and the harness
-    falls back to the config_bundle default model.
+    Lease authority must come from ``session_watches.lease_id``. This helper
+    remains available to old callers during the migration window, but returns
+    no lease so an unbound watch fails closed instead of drifting to another
+    active lease.
     """
-    with pg_conn.cursor() as cur:
-        cur.execute(
-            """SELECT id, role, channel, model,
-                      budget_units, consumed_units,
-                      status, window_end, expires_at
-               FROM tackle.role_leases
-               WHERE role = %s AND status = 'ACTIVE'
-               ORDER BY created_at DESC
-               LIMIT 1""",
-            (role,),
-        )
-        cols = [d[0] for d in cur.description]
-        row = cur.fetchone()
-        return dict(zip(cols, row)) if row else None
+    return None
 
 
 def _bump_turn_count(pg_conn: Any, watch_id: str) -> None:
@@ -255,17 +255,224 @@ def _close_watch(pg_conn: Any, watch_id: str, reason: str) -> None:
             """UPDATE duality.session_watches
                SET status = 'closed',
                    updated_at = now()
-               WHERE id = %s::uuid""",
+               WHERE id = %s::uuid
+               RETURNING thread_id""",
             (watch_id,),
         )
+        row = cur.fetchone()
     pg_conn.commit()
     _log("Watch %s closed: %s", watch_id[:8], reason)
+    # Emit a durable watch.status envelope so SSE subscribers see the
+    # session close (P1 item 4). Idempotent via event_key.
+    if row:
+        _record_session_event(
+            pg_conn,
+            thread_id=str(row[0]),
+            watch_id=watch_id,
+            event_type="watch.status",
+            event_key=f"watch.closed:{watch_id}",
+            payload={"status": "closed", "reason": reason[:500]},
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Session event log (P1 items 4-5)
+# ═══════════════════════════════════════════════════════════════════════
+# Durable, append-only per-thread stream in duality.session_events backing
+# the replayable SSE endpoint GET /api/duality/sessions/:id/events?after=<seq>.
+# Each row is a typed envelope with a monotonic sequence and a UNIQUE
+# event_key — the durable dedup key. Writers INSERT ... ON CONFLICT DO
+# NOTHING, so duplicate delivery (NATS + PG LISTEN ingresses, subscriber
+# restart) cannot double-emit; the log is replayable history.
+
+def _record_session_event(
+    pg_conn: Any,
+    thread_id: str,
+    event_type: str,
+    event_key: str,
+    payload: dict[str, Any] | None = None,
+    turn_id: str | None = None,
+    watch_id: str | None = None,
+) -> bool:
+    """Append a typed envelope to duality.session_events (idempotent).
+
+    event_key is the durable dedup key: a re-delivered event is a no-op via
+    ON CONFLICT (event_key) DO NOTHING. Returns True when this call
+    performed the insert, False when the event was already recorded (durable
+    dedup hit). Never raises — event recording is best-effort so a log
+    write failure cannot break turn execution (returns True on error so
+    callers do not treat a failed log write as a duplicate).
+    """
+    try:
+        with pg_conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO duality.session_events
+                     (thread_id, turn_id, watch_id, event_type, event_key, payload)
+                   VALUES (%s::uuid, %s::uuid, %s::uuid, %s, %s, %s)
+                   ON CONFLICT (event_key) DO NOTHING
+                   RETURNING seq""",
+                (thread_id, turn_id, watch_id, event_type, event_key,
+                 json.dumps(payload or {})),
+            )
+            inserted = cur.fetchone() is not None
+        pg_conn.commit()
+        return inserted
+    except Exception as e:
+        _log("Failed to record session event %s: %s", event_key, e)
+        return True
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Turn/job state envelope (P0-1 item 3)
+# ═══════════════════════════════════════════════════════════════════════
+# One durable row per turn in duality.session_turns, keyed by turn_id,
+# transitioning accepted → running → completed | failed | timed_out |
+# cancelled. The UI renders this server-side state instead of inferring
+# turn lifecycle from comment count. Rows are never deleted.
+
+_TURN_STATE_COLUMNS = {
+    "accepted": "accepted_at",
+    "running": "running_at",
+    "completed": "completed_at",
+    "failed": "failed_at",
+    "timed_out": "timed_out_at",
+    "cancelled": "cancelled_at",
+}
+
+
+def _create_turn(
+    pg_conn: Any,
+    thread_id: str,
+    watch_id: str,
+    role: str,
+    backend: str,
+    request_comment_id: str | None,
+    execution_plan_version: str | None = None,
+    lease_id: str | None = None,
+) -> str:
+    """Create a turn row in 'accepted' state. Returns turn_id."""
+    with pg_conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO duality.session_turns
+                 (thread_id, watch_id, lease_id, role, execution_backend, state,
+                  request_comment_id, subscriber_id, execution_plan_version,
+                  accepted_at, created_at, updated_at)
+               VALUES (%s::uuid, %s::uuid, %s::uuid, %s, %s, 'accepted',
+                       %s::uuid, 'cascade-interactive-turn', %s,
+                       now(), now(), now())
+               RETURNING id""",
+            (thread_id, watch_id, lease_id, role, backend,
+             request_comment_id, execution_plan_version),
+        )
+        turn_id = cur.fetchone()[0]
+    pg_conn.commit()
+    _log("Turn %s created (thread=%s role=%s backend=%s state=accepted)",
+         str(turn_id)[:8], str(thread_id)[:8], role, backend)
+    # Emit the turn.accepted envelope (P1 item 4) — idempotent via event_key.
+    _record_session_event(
+        pg_conn,
+        thread_id=thread_id,
+        turn_id=str(turn_id),
+        watch_id=watch_id,
+        event_type="turn.accepted",
+        event_key=f"turn.accepted:{turn_id}",
+        payload={
+            "role": role,
+            "backend": backend,
+            "request_comment_id": request_comment_id,
+            "execution_plan_version": execution_plan_version,
+            "lease_id": lease_id,
+        },
+    )
+    return str(turn_id)
+
+
+def _set_turn_state(
+    pg_conn: Any,
+    turn_id: str,
+    state: str,
+    failure_detail: str | None = None,
+    response_comment_id: str | None = None,
+    job_id: str | None = None,
+    execution_plan_version: str | None = None,
+) -> None:
+    """Transition a turn to a new state, stamping its *_at timestamp.
+
+    Only forward transitions are applied (a completed turn is never
+    rewritten to running): the state column is guarded so a stale event
+    cannot regress an already-terminal turn.
+    """
+    from_column = _TURN_STATE_COLUMNS.get(state)
+    if not from_column:
+        _log("Turn %s: unknown state %r — ignoring", turn_id[:8], state)
+        return
+    sets = ["state = %s", f"{from_column} = now()", "updated_at = now()"]
+    params: list[Any] = [state]
+    if failure_detail is not None:
+        sets.append("failure_detail = %s")
+        params.append(failure_detail[:2000])
+    if response_comment_id is not None:
+        sets.append("response_comment_id = %s")
+        params.append(response_comment_id)
+    if job_id is not None:
+        sets.append("job_id = %s")
+        params.append(job_id)
+    if execution_plan_version is not None:
+        sets.append("execution_plan_version = %s")
+        params.append(execution_plan_version)
+    with pg_conn.cursor() as cur:
+        cur.execute(
+            f"""UPDATE duality.session_turns
+               SET {', '.join(sets)}
+               WHERE id = %s::uuid
+                 AND state = ANY(ARRAY['accepted','running']::text[])
+               RETURNING thread_id, role, execution_backend, lease_id""",
+            params + [turn_id],
+        )
+        row = cur.fetchone()
+    pg_conn.commit()
+    _log("Turn %s → %s", turn_id[:8], state)
+    # Emit the matching typed envelope (P1 item 4): running → turn.started,
+    # completed/failed/timed_out/cancelled → the terminal type. Idempotent
+    # via event_key; skipped when the transition was rejected (already
+    # terminal / unknown turn) or for 'accepted' (emitted at _create_turn).
+    # Envelopes are self-describing: role + backend ride along so the SSE
+    # consumer can render the envelope without an extra turn fetch.
+    event_type = {
+        "running": "turn.started",
+        "completed": "turn.completed",
+        "failed": "turn.failed",
+        "timed_out": "turn.timed_out",
+        "cancelled": "turn.cancelled",
+    }.get(state)
+    if row and event_type:
+        payload: dict[str, Any] = {
+            "role": row[1],
+            "backend": row[2],
+            "lease_id": str(row[3]) if row[3] else None,
+        }
+        if failure_detail is not None:
+            payload["failure_detail"] = failure_detail[:2000]
+        if response_comment_id is not None:
+            payload["response_comment_id"] = response_comment_id
+        if job_id is not None:
+            payload["job_id"] = job_id
+        if execution_plan_version is not None:
+            payload["execution_plan_version"] = execution_plan_version
+        _record_session_event(
+            pg_conn,
+            thread_id=str(row[0]),
+            turn_id=turn_id,
+            event_type=event_type,
+            event_key=f"turn.{state}:{turn_id}",
+            payload=payload,
+        )
 
 
 def _consume_lease(role: str) -> None:
     """POST /api/role-leases/consume on nebula (best-effort)."""
     try:
-        body = json.dumps({"role": role}).encode()
+        body = json.dumps({"role": role, "channel": "interactive"}).encode()
         req = urllib.request.Request(
             f"{NEBULA_URL}/api/role-leases/consume",
             data=body,
@@ -379,6 +586,78 @@ def _extract_opencode_text(stdout: str) -> str:
     return stdout
 
 
+def _extract_opencode_trace(stdout: str) -> str:
+    """Extract the agent's reasoning trace from an opencode `--format json`
+    event stream.
+
+    opencode emits `reasoning` events alongside `text` events (shape mirrors
+    text: `{"type":"reasoning","part":{"text":...}}`; some versions put the
+    text at the top level). The response extractor drops them — this collects
+    them so the "agent thinking" trace can be surfaced in the UI the way
+    Freebuff shows it. Returns joined reasoning text, or "" when the stream
+    carries none (tool-only turns, non-JSON output, older agents).
+    """
+    if not stdout:
+        return ""
+    parts: list[str] = []
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if ev.get("type") != "reasoning":
+            continue
+        part = ev.get("part") or {}
+        t = part.get("text") if isinstance(part, dict) else None
+        if not isinstance(t, str):
+            t = ev.get("text")  # older envelope shape: top-level text
+        if isinstance(t, str) and t.strip():
+            parts.append(t)
+    return "\n\n".join(parts)
+
+
+def _extract_opencode_error(stdout: str) -> str:
+    """Extract a provider/API error message from an opencode `--format json`
+    event stream.
+
+    opencode reports provider failures (e.g. a 429 rate-limit) as a
+    `{"type":"error","error":{"name":..,"data":{"message":..,
+    "statusCode":..}}}` envelope on stdout — not stderr — so the raw stream
+    is the only place the real cause lives. This pulls the message + status
+    out so a failed turn surfaces "Rate limit exceeded …" instead of
+    "(agent produced no text output this turn)".
+    """
+    if not stdout:
+        return ""
+    msgs: list[str] = []
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if ev.get("type") != "error":
+            continue
+        err = ev.get("error") or {}
+        if not isinstance(err, dict):
+            continue
+        data = err.get("data")
+        data = data if isinstance(data, dict) else err
+        msg = data.get("message")
+        if not isinstance(msg, str):
+            msg = err.get("message")
+        if not isinstance(msg, str) or not msg.strip():
+            continue
+        status = data.get("statusCode") or err.get("statusCode") or err.get("status")
+        msgs.append(f"opencode error ({status}): {msg}" if status else f"opencode error: {msg}")
+    return "\n".join(msgs)
+
+
 def _compose_failure_detail(
     stderr: str, stdout: str, exit_code: int, job_id: str | None = None,
 ) -> str:
@@ -411,16 +690,19 @@ def _compose_failure_detail(
 def _invoke_agent_harness(
     role: str,
     prompt: str,
-    model: str | None,
+    model: str | None = None,
     timeout_ms: int = 600_000,
 ) -> dict[str, Any]:
-    """Invoke an agent via harness-srv POST /run-direct.
+    """Invoke an agent via harness-srv's async job contract (P1 item 6).
 
-    This is the OpenCode path — ephemeral execution that needs full
-    context reconstruction. The prompt should already contain the
-    assembled Assembly thread + participant identities + SOL facts.
+    POST /run-direct { async: true } returns 202 {job_id, state} and the
+    job runs in the background; the subscriber polls GET /jobs/:jobId until
+    terminal and reads the envelope — which preserves the RAW accumulated
+    stdout (partial output on timeout/failure) and exact exit/timeout
+    metadata. This replaces the old blocking-only contract: the subscriber
+    no longer holds an HTTP connection open for the whole run.
 
-    Returns { exit_code, stdout, stderr }.
+    Returns { exit_code, stdout, stderr, trace, job_id }.
     """
     body = json.dumps({
         "role": role,
@@ -428,6 +710,7 @@ def _invoke_agent_harness(
         **({"model": model} if model else {}),
         "timeout_ms": timeout_ms,
         "channel": "duality",
+        "async": True,
     }).encode()
 
     req = urllib.request.Request(
@@ -436,25 +719,44 @@ def _invoke_agent_harness(
         headers={"Content-Type": "application/json"},
         method="POST",
     )
+
+    def _result(data: dict[str, Any]) -> dict[str, Any]:
+        raw = data.get("stdout", "") or ""
+        plan = data.get("plan") or {}
+        stderr = data.get("stderr", "") or ""
+        # harness-srv now surfaces opencode error envelopes into stderr, but
+        # keep a fallback here for stale/older harness-srv builds: extract the
+        # error message from the raw stream so the real cause (e.g. a 429
+        # rate-limit) is never hidden behind "no text output".
+        opencode_err = _extract_opencode_error(raw)
+        if opencode_err and opencode_err not in stderr:
+            stderr = f"{opencode_err}\n{stderr}".strip()
+        return {
+            "exit_code": data.get("exit_code", 0),
+            # opencode --format json emits a JSON-lines event stream;
+            # reduce it to the assistant's text so the conversation
+            # response is readable rather than raw event envelopes.
+            "stdout": _extract_opencode_text(raw),
+            # Keep the reasoning trace ("agent thinking") for the UI —
+            # extracted from the RAW stream, not the reduced stdout.
+            "trace": _extract_opencode_trace(raw),
+            "stderr": stderr,
+            "job_id": data.get("job_id"),
+            # P1 item 7 — the Tackle-resolved versioned execution plan.
+            "plan_version": plan.get("plan_version"),
+        }
+
     try:
-        with urllib.request.urlopen(req, timeout=timeout_ms // 1000 + 30) as resp:
-            data = json.loads(resp.read())
-            if data.get("error"):
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            accepted = json.loads(resp.read())
+        job_id = accepted.get("job_id")
+        if not job_id or resp.status != 202:
+            if accepted.get("error"):
                 return {
-                    "exit_code": 1,
-                    "stdout": "",
-                    "stderr": data["error"],
-                    "job_id": data.get("job_id"),
+                    "exit_code": 1, "stdout": "", "stderr": accepted["error"],
+                    "job_id": job_id,
                 }
-            return {
-                "exit_code": data.get("exit_code", 0),
-                # opencode --format json emits a JSON-lines event stream;
-                # reduce it to the assistant's text so the conversation
-                # response is readable rather than raw event envelopes.
-                "stdout": _extract_opencode_text(data.get("stdout", "")),
-                "stderr": data.get("stderr", ""),
-                "job_id": data.get("job_id"),
-            }
+            return _result(accepted)  # sync-shaped response (older server)
     except urllib.error.HTTPError as e:
         # 4xx/5xx from harness-srv: urllib raises before reading the body,
         # so the real reason (e.g. 'No active config_bundle found for role X')
@@ -470,14 +772,53 @@ def _invoke_agent_harness(
         _log("Harness invocation failed for %s (HTTP %s): %s",
              role, e.code, str(detail))
         return {
-            "exit_code": 1,
-            "stdout": "",
-            "stderr": str(detail)[:500],
+            "exit_code": 1, "stdout": "", "stderr": str(detail)[:500],
             "job_id": job_id,
         }
     except Exception as e:
         _log("Harness invocation failed for %s: %s", role, e)
         return {"exit_code": 1, "stdout": "", "stderr": str(e)}
+
+    # ── Poll the job envelope until terminal (or the deadline) ──────
+    deadline = time.time() + (timeout_ms / 1000) + 60  # 60s grace for start
+    last_envelope: dict[str, Any] = {}
+    terminal_states = {"completed", "failed", "timed_out", "cancelled"}
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(
+                f"{HARNESS_SRV_URL}/jobs/{job_id}", timeout=30
+            ) as resp:
+                last_envelope = (json.loads(resp.read()) or {}).get("job", {})
+        except Exception as e:
+            _log("Job %s poll failed: %s", str(job_id)[:8], e)
+            time.sleep(1.0)
+            continue
+        state = last_envelope.get("state", "")
+        if state in terminal_states:
+            if state == "cancelled":
+                return {
+                    "exit_code": 137,
+                    "stdout": _extract_opencode_text(last_envelope.get("stdout", "") or ""),
+                    "trace": _extract_opencode_trace(last_envelope.get("stdout", "") or ""),
+                    "stderr": last_envelope.get("stderr") or "interrupted by user request",
+                    "job_id": job_id,
+                }
+            return _result(last_envelope)
+        time.sleep(1.0)
+
+    # Deadline exceeded — the job never reached terminal. Report honestly
+    # as a timeout (exit 124) and preserve the partial output produced so
+    # far (P1 item 6: partial output + exact exit metadata).
+    _log("Job %s did not finish within %sms — reporting timeout",
+         str(job_id)[:8], timeout_ms)
+    partial = last_envelope.get("stdout", "") or ""
+    return {
+        "exit_code": 124,
+        "stdout": _extract_opencode_text(partial),
+        "trace": _extract_opencode_trace(partial),
+        "stderr": f"harness job {job_id} did not finish within {timeout_ms}ms — partial output below",
+        "job_id": job_id,
+    }
 
 
 async def _emit_turn_requested(
@@ -485,6 +826,8 @@ async def _emit_turn_requested(
     thread_id: str,
     role: str,
     comment_role: str,
+    lease_id: str | None,
+    turn_id: str,
 ) -> bool:
     """Emit conversation.turn.requested on NATS for freebuff backends.
 
@@ -503,6 +846,8 @@ async def _emit_turn_requested(
             "thread_id": thread_id,
             "role": role,
             "comment_role": comment_role,
+            "lease_id": str(lease_id) if lease_id else None,
+            "turn_id": turn_id,
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }).encode()
         await nc.publish("nexus.duality.v1.conversation.turn.requested", payload)
@@ -515,12 +860,41 @@ async def _emit_turn_requested(
 
 
 def _post_assembly_comment(
+    pg_conn: Any,
     thread_id: str,
     body_text: str,
     role: str,
     model: str | None = None,
 ) -> str | None:
-    """Post an agent response as an Assembly comment. Returns comment ID."""
+    """Project an agent response — event FIRST, then the Assembly comment.
+
+    P2 item 9 (inversion): duality.session_events is the source of truth;
+    the Assembly comment is a rendering projection. The typed envelope is
+    written first (its NOTIFY pushes to SSE subscribers), then the comment
+    is projected via the Assembly add_comment path, and the rendered comment
+    id is linked back onto the event payload. Returns the ASSEMBLY comment
+    id (so the turn envelope's response_comment_id resolves in the thread
+    history), or None when the projection failed — the event survives either
+    way.
+    """
+    event_type = "thinking" if role == "thinking" else "comment.created"
+    canonical_id = str(uuid.uuid4())
+
+    # 1. Event FIRST — the durable source of truth (append-only).
+    _record_session_event(
+        pg_conn=pg_conn,
+        thread_id=thread_id,
+        event_type=event_type,
+        event_key=f"comment:{canonical_id}",
+        payload={
+            "comment_id": canonical_id,
+            "role": role,
+            "model": model,
+            "excerpt": body_text[:200],
+        },
+    )
+
+    # 2. Project the Assembly comment (render).
     try:
         payload = {
             "body": body_text,
@@ -537,10 +911,26 @@ def _post_assembly_comment(
         )
         with urllib.request.urlopen(req, timeout=15) as resp:
             result = json.loads(resp.read())
-            return result.get("id")
+            comment_id = result.get("id")
     except Exception as e:
-        _log("Failed to post Assembly comment: %s", e)
+        _log("Failed to project Assembly comment (event preserved): %s", e)
         return None
+
+    # 3. Link the rendered comment id back onto the event payload.
+    if comment_id:
+        try:
+            with pg_conn.cursor() as cur:
+                cur.execute(
+                    """UPDATE duality.session_events
+                       SET payload = payload || %s::jsonb
+                       WHERE event_key = %s""",
+                    (json.dumps({"assembly_comment_id": comment_id}),
+                     f"comment:{canonical_id}"),
+                )
+            pg_conn.commit()
+        except Exception as e:
+            _log("Failed to link assembly_comment_id onto event: %s", e)
+    return comment_id
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -576,6 +966,7 @@ def _build_thread_context(pg_conn: Any, thread_id: str, role: str) -> str:
                FROM assembly.comments c
                LEFT JOIN assembly.users u ON u.id = c.posted_by_id
                WHERE c.post_id = %s::uuid
+                 AND (c.role IS NULL OR c.role <> 'thinking')
                ORDER BY c.created DESC
                LIMIT 30""",
             (thread_id,),
@@ -623,6 +1014,7 @@ def _build_incremental_context(
                FROM assembly.comments c
                LEFT JOIN assembly.users u ON u.id = c.posted_by_id
                WHERE c.post_id = %s::uuid
+                 AND (c.role IS NULL OR c.role <> 'thinking')
                ORDER BY c.created DESC
                LIMIT 1""",
             (thread_id,),
@@ -690,6 +1082,7 @@ async def handle_comment_created(
     nc: Any,
     pg_conn: Any,
     event_envelope: dict[str, Any],
+    already_recorded: bool = False,
 ) -> None:
     """Process an assembly.comment.created event.
 
@@ -697,6 +1090,13 @@ async def handle_comment_created(
     2. Query watch table → find target roles
     3. For each watch: coordinator → continue/delegate/close
     4. If continue: invoke agent → post response → consume lease
+
+    already_recorded=True (P2 item 9) marks the session-event ingress: the
+    comment.created row in duality.session_events was written FIRST by the
+    /messages endpoint (the event stream is the source of truth), so the
+    durable dedup-claim step below is skipped — the row's presence IS the
+    claim, and the event must be DISPATCHED rather than treated as a
+    duplicate delivery.
     """
     # ── Dedup (protects both PG LISTEN and NATS paths) ──
     dedup_id = event_envelope.get("aggregate_id") or event_envelope.get("event_id", "")
@@ -714,6 +1114,7 @@ async def handle_comment_created(
     thread_id = normalized["thread_id"]
     comment_role = normalized["comment_role"]
     forum_slug = normalized["forum_slug"]
+    request_comment_id = normalized.get("comment_id") or None
 
     # ── Guard: never process system-level comments (error reports, etc).
     # These are posted by the subscriber itself when an agent fails;
@@ -737,6 +1138,35 @@ async def handle_comment_created(
     if not watches:
         return  # thread not managed
 
+    # ── Durable dedup gate (P1 item 5) ──────────────────────────────
+    # The comment.created row in duality.session_events doubles as the
+    # durable dedup record for both ingresses (PG LISTEN + NATS) and across
+    # subscriber restarts — the process-local _seen set above is only a fast
+    # path. Inserting with ON CONFLICT DO NOTHING is the claim: a duplicate
+    # delivery finds the row already present and is skipped. The comment's
+    # own event_key means the log is exactly the replayable history.
+    if request_comment_id and not already_recorded:
+        # The comment.created row in duality.session_events doubles as the
+        # durable dedup claim: an insert that conflicts (ON CONFLICT DO
+        # NOTHING) means this comment was already processed — skip without
+        # re-executing the turn. (The session-event ingress skips this: the
+        # row already exists because it IS the source, P2 item 9.)
+        claimed = _record_session_event(
+            pg_conn,
+            thread_id=thread_id,
+            event_type="comment.created",
+            event_key=f"comment:{request_comment_id}",
+            payload={
+                "comment_id": request_comment_id,
+                "role": comment_role,
+                "forum_slug": forum_slug,
+            },
+        )
+        if not claimed:
+            _log("Comment %s already processed — durable dedup skip",
+                 str(request_comment_id)[:8])
+            return
+
     for watch in watches:
         watch_role = watch["role"]
         watch_id = watch["id"]
@@ -750,18 +1180,35 @@ async def handle_comment_created(
              watch_id[:8], watch_role,
              watch.get("turn_count", 0), watch.get("max_turns", "?"))
 
-        # 2. Check lease — watch.lease_id is the explicit binding, but the
-        #    assembly-srv watch API doesn't set it; fall back to the role's
-        #    most recent ACTIVE lease so the model + budget governance work.
-        lease = _query_lease(pg_conn, watch.get("lease_id"))
-        if lease is None:
-            lease = _query_active_lease_for_role(pg_conn, watch_role)
-            if lease:
-                _log("Watch %s: no lease_id, resolved active lease %s for role %s",
-                     watch_id[:8], str(lease["id"])[:8], watch_role)
+        # 2. Check the watch's explicit lease binding. There is no role-level
+        # fallback: rebinding to another active lease would make the turn's
+        # authority non-deterministic and permit lease drift.
+        backend = watch.get("execution_backend", "operator")
+        lease = _query_lease(
+            pg_conn,
+            watch.get("lease_id"),
+            role=watch_role,
+            backend=backend,
+        )
 
         # ── Invoke the agent (backend dispatch) ──────────────────
-        backend = watch.get("execution_backend", "operator")
+        plan_version = lease.get("model") if lease else None
+        # P1 item 7: for the harness (ephemeral opencode) backend the
+        # Tackle-resolved execution plan is authoritative — the lease model
+        # is a Freebuff concept and must NOT be stamped as the plan (a stale
+        # or bare lease model would bypass the canonical resolver). The
+        # resolved plan version is filled in from the harness result below.
+        initial_plan = None if backend == "harness" else plan_version
+
+        # ── Turn envelope (P0-1 item 3) ──────────────────────────
+        # Create the turn in 'accepted' state up front so the UI sees the
+        # request has been picked up (rather than inferring from a comment
+        # count). The terminal transition is written at each outcome below.
+        turn_id = _create_turn(
+            pg_conn, thread_id, watch_id, watch_role, backend,
+            request_comment_id, execution_plan_version=initial_plan,
+            lease_id=watch.get("lease_id"),
+        )
 
         # ── Leased-mode gate (R1 hard stop, pre-invocation) ──────
         # 'freebuff' is the LEASED interactive path: an agent must have
@@ -780,15 +1227,18 @@ async def handle_comment_created(
         # (so idle sweeps keep the session fresh while the user tries) but
         # turn_count is left alone — a lease-less role that keeps failing
         # must not burn its 20-turn budget on failures that never ran.
-        if backend == "freebuff" and not _lease_valid(lease):
-            reason = _lease_failure_reason(lease)
+        if backend == "freebuff":
+            admitted, reason = evaluate_lease_dispatch(lease)
+        if backend == "freebuff" and not admitted:
             _log("Watch %s: leased role %s has no valid lease — failing turn (%s)",
                  watch_id[:8], watch_role, reason)
             _post_assembly_comment(
+                pg_conn,
                 thread_id,
                 f"[system] Agent {watch_role} encountered an error: {reason}",
                 "system",
             )
+            _set_turn_state(pg_conn, turn_id, "failed", failure_detail=reason)
             _touch_watch_activity(pg_conn, watch_id)
             continue
 
@@ -797,7 +1247,12 @@ async def handle_comment_created(
             # The session polls Assembly directly (duality-ui polling loop).
             # We do NOT bump turn_count here — the session owns its own
             # accounting. Lease consumption also handled by the session.
-            await _emit_turn_requested(nc, thread_id, watch_role, comment_role)
+            # The turn stays 'accepted': the freebuff session owns the
+            # reply, so the subscriber cannot observe completion.
+            await _emit_turn_requested(
+                nc, thread_id, watch_role, comment_role,
+                watch.get("lease_id"), turn_id,
+            )
             continue
 
         # Build context appropriate for the backend
@@ -808,18 +1263,21 @@ async def handle_comment_created(
             # operator: incremental — just the new comment, session has context
             prompt = _build_incremental_context(pg_conn, thread_id, watch_role, comment_role)
 
+        _set_turn_state(pg_conn, turn_id, "running",
+                        execution_plan_version=initial_plan)
         _log("Invoking %s via %s backend...", watch_role, backend)
         if backend == "harness":
+            # No model override — harness-srv resolves the canonical Tackle
+            # execution plan (P1 item 7).
             result = _invoke_agent_harness(
                 role=watch_role,
                 prompt=prompt,
-                model=lease.get("model") if lease else None,
             )
         else:
             result = _invoke_agent_operator(
                 role=watch_role,
                 prompt=prompt,
-                model=lease.get("model") if lease else None,
+                model=plan_version,
             )
 
         stdout = result.get("stdout", "") or ""
@@ -834,21 +1292,56 @@ async def handle_comment_created(
                 stderr, stdout, exit_code, result.get("job_id")
             )
             _post_assembly_comment(
+                pg_conn,
                 thread_id,
                 f"[system] Agent {watch_role} encountered an error: {detail}",
                 "system",
             )
+            # Distinguish a timeout (harness exit 124 / 'timeout after' in
+            # stderr) from a plain failure so the envelope carries the
+            # honest terminal state.
+            if exit_code == 124 or "timeout" in (stderr or "").lower():
+                _set_turn_state(pg_conn, turn_id, "timed_out",
+                                failure_detail=detail, job_id=result.get("job_id"),
+                                execution_plan_version=result.get("plan_version"))
+            else:
+                _set_turn_state(pg_conn, turn_id, "failed",
+                                failure_detail=detail, job_id=result.get("job_id"),
+                                execution_plan_version=result.get("plan_version"))
             _bump_turn_count(pg_conn, watch_id)
             continue
 
+        # 4.5. Post the agent's reasoning trace ("thinking") BEFORE the
+        #     response so the thread reads thinking → answer, matching the
+        #     Freebuff UX. Only the harness (opencode JSON event stream)
+        #     path carries reasoning today; leased freebuff sessions own
+        #     their context and emit none here.
+        trace = result.get("trace") or ""
+        if isinstance(trace, str) and trace.strip():
+            _post_assembly_comment(
+                pg_conn,
+                thread_id, trace[:4000], "thinking",
+                model=lease.get("model") if lease else None,
+            )
+            _log("Posted reasoning trace for %s (%d chars)",
+                 watch_role, min(len(trace), 4000))
+
         # 5. Post agent response
         response_preview = stdout[:3000]
-        comment_id = _post_assembly_comment(
+        response_comment_id = _post_assembly_comment(
+            pg_conn,
             thread_id, response_preview, watch_role,
             model=lease.get("model") if lease else None,
         )
-        if comment_id:
-            _log("Posted response as comment %s", comment_id[:8])
+        if response_comment_id:
+            _log("Posted response as comment %s", response_comment_id[:8])
+
+        # 5.5. Turn envelope: mark the turn completed with the response
+        #      comment id so the UI can link request → response.
+        _set_turn_state(pg_conn, turn_id, "completed",
+                        response_comment_id=response_comment_id,
+                        job_id=result.get("job_id"),
+                        execution_plan_version=result.get("plan_version"))
 
         # 6. Re-check coordinator with the actual response.
         #    Harness (cloud executor) needs no role lease — it launches
@@ -884,31 +1377,112 @@ async def handle_comment_created(
 
 
 # ═══════════════════════════════════════════════════════════════════════
-#  NATS subscriber
+#  Session-event ingress (P2 item 9 — event stream is the dispatch source)
 # ═══════════════════════════════════════════════════════════════════════
+# The durable duality.session_events log is the canonical transport for user
+# messages: the /messages endpoint writes a comment.created envelope FIRST
+# (source), then projects the Assembly comment (render). This ingress LISTENs
+# on the duality_session_events channel (fired by the V113 AFTER INSERT
+# trigger) and dispatches the turn from the typed envelope — the Assembly
+# comment is no longer the dispatch trigger, only a projection.
 
-def _is_comment_created(data: dict[str, Any], subject: str) -> bool:
-    """True when this event is assembly.comment.created.
+def _fetch_session_event(
+    pg_conn: Any,
+    thread_id: str,
+    seq: int,
+) -> dict[str, Any] | None:
+    """Fetch one duality.session_events row by (thread_id, seq).
 
-    Matches both kernel transition subjects
-    (``nexus.kernel.v1.transition.assembly.comment.created``) and
-    duality conversation subjects
-    (``nexus.duality.v1.conversation.assembly.comment.created``).
+    Returns the row as a dict with payload decoded to a dict (JSONB comes
+    back from psycopg2 as a string unless a typecaster is registered), or
+    None when the row does not exist.
     """
-    if subject.endswith("assembly.comment.created"):
-        return True
-    return False
+    with pg_conn.cursor() as cur:
+        cur.execute(
+            """SELECT seq, thread_id, turn_id, watch_id, event_type, payload,
+                      created_at
+               FROM duality.session_events
+               WHERE thread_id = %s::uuid AND seq = %s
+               LIMIT 1""",
+            (thread_id, seq),
+        )
+        cols = [d[0] for d in cur.description]
+        row = cur.fetchone()
+    if not row:
+        return None
+    event = dict(zip(cols, row))
+    payload = event.get("payload")
+    if isinstance(payload, str):
+        try:
+            payload = json.loads(payload)
+        except json.JSONDecodeError:
+            payload = {}
+    event["payload"] = payload if isinstance(payload, dict) else {}
+    return event
 
+
+async def _handle_session_event(
+    nc: Any,
+    pg_conn: Any,
+    thread_id: str,
+    seq: int,
+) -> None:
+    """Dispatch a turn from a duality.session_events NOTIFY (P2 item 9).
+
+    Only comment.created envelopes are dispatch triggers (turn.* / thinking /
+    watch.status envelopes are observation-only). The subscriber's own agent
+    response also lands as a comment.created envelope with role == the watch
+    role — the self-reply guard inside handle_comment_created skips it, so no
+    dispatch loop. System/thinking roles are skipped up front.
+    """
+    event = _fetch_session_event(pg_conn, thread_id, seq)
+    if not event:
+        return
+    if event["event_type"] != "comment.created":
+        return
+    payload = event["payload"]
+    role = payload.get("role", "") or ""
+    if role in ("system", "thinking"):
+        return
+    comment_id = payload.get("comment_id", "") or ""
+
+    # Build a duality-conversation-shaped envelope so handle_comment_created
+    # normalizes it via the flat branch. already_recorded=True because the
+    # event row already exists (it IS the source — no durable dedup claim).
+    envelope: dict[str, Any] = {
+        "event_id": f"session-event:{seq}",
+        "payload": {
+            "thread_id": thread_id,
+            "role": role,
+            "comment_id": comment_id,
+            "forum_slug": "",
+        },
+    }
+    _log("session-event %s: comment.created (thread=%s, role=%s)",
+         seq, thread_id[:8], role)
+    await handle_comment_created(nc, pg_conn, envelope, already_recorded=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Main loop
+# ═══════════════════════════════════════════════════════════════════════
+# NATS is publish-only after P2 item 9: the subscriber emits
+# conversation.turn.requested for freebuff sessions but no longer SUBSCRIBES
+# to assembly.comment.created — that was the legacy transport, and the single
+# dispatch ingress is the durable duality_session_events stream. Removing the
+# subscription eliminates the duplicate PG+NATS delivery path (items 5/10).
 
 async def run_interactive_turn_subscriber() -> None:  # noqa: C901
-    """Main loop: connect NATS + DB, subscribe, process comment events.
+    """Main loop: connect NATS + DB, LISTEN for session events, dispatch turns.
 
-    Two event sources:
-    1. PostgreSQL LISTEN on ``kernel_transition`` — receives trigger events
-       directly from ``trg_comment_created`` (bypasses the NATS bridge).
-       Channel: ``kernel_transition`` (same channel the trigger uses).
-    2. NATS on ``nexus.duality.v1.conversation.>`` — future duality-specific
-       events and turn.requested replies from freebuff sessions.
+    One event source:
+    PostgreSQL LISTEN on ``duality_session_events`` — the durable event
+    stream is the dispatch source (P2 item 9). The /messages endpoint
+    writes a comment.created envelope first and the V113 AFTER INSERT
+    trigger NOTIFYs this channel; the Assembly comment is a projection,
+    not the transport. NATS is publish-only (conversation.turn.requested
+    for freebuff sessions); the legacy assembly.comment.created subscription
+    was removed so there is no second ingress to double-deliver (item 5/10).
     """
     try:
         import psycopg2
@@ -937,44 +1511,22 @@ async def run_interactive_turn_subscriber() -> None:  # noqa: C901
     )
     _log("PostgreSQL connected")
 
-    # ── LISTEN for trigger events directly (bypass NATS bridge) ──
-    _PG_LISTEN_CHANNEL = "kernel_transition"
+    # ── LISTEN for session-event inserts (the durable dispatch source) ──
+    # P2 item 9: the event stream is the transport; Assembly comments are a
+    # projection. The V113 AFTER INSERT trigger NOTIFYs this channel with
+    # { thread_id, seq }; we fetch the typed envelope and dispatch from it.
+    _PG_LISTEN_CHANNEL = "duality_session_events"
     cur = pg_conn.cursor()
     cur.execute(f"LISTEN {_PG_LISTEN_CHANNEL};")
-    _log("Listening on PostgreSQL channel '%s' for comment triggers",
+    _log("Listening on PostgreSQL channel '%s' for session events",
          _PG_LISTEN_CHANNEL)
 
-    # ── Connect to NATS (for duality conversation events + publishing) ──
+    # ── Connect to NATS (publish-only: conversation.turn.requested) ──
     _log("Connecting to NATS at %s...", NATS_URL)
     nc = await nats.connect(NATS_URL, name="interactive_turn_subscriber")
-    _log("NATS connected")
+    _log("NATS connected (publish-only)")
 
     processed_count = 0
-
-    # ── NATS message handler (duality conversation events) ──
-    async def on_nats_message(msg: Any) -> None:
-        nonlocal processed_count
-
-        try:
-            data: dict[str, Any] = json.loads(msg.data.decode())
-            _log("Received NATS event on %s", msg.subject)
-
-            if not _is_comment_created(data, msg.subject):
-                return
-
-            await handle_comment_created(nc, pg_conn, data)
-            processed_count += 1
-
-        except json.JSONDecodeError as e:
-            _log("Invalid JSON: %s", e)
-        except Exception as e:
-            _log("Error processing NATS message: %s", e)
-            import traceback
-            _log(traceback.format_exc())
-
-    # ── Subscribe to NATS ──
-    sub = await nc.subscribe(NATS_SUBJECT, cb=on_nats_message)
-    _log("Subscribed to NATS %s", NATS_SUBJECT)
     _log("Forum: %s | Harness: %s", FORUM_SLUG, HARNESS_SRV_URL)
 
     # ── PG notification polling loop ──
@@ -993,13 +1545,15 @@ async def run_interactive_turn_subscriber() -> None:  # noqa: C901
                         continue
                     try:
                         payload: dict[str, Any] = json.loads(notify.payload)
-                        event_type = payload.get("event_type", "")
-                        if event_type != "assembly.comment.created":
+                        thread_id = payload.get("thread_id")
+                        seq = payload.get("seq")
+                        if not thread_id or seq is None:
                             continue
-                        _log("PG NOTIFY: %s (%s)",
-                             event_type, payload.get("aggregate_id", "?")[:8])
-                        # Wrap in the format handle_comment_created expects
-                        await handle_comment_created(nc, pg_conn, payload)
+                        _log("PG NOTIFY: session-event (thread=%s seq=%s)",
+                             str(thread_id)[:8], seq)
+                        await _handle_session_event(
+                            nc, pg_conn, str(thread_id), int(seq),
+                        )
                         processed_count += 1
                     except json.JSONDecodeError as e:
                         _log("Invalid PG payload: %s", e)
@@ -1026,7 +1580,6 @@ async def run_interactive_turn_subscriber() -> None:  # noqa: C901
             await pg_task
         except asyncio.CancelledError:
             pass
-        await sub.unsubscribe()
         await nc.drain()
         cur.close()
         pg_conn.close()
@@ -1047,8 +1600,7 @@ def main() -> None:
             pass
 
     _log("Starting Interactive Turn Subscriber...")
-    _log("NATS: %s | Subject: %s | Harness: %s",
-         NATS_URL, NATS_SUBJECT, HARNESS_SRV_URL)
+    _log("NATS: %s (publish-only) | Harness: %s", NATS_URL, HARNESS_SRV_URL)
     try:
         loop.run_until_complete(run_interactive_turn_subscriber())
     except KeyboardInterrupt:

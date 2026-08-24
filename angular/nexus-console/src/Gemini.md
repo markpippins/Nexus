@@ -18,11 +18,11 @@ The `AppComponent` is the top-level component that acts as the central controlle
 
 2.  **Multi-Root & Per-User File System Orchestration:** This is the key architectural feature of the component.
     -   On startup, it constructs a virtual "Home" folder that contains the root from the `SessionService` and roots from any mounted remote servers.
-    -   When a user logs into a remote server, it creates a `RemoteFileSystemService` instance *specifically for that user*. This service uses the user's username as an `alias` for all backend file operations, ensuring each user has a sandboxed view of the remote file system.
+    -   When a user logs into a remote server, it creates a `SecureFileSystemService` instance *specifically for that user*. This service uses the user's username as an `alias` for all backend file operations, ensuring each user has a sandboxed view of the remote file system.
     -   This virtual tree, including user-specific remote roots, is passed to the sidebar, allowing seamless navigation across different data sources.
 
 3.  **Per-Pane Dynamic File System Provider:**
-    -   The component manages a map of `RemoteFileSystemService` instances, keyed by the server profile's name.
+    -   The component manages a map of `SecureFileSystemService` instances, keyed by the server profile's name.
     -   It uses `computed` signals (`pane1Provider`, `pane2Provider`) to dynamically assign the correct file system service to each file explorer pane based on its current path.
     -   This design makes the `FileExplorerComponent` completely agnostic about its data source; it simply interacts with the `FileSystemProvider` interface it is given.
 
@@ -40,7 +40,7 @@ The `AppComponent` is the top-level component that acts as the central controlle
 -   **Methods:**
     -   `loadFolderTree()`: An async method that builds the combined virtual folder tree.
     -   `onLoginAndMount()`: Handles the login process and, on success, mounts a user-specific remote file system.
-    -   `onUnmountProfile()`: Destroys a `RemoteFileSystemService` instance and clears the associated user session.
+    -   `onUnmountProfile()`: Destroys a `SecureFileSystemService` instance and clears the associated user session.
     -   `toggleSplitView()`: Manages the split-view layout.
     -   `toggleDetailPane()`: Manages the visibility of the details pane.
     -   `onPane1PathChanged()` / `onPane2PathChanged()`: Keeps the parent component's record of each pane's path in sync.

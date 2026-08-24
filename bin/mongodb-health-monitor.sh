@@ -34,6 +34,32 @@ MONGODB_DEPENDENT_SERVICES=(
     "broker-gateway.service"
 )
 
+# ── Terrain registry write-back ────────────────────────────────────────
+# MongoDB has no HTTP health endpoint and no heartbeat registration, so
+# staleness sweeps periodically flip its terrain row OFFLINE while the
+# service is healthy (incident 1f5c2806, 2026-08-23). This monitor already
+# computes authoritative liveness every cycle — so we write the truth back.
+TERRAIN_DSN="${PEB_DATABASE_URL:-postgresql://pguser:pgpass@localhost:5432/nexus}"
+TERRAIN_SERVICE_NAME="mongodb"
+
+_sync_terrain_status() {
+    local is_up="$1"   # "true" / "false"
+    local want="ONLINE"
+    [[ "$is_up" == "false" ]] && want="OFFLINE"
+    local current
+    current=$(PGPASSWORD=pgpass PGUSER=pguser psql -h localhost -d nexus -t -A \
+        -c "SELECT status FROM terrain.runnable_services WHERE name='${TERRAIN_SERVICE_NAME}' LIMIT 1;" 2>/dev/null)
+    if [[ -z "$current" ]]; then
+        _log "WARN" "Terrain row for '$TERRAIN_SERVICE_NAME' not found — skipping write-back"
+        return 0
+    fi
+    if [[ "$current" != "$want" ]]; then
+        PGPASSWORD=pgpass PGUSER=pguser psql -h localhost -d nexus -q \
+            -c "UPDATE terrain.runnable_services SET status='${want}' WHERE name='${TERRAIN_SERVICE_NAME}' AND status <> '${want}';" 2>/dev/null
+        _log "INFO" "Terrain status reconciled for $TERRAIN_SERVICE_NAME: ${current} -> ${want}"
+    fi
+}
+
 # ── Helpers ─────────────────────────────────────────────────────────────
 
 _log() {
@@ -148,6 +174,9 @@ main() {
     else
         _log "DEBUG" "MongoDB is DOWN"
     fi
+
+    # ── Terrain registry write-back (liveness truth, every cycle) ──
+    _sync_terrain_status "$mongodb_is_up"
 
     # Persist current state
     _save_state "$mongodb_is_up"

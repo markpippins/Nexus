@@ -158,7 +158,7 @@ html.steel [class*="text-gray-"] {
 
 @layer components {
   .app-panel {
-    @apply bg-white border border-steel-200 rounded shadow-card dark:bg-steel-800 dark:border-steel-700;
+    @apply bg-white border border-steel-200 shadow-card dark:bg-steel-800 dark:border-steel-700;
   }
 
   .app-table {

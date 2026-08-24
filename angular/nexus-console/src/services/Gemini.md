@@ -15,7 +15,7 @@ This directory is the logical core of the application, containing all the inject
 -   **Purpose:** An implementation of `FileSystemProvider` that creates a complete, writable virtual file system that persists in the browser's `localStorage`.
 -   **Role:** This service provides the default "Session" drive in the application. It manages a hierarchical tree of files and folders in an Angular Signal. All file operations are handled through robust, immutable update patterns. The entire file system state is serialized to JSON and saved to `localStorage`, so changes are preserved between sessions.
 
-### `remote-file-system.service.ts`
+### `secure-file-system.service.ts`
 
 -   **Purpose:** An implementation of `FileSystemProvider` that communicates with a remote backend via the broker.
 -   **Role:** This service is instantiated by the `AppComponent` when a user "mounts" a server profile. It uses the **user's username** as the `alias` for all backend file system requests, effectively creating a secure, sandboxed file system for each user.

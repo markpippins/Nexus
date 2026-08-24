@@ -1,0 +1,57 @@
+[
+  {
+    "id": "ingest.html",
+    "type": "deterministic",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "source": {"type": "string", "description": "HTML source URI or raw document"}
+      },
+      "required": ["source"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "document": {"type": "object", "description": "Parsed document tree"}
+      }
+    },
+    "implementation": "bin/ingest_history.py:parse_html"
+  },
+  {
+    "id": "ingest.extract",
+    "type": "deterministic",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "document": {"type": "object"}
+      },
+      "required": ["document"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "chunks": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "implementation": "bin/ingest_conduit_data.py:extract_chunks"
+  },
+  {
+    "id": "ingest.index",
+    "type": "external_tool",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "chunks": {"type": "array", "items": {"type": "object"}}
+      },
+      "required": ["chunks"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "indexed": {"type": "integer", "description": "Number of chunks indexed"}
+      }
+    },
+    "interface": {"protocol": "http", "endpoint": "/api/ingest/index"},
+    "retry_policy": {"max_retries": 3, "backoff_seconds": 1.0}
+  }
+]

@@ -45,16 +45,6 @@ import sys
 import time
 from typing import Any
 
-# ── Path setup ──────────────────────────────────────────────────────
-_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _PARENT not in sys.path:
-    sys.path.insert(0, _PARENT)
-
-# Ensure the shared nats_envelope package is importable
-_NATS_PACKAGE = os.path.join(_PARENT, "nats")
-if os.path.isdir(_NATS_PACKAGE) and _NATS_PACKAGE not in sys.path:
-    sys.path.insert(0, _NATS_PACKAGE)
-
 # ── Configuration ───────────────────────────────────────────────────
 DATABASE_URL = os.getenv(
     "DATABASE_URL",

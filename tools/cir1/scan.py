@@ -4,6 +4,13 @@ CIR-1 Scan — reference index builder.
 
 Outputs a line-numbered inventory of all CIR-relevant references
 across the repository (JSON + text). Used for diagnostics and auditing.
+
+Declared output contract (Wave 4 folder hygiene):
+    output_path   — defaults to `cir1_ref_index.txt` in the CWD; override with
+                     argv[2]. Regenerable, never authoritative.
+    lifecycle     — ephemeral diagnostic artifact. Regenerate on demand with
+                     `make cir1-scan`; do not commit the output (gitignored
+                     via .gitignore `cir1_ref_index.txt`).
 """
 
 import sys

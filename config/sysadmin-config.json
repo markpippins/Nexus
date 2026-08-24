@@ -101,7 +101,7 @@
       "displayName": "PEB Kernel",
       "category": "backend",
       "host": "localhost",
-      "port": 8080,
+      "port": 8098,
       "checkMethod": "http",
       "healthEndpoint": "/actuator/health",
       "expectedStatus": 200,

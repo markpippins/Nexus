@@ -118,7 +118,6 @@ function labelForRoute(path: string): string {
     harvests: 'Harvests',
     conversations: 'Conversations',
     'open-questions': 'Open Questions',
-    intents: 'Intent Records',
     assessments: 'Assessments',
     observations: 'Observations',
     reports: 'Reports',

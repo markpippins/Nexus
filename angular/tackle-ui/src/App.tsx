@@ -494,6 +494,7 @@ export default function App() {
                 onDeleteRole={handleDeleteRole}
                 onSavePrompt={handleSavePrompt}
                 onSaveTask={handleSaveTask}
+                onRefresh={fetchAllData}
               />
             )}
 

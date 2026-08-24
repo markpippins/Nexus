@@ -14,6 +14,7 @@ Usage:
     python tools/cir1/lint.py --cir5               # CIR-1 + CIR-5
     python tools/cir1/lint.py --strict             # CIR-1 blocking (exit 1 on violation)
     python tools/cir1/lint.py --strict --cir2|--cir3|--cir4|--cir5
+    python tools/cir1/lint.py --all --strict --json   # machine-readable report
 
 Exit codes:
     0 — all checks pass
@@ -54,7 +55,11 @@ SCHEMA_STATE_KEYS = [
 # ─── CIR-5: Single Canonical Authority Rule ──────────────────────────────────
 
 SEMANTIC_CLASSES = {
-    "execution_state": ["execution_state", "mode", "state"],
+    # Intent-vs-state split: `execution_state` is event-derived runtime state,
+    # `ir_layer` is the 3-layer IR mode (INTENT/BINDING/EXECUTION-BOUND) — two
+    # distinct semantic classes, not aliases of one another.
+    "execution_state": ["execution_state", "state"],
+    "ir_layer": ["metadata.mode"],
     "pipeline_intent": ["intent_source", "PIPELINE_INTENT"],
     "decision": ["decision", "result", "score"],
     "runtime_snapshot": ["snapshot", "snapshot_ref"],
@@ -69,7 +74,11 @@ def classify(path: str):
 
     Priority: BUILD > SCHEMA > DATA > GOVERNANCE > RUNTIME > DATA(fallback)
     """
-    p = path.lstrip("./")
+    # strip only a leading ./ prefix — never the leading dot of hidden dirs
+    # (lstrip("./") stripped ALL leading '.'/'/' chars, corrupting .agents/ → agents/)
+    p = path.strip()
+    if p.startswith("./"):
+        p = p[2:]
 
     # 1. BUILD — fastest exclusion
     if any(x in p for x in [
@@ -198,7 +207,11 @@ def load_native_domains():
 
 def get_native_tokens_for_path(path: str):
     """Return set of tokens native to this path's domain."""
-    p = path.lstrip("./")
+    # strip only a leading ./ prefix — never the leading dot of hidden dirs
+    # (lstrip("./") stripped ALL leading '.'/'/' chars, corrupting .agents/ → agents/)
+    p = path.strip()
+    if p.startswith("./"):
+        p = p[2:]
     for prefix, tokens in _NATIVE_DOMAINS.items():
         if p.startswith(prefix) or ("/" + prefix) in p:
             return set(tokens)
@@ -329,7 +342,22 @@ def check_cir4(path, obj, violations, mode, domain):
 
 # ─── CIR-5: Single Canonical Authority Rule — relational detector ──────────
 
-def collect_semantic_classes(path, obj, index, mode, domain):
+def _semantic_key_matches(key, ancestors, class_keys):
+    """Qualified-key matching: a class key like `metadata.mode` matches the
+    bare key `mode` only when `metadata` is among its ancestors. Bare class
+    keys match the bare key directly. This disambiguates the overloaded `mode`
+    key (pipeline `mode: execute` vs the IR-layer `metadata.mode`)."""
+    for ck in class_keys:
+        if "." in ck:
+            head, tail = ck.split(".", 1)
+            if tail == key and head in ancestors:
+                return True
+        elif ck == key:
+            return True
+    return False
+
+
+def collect_semantic_classes(path, obj, index, mode, domain, ancestors=()):
     level = CIR_APPLY.get((domain, mode, 5))
     if level is None or level == "MINIMAL":
         return
@@ -341,16 +369,16 @@ def collect_semantic_classes(path, obj, index, mode, domain):
             if _is_quarantined(v):
                 continue
             for cls, keys in SEMANTIC_CLASSES.items():
-                if k in keys:
+                if _semantic_key_matches(k, ancestors, keys):
                     index.setdefault(cls, []).append({
                         "path": fpath,
                         "key": k,
                         "value": v,
                     })
-            collect_semantic_classes(path, v, index, mode, domain)
+            collect_semantic_classes(path, v, index, mode, domain, ancestors + (k,))
     elif isinstance(obj, list):
         for v in obj:
-            collect_semantic_classes(path, v, index, mode, domain)
+            collect_semantic_classes(path, v, index, mode, domain, ancestors)
 
 
 def check_cir5(index, violations):
@@ -358,8 +386,12 @@ def check_cir5(index, violations):
         authoritative = []
         for o in occurrences:
             p = o["path"]
+            # cache/mirror/quarantine + point-in-time snapshots are generated
+            # projections, never authoritative (snapshot = Wave-3 rule)
             if "cache" not in p and "mirror" not in p \
-               and "quarantine" not in p and "CIR" not in p:
+               and "quarantine" not in p and "CIR" not in p \
+               and "snapshot" not in p and ".bak" not in p \
+               and ".pre-rebuild" not in p:
                 authoritative.append(o)
         if len(authoritative) > 1:
             a0, a1 = authoritative[0], authoritative[1]
@@ -382,6 +414,7 @@ def main():
 
     active_cirs = {"cir1": True}
     strict = False
+    output_json = "--json" in sys.argv
 
     for arg in sys.argv[1:]:
         if arg == "--strict":
@@ -425,6 +458,25 @@ def main():
         check_cir5(cir5_index, all_violations)
 
     # Report
+    if output_json:
+        items = []
+        for entry in all_violations:
+            path, rule, code, detail = entry
+            items.append({
+                "path": str(path),
+                "rule": rule,
+                "code": code,
+                "detail": detail,
+            })
+        active_flags = sorted(k.upper() for k, v in active_cirs.items() if v)
+        print(json.dumps({
+            "status": "PASS" if not all_violations else "FAIL",
+            "cirs": active_flags,
+            "total_violations": len(all_violations),
+            "violations": items,
+        }, indent=2))
+        sys.exit(1 if all_violations and strict else 0)
+
     by_rule = {}
     for v in all_violations:
         rule = v[1]

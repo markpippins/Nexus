@@ -15,7 +15,6 @@
  */
 
 import type { InputSchema } from "mcp-types";
-import { Client } from "pg";
 import { parseCommandLine, type ParsedCommand } from "./parser";
 import { coerceArgs, CoercionError } from "./coerce";
 import {
@@ -28,6 +27,7 @@ import {
   describeRow,
   type RegistryRow,
 } from "./registry";
+
 import { dispatchToolCall, DispatchError } from "./executor";
 
 // ── Tool definitions (MCP tools/list) ──────────────────────────────
@@ -293,26 +293,12 @@ async function handleCompletions(args: any) {
       return ok({ services: services.slice(0, limit), stage: "service" });
     }
     // Fall back to command suggestions across all services for bare commands.
-    const client = new Client({
-      connectionString:
-        process.env.MCP_PG_DSN ||
-        process.env.CONDUIT_PG_DSN ||
-        "postgresql://pguser:pgpass@localhost:5432/nexus",
+    const { searchCommands } = await import("./registry");
+    const matches = await searchCommands(parsed.command, limit);
+    return ok({
+      commands: matches.map((r) => ({ command: r.command, service: r.service })),
+      stage: "command",
     });
-    await client.connect();
-    try {
-      const { rows } = await client.query(
-        `SELECT DISTINCT command, service FROM mcp.command_registry
-         WHERE command LIKE $1 || '%' ORDER BY command LIMIT $2`,
-        [parsed.command, limit]
-      );
-      return ok({
-        commands: rows.map((r: any) => ({ command: r.command, service: r.service })),
-        stage: "command",
-      });
-    } finally {
-      await client.end();
-    }
   }
 
   // Service given — resolve it.

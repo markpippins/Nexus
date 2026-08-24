@@ -1,0 +1,57 @@
+[
+  {
+    "id": "vfs.scan",
+    "type": "external_tool",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string", "description": "Root directory to scan"}
+      },
+      "required": ["path"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "entries": {"type": "array", "items": {"type": "object"}},
+        "scanned_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "interface": {"protocol": "shell", "endpoint": "python/voyager/"},
+    "retry_policy": {"max_retries": 2, "backoff_seconds": 1.0}
+  },
+  {
+    "id": "vfs.observe",
+    "type": "external_tool",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string", "description": "Path to watch for changes"}
+      },
+      "required": ["path"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "change": {"type": "string", "description": "Observed change kind (created, modified, deleted)"},
+        "path": {"type": "string"}
+      }
+    },
+    "interface": {"protocol": "shell", "endpoint": "python/voyager/observer.py"},
+    "retry_policy": {"max_retries": 0}
+  },
+  {
+    "id": "vfs.notify",
+    "type": "external_tool",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "message": {"type": "string"},
+        "channel": {"type": "string"}
+      },
+      "required": ["message"]
+    },
+    "output_schema": {"type": "object"},
+    "interface": {"protocol": "mcp", "endpoint": "voyager/notify"},
+    "retry_policy": {"max_retries": 3, "backoff_seconds": 0.5}
+  }
+]

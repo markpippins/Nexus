@@ -60,6 +60,9 @@
 
 import crypto from "node:crypto";
 import { Pool, PoolClient, types } from "pg";
+import { evaluateReleaseGate, ReleaseDecision } from "./release-gate";
+import { RippleAssignment } from "./ripple-classifier";
+import { CompareTarget } from "./compile-compare";
 
 // ── Keep timestamps as ISO strings ─────────────────────────────────
 // pg parses TIMESTAMPTZ into Date objects by default. Override to keep
@@ -1163,6 +1166,10 @@ const migrations: Migration[] = [
       // Backfill event log for existing pending work requests.
       // Every existing WR with status 'pending' gets a synthetic WR_SUBMITTED event
       // so the fold produces VALIDATED state, making them eligible for the decision loop.
+      // Skip identity-less rows (wr_id NULL/'' — e.g. the resolution seed
+      // `wr-mongo-wiring`): they have no compile-unit identity, so they can't
+      // carry an event-log entry (wr_id is the FK key). Backfilling them would
+      // violate the NOT NULL constraint and brick fresh-schema bootstrap.
       await exec(`
         INSERT INTO ${PG_SCHEMA}.work_request_events (wr_id, event_type, payload, created_at)
         SELECT wr_id, 'WR_SUBMITTED',
@@ -1170,6 +1177,8 @@ const migrations: Migration[] = [
                recorded_on_dt
         FROM ${VISION_SCHEMA}.work_requests
         WHERE status = 'pending'
+          AND wr_id IS NOT NULL
+          AND wr_id <> ''
           AND wr_id NOT IN (
             SELECT wr_id FROM ${PG_SCHEMA}.work_request_events WHERE event_type = 'WR_SUBMITTED'
           )
@@ -2064,7 +2073,12 @@ const migrations: Migration[] = [
         { name: "critic", desc: "Adversarial evaluator — surfaces risks, contradictions, and blind spots" },
         { name: "analyst", desc: "Gap and triage analyst — identifies missing coverage, classifies incidents" },
         { name: "inspector", desc: "Compliance auditor — verifies invariants, issues violation reports" },
+        { name: "auditor", desc: "Audit and compliance reviewer — verifies records, constraints, and drift; issues inspection findings" },
+        { name: "epistemologist", desc: "Epistemic governance — tracks knowledge stratification, role boundaries, and cross-role divergence" },
+        { name: "operator", desc: "Pipeline and platform operator — monitors pipeline state, investigates stuck plans and drift, keeps operational surfaces healthy" },
+        { name: "sysadmin", desc: "Infrastructure health governance — systemd-timer cycles, service health, incident reporting; runs standalone" },
         { name: "test", desc: "Internal test harness role — used for test invoke sessions and ad-hoc agent runs" },
+        { name: "tester", desc: "Walkthrough role (b80f0fdb) — full-surface demonstration of the role-creation runbook" },
       ];
       for (const r of defaultRoles) {
         await exec(
@@ -2858,11 +2872,90 @@ const migrations: Migration[] = [
         ALTER TABLE ${VISION_SCHEMA}.work_requests
           ADD COLUMN IF NOT EXISTS entity_key TEXT
       `);
+      // The legacy ${PG_SCHEMA}.work_requests ("conduit" in production) is a
+      // pre-split table that does NOT exist on a fresh schema (the test
+      // harness runs initDb against an empty test schema). Guard with an
+      // existence check so this migration stays replay-safe — same pattern as
+      // the v6 step_outputs guard.
       await exec(`
-        ALTER TABLE ${PG_SCHEMA}.work_requests
-          ADD COLUMN IF NOT EXISTS entity_key TEXT
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = '${PG_SCHEMA}' AND table_name = 'work_requests'
+          ) THEN
+            ALTER TABLE ${PG_SCHEMA}.work_requests
+              ADD COLUMN IF NOT EXISTS entity_key TEXT;
+          END IF;
+        END $$;
       `);
       console.log("[migrations] v37: added entity_key to work_requests (vision + conduit)");
+    },
+  },
+  {
+    version: 38,
+    description: "Create vision.wr_compile_verdicts (R-A-2026-08-15-010 option c) — WR-scoped compile verdict store keyed by entityKey",
+    up: async (exec) => {
+      // D2/D5 (amended): WR_COMPILE_PASS/FAIL verdicts live in a dedicated,
+      // entityKey-keyed store — NOT vision.receipts (frozen, D-T19-2(d)) and
+      // NOT execution.receipts (request/attempt-scoped, ADR-006). The verdict
+      // exists pre-plan and pre-attempt; its identity is the compile unit
+      // (entityKey, D3). Insert-only: deterministic verdict_id + idempotent
+      // INSERT ... ON CONFLICT DO NOTHING. Immutability guard rejects
+      // UPDATE/DELETE (mirrors execution.receipts' immutable-evidence intent).
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ${VISION_SCHEMA}.wr_compile_verdicts (
+            verdict_id   TEXT PRIMARY KEY,          -- SHA256(type, entity_key, rule_version, description)
+            entity_key   TEXT NOT NULL,             -- compile-unit identity (D3)
+            wr_id        TEXT,                      -- WR row link when present (nullable: pure-compile mode)
+            plan_id      TEXT,                      -- re-parented at release via entityKey (D2 semantic)
+            verdict_type TEXT NOT NULL CHECK (verdict_type IN ('WR_COMPILE_PASS','WR_COMPILE_FAIL')),
+            rule_version TEXT NOT NULL,
+            description  TEXT NOT NULL,
+            detected_at  TIMESTAMPTZ,               -- compile event timestamp (deterministic)
+            created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_wr_compile_verdicts_entity_key
+            ON ${VISION_SCHEMA}.wr_compile_verdicts (entity_key, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_wr_compile_verdicts_wr_id
+            ON ${VISION_SCHEMA}.wr_compile_verdicts (wr_id);
+        CREATE INDEX IF NOT EXISTS idx_wr_compile_verdicts_plan
+            ON ${VISION_SCHEMA}.wr_compile_verdicts (plan_id);
+
+        -- Immutability guard — no UPDATE/DELETE on verdict rows.
+        CREATE OR REPLACE FUNCTION ${VISION_SCHEMA}.wr_compile_verdicts_immutable()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            RAISE EXCEPTION 'vision.wr_compile_verdicts is immutable: % not allowed on verdict rows', TG_OP;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        DROP TRIGGER IF EXISTS trg_wr_compile_verdicts_immutable ON ${VISION_SCHEMA}.wr_compile_verdicts;
+        CREATE TRIGGER trg_wr_compile_verdicts_immutable
+            BEFORE UPDATE OR DELETE ON ${VISION_SCHEMA}.wr_compile_verdicts
+            FOR EACH ROW
+            EXECUTE FUNCTION ${VISION_SCHEMA}.wr_compile_verdicts_immutable();
+      `);
+      console.log("[migrations] v38: created vision.wr_compile_verdicts (WR-scoped compile verdicts)");
+    },
+  },
+  {
+    version: 39,
+    description: "Add route to vision.wr_compile_verdicts (CP-9 review a5f096e9: D5 gate must hold reserved routes)",
+    up: async (exec) => {
+      // CP-9 review (a5f096e9): the bootstrap gate could not distinguish
+      // PASS+reserved from PASS+conduit because the verdict store had no
+      // route column — a PASS on an R3/R4 (reserved) route would auto-emit a
+      // builder ticket, which R-A-003 forbids. Persist classification.route
+      // so the D5 gate can block on FAIL OR route='reserved'. Nullable:
+      // pre-v39 verdicts and route-less issue_compile_verdict calls are
+      // legacy (no route = not reserved, legacy behavior unchanged).
+      await exec(`
+        ALTER TABLE ${VISION_SCHEMA}.wr_compile_verdicts
+            ADD COLUMN IF NOT EXISTS route TEXT;   -- classification.route: conduit | conduit-review | reserved
+      `);
+      console.log("[migrations] v39: added route column to vision.wr_compile_verdicts");
     },
   },
 ];
@@ -3186,7 +3279,7 @@ export async function insertReceipt(r: ReceiptRow): Promise<void> {
 
 export async function getReceiptsForPlan(planId: string): Promise<ReceiptRow[]> {
   return qAll(
-    `SELECT * FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId ORDER BY created_at ASC`,
+    `SELECT * FROM nebula.receipts_unified WHERE plan_id = @planId ORDER BY created_at ASC`,
     { planId }
   );
 }
@@ -3218,16 +3311,261 @@ export async function getPlanReceipts(planId: string): Promise<Array<{
 
 export async function getLatestReceiptType(planId: string): Promise<string | null> {
   const row = await qOne(
-    `SELECT type FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId ORDER BY created_at DESC LIMIT 1`,
+    `SELECT type FROM nebula.receipts_unified WHERE plan_id = @planId ORDER BY created_at DESC LIMIT 1`,
     { planId }
   );
   return row?.type ?? null;
 }
 
+// ── WR compile verdicts (R-A-2026-08-15-010 option c) ────────────────────
+// A pre-release WR_COMPILE_PASS/FAIL verdict, keyed by the compile unit's
+// entityKey (D3). Lives in vision.wr_compile_verdicts — NOT vision.receipts
+// (frozen legacy surface, D-T19-2(d)) and NOT execution.receipts
+// (request/attempt-scoped, ADR-006). Insert-only and idempotent.
+
+export type CompileVerdictType = "WR_COMPILE_PASS" | "WR_COMPILE_FAIL";
+
+export interface CompileVerdictRow {
+  verdict_id: string;
+  entity_key: string;
+  wr_id: string | null;
+  plan_id: string | null;
+  verdict_type: CompileVerdictType;
+  rule_version: string;
+  description: string;
+  detected_at: string | null;
+  created_at: string;
+  /** classification.route (conduit | conduit-review | reserved). */
+  route: string | null;
+}
+
+export interface CompileVerdictInput {
+  verdict_id?: string; // omitted → derived deterministically below
+  entity_key: string;
+  wr_id?: string | null;
+  plan_id?: string | null;
+  verdict_type: CompileVerdictType;
+  rule_version: string;
+  description: string;
+  detected_at?: string | null;
+  /** classification.route — persisted so the D5 gate can hold reserved. */
+  route?: string | null;
+}
+
+/**
+ * Deterministic verdict id — SHA256(type, entity_key, rule_version,
+ * description). Re-issuing the same verdict for the same compile unit yields
+ * the same id, so INSERT ... ON CONFLICT (verdict_id) DO NOTHING is naturally
+ * idempotent (the same pattern as peb.cir_violations, V106).
+ */
+export function computeCompileVerdictId(
+  verdictType: string,
+  entityKey: string,
+  ruleVersion: string,
+  description: string,
+): string {
+  return crypto
+    .createHash("sha256")
+    .update(verdictType)
+    .update("\u0000")
+    .update(entityKey)
+    .update("\u0000")
+    .update(ruleVersion)
+    .update("\u0000")
+    .update(description)
+    .digest("hex");
+}
+
+/** Insert a compile verdict. Idempotent on verdict_id (no duplicate rows). */
+export async function insertCompileVerdict(v: CompileVerdictInput): Promise<void> {
+  const verdictId =
+    v.verdict_id ??
+    computeCompileVerdictId(v.verdict_type, v.entity_key, v.rule_version, v.description);
+  await qRun(
+    `INSERT INTO ${VISION_SCHEMA}.wr_compile_verdicts
+       (verdict_id, entity_key, wr_id, plan_id, verdict_type, rule_version,
+        description, detected_at, route, created_at)
+     VALUES (@verdictId, @entityKey, @wrId, @planId, @verdictType, @ruleVersion,
+             @description, @detectedAt, @route, now())
+     ON CONFLICT (verdict_id) DO NOTHING`,
+    {
+      verdictId,
+      entityKey: v.entity_key,
+      wrId: v.wr_id ?? null,
+      planId: v.plan_id ?? null,
+      verdictType: v.verdict_type,
+      ruleVersion: v.rule_version,
+      description: v.description,
+      detectedAt: v.detected_at ?? null,
+      route: v.route ?? null,
+    },
+  );
+}
+
+/** Newest verdict for a compile unit (the D5 bootstrap gate query). */
+export async function getNewestCompileVerdict(
+  entityKey: string,
+): Promise<CompileVerdictRow | undefined> {
+  return qOne(
+    `SELECT * FROM ${VISION_SCHEMA}.wr_compile_verdicts
+     WHERE entity_key = @entityKey
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    { entityKey },
+  );
+}
+
+/**
+ * Resolve the compile-unit entityKey(s) linked to a plan, for the D5 gate.
+ *
+ * A plan links to its compile unit through the released WorkRequest whose
+ * `context.plan_id` equals the plan number (the release-emission boundary
+ * writes this link at CP-9; a WR carries its D3 entityKey from birth).
+ *
+ * Returns [] when no entityKey is resolvable — a legacy/unclassified plan,
+ * for which the gate is unchanged (no verdict = legacy behavior).
+ */
+export async function resolveEntityKeysForPlan(planId: string): Promise<string[]> {
+  const rows = await qAll(
+    `SELECT DISTINCT wr.entity_key AS entity_key
+     FROM ${VISION_SCHEMA}.work_requests wr
+     WHERE wr.entity_key IS NOT NULL
+       AND wr.context->>'plan_id' = @planId`,
+    { planId },
+  );
+  return (rows ?? []).map((r: any) => r.entity_key).filter(Boolean);
+}
+
+/**
+ * Newest verdict for a plan (the D5 bootstrap gate).
+ *
+ * Matches verdicts by the plan's resolved compile-unit entityKey(s)
+ * (canonical D5 key) OR by a release-time re-parented plan_id; newest wins.
+ * No verdict → undefined (legacy unchanged).
+ */
+export async function getNewestCompileVerdictForPlan(
+  planId: string,
+): Promise<CompileVerdictRow | undefined> {
+  const entityKeys = await resolveEntityKeysForPlan(planId);
+  if (entityKeys.length === 0) {
+    return qOne(
+      `SELECT * FROM ${VISION_SCHEMA}.wr_compile_verdicts
+       WHERE plan_id = @planId
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      { planId },
+    );
+  }
+  const placeholders = entityKeys.map((_, i) => `@ek${i}`).join(", ");
+  const params: Record<string, any> = { planId };
+  entityKeys.forEach((ek, i) => {
+    params[`ek${i}`] = ek;
+  });
+  return qOne(
+    `SELECT * FROM ${VISION_SCHEMA}.wr_compile_verdicts
+     WHERE plan_id = @planId OR entity_key IN (${placeholders})
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    params,
+  );
+}
+
+/**
+ * D5 bootstrap gate predicate (CP-9 review a5f096e9).
+ *
+ * A compile verdict blocks auto-bootstrap when it is a FAIL, or a PASS on a
+ * reserved (R3/R4) route — R-A-003: reserved is never auto-armed (explicit
+ * Architect/human release only). ``undefined`` (no verdict) → false = legacy
+ * behavior unchanged. This is the single source of truth shared by the
+ * watcher's bootstrap pass and the tests.
+ */
+export function verdictBlocksBootstrap(
+  verdict: Pick<CompileVerdictRow, "verdict_type" | "route"> | undefined,
+): boolean {
+  if (!verdict) return false;
+  return verdict.verdict_type === "WR_COMPILE_FAIL" || verdict.route === "reserved";
+}
+
+/**
+ * D5 downstream analytics — compile pass/fail measurement surface (CP-9
+ * delta sub-item 1). Aggregates vision.wr_compile_verdicts by verdict_type
+ * and rule_version so pass/fail rates are measurable once the gate is live.
+ */
+export interface CompileVerdictStats {
+  total: number;
+  byVerdictType: Array<{ verdict_type: string; count: number }>;
+  byRuleVersion: Array<{ rule_version: string; count: number }>;
+}
+
+export async function getCompileVerdictStats(): Promise<CompileVerdictStats> {
+  const byType = await qAll(
+    `SELECT verdict_type, count(*)::int AS count
+     FROM ${VISION_SCHEMA}.wr_compile_verdicts
+     GROUP BY verdict_type
+     ORDER BY verdict_type`,
+  );
+  const byVersion = await qAll(
+    `SELECT rule_version, count(*)::int AS count
+     FROM ${VISION_SCHEMA}.wr_compile_verdicts
+     GROUP BY rule_version
+     ORDER BY rule_version`,
+  );
+  const total = (byType ?? []).reduce((sum: number, r: any) => sum + r.count, 0);
+  return {
+    total,
+    byVerdictType: (byType ?? []).map((r: any) => ({
+      verdict_type: r.verdict_type,
+      count: r.count,
+    })),
+    byRuleVersion: (byVersion ?? []).map((r: any) => ({
+      rule_version: r.rule_version,
+      count: r.count,
+    })),
+  };
+}
+
 export async function getReceiptCount(): Promise<{ type: string; count: number }[]> {
   return qAll(
-    `SELECT type, COUNT(*) as count FROM ${VISION_SCHEMA}.receipts GROUP BY type`
+    `SELECT type, COUNT(*) as count FROM nebula.receipts_unified GROUP BY type`
   );
+}
+
+/**
+ * CP-9 end-to-end: run the release gate and persist the verdict.
+ *
+ * Fuses compare → classify into the deterministic release decision
+ * (evaluateReleaseGate), then persists the pre-row verdict to
+ * vision.wr_compile_verdicts (idempotent on the deterministic verdict_id).
+ * Returns the decision + the persisted verdict_id for the caller/bootstrapper.
+ */
+export async function runCompileGate(opts: {
+  wr: CompareTarget;
+  plan: CompareTarget;
+  assignment: RippleAssignment;
+  entityKey: string;
+  ruleVersion?: string;
+  wrId?: string | null;
+  planId?: string | null;
+}): Promise<ReleaseDecision & { verdict_id: string }> {
+  const decision = evaluateReleaseGate(opts.wr, opts.plan, opts.assignment);
+  const ruleVersion = opts.ruleVersion ?? "1";
+  const verdictId = computeCompileVerdictId(
+    decision.verdict,
+    opts.entityKey,
+    ruleVersion,
+    decision.reason,
+  );
+  await insertCompileVerdict({
+    verdict_id: verdictId,
+    entity_key: opts.entityKey,
+    wr_id: opts.wrId ?? null,
+    plan_id: opts.planId ?? null,
+    verdict_type: decision.verdict,
+    rule_version: ruleVersion,
+    description: decision.reason,
+    route: decision.classification.route,
+  });
+  return { ...decision, verdict_id: verdictId };
 }
 
 export async function deleteReceiptsByPlanAndType(
@@ -3656,7 +3994,7 @@ export interface TicketRow {
 
 async function _isPlanTerminal(planId: string): Promise<boolean> {
   const row = await qOne(
-    `SELECT type FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId
+    `SELECT type FROM nebula.receipts_unified WHERE plan_id = @planId
      ORDER BY created_at DESC LIMIT 1`,
     { planId }
   );
@@ -4337,6 +4675,45 @@ export async function getEvents(wrId: string): Promise<WorkRequestEventRow[]> {
   );
 }
 
+// ── CIR-SDM violation persistence (T23 Step 8) ─────────────────────
+// Governed-decision record: a blocking violation detected at WR-transition
+// admission is recorded in peb.cir_violations (INSERT-only, idempotent on the
+// deterministic violation_id) — never a mutation of canonical WR rows.
+
+export interface CirViolationRow {
+  violation_id: string;
+  cer_id: string | null;
+  event_id: string;
+  rule_id: string;
+  rule_version: string;
+  severity: string;
+  description: string;
+  detected_at: number | null;
+  blocking: boolean;
+}
+
+export async function insertCirViolation(v: CirViolationRow): Promise<number> {
+  return qRun(
+    `INSERT INTO ${PEB_SCHEMA}.cir_violations
+       (violation_id, cer_id, event_id, rule_id, rule_version, severity, description, detected_at, blocking)
+     VALUES (@violation_id, @cer_id, @event_id, @rule_id, @rule_version, @severity, @description, @detected_at, @blocking)
+     ON CONFLICT (violation_id) DO NOTHING`,
+    {
+      violation_id: v.violation_id,
+      cer_id: v.cer_id,
+      event_id: v.event_id,
+      rule_id: v.rule_id,
+      rule_version: v.rule_version,
+      severity: v.severity,
+      description: v.description,
+      detected_at: v.detected_at
+        ? new Date(v.detected_at * 1000).toISOString()
+        : null,
+      blocking: v.blocking,
+    },
+  );
+}
+
 export async function getAllEvents(filters?: {
   eventType?: string;
   limit?: number;
@@ -4491,9 +4868,14 @@ export async function listWorkRequestStates(filters?: {
   }
   const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
   const limit = filters?.limit ?? 50;
+  // Guard: work_request_uuid is TEXT and legacy rows may hold non-uuid ids
+  // (e.g. 'wr-test-p11-local'); casting those to uuid throws and kills the
+  // whole unfiltered listing. Only cast well-formed uuids.
   return qAll(
     `SELECT wr.*,
-            (SELECT count(*) FROM ${PG_SCHEMA}.work_request_events e WHERE e.work_request_id = wr.work_request_uuid::uuid) AS event_count
+            (SELECT count(*) FROM ${PG_SCHEMA}.work_request_events e
+             WHERE wr.work_request_uuid ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+               AND e.work_request_id = wr.work_request_uuid::uuid) AS event_count
      FROM ${VISION_SCHEMA}.work_requests wr
      ${where}
      ORDER BY wr.recorded_on_dt DESC
@@ -4505,12 +4887,12 @@ export async function listWorkRequestStates(filters?: {
 export async function listReceiptsByPlan(planId: string, asOf?: string): Promise<any[]> {
   if (asOf) {
     return qAll(
-      `SELECT * FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId AND created_at <= @asOf ORDER BY created_at ASC`,
+      `SELECT * FROM nebula.receipts_unified WHERE plan_id = @planId AND created_at <= @asOf ORDER BY created_at ASC`,
       { planId, asOf }
     );
   }
   return qAll(
-    `SELECT * FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId ORDER BY created_at ASC`,
+    `SELECT * FROM nebula.receipts_unified WHERE plan_id = @planId ORDER BY created_at ASC`,
     { planId }
   );
 }
@@ -4522,7 +4904,7 @@ export async function getTokenUsageByPlan(planId: string): Promise<{
 }> {
   const row = await qOne(
     `SELECT COALESCE(SUM(tokens_used), 0) as total_tokens, COUNT(*) as receipts
-    FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId`,
+    FROM nebula.receipts_unified WHERE plan_id = @planId`,
     { planId }
   );
   return { plan_id: planId, total_tokens: row?.total_tokens ?? 0, receipts: row?.receipts ?? 0 };
@@ -4533,7 +4915,7 @@ export async function getTokenUsageByRole(role: string): Promise<{
 }> {
   const row = await qOne(
     `SELECT COALESCE(SUM(tokens_used), 0) as total_tokens, COUNT(*) as receipts
-    FROM ${VISION_SCHEMA}.receipts WHERE agent_role = @role`,
+    FROM nebula.receipts_unified WHERE agent_role = @role`,
     { role }
   );
   return { role, total_tokens: row?.total_tokens ?? 0, receipts: row?.receipts ?? 0 };

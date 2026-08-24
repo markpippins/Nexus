@@ -256,7 +256,7 @@ _cascade_srv_healthy() {
     return 1
 }
 
-# ── PEB-kernel (port 8080) ────────────────────────────────────────────
+# ── PEB-kernel (port 8098) ────────────────────────────────────────────
 # Engineering brain. Heartbeat services depend on it.
 
 PEB_KERNEL_DEPENDENT_SERVICES=(
@@ -266,13 +266,13 @@ PEB_KERNEL_DEPENDENT_SERVICES=(
 _peb_kernel_healthy() {
     # Method 1: HTTP health probe (Spring Boot actuator if available)
     if command -v curl &>/dev/null; then
-        if curl -s --max-time 3 http://localhost:8080/actuator/health >/dev/null 2>&1 || \
-           curl -s --max-time 3 http://localhost:8080/health >/dev/null 2>&1; then
+        if curl -s --max-time 3 http://localhost:8098/actuator/health >/dev/null 2>&1 || \
+           curl -s --max-time 3 http://localhost:8098/health >/dev/null 2>&1; then
             return 0
         fi
     fi
-    ss -tlnp 2>/dev/null | grep -q ':8080 ' 2>/dev/null && return 0
-    timeout 2 bash -c 'echo > /dev/tcp/localhost/8080' 2>/dev/null && return 0
+    ss -tlnp 2>/dev/null | grep -q ':8098 ' 2>/dev/null && return 0
+    timeout 2 bash -c 'echo > /dev/tcp/localhost/8098' 2>/dev/null && return 0
     return 1
 }
 

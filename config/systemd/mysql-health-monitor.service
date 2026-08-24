@@ -1,0 +1,16 @@
+[Unit]
+Description=MySQL Health Monitor — alerts on my-mysql DOWN/recovery + stale backups
+Documentation=https://github.com/codex/nexus/wiki/mysql-health-monitor
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/codex/dev/nexus/bin/mysql-health-monitor.sh
+User=codex
+Group=codex
+
+# Hardening (state file written to $XDG_RUNTIME_DIR, usually /run/user/1000/nexus-monitor)
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

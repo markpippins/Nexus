@@ -160,7 +160,7 @@ Stores the ISO 8601 timestamp of the most recent cache sync. Agents check this t
 
 ## Related
 
-- [`nexus/schemas/tackle/memory_procedure_registry.sql`](../../schemas/tackle/memory_procedure_registry.sql) — PostgreSQL DDL for the `tackle.memory` and `tackle.role_memory` tables
+- [`nexus/schemas/migrations/tackle/memory_procedure_registry.sql`](../../schemas/migrations/tackle/memory_procedure_registry.sql) — PostgreSQL DDL for the `tackle.memory` and `tackle.role_memory` tables
 - `nexus/typescript/tackle-mcp/` — MCP server that reads from the Redis cache (via HTTP to role-memory-srv or directly via tools-aggregator)
 - `nexus/typescript/tools-aggregator/` — Aggregates all MCP tools including procedure registry queries
 

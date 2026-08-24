@@ -1,0 +1,20 @@
+# docker/vanadium/docker-compose.vanadium.yml — vanadium-host-only overrides.
+# Apply on the vanadium machine:
+#   docker compose -f docker-compose.yml -f docker-compose.vanadium.yml up -d
+#
+# W2 ruling (2026-08-23, f17d973d): terrain-ts HOST NETWORKING approved.
+# Its prebuilt dist hardcodes localhost PG and has no PG* env support; under
+# host networking "localhost" IS the vanadium host, where PG is co-located
+# per the middle-path DB plan — so the hardcoded value becomes correct.
+# The base manifest keeps bridge networking so local offset-port smoke
+# tests are unaffected.
+#
+# Engineer backlog (W2): recover terrain-ts TS source or re-package dist
+# with PG* env support before ANY future image refresh — hardcoded localhost
+# must not survive into a bridged image.
+services:
+  terrain-ts:
+    network_mode: host
+    # Host networking ignores published ports; !reset drops the base mapping
+    # (requires compose v2.24+; vanadium runs a newer release).
+    ports: !reset []

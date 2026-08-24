@@ -29,7 +29,6 @@ export class SidebarComponent {
   ];
 
   reasonItems = [
-    { route: '/intents', label: 'Intent Records', icon: 'scroll-text', countKey: 'intents' as keyof Counts },
     { route: '/agendas', label: 'Agendas', icon: 'list-checks', countKey: 'agendas' as keyof Counts },
     { route: '/specifications', label: 'Specifications', icon: 'file-text', countKey: 'specifications' as keyof Counts },
     { route: '/specs', label: 'Spec Items', icon: 'file-text', countKey: 'specifications' as keyof Counts },

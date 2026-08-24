@@ -23,6 +23,7 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import subprocess
 import sys
 import time
@@ -44,8 +45,12 @@ logging.basicConfig(
 log = logging.getLogger("unified_search")
 
 # ── Config ─────────────────────────────────────────────────────
-OLLAMA_URL = "http://localhost:11434"
-EMBED_MODEL = "nomic-embed-text"
+# Embedding provider is governed by embed_client.py (decision 8ae276bf):
+# NVIDIA NIM -> OpenRouter -> local ollama fallback.  These constants
+# are legacy defaults; the actual embed call uses embed_client.embed_one()
+# which reads its own env-driven provider chain.
+OLLAMA_URL = os.environ.get('EMBED_OLLAMA_URL', 'http://localhost:11434')
+EMBED_MODEL = os.environ.get('EMBED_MODEL', 'nomic-embed-text')
 DOCKER_PSQL = [
     "docker", "exec", "-i", "pgvector_db",
     "psql", "-U", "pguser", "-d", "nexus",
@@ -54,17 +59,16 @@ DOCKER_PSQL = [
 
 
 def generate_query_embedding(query: str) -> list[float] | None:
-    """Generate an embedding for the search query via Ollama."""
+    """Embedding via tiered provider chain (decision 8ae276bf).
+    NIM/Gemini/OpenRouter external default; local ollama offline fallback.
+    Returns None on total failure -> callers keep stay-pending semantics."""
     try:
-        resp = httpx.post(
-            f"{OLLAMA_URL}/api/embeddings",
-            json={"model": EMBED_MODEL, "prompt": query},
-            timeout=30.0,
-        )
-        resp.raise_for_status()
-        return resp.json()["embedding"]
+        from embed_client import embed_one  # same dir
+        vec, provider = embed_one(query)
+        log.info("query embedding via %s", provider)
+        return vec
     except Exception as e:
-        log.error("Failed to generate query embedding: %s", e)
+        log.error("E_TRANSIENT_LLM_UNAVAILABLE: %s", e)
         return None
 
 

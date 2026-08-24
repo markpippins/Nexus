@@ -1,0 +1,288 @@
+{
+  "$schema": "https://nexus.local/schema/protocol/supervisor-execution/v1",
+  "$id": "https://nexus.local/schema/protocol/supervisor-execution/v1",
+  "title": "Supervisor Execution Protocol",
+  "description": "Canonical protocol for coordinating bounded leased execution across interactive, scheduled, worker, Wind, Duality, and future channels. The Supervisor coordinates lifecycle closure but is not an authority source.",
+  "protocol_version": "1.0",
+  "status": "proposed",
+  "normative_rule": "Agent prose is an observation or proposal. Only a PEB-admitted, SOL-evaluated transition backed by durable evidence may become authoritative state.",
+
+  "topology": {
+    "flow": [
+      "RoleLease",
+      "Supervisor",
+      "ExecutionGrant",
+      "ExecutionAttempt",
+      "Worker",
+      "ExecutionClaim",
+      "EvidenceAdapter",
+      "SOL",
+      "PEBSettlement",
+      "WorkRequestProjection"
+    ],
+    "supervisor_is": [
+      "lifecycle_coordinator",
+      "grant_requester",
+      "attempt_monitor",
+      "evidence_commissioner",
+      "settlement_requester",
+      "recovery_coordinator"
+    ],
+    "supervisor_is_not": [
+      "lease_issuer",
+      "execution_authority",
+      "semantic_evaluator",
+      "independent_verifier",
+      "source_of_work_request_truth",
+      "replacement_for_peb_or_sol"
+    ]
+  },
+
+  "correlation_contract": {
+    "required_identifiers": [
+      "work_request_id",
+      "lease_id",
+      "grant_id",
+      "attempt_id",
+      "claim_id",
+      "evidence_id",
+      "peb_transaction_id"
+    ],
+    "rules": [
+      "Every execution-scoped message carries the identifiers available at its lifecycle stage.",
+      "The Supervisor may correlate identifiers but may not invent or substitute an authority identifier.",
+      "A retry receives a new grant_id and attempt_id and references the prior attempt_id through recovery_of_attempt_id.",
+      "A settled attempt is immutable; recovery never rewrites it into success.",
+      "All messages carry policy_version_hash when they concern an admitted execution or its evidence."
+    ]
+  },
+
+  "message_protocol": {
+    "common_fields": [
+      "message_id",
+      "message_type",
+      "protocol_version",
+      "occurred_at",
+      "causation_id",
+      "correlation_id",
+      "work_request_id",
+      "lease_id",
+      "grant_id",
+      "attempt_id",
+      "policy_version_hash",
+      "idempotency_key"
+    ],
+    "messages": {
+      "ExecutionIntent": {
+        "producer": "WorkRequest-orchestrator",
+        "consumer": "Supervisor",
+        "required_fields": ["work_request_id", "action", "requested_scope", "success_criteria"],
+        "authority": "request_only"
+      },
+      "ExecutionGrantRequest": {
+        "producer": "Supervisor",
+        "consumer": "PEB",
+        "required_fields": ["work_request_id", "lease_id", "action", "requested_scope", "policy_version_hash", "idempotency_key"],
+        "authority": "request_only"
+      },
+      "ExecutionGrant": {
+        "producer": "PEB",
+        "consumer": "Supervisor",
+        "required_fields": ["grant_id", "lease_id", "work_request_id", "action", "capability_scope", "expires_at", "policy_version_hash", "peb_transaction_id"],
+        "authority": "admission_authority"
+      },
+      "AttemptStarted": {
+        "producer": "Supervisor/execution-store",
+        "consumer": "Worker, PEB, projections",
+        "required_fields": ["attempt_id", "grant_id", "started_at", "executor_id", "heartbeat_deadline"],
+        "authority": "execution_observation"
+      },
+      "ExecutionClaim": {
+        "producer": "Worker",
+        "consumer": "Supervisor, SOL",
+        "required_fields": ["claim_id", "attempt_id", "subject_kind", "subject_ref", "predicate", "object_value", "declared_by", "declared_at"],
+        "authority": "proposal_only"
+      },
+      "Evidence": {
+        "producer": "Independent evidence adapter",
+        "consumer": "Supervisor, SOL, PEB",
+        "required_fields": ["evidence_id", "evidence_kind", "source_system", "source_hash", "captured_at", "captured_by", "context_kind", "payload", "verifier_id", "verifier_independence"],
+        "authority": "observed_fact_only"
+      },
+      "SolEvaluation": {
+        "producer": "SOL/resolution",
+        "consumer": "Supervisor, PEB",
+        "required_fields": ["claim_id", "evaluation_id", "disposition", "evaluated_at", "rule_set_hash", "evidence_ids"],
+        "authority": "semantic_evaluation"
+      },
+      "SettlementRequest": {
+        "producer": "Supervisor",
+        "consumer": "PEB",
+        "required_fields": ["attempt_id", "grant_id", "claim_id", "evidence_ids", "sol_evaluation_id", "requested_disposition", "causal_chain"],
+        "authority": "request_only"
+      },
+      "SettlementReceipt": {
+        "producer": "PEB/kernel",
+        "consumer": "Supervisor, WorkRequest-authority, projections",
+        "required_fields": ["peb_transaction_id", "attempt_id", "settlement_disposition", "rule_or_reason", "kernel_event_id", "receipt_hash", "settled_at"],
+        "authority": "administrative_authority"
+      },
+      "RecoveryRequest": {
+        "producer": "Supervisor",
+        "consumer": "lease/PEB/execution authority",
+        "required_fields": ["recovery_of_attempt_id", "reason", "requested_scope", "handoff_context"],
+        "authority": "request_only"
+      },
+      "Violation": {
+        "producer": "PEB, SOL, Supervisor, or adapter according to observed violation",
+        "consumer": "governance projections and owning authority",
+        "required_fields": ["violation_id", "violation_type", "severity", "causation_id", "context", "resolution"],
+        "authority": "append_only_finding; owning authority resolves"
+      }
+    }
+  },
+
+  "state_models": {
+    "lifecycle": {
+      "description": "Administrative progress of one execution attempt. Lifecycle state never implies semantic truth.",
+      "initial": "LEASED",
+      "terminal": ["SETTLED"],
+      "states": {
+        "LEASED": {"description": "An active role lease scopes the requested work; no action is yet admitted.", "transitions_to": ["ADMITTED", "SETTLED"]},
+        "ADMITTED": {"description": "PEB issued a bounded ExecutionGrant for one action/attempt.", "transitions_to": ["EXECUTING", "SETTLED"]},
+        "EXECUTING": {"description": "The worker is running under the grant and heartbeat/timeout supervision.", "transitions_to": ["CLAIMED", "SETTLED"]},
+        "CLAIMED": {"description": "The worker emitted an append-only claim; the claim is not verified.", "transitions_to": ["EVIDENCE_COLLECTING", "SETTLED"]},
+        "EVIDENCE_COLLECTING": {"description": "The Supervisor commissioned the independent adapter and is correlating immutable evidence.", "transitions_to": ["EVALUATED", "SETTLED"]},
+        "EVALUATED": {"description": "SOL produced a durable semantic evaluation for the claim and evidence set.", "transitions_to": ["SETTLED"]},
+        "SETTLED": {"description": "PEB recorded the final administrative disposition; this attempt is immutable.", "transitions_to": []}
+      },
+      "transitions": [
+        {"from": "LEASED", "to": "ADMITTED", "receipt": "ExecutionGrant", "owner": "PEB"},
+        {"from": "LEASED", "to": "SETTLED", "receipt": "SettlementReceipt", "reason": "lease_expired_or_admission_denied", "owner": "PEB"},
+        {"from": "ADMITTED", "to": "EXECUTING", "receipt": "AttemptStarted", "owner": "Supervisor/execution-store"},
+        {"from": "ADMITTED", "to": "SETTLED", "receipt": "SettlementReceipt", "reason": "grant_expired_or_cancelled", "owner": "PEB"},
+        {"from": "EXECUTING", "to": "CLAIMED", "receipt": "ExecutionClaim", "owner": "Worker_as_claimant"},
+        {"from": "EXECUTING", "to": "SETTLED", "receipt": "SettlementReceipt", "reason": "failed_or_timed_out_without_claim", "owner": "PEB"},
+        {"from": "CLAIMED", "to": "EVIDENCE_COLLECTING", "receipt": "evidence_request", "owner": "Supervisor"},
+        {"from": "CLAIMED", "to": "SETTLED", "receipt": "SettlementReceipt", "reason": "malformed_or_unsupported_claim", "owner": "PEB"},
+        {"from": "EVIDENCE_COLLECTING", "to": "EVALUATED", "receipt": "SolEvaluation", "owner": "SOL"},
+        {"from": "EVIDENCE_COLLECTING", "to": "SETTLED", "receipt": "SettlementReceipt", "reason": "evidence_unavailable_or_timeout", "owner": "PEB"},
+        {"from": "EVALUATED", "to": "SETTLED", "receipt": "SettlementReceipt", "owner": "PEB"}
+      ],
+      "recovery": "Recovery never transitions SETTLED backward. Supervisor requests a new lease/grant/attempt with recovery_of_attempt_id pointing to the settled attempt."
+    },
+    "disposition": {
+      "description": "Orthogonal semantic/evidence/administrative outcome. A disposition does not replace lifecycle state.",
+      "claim_semantic": ["Proposed", "Pending", "Asserted", "Rejected", "Disputed", "Stale", "Retracted"],
+      "evidence_outcome": ["verified", "rejected", "unavailable"],
+      "peb_settlement": ["accepted", "rejected", "pending", "disputed", "stale", "unavailable", "timed_out", "cancelled"],
+      "rules": [
+        "The SOL claim disposition never contains Accepted; accepted is a PEB settlement disposition.",
+        "A worker claim is Proposed or Pending until SOL evaluation; worker prose cannot produce Asserted.",
+        "Evidence outcome verified is a fact from an adapter, not a settlement decision.",
+        "PEB may settle rejected, pending, disputed, stale, unavailable, timed_out, or accepted outcomes, but accepted requires the SOL/evidence gates defined by policy.",
+        "A rejected or unavailable attempt may be recovered only through a new attempt and new grant."
+      ]
+    }
+  },
+
+  "transition_guards": [
+    {
+      "id": "SUP-G01",
+      "transition": "LEASED -> ADMITTED",
+      "owner": "PEB",
+      "requires": ["active lease", "lease not expired", "requested action within lease scope", "budget available", "policy_version_hash present", "idempotency key unused or exact replay"]
+    },
+    {
+      "id": "SUP-G02",
+      "transition": "ADMITTED -> EXECUTING",
+      "owner": "Supervisor",
+      "requires": ["unexpired grant", "capability scope contains action", "unique attempt_id", "worker identity bound", "heartbeat deadline recorded"]
+    },
+    {
+      "id": "SUP-G03",
+      "transition": "EXECUTING -> CLAIMED",
+      "owner": "Worker_as_claimant",
+      "requires": ["attempt is active", "claim is append-only", "claim references attempt/grant/lease", "claim has causation_id", "claim does not mutate WorkRequest state"]
+    },
+    {
+      "id": "SUP-G04",
+      "transition": "CLAIMED -> EVIDENCE_COLLECTING",
+      "owner": "Supervisor",
+      "requires": ["claim schema valid", "adapter selected from subject kind", "adapter request carries grant/lease/attempt/policy context"]
+    },
+    {
+      "id": "SUP-G05",
+      "transition": "EVIDENCE_COLLECTING -> EVALUATED",
+      "owner": "SOL",
+      "requires": ["evidence immutable", "evidence source/hash present", "execution evidence context matches claim and grant", "verifier independent", "adapter outcome known", "evaluation receipt durable"]
+    },
+    {
+      "id": "SUP-G06",
+      "transition": "EVALUATED -> SETTLED",
+      "owner": "PEB",
+      "requires": ["SOL evaluation exists", "settlement request correlation exact", "required evidence references present", "no conflicting replay", "kernel/PEB receipt durable"]
+    },
+    {
+      "id": "SUP-G07",
+      "transition": "SETTLED -> new attempt",
+      "owner": "Supervisor_request_only",
+      "requires": ["prior attempt immutable", "recovery reason recorded", "new lease/grant/attempt identifiers", "handoff context preserved"]
+    }
+  ],
+
+  "authority_matrix": [
+    {"action": "issue_renew_revoke_role_lease", "authority_owner": "Tackle/lease subsystem", "supervisor": "request_or_observe", "worker": "forbidden", "sol": "observe_only", "peb": "validate_reference_only", "projections": "read_only"},
+    {"action": "admit_one_execution_action", "authority_owner": "PEB/kernel", "supervisor": "request_and_correlate", "worker": "forbidden", "sol": "supply_semantic_preconditions_only", "peb": "decide_and_receipt", "projections": "read_only"},
+    {"action": "create_start_monitor_attempt", "authority_owner": "Execution authority store under Supervisor coordination", "supervisor": "coordinate", "worker": "execute_within_grant", "sol": "observe_only", "peb": "bind_receipt", "projections": "read_only"},
+    {"action": "declare_execution_claim", "authority_owner": "Worker/model as claimant", "supervisor": "record_and_forward", "worker": "propose_only", "sol": "evaluate_only", "peb": "reject_unverified_authority", "projections": "display_observation"},
+    {"action": "observe_artifact_or_runtime_fact", "authority_owner": "Independent evidence adapter", "supervisor": "commission_and_correlate", "worker": "cannot_self_verify", "sol": "consume", "peb": "gate_on_evidence", "projections": "display_provenance"},
+    {"action": "evaluate_claim_semantics", "authority_owner": "SOL/resolution", "supervisor": "submit_and_receive", "worker": "forbidden", "sol": "evaluate_and_record_disposition", "peb": "consume_evaluation", "projections": "display_result"},
+    {"action": "settle_execution_attempt", "authority_owner": "PEB/kernel", "supervisor": "request_only", "worker": "forbidden", "sol": "provide_evaluation", "peb": "record_settlement_and_violation", "projections": "display_receipt"},
+    {"action": "transition_work_request_authoritative_state", "authority_owner": "WRP/WorkRequest authority via PEB settlement contract", "supervisor": "request_only", "worker": "forbidden", "sol": "semantic input_only", "peb": "authorize_or_reject", "projections": "project"},
+    {"action": "recover_failed_or_unavailable_attempt", "authority_owner": "Supervisor coordinates; lease/PEB authorize new attempt", "supervisor": "request_new_attempt", "worker": "execute_new_grant_only", "sol": "preserve_prior_disposition", "peb": "issue_new_admission_receipt", "projections": "show_handoff"},
+    {"action": "publish_ui_forum_mongo_projection", "authority_owner": "Projection service", "supervisor": "supply_receipts_only", "worker": "forbidden", "sol": "source_data_only", "peb": "source_receipts_only", "projections": "render_without_authority"}
+  ],
+
+  "global_invariants": [
+    {"id": "SUP-I01", "rule": "No worker, model, Supervisor, UI, or projection may directly mark a WorkRequest completed without a PEB settlement receipt."},
+    {"id": "SUP-I02", "rule": "No claim is evidence merely because it was emitted; no evidence is acceptance merely because it was stored."},
+    {"id": "SUP-I03", "rule": "Every accepted settlement is bound to exactly one lease, grant, attempt, policy version, claim/evidence set, and PEB transaction."},
+    {"id": "SUP-I04", "rule": "Independent verification requires verifier_id distinct from claimant identity and verifier_independence=true; self-verification is rejected."},
+    {"id": "SUP-I05", "rule": "Unavailable verification is not falsity and never becomes acceptance; it settles as unavailable or pending according to policy."},
+    {"id": "SUP-I06", "rule": "All retries are new attempts; old claims, evidence, violations, and settlement receipts are append-only history."},
+    {"id": "SUP-I07", "rule": "Duplicate exact messages are idempotent; conflicting reuse of a transaction, attempt, grant, or evidence correlation is rejected."},
+    {"id": "SUP-I08", "rule": "Policy/procedure/persona hash drift pauses new actions and requires re-anchor or renewal."},
+    {"id": "SUP-I09", "rule": "Supervisor decisions are coordination observations or settlement requests, never unilateral authority decisions."},
+    {"id": "SUP-I10", "rule": "Projection consumers may not be used as an admission or settlement backchannel."}
+  ],
+
+  "required_receipt_chain": [
+    "lease_issued_or_referenced",
+    "execution_grant_admitted",
+    "attempt_started",
+    "claim_observed_or_failure_observed",
+    "evidence_observed_or_unavailable",
+    "sol_evaluation_recorded_or_not_applicable",
+    "peb_settlement_recorded",
+    "work_request_transition_projected"
+  ],
+
+  "conformance_requirements": [
+    "A fabricated artifact claim remains a claim and is rejected when the independent adapter reports the artifact absent.",
+    "A verifier timeout settles unavailable or pending and never rejected solely from infrastructure failure.",
+    "A self-verifying Supervisor or worker cannot produce accepted settlement.",
+    "A stale lease cannot admit a new action, while in-flight history remains readable and immutable.",
+    "Every execution channel uses the same grant, claim, evidence, evaluation, and settlement correlation contract.",
+    "A conflicting replay cannot overwrite a prior receipt or change a settled attempt."
+  ],
+
+  "implementation_status": {
+    "protocol": "proposed",
+    "resolution_claim_evidence": "v28/v29/v30 live in the local resolution catalog; applied out-of-band and absent from the PEB Flyway ledger, with no T24 evidence rows currently present",
+    "git_evidence_adapter": "implemented with AC1-AC10 conformance coverage; current live receipts are rejected for missing or mismatched evidence context",
+    "peb_resolution_admission_adapter": "implemented and active in the Python PEB runtime on :8098; current live resolution claim is Proposed and no claim has reached admitted=true",
+    "supervisor_coordinator_runtime": "not yet implemented",
+    "next_slice": "implement a deterministic coordinator around this protocol for one channel, then promote the conformance suite across all execution channels"
+  }
+}

@@ -5,11 +5,11 @@
 
 Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge graph, and cross-references.
 
-**223 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**225 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/agendas` | AGENDAS (scoped by hierarchy via agenda_items → intent_records → harvest_candidates) GET /api/agendas — list ALL agendas (unscoped, when no hierarchy selected) |
+| GET | `/api/agendas` | AGENDAS (scoped by hierarchy via agenda_items → requirements) GET /api/agendas — list ALL agendas (unscoped, when no hierarchy selected) |
 | GET | `/api/agendas/:id` | GET /api/agendas/:id — single agenda with items |
 | POST | `/api/agendas/:id/finalize` | POST /api/agendas/:id/finalize — create a specification from an agenda |
 | DELETE | `/api/agendas/:id/items` | DELETE /api/agendas/:id/items — remove an agenda item by source_id Query: ?sourceId=<uuid> — finds and deletes the item matching that source |
@@ -35,11 +35,11 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | POST | `/api/audit/:id/regenerate` | POST /api/audit/:id/regenerate — re-read this specific file from disk into DB |
 | GET | `/api/audit/graph` | GET /api/audit/graph — agent records as nodes, cross-references as edges ⚠ MUST be before /audit/:id to avoid Express matching 'graph' as a UUID |
 | POST | `/api/audit/sync` | POST /api/audit/sync — scan filesystem and upsert all audit files |
-| GET | `/api/candidates` |  |
+| GET | `/api/candidates` | /candidates alias — mirrors /harvest-candidates for Assembly UI |
 | GET | `/api/candidates/:id` |  |
 | GET | `/api/cascade/subscriber-status` | cascade interactive-turn subscriber (the daemon that turns duality comments into agent turns). The subscriber tags its PG connection with application_name='cascade-interactive-turn'; when the daemon dies its socket closes and the backend disappears from pg_stat_activity. The duality-ui TopBar polls  |
 | GET | `/api/conduit/deleted-plans` | GET /api/conduit/deleted-plans — shortcut to find all soft-deleted plans |
-| GET | `/api/conduit/plans` | CONDUIT — plan history & point-in-time queries (conduit + vision schemas) Reads from nebula.plans, vision.receipts, vision.tickets via fully qualified table names (pool search_path=nebula). GET /api/conduit/plans — list all conduit plans, option to include soft-deleted Query params: includeDeleted ( |
+| GET | `/api/conduit/plans` | CONDUIT — plan history & point-in-time queries (conduit + vision schemas) Reads from nebula.plans, nebula.receipts_unified, vision.tickets via fully qualified table names (pool search_path=nebula). GET /api/conduit/plans — list all conduit plans, option to include soft-deleted Query params: includeD |
 | GET | `/api/conduit/plans/:id/history` | GET /api/conduit/plans/:id/history — full lifecycle history for one plan Returns plan metadata (even if deleted), all receipts, all tickets, linked sessions, token usage |
 | GET | `/api/conduit/plans/:id/receipts` | GET /api/conduit/plans/:id/receipts — receipts for a specific plan |
 | GET | `/api/conduit/plans/as-of` | GET /api/conduit/plans/as-of — point-in-time snapshot of plan states Query params: timestamp (ISO 8601, required), includeDeleted |
@@ -82,19 +82,21 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | GET | `/api/features/:id/agendas` | GET /api/features/:id/agendas — list agendas scoped to a feature, with nested items |
 | GET | `/api/features/:id/harvest-candidates` | GET /api/features/:id/harvest-candidates — list all harvest candidates linked to a specific feature (filter by feature_id). |
 | GET | `/api/features/:id/implementation-plans` | GET /api/features/:id/implementation-plans — plans linked to a feature |
-| GET | `/api/features/:id/intent-records` | GET /api/features/:id/intent-records — list intent records scoped to a feature |
 | GET | `/api/features/:id/specifications` | GET /api/features/:id/specifications — list specification revisions scoped to a feature |
 | GET | `/api/features/:id/work-requests` | GET /api/features/:id/work-requests — list work requests scoped to a feature |
 | POST | `/api/features/move` | COMPLEX OPERATIONS (transactional) POST /api/features/move — re-parent a feature to a different subsystem |
-| GET | `/api/harvest-candidates` | GET /api/harvest-candidates — list candidates, filterable by harvest or hierarchy |
+| GET | `/api/harvest-candidates` | GET /api/harvest-candidates — list candidates, filterable by harvest or hierarchy Sweep-tooling extras (to-do 7e2d116f): ?completed=true\|false, ?status=<value>, and an endpoint-local page cap of 1000 (global default stays 100) so a sweep can pull the full ~100+ candidate set in one call. `total` is  |
 | POST | `/api/harvest-candidates` | POST /api/harvest-candidates — create a standalone candidate (e.g. manually linked). When systemId is set, auto-upserts a harvest_context info tab on the target system. |
 | GET | `/api/harvest-candidates/:id` | GET /api/harvest-candidates/:id — full candidate with all fields |
 | PATCH | `/api/harvest-candidates/:id` | PATCH /api/harvest-candidates/:id — update candidate (primarily for linking to hierarchy) When systemId is set, auto-upserts the candidate's intent into a harvest_context info tab. |
+| GET | `/api/harvest-candidates/:id/completion` |  |
 | GET | `/api/harvest-candidates/:id/dependencies` | CANDIDATE DEPENDENCIES sub-resource GET /api/harvest-candidates/:id/dependencies |
 | POST | `/api/harvest-candidates/:id/promote` | POST /api/harvest-candidates/:id/promote — mark candidate as useful |
-| POST | `/api/harvest-candidates/:id/spawn-plan` | POST /api/harvest-candidates/:id/spawn-plan — full flow: link candidate to system, create a requirement derived from the candidate, and optionally cross-reference a conduit plan — all in one atomic transaction. |
+| POST | `/api/harvest-candidates/:id/spawn-plan` | POST /api/harvest-candidates/:id/spawn-plan — DEPRECATED alias (decision 319defa5): candidates promote ONLY to requirements; verb renamed to spawn-requirement. Fails loudly with a pointer so callers migrate. |
+| POST | `/api/harvest-candidates/:id/spawn-requirement` | POST /api/harvest-candidates/:id/spawn-requirement — full flow: link candidate to system, create a requirement derived from the candidate, and optionally cross-reference a conduit plan — all in one atomic transaction. (Renamed from spawn-plan per decision 319defa5.) |
+| POST | `/api/harvest-candidates/completion-sweep` | Batch variant: POST /api/harvest-candidates/completion-sweep { ids: [...] } Missing/unknown ids are reported per-id rather than failing the batch. |
 | POST | `/api/harvest-candidates/discover` | HARVEST CANDIDATE DISCOVERY — semantic search against project hierarchy POST /api/harvest-candidates/discover — match unlinked candidates to systems/subsystems/features via semantic search, flagging undocumented projects below confidence threshold. |
-| POST | `/api/harvest-candidates/promote-to-plan` | POST /api/harvest-candidates/promote-to-plan — collate useful candidates into a conduit plan |
+| POST | `/api/harvest-candidates/promote-to-plan` | POST /api/harvest-candidates/promote-to-plan — RETIRED (architect ruling on to-do e68449f2): the backing nebula.candidates_to_plan() procedure was dropped in a migration and must NOT be resurrected — spawn_requirement_from_candidate is the canonical promotion path (MCP-surfaced, sets requirements.ca |
 | GET | `/api/harvests` | HARVESTS — database-first harvest pipeline output GET /api/harvests — list all harvests with sort/filter support + pagination sort options: candidate_count, code_blocks, turns, block_density, collaboration, created_at |
 | POST | `/api/harvests` | POST /api/harvests — create a new harvest record AND unpack candidates into harvest_candidates (dual-write: JSONB preserved for Rover + relational for linking) |
 | DELETE | `/api/harvests/:id` | DELETE /api/harvests/:id |
@@ -107,18 +109,14 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | GET | `/api/inbox-pointer/:role` | INBOX POINTERS — per-role watermark for unread messages GET /api/inbox-pointer/:role — get the inbox pointer for a role |
 | PUT | `/api/inbox-pointer/:role` | PUT /api/inbox-pointer/:role — set the inbox pointer for a role |
 | GET | `/api/inbox-pointers` | GET /api/inbox-pointers — list all inbox pointers (debugging) |
-| GET | `/api/intent-records` | INTENT RECORDS (scoped by hierarchy via harvest_candidates JOIN) GET /api/intent-records — list ALL intent records with pagination |
-| GET | `/api/intent-records/:id` | GET /api/intent-records/:id — full intent record with candidate info |
-| GET | `/api/intents` | INTENT RECORDS GET /api/intents — list with pagination |
-| GET | `/api/intents/:id` | GET /api/intents/:id — single intent record |
 | GET | `/api/inventory` | GET /api/inventory — rollup counts for the full hierarchy tree Returns per-node counts (systems/subsystems/features) for tree badges plus global totals. Single query, no per-node N+1. |
-| GET | `/api/knowledge/cross-references` | GET /api/knowledge/cross-references — list cross-references for graph overlay with pagination. Also includes harvest_candidate spawn-plan cross-references from nebula.cross_references. |
+| GET | `/api/knowledge/cross-references` | GET /api/knowledge/cross-references — list cross-references for graph overlay with pagination. Also includes harvest_candidate spawn-requirement cross-references from nebula.cross_references. |
 | GET | `/api/knowledge/edges` | GET /api/knowledge/edges — list graph edges with optional filters and pagination |
 | GET | `/api/knowledge/entities` | KNOWLEDGE GRAPH — read-only queries for graph visualization GET /api/knowledge/entities — list knowledge graph entities with optional filters and pagination |
 | GET | `/api/knowledge/entities/:section/:entityId` | GET /api/knowledge/entities/:section/:entityId — get single entity |
 | GET | `/api/knowledge/entities/:section/:entityId/relations` | GET /api/knowledge/entities/:section/:entityId/relations — inbound + outbound with pagination |
 | GET | `/api/knowledge/summary` | GET /api/knowledge/summary — entity counts by section (with embedded), edge counts by relation type |
-| GET | `/api/knowledge/view` | GET /api/knowledge/view — combined data payload for graph visualization Returns all entities (including linked harvest_candidates) + all edges in one call, with optional limit. Harvest_candidates are unioned so spawn-plan cross-references render as dashed edges in graph-view X-Refs mode. |
+| GET | `/api/knowledge/view` | GET /api/knowledge/view — combined data payload for graph visualization Returns all entities (including linked harvest_candidates) + all edges in one call, with optional limit. Harvest_candidates are unioned so spawn-requirement cross-references render as dashed edges in graph-view X-Refs mode. |
 | GET | `/api/observations` | OBSERVATIONS GET /api/observations — list with pagination |
 | GET | `/api/observations/:id` | GET /api/observations/:id — single observation |
 | GET | `/api/op-registry` | GET /api/op-registry — list registry entries with optional filters and pagination |
@@ -168,11 +166,17 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | GET | `/api/role-leases` | GET /api/role-leases — list role leases (filters: role, status) |
 | POST | `/api/role-leases/:id/renew` | POST /api/role-leases/:id/renew — renew an ACTIVE lease (window + budget) |
 | POST | `/api/role-leases/:id/revoke` | POST /api/role-leases/:id/revoke — release an ACTIVE role lease |
+| GET | `/api/role-leases/:role/status` | GET /api/role-leases/:role/status — derived lease state for (role, channel) (D-2026-08-16-008 R1). NEVER_LEASED / ACTIVE / REVOKED / EXPIRED. |
 | POST | `/api/role-leases/consume` | POST /api/role-leases/consume — increment consumed_units (all channels) Unified accounting: execution_worker, harness-srv, and interactive Freebuff all hit this one endpoint for lease consumption. When the budget is exhausted, the endpoint auto-revokes the lease and emits a type:lease-exhausted agen |
 | POST | `/api/role-leases/issue` | ROLE LEASES (RoleLeases / plan 1286) — session-level leases in tackle schema: a bounded window + budget under which a role on a channel may consume work. Mirrors execution.leases (per-request) at role scope. POST /api/role-leases/issue — issue an ACTIVE role lease |
 | GET | `/api/role-leases/stale` | GET /api/role-leases/stale — ACTIVE leases past window/budget (for sweep) |
+| POST | `/api/role-leases/sweep` | POST /api/role-leases/sweep — transition stale ACTIVE leases → EXPIRED (D-2026-08-16-007 R5). Idempotent; non-destructive (never RELEASED — that stays the explicit-revoke/auto-exhaust path). Each swept lease emits a type:drift-finding record so the operator sees it. Wired at nebula-srv startup + on  |
 | GET | `/api/roles` | ROLES GET /api/roles — list all roles (governance roles with capabilities) |
+| POST | `/api/roles` | POST /api/roles — create role metadata (Gap 2: nebula.roles create API) |
+| DELETE | `/api/roles/:id` | DELETE /api/roles/:id — remove role metadata (Gap 2). Accepts a UUID or a role name (architect review: previously UUID-only). Hard delete guarded: FK references from wind.titles / nebula.roles_history surface as 23503 → 409 with a hint instead of a raw PG error. |
 | GET | `/api/roles/:id` | GET /api/roles/:id — single role |
+| PATCH | `/api/roles/:id` | PATCH /api/roles/:id — update capabilities/visibility/description (Gap 2) |
+| GET | `/api/roles/drift` | (D-2026-08-16-009 R5). Three planes: governance = nebula.roles (current bitemporal view) + roles_history runtime = tackle.roles (runtime personas) execution = tackle.role_leases (ACTIVE leases) Read-only: surfaces drift findings, never silently reconciles. Registered BEFORE /roles/:id so 'drift' is  |
 | GET | `/api/search` | SEARCH (cross-entity full-text) GET /api/search?q=... |
 | POST | `/api/search/semantic` | SEMANTIC SEARCH POST /api/search/semantic — vector similarity search against knowledge graph Accepts a pre-embedded query vector (768-dim, matching nomic-embed-text) and returns similar entities from knowledge.graph_entity_embeddings. |
 | POST | `/api/seed` | POST /api/seed — seed default example data (Plan 0087, idempotent, atomic) |
@@ -200,7 +204,6 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | GET | `/api/subsystems/:id/docs` | GET /api/subsystems/:id/docs — read docs from workspace path for a subsystem |
 | GET | `/api/subsystems/:id/harvest-candidates` | GET /api/subsystems/:id/harvest-candidates — list all harvest candidates linked to a specific subsystem (filter by subsystem_id). |
 | GET | `/api/subsystems/:id/implementation-plans` | GET /api/subsystems/:id/implementation-plans — plans linked to a subsystem |
-| GET | `/api/subsystems/:id/intent-records` | GET /api/subsystems/:id/intent-records — list intent records scoped to a subsystem |
 | GET | `/api/subsystems/:id/specifications` | GET /api/subsystems/:id/specifications — list specification revisions scoped to a subsystem |
 | GET | `/api/subsystems/:id/work-requests` | GET /api/subsystems/:id/work-requests — list work requests scoped to a subsystem |
 | POST | `/api/subsystems/move` | POST /api/subsystems/move — re-parent a subsystem to a different system |
@@ -220,7 +223,6 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | GET | `/api/systems/:id/info` | SYSTEM INFO TABS GET /api/systems/:id/info — get all info tabs for a system with pagination |
 | DELETE | `/api/systems/:id/info/:tabId` | DELETE /api/systems/:id/info/:tabId — delete an info tab When tabId='harvest_context', also unlinks all candidates from this system. |
 | PUT | `/api/systems/:id/info/:tabId` | PUT /api/systems/:id/info/:tabId — save an info tab |
-| GET | `/api/systems/:id/intent-records` | GET /api/systems/:id/intent-records — list intent records scoped to a system |
 | GET | `/api/systems/:id/inventory` | SYSTEM INVENTORY (unified cross-schema view) GET /api/systems/:id/inventory — unified inventory via asset_relation V076 migration: joins through asset_relation (system OWNS service) instead of the deprecated system_external_ids junction. |
 | GET | `/api/systems/:id/specifications` | GET /api/systems/:id/specifications — list specification revisions scoped to a system |
 | GET | `/api/systems/:id/work-requests` | GET /api/systems/:id/work-requests — list work requests scoped to a system |
@@ -239,3 +241,200 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 cd nexus && python3 tools/api-docs/extract_routes.py --out /tmp/api_inventory.json
 python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (vision-srv also refreshes from the live FastAPI spec)
 ```
+
+<!-- API-SPEC-BEGIN -->
+
+
+
+
+
+
+
+
+
+
+
+
+---
+
+# nebula-srv — REST & Envelope Spec
+
+> **Hand-authored section — preserved across regeneration.** Base URL:
+> `http://localhost:3101`. JSON in/out (CORS). Canonical knowledge graph over
+> the `nebula` PostgreSQL schema. **This is the database-first API** — the
+> canonical write path for harvests, agent records, projections, plans, and
+> most knowledge artifacts. Filesystem audit files are projections, never the
+> source of truth.
+>
+> **Conventions:**
+> - List endpoints are paginated; most return `{ items: [...], total, limit, offset }` (or family-specific keys like `records`, `harvests`).
+> - Agent records support filters: `role`, `recordType`, `level`, `tags`, `createdAfter` (ISO), `limit` (≤100), plus full-text `q`.
+> - Errors: `{ error: "<message>" }` with 400/404/500.
+
+## Agent records (database-first audit trail)
+
+The core messaging + audit primitive. List fields (id, recordType, role,
+model, title, sourcePath, tags, systemId, subsystemId, featureId, planRef,
+createdAt, level, visibilityScope); detail adds the full `content`.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/agent-records` | List with filters + pagination. |
+| `POST /api/agent-records` | **Create** — canonical write path. Body: `{ recordType, role, title, content, tags[], level?, visibilityScope? }`. `recordType` ∈ `report, analysis, assessment, inspection, prompt, response, engineering_log, architecture_note, decision`. `level` ∈ 1–4. |
+| `GET /api/agent-records/:id` | Full record **with content**. |
+| `PATCH /api/agent-records/:id` | Update fields. |
+| `DELETE /api/agent-records/:id` | Delete. |
+| `POST /api/agent-records/search` | Multi-tag AND/OR search. |
+
+## Hierarchy: systems → subsystems → features
+
+Each level has CRUD + scoped children lists:
+
+| Resource | CRUD | Scoped children |
+|----------|------|-----------------|
+| Systems | `GET/POST /api/systems`, `GET/PATCH/DELETE /api/systems/:id`, `POST /api/systems/demote/:id` | `…/:id/agendas`, `docs`, `harvest-candidates`, `implementation-plans`, `specifications`, `work-requests`, `inventory`, `info`, `external-ids`, `folders` |
+| Subsystems | `POST /api/subsystems`, `GET/PATCH/DELETE /api/subsystems/:id`, `POST /api/subsystems/move` | `…/:id/agendas`, `docs`, `harvest-candidates`, `implementation-plans`, `specifications`, `work-requests` |
+| Features | `POST /api/features`, `GET/PATCH/DELETE /api/features/:id`, `POST /api/features/move` | `…/:id/agendas`, `harvest-candidates`, `implementation-plans`, `specifications`, `work-requests` |
+
+## Harvests
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/harvests` | List with pagination. |
+| `POST /api/harvests` | **Create harvest** (canonical write path). |
+| `GET /api/harvests/:id` | Single harvest. |
+| `DELETE /api/harvests/:id` | Delete. |
+| `GET /api/harvests/:id/transcript` | Conversation transcript for the harvest. |
+| `GET /api/harvests/distribution` | Distribution stats. |
+
+## Harvest candidates
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/harvest-candidates` | List with filters + pagination (CPF scores, status). |
+| `POST /api/harvest-candidates` | Create. |
+| `GET /api/harvest-candidates/:id` | Single candidate. |
+| `PATCH /api/harvest-candidates/:id` | Update. |
+| `GET /api/harvest-candidates/:id/dependencies` | Candidate dependencies. |
+| `POST /api/harvest-candidates/:id/promote` | Promote → mark candidate as useful (stage). |
+| `POST /api/harvest-candidates/:id/spawn-plan` | Spawn an implementation plan. |
+| `POST /api/harvest-candidates/discover` | Batch discovery. |
+| `POST /api/harvest-candidates/promote-to-plan` | Bulk promote-to-plan. |
+
+`/api/candidates` aliases `/api/harvest-candidates` (Assembly UI compat).
+
+## Requirements
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/requirements` | List with filters + pagination. |
+| `POST /api/requirements` | Create. |
+| `GET /api/requirements/:id` · `PATCH` · `DELETE` | Single / update / delete. |
+| `PATCH /api/requirements/batch` | Batch update. |
+| `GET /api/requirements/:id/children` | Child requirements. |
+| `POST /api/requirements/:id/compile` | Compile → implementation plan. |
+| `GET/POST/DELETE /api/requirements/:id/dependencies[/:depId]` | Dependency edges. |
+| `POST /api/requirements/:id/move` | Reparent. |
+
+## Plans, specifications, agendas
+
+- **Plans:** `GET/POST /api/plans`, `GET /api/plans/:id`, `GET /api/plans/:planRef/candidates`.
+- **Specifications:** `GET /api/specifications`, `GET /api/specifications/:id`, `POST /api/specifications/:id/link-requirements`.
+- **Agendas:** `GET /api/agendas`, `GET /api/agendas/:id`, `POST /api/agendas/:id/items` (body includes `sourceId`), `DELETE /api/agendas/:id/items?sourceId=<uuid>`, `POST /api/agendas/:id/finalize`.
+
+## Open questions
+
+`GET/POST /api/open-questions`, `GET /api/open-questions/:id`,
+`PUT /api/open-questions/:id/answer` (mark answered), `GET/POST …/answers`,
+`GET/POST …/participants`, `PUT /api/open-questions/:id/resolve`,
+`GET /api/open-questions/:id/timeline`.
+
+## Projections (DB → markdown)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/projections` | List projection configs. |
+| `POST /api/projections` | Create config (recordType/role/template/scope). |
+| `DELETE /api/projections/:id` | Delete config. |
+| `POST /api/projections/:id/render` | Render one projection (DB → audit markdown file). |
+
+## Audit (filesystem projection of agent records)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/audit` | List audit files with pagination. |
+| `GET /api/audit/:id` | Single audit file with content. |
+| `GET /api/audit/graph` | Agent records as nodes, cross-references as edges. |
+| `POST /api/audit/sync` | Scan filesystem, upsert all audit files. |
+| `POST /api/audit/:id/regenerate` | Re-read one file from disk into DB. |
+
+## Knowledge graph
+
+`GET /api/knowledge/entities`, `GET /api/knowledge/entities/:section/:entityId`,
+`GET /api/knowledge/entities/:section/:entityId/relations`,
+`GET /api/knowledge/edges`, `GET /api/knowledge/cross-references`,
+`GET /api/knowledge/summary`, `GET /api/knowledge/view`.
+Also `GET/POST/DELETE /api/cross-references[/:id]`.
+
+## Role leases (dispenser)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/role-leases?role=` | List leases (optionally by role). |
+| `GET /api/role-leases/stale` | Leases past their window still ACTIVE. |
+| `POST /api/role-leases/issue` | Issue a lease (role, channel, model, window, budget). |
+| `POST /api/role-leases/:id/renew` | Renew window + budget. |
+| `POST /api/role-leases/:id/revoke` | Revoke. |
+| `POST /api/role-leases/consume` | **Canonical accounting**: `consumed_units += 1` for a role's active lease (body `{ role }`). |
+
+## Execution bridge
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET/POST /api/execution/requests` | List / create execution requests. |
+| `GET /api/execution/requests/:id` | Single request. |
+| `PATCH /api/execution/requests/:id/transition` | State transition. |
+| `POST /api/execution/leases/acquire` | Acquire a lease. |
+| `POST /api/execution/leases/:id/renew` · `…/release` | Renew / release. |
+| `GET/POST /api/execution/attempts` | List / create attempts. |
+| `GET/POST /api/execution/receipts` | List / create receipts. |
+| `GET /api/execution/state` | Execution state snapshot. |
+
+## Conduit projection
+
+`GET /api/conduit/plans`, `GET /api/conduit/deleted-plans`,
+`GET /api/conduit/plans/:id/history`, `GET /api/conduit/plans/:id/receipts`,
+`GET /api/conduit/plans/as-of` — conduit plan receipts/history mirrored for
+UI (normalized field set differs from conduit-srv's native shapes).
+
+## Other families
+
+| Family | Endpoints |
+|--------|-----------|
+| Roles | `GET/POST /api/roles`, `GET/PATCH/DELETE /api/roles/:id` |
+| Sessions | `GET/POST /api/sessions`, `PATCH/DELETE /api/sessions/:id` |
+| Observations / assessments | `GET /api/observations[/:id]`, `GET /api/assessments[/:id]` |
+| Architect specs / artifact provenance / op-registry | CRUD per family; op-registry adds `…/:id/lineage`, `…/:id/supersede`, `…/:id/deprecate`, `POST /api/op-registry/fork` |
+| Evidence links | `GET/POST/DELETE /api/evidence-links`, `DELETE /api/evidence-links` (bulk by query) |
+| CPF | `GET /api/cpf`, `GET /api/cpf/count`, `POST /api/cpf/promote` |
+| Segments / workspaces | CRUD |
+| Snapshots | `POST /api/snapshots`, `GET /api/snapshots/:id/blocks|projection|references` |
+| Conversations | `GET /api/conversations`, `GET /api/conversations/:id/blocks|snapshots`, `GET /api/conversations/by-snapshot/:snapshotId[/blocks]` |
+| Inbox pointer | `GET /api/inbox-pointer/:role`, `PUT /api/inbox-pointer/:role` (body `{ timestamp: "<ISO>" }`) |
+| Preferences | `GET /api/preferences`, `PUT/DELETE /api/preferences/:key` |
+| External ids | `GET /api/external-ids`, `PATCH /api/external-ids/:id` |
+| Projection overrides | `POST /api/projection-overrides`, `DELETE …/:id` |
+| Search | `GET /api/search`, `POST /api/search/semantic` |
+| Cascade subscriber status | `GET /api/cascade/subscriber-status` (interactive-turn subscriber liveness) |
+
+## Health
+
+- `GET /api/health` · `GET /health` — process + DB health.
+
+## Notes
+
+- **Database-first:** never write `.md` files directly to audit dirs as the
+  initial persistence path — create records/harvests/plans through this API;
+  the filesystem is a derived projection (`POST /api/projections/:id/render`).
+- Timestamps are epoch-millis in list responses; inbox-pointer `createdAfter`
+  filters expect ISO 8601 strings.

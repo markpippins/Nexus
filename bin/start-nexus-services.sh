@@ -44,7 +44,7 @@ ALL_SERVICES=(
     "file-system-server.service"        # port 4042 — file system operations (monaco-judge)
     "secure-file-system-server.service" # port 4040 — secure file system operations (service-broker)
     "ui-event-bus.service"     # port 3200 — cross-app UI event bus (SSE)
-    "peb-kernel.service"       # port 8080 — engineering brain
+    "peb-kernel.service"       # port 8098 — engineering brain
     "kernel-srv.service"       # port 8100 — Semantic Kernel REST API (wraps sys_transition, sys_issue_receipt, v_* views; SSE over pg_notify)
     "nebula-srv.service"       # Nebula RMS API
     "cascade-srv.service"      # port 3106 — Cascade Event API
@@ -86,8 +86,7 @@ ALL_SERVICES=(
     "execution-srv.service"    # port 3110 — execution observability REST API
     "harness-srv.service"      # port 3420 — generic execution harness (Tackle role context + Wind task context)
     "mcp-bridge.service"       # ports 3131-3134 — generic stdio-to-SSE bridge (knowledge/vision/peb/terrain MCPs)
-    "tools-aggregator.service" # port 3210 — unified MCP tool-discovery aggregator
-    "slash-command-mcp.service" # port 3220 — Phase-2 DSL MCP (command_lookup/execute/completions → aggregator)
+    "tools-aggregator.service" # port 3210 — unified MCP tool-discovery aggregator (hosts command-router namespace: command_lookup/execute/completions, folded in from slash-command-mcp per D-2026-08-16-002)
     "service-broker-mcp.service" # port 3112 — service-broker MCP over SSE (auth/token tools)
     "substance.service"        # port 3115 — Segment Sets API (FastAPI)
     "moleculer-search.service"  # port 4050 — Moleculer Search API (Google, registry)
@@ -137,7 +136,7 @@ SERVICE_PORTS=(
     ["file-system-server.service"]="4042"
     ["secure-file-system-server.service"]="4040"
     ["ui-event-bus.service"]="3200"
-    ["peb-kernel.service"]="8080"
+    ["peb-kernel.service"]="8098"
     ["kernel-srv.service"]="8100"
     ["nebula-srv.service"]="3101"
     ["cascade-srv.service"]="3106"
@@ -169,8 +168,7 @@ SERVICE_PORTS=(
     ["execution-srv.service"]="3110"
     ["harness-srv.service"]="3420"
     ["mcp-bridge.service"]="3131"     # one of ports 3131-3134 — any bridge target's /health works
-    ["tools-aggregator.service"]="3210"
-    ["slash-command-mcp.service"]="3220"
+    ["tools-aggregator.service"]="3210"   # command-router namespace folded in (D-2026-08-16-002); :3220 retired
     ["service-broker-mcp.service"]="3112"
     ["nexus-control-edge.service"]="8082"
     ["nexus-broker.service"]="4080"
@@ -216,6 +214,7 @@ SERVICE_HEALTH_PATHS=(
     ["peb-ui.service"]="/"
     ["semantic-kernel-ui.service"]="/"
     # Other services with non-standard health paths
+    ["peb-kernel.service"]="/actuator/health"
     ["terrain.service"]="/api/v1/platform/health"
     ["quarkus-broker-gateway.service"]="/api/health"
     ["mildred-dam-api.service"]="/api/health"

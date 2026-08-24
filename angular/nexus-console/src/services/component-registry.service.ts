@@ -3,6 +3,7 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 import { ComponentConfig, INITIAL_REGISTRY, NodeType } from '../models/component-config.js';
 import { PlatformManagementService } from './platform-management.service.js';
 import { RegistryServerProfileService } from './registry-server-profile.service.js';
+import { SERVICE_REGISTRY_ENV, SERVICE_REGISTRY_LEGACY, readEnv } from './endpoint-resolver.js';
 
 @Injectable({
     providedIn: 'root'
@@ -37,7 +38,8 @@ export class ComponentRegistryService {
 
         const profiles = this.registryServerProfileService.profiles();
         if (profiles.length === 0) {
-            return 'http://localhost:8085'; // Default fallback
+            // T25 3.2 (R-A-2026-08-15-008): runtime lookup > env > legacy localhost.
+            return readEnv(SERVICE_REGISTRY_ENV) || SERVICE_REGISTRY_LEGACY; // Default fallback
         }
         let url = profiles[0].registryServerUrl;
         if (!url.startsWith('http')) url = `http://${url}`;

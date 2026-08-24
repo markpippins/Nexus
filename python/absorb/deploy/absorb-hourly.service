@@ -1,0 +1,10 @@
+[Unit]
+Description=absorb hourly: ingest new chat exports + extract candidates (5 most recent)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/codex/dev/nexus/python/absorb
+# Watermark-safe: only new/changed files get absorbed, then the 5 most
+# recent unconsumed documents go through candidate extraction (Rover
+# configbundle via tackle-srv).
+ExecStart=/bin/bash -c 'python3 -u -m absorb run chat-export-markdown && python3 -u -m absorb_candidates consume --limit 5'

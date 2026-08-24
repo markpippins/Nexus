@@ -104,4 +104,60 @@ model ServiceResponseBody {
   encrypt?: boolean;
 }
 
+/**
+ * Broker service registration status.
+ */
+enum ServiceStatus {
+  HEALTHY,
+  UNHEALTHY,
+  UNKNOWN,
+}
+
+/**
+ * A service registration record held by the broker registry.
+ */
+model ServiceRegistration {
+  serviceName: string;
+  operations?: string[];
+  endpoint?: string;
+  healthCheck?: string;
+  metadata?: Record<unknown>;
+  lastHeartbeat?: utcDateTime;
+  status?: ServiceStatus;
+}
+
+/**
+ * Generic broker service response wrapper (ServiceResponseBody is its
+ * non-generic concrete form).
+ */
+model ServiceResponse<T> {
+  ok: boolean;
+  data?: T;
+  errors?: Record<unknown>[];
+  requestId: string;
+  ts: utcDateTime;
+  version?: string = "1.0";
+  service?: string;
+  operation?: string;
+  encrypt?: boolean;
+}
+
+/**
+ * Immutable event emitted per request/response cycle (carried over SSE).
+ */
+model BrokerTrafficEvent {
+  eventId: string;
+  timestamp: string;
+  durationMs: int64;
+  requestId: string;
+  service: string;
+  operation: string;
+  ok: boolean;
+  httpStatus: int32;
+  source: string;
+  request?: ServiceRequest;
+  response?: ServiceResponse<unknown>;
+  errorMessage?: string;
+}
+
 }

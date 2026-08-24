@@ -26,6 +26,23 @@ interface RolesTasksTabProps {
   onDeleteRole: (id: string) => Promise<void>;
   onSavePrompt: (prompt: Partial<PromptTemplate>) => Promise<void>;
   onSaveTask: (task: Partial<TaskDefinition>) => Promise<void>;
+  onRefresh: () => Promise<void>;
+}
+
+export interface ReadinessPiece {
+  key: string;
+  label: string;
+  required: boolean;
+  present: boolean;
+  detail: string;
+}
+
+export interface ReadinessReport {
+  role: string;
+  ready: boolean;
+  requiredPresent: number;
+  requiredTotal: number;
+  pieces: ReadinessPiece[];
 }
 
 export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
@@ -36,7 +53,8 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
   onSaveRole,
   onDeleteRole,
   onSavePrompt,
-  onSaveTask
+  onSaveTask,
+  onRefresh
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'roles' | 'prompts' | 'tasks' | 'dispatch'>('prompts');
 
@@ -62,6 +80,70 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
   const [tScope, setTScope] = useState('');
   const [tCriteriaStr, setTCriteriaStr] = useState('Check active bundle priority\nVerify valid dates');
   const [tPromptId, setTPromptId] = useState('');
+
+  // Provision Role modal (Gap 1 onboarding — POST /roles/provision)
+  const [provisionOpen, setProvisionOpen] = useState(false);
+  const [pvName, setPvName] = useState('');
+  const [pvDesc, setPvDesc] = useState('');
+  const [pvDisplayName, setPvDisplayName] = useState('');
+  const [pvModelId, setPvModelId] = useState('');
+  const [pvTools, setPvTools] = useState('');
+  const [pvProcedures, setPvProcedures] = useState('');
+  const [pvCreateUser, setPvCreateUser] = useState(true);
+  const [provisionBusy, setProvisionBusy] = useState(false);
+  const [provisionResult, setProvisionResult] = useState<{ steps?: string[]; readiness?: ReadinessReport } | null>(null);
+
+  // Readiness modal (Gap 6 — GET /roles/readiness/:name)
+  const [readiness, setReadiness] = useState<ReadinessReport | null>(null);
+  const [readinessBusy, setReadinessBusy] = useState(false);
+
+  const handleProvisionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProvisionBusy(true);
+    setProvisionResult(null);
+    try {
+      const res = await fetch('/roles/provision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: pvName.trim(),
+          description: pvDesc.trim() || undefined,
+          displayName: pvDisplayName.trim() || undefined,
+          modelId: pvModelId.trim() || undefined,
+          tools: pvTools.split(',').map(s => s.trim()).filter(Boolean),
+          procedures: pvProcedures.split(',').map(s => s.trim()).filter(Boolean),
+          createAssemblyUser: pvCreateUser,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error((err && (err.error || err.message)) || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setProvisionResult(data);
+      await onRefresh();
+    } catch (err) {
+      showToast(`Provision error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setProvisionBusy(false);
+    }
+  };
+
+  const handleShowReadiness = async (roleName: string) => {
+    setReadinessBusy(true);
+    try {
+      const res = await fetch(`/roles/readiness/${encodeURIComponent(roleName)}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error((err && (err.error || err.message)) || `HTTP ${res.status}`);
+      }
+      setReadiness(await res.json());
+    } catch (err) {
+      showToast(`Readiness error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setReadinessBusy(false);
+    }
+  };
 
   // Handlers
   const handleSaveRole = async (e: React.FormEvent) => {
@@ -211,17 +293,30 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
           </button>
         )}
         {activeSubTab === 'roles' && (
-          <button
-            onClick={() => {
-              setRoleName('');
-              setRoleDesc('');
-              setRoleModalOpen(true);
-            }}
-            className="px-3 py-1.5 rounded-lg text-sm font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
-          >
-            <Plus className="w-4 h-4 text-[var(--accent-color)]" />
-            <span>Add Role</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setProvisionOpen(true);
+                setProvisionResult(null);
+              }}
+              className="px-3 py-1.5 rounded-lg text-sm font-bold bg-[var(--accent-color)] text-slate-950 hover:opacity-90 border border-[var(--border-color)] transition flex items-center gap-1.5 cursor-pointer"
+              title="One-call atomic role setup (identity + bundle + persona + tools + procedures + nebula sync)"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Provision Role</span>
+            </button>
+            <button
+              onClick={() => {
+                setRoleName('');
+                setRoleDesc('');
+                setRoleModalOpen(true);
+              }}
+              className="px-3 py-1.5 rounded-lg text-sm font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-[var(--accent-color)]" />
+              <span>Add Role</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -436,12 +531,198 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
                 </p>
               </div>
 
-              <div className="pt-2 border-t border-[var(--border-subtle)] text-[10px] font-mono text-[var(--text-muted)] flex justify-between">
+              <div className="pt-2 border-t border-[var(--border-subtle)] text-[10px] font-mono text-[var(--text-muted)] flex items-center justify-between">
                 <span>Role ID: {r.id}</span>
+                <button
+                  onClick={() => handleShowReadiness(r.name)}
+                  disabled={readinessBusy}
+                  className="px-2 py-1 rounded-md text-[10px] font-bold bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--accent-color)] hover:text-slate-950 hover:bg-[var(--accent-color)] transition cursor-pointer"
+                  title="Check role readiness (10-piece checklist)"
+                >
+                  {readinessBusy ? '…' : '✓ Readiness'}
+                </button>
                 <span>{new Date(r.created_at || '').toLocaleDateString()}</span>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* PROVISION ROLE MODAL */}
+      {provisionOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl max-w-lg w-full p-6 space-y-4 shadow-2xl my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+              <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[var(--accent-color)]" />
+                Provision Role
+              </h3>
+              <button onClick={() => setProvisionOpen(false)} className="text-[var(--text-muted)] cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleProvisionSubmit} className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Role Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={pvName}
+                    onChange={e => setPvName(e.target.value)}
+                    placeholder="e.g. synthesizer"
+                    className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 font-mono text-[var(--text-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Display Name</label>
+                  <input
+                    type="text"
+                    value={pvDisplayName}
+                    onChange={e => setPvDisplayName(e.target.value)}
+                    placeholder="Synthesizer"
+                    className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-[var(--text-primary)]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Description</label>
+                <textarea
+                  rows={2}
+                  value={pvDesc}
+                  onChange={e => setPvDesc(e.target.value)}
+                  placeholder="What this role does..."
+                  className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg p-2.5 text-[var(--text-primary)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[var(--text-secondary)] mb-1 font-semibold">
+                  Model ID <span className="text-[var(--text-muted)] font-normal">(optional — creates the config bundle)</span>
+                </label>
+                <input
+                  type="text"
+                  value={pvModelId}
+                  onChange={e => setPvModelId(e.target.value)}
+                  placeholder="e.g. mod-glm-5-2"
+                  className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 font-mono text-[var(--text-primary)]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Tools (comma-separated)</label>
+                  <input
+                    type="text"
+                    value={pvTools}
+                    onChange={e => setPvTools(e.target.value)}
+                    placeholder="conduit-mcp_query_conduit_state"
+                    className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 font-mono text-[var(--text-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Procedures (comma-separated)</label>
+                  <input
+                    type="text"
+                    value={pvProcedures}
+                    onChange={e => setPvProcedures(e.target.value)}
+                    placeholder="inbox-query-procedure"
+                    className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 font-mono text-[var(--text-primary)]"
+                  />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-[var(--text-secondary)] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={pvCreateUser}
+                  onChange={e => setPvCreateUser(e.target.checked)}
+                  className="accent-[var(--accent-color)]"
+                />
+                <span>Also create Assembly user (posting identity)</span>
+              </label>
+
+              {provisionResult && (
+                <div className="bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg p-3 space-y-2 text-xs font-mono">
+                  <div className="text-emerald-400 font-bold">✓ Provisioned — {provisionResult.readiness?.ready ? 'READY' : 'INCOMPLETE'}
+                    {provisionResult.readiness ? ` (${provisionResult.readiness.requiredPresent}/${provisionResult.readiness.requiredTotal} required pieces)` : ''}
+                  </div>
+                  {provisionResult.steps && provisionResult.steps.length > 0 && (
+                    <div className="text-[var(--text-secondary)]">Steps: {provisionResult.steps.join(' → ')}</div>
+                  )}
+                  {provisionResult.readiness?.pieces && (
+                    <ul className="space-y-0.5 text-[var(--text-secondary)]">
+                      {provisionResult.readiness.pieces.filter(p => p.required).map(p => (
+                        <li key={p.key} className={p.present ? 'text-emerald-400' : 'text-rose-400'}>· {p.present ? '✓' : '✗'} {p.label}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setProvisionOpen(false)}
+                  className="px-3 py-1.5 rounded-lg text-[var(--text-secondary)] cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  disabled={provisionBusy}
+                  className="px-4 py-1.5 rounded-lg font-bold bg-[var(--accent-color)] text-slate-950 cursor-pointer disabled:opacity-50"
+                >
+                  {provisionBusy ? 'Provisioning…' : 'Provision Role'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* READINESS MODAL */}
+      {readiness && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+              <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-[var(--accent-color)]" />
+                Readiness: <span className="font-mono">{readiness.role}</span>
+              </h3>
+              <button onClick={() => setReadiness(null)} className="text-[var(--text-muted)] cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className={`text-sm font-bold ${readiness.ready ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {readiness.ready ? '✓ READY' : '⚠ INCOMPLETE'} — {readiness.requiredPresent}/{readiness.requiredTotal} required pieces present
+            </div>
+
+            <ul className="space-y-1.5 text-sm">
+              {readiness.pieces.map(p => (
+                <li key={p.key} className="flex items-start justify-between gap-2">
+                  <span className={`${p.present ? 'text-emerald-400' : 'text-rose-400'} shrink-0`}>{p.present ? '✓' : '✗'}</span>
+                  <span className="flex-1 text-[var(--text-secondary)]">
+                    {p.label}
+                    {!p.required && <span className="text-[var(--text-muted)] text-[10px] ml-1">(optional)</span>}
+                  </span>
+                  {p.detail && <span className="text-[10px] font-mono text-[var(--text-muted)]">{p.detail}</span>}
+                </li>
+              ))}
+            </ul>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setReadiness(null)}
+                className="px-4 py-1.5 rounded-lg font-bold bg-[var(--accent-color)] text-slate-950 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

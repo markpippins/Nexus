@@ -21,14 +21,25 @@ import {
   getAllEvents,
   selectNextRunnable,
   listWorkRequestStates,
+  insertCompileVerdict,
+  computeCompileVerdictId,
+  runCompileGate,
 } from "./db";
+import {
+  gateWrTransition,
+  recordGovernedDecisions,
+  surfaceBlocker,
+  CirsdmEnforceResult,
+} from "./cirsdm";
 import * as api from "./conduit-client";
 import {
   validateCompilerOutput,
   compilerOutputToEvent,
   foldEvents,
   decide,
-  validateTransition,
+  validateTransitionWithOps,
+  getOpTrace,
+  isUnresolvedOps,
   getDecisionPriority,
   dbEventsToRuntimeEvents,
   WorkRequestState,
@@ -286,6 +297,91 @@ export const toolDefinitions: MCPToolDefinition[] = [
     },
   },
   {
+    name: "issue_compile_verdict",
+    description:
+      "Record a WR compile verdict (WR_COMPILE_PASS|WR_COMPILE_FAIL) in " +
+      "vision.wr_compile_verdicts, keyed by the compile unit's entityKey (D3). " +
+      "Pre-release: never mutates WR/plan status. Idempotent — re-issuing the " +
+      "same verdict is a no-op (deterministic verdict_id).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        entity_key: {
+          type: "string",
+          description: "Compile-unit identity (D3 entityKey — emission boundary)",
+        },
+        verdict_type: {
+          type: "string",
+          description: "WR_COMPILE_PASS|WR_COMPILE_FAIL",
+        },
+        rule_version: {
+          type: "string",
+          description: "Verdict rule generation (deterministic)",
+        },
+        description: {
+          type: "string",
+          description: "Human-readable verdict rationale",
+        },
+        wr_id: {
+          type: "string",
+          description: "Optional WR row link (nullable: pure-compile mode)",
+        },
+        plan_id: {
+          type: "string",
+          description: "Optional plan link (re-parented at release)",
+        },
+        detected_at: {
+          type: "string",
+          description: "Optional compile event timestamp (ISO-8601)",
+        },
+        route: {
+          type: "string",
+          description:
+            "Optional classification.route (conduit|conduit-review|reserved). " +
+            "Persisted so the D5 bootstrap gate holds PASS verdicts on reserved " +
+            "(R3/R4) routes.",
+        },
+      },
+      required: ["entity_key", "verdict_type", "rule_version", "description"],
+    },
+  },
+  {
+    name: "run_compile_gate",
+    description:
+      "Run the WR-compile release gate: compare a compiled WR against its plan " +
+      "spec, classify ripple/shape/route, and persist the pre-row " +
+      "WR_COMPILE_PASS/FAIL verdict. Returns the deterministic release decision " +
+      "(verdict, diffs, route, release, verdict_id).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        wr: {
+          type: "object",
+          description: "Compiled WR surface: goal, filesAffected, acceptanceCriteria, deliverable",
+        },
+        plan: {
+          type: "object",
+          description: "Plan spec surface: goal, filesAffected, acceptanceCriteria, deliverable",
+        },
+        assignment: {
+          type: "object",
+          description: "Ripple assignment: ripple (R0-R4), shape (B/E/A), rationale?, dimensions?",
+        },
+        entity_key: {
+          type: "string",
+          description: "Compile-unit entityKey (D3, emission boundary)",
+        },
+        rule_version: {
+          type: "string",
+          description: "Optional verdict rule version (default 1)",
+        },
+        wr_id: { type: "string", description: "Optional WR row link" },
+        plan_id: { type: "string", description: "Optional plan link" },
+      },
+      required: ["wr", "plan", "assignment", "entity_key"],
+    },
+  },
+  {
     name: "revise_plan",
     description:
       "Create a revision copy of an existing implementation_plan in planning state. "
@@ -520,7 +616,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
           type: "object",
           properties: {
             type: { type: "string", description: "Intent type" },
-            inputs: { description: "Intent inputs (any)" },
+            inputs: { description: "Intent inputs — may carry `deliverable` (D1 first-class output path for recon nodes) or `outputs[]`" },
             objective: { type: "string", description: "Objective description" },
           },
           required: ["type", "objective"],
@@ -867,6 +963,72 @@ export function registerToolHandlers(
         count: receipts.length,
         receipts,
       };
+    },
+    issue_compile_verdict: async (args: {
+      entity_key: string;
+      verdict_type: string;
+      rule_version: string;
+      description: string;
+      wr_id?: string;
+      plan_id?: string;
+      detected_at?: string;
+      route?: string;
+    }) => {
+      if (
+        args.verdict_type !== "WR_COMPILE_PASS" &&
+        args.verdict_type !== "WR_COMPILE_FAIL"
+      ) {
+        return {
+          issued: false,
+          error:
+            `verdict_type must be WR_COMPILE_PASS or WR_COMPILE_FAIL ` +
+            `(got ${args.verdict_type})`,
+          entity_key: args.entity_key,
+        };
+      }
+      const verdictId = computeCompileVerdictId(
+        args.verdict_type,
+        args.entity_key,
+        args.rule_version,
+        args.description,
+      );
+      await insertCompileVerdict({
+        verdict_id: verdictId,
+        entity_key: args.entity_key,
+        wr_id: args.wr_id ?? null,
+        plan_id: args.plan_id ?? null,
+        verdict_type: args.verdict_type as "WR_COMPILE_PASS" | "WR_COMPILE_FAIL",
+        rule_version: args.rule_version,
+        description: args.description,
+        detected_at: args.detected_at ?? null,
+        route: args.route ?? null,
+      });
+      return {
+        issued: true,
+        verdict_id: verdictId,
+        entity_key: args.entity_key,
+        verdict_type: args.verdict_type,
+        route: args.route ?? null,
+      };
+    },
+    run_compile_gate: async (args: {
+      wr: any;
+      plan: any;
+      assignment: any;
+      entity_key: string;
+      rule_version?: string;
+      wr_id?: string;
+      plan_id?: string;
+    }) => {
+      return await runCompileGate({
+        wr: args.wr,
+        plan: args.plan,
+        assignment: args.assignment,
+        entityKey: args.entity_key,
+        ruleVersion: args.rule_version,
+        wrId: args.wr_id ?? null,
+        planId: args.plan_id ?? null,
+      });
     },
     revise_plan: async (args: {
       planNumber: string;
@@ -1874,7 +2036,7 @@ export function registerToolHandlers(
       await createWorkRequest({
         id: event.wrId,
         dco_json: JSON.stringify(args),
-        context: { intent: args.intent, constraints: args.constraints, opTrace: args.opTrace },
+        context: { intent: args.intent, constraints: args.constraints, opTrace: args.opTrace, normalization_pending: args.normalization_pending },
         status: "draft",
         title: args.intent?.objective || "",
       });
@@ -1932,8 +2094,37 @@ export function registerToolHandlers(
       const rawEvents = await getEvents(args.wrId);
       if (rawEvents.length === 0)
         throw createError("NOT_FOUND", `WorkRequest ${args.wrId} not found`);
-      const state = foldEvents(args.wrId, dbEventsToRuntimeEvents(rawEvents));
-      validateTransition(state.status, args.type as any);
+      const events = dbEventsToRuntimeEvents(rawEvents);
+      const state = foldEvents(args.wrId, events);
+      validateTransitionWithOps(state.status, args.type as any, getOpTrace(events));
+      // T23 Step 8: CIR-SDM pre-row enforcement gate (fail-closed).
+      const cirsdm = await gateWrTransition(
+        events,
+        args.type,
+        rawEvents[0].work_request_id,
+      ).catch(async (e: any) => {
+        await surfaceBlocker(
+          `enforcement unavailable for ${args.wrId} (${args.type}): ${e.message}`,
+        );
+        throw createError(
+          "CIR_SDM_UNAVAILABLE",
+          `CIR-SDM enforcement unavailable (fail-closed): ${e.message}`,
+        );
+      });
+      if (cirsdm.reject) {
+        await recordGovernedDecisions(cirsdm.decisions);
+        throw createError(
+          "CIR_SDM_REJECTED",
+          `transition ${args.type} violates an enforced CIR-SDM rule`,
+          cirsdm.decisions.map((d) => d.violation_id),
+        );
+      }
+      const warnings = cirsdm.violations.filter((v) => !v.blocking);
+      if (warnings.length > 0) {
+        console.log(
+          `[CIR-SDM] warnings on ${args.wrId}: ${warnings.map((v) => `${v.rule_id}@${v.event_id}`).join(", ")}`,
+        );
+      }
       await appendEvent(args.wrId, args.type, args.payload || {});
       const rawNewEvents = await getEvents(args.wrId);
       const newState = foldEvents(args.wrId, dbEventsToRuntimeEvents(rawNewEvents));
@@ -1945,10 +2136,40 @@ export function registerToolHandlers(
       if (!wr)
         return { ok: true, ticked: false, reason: "no runnable work requests" };
       const rawEvents = await getEvents(wr.work_request_uuid);
-      const state = foldEvents(wr.work_request_uuid, dbEventsToRuntimeEvents(rawEvents));
+      const events = dbEventsToRuntimeEvents(rawEvents);
+      const state = foldEvents(wr.work_request_uuid, events);
+      // D4: never auto-advance an UNRESOLVED WR past VALIDATED.
+      if (state.status === "VALIDATED" && isUnresolvedOps(getOpTrace(events))) {
+        return { ok: true, ticked: false, reason: "UNRESOLVED_OPS: held at VALIDATED, not auto-advancing" };
+      }
       const decision = decide(state);
       if (!decision)
         return { ok: true, ticked: false, reason: `state ${state.status} has no automatic transition` };
+      // T23 Step 8: CIR-SDM pre-row enforcement gate (fail-closed). A gate
+      // outage HOLDS the tick (do not auto-advance) — mirror the D4 hold.
+      let cirsdm: CirsdmEnforceResult | null = null;
+      try {
+        cirsdm = await gateWrTransition(
+          events,
+          decision.type,
+          wr.work_request_uuid,
+        );
+      } catch (e: any) {
+        await surfaceBlocker(
+          `enforcement unavailable for ${wr.work_request_uuid} (${decision.type}): ${e.message}`,
+        );
+      }
+      if (cirsdm === null) {
+        return { ok: true, ticked: false, reason: "CIR_SDM_UNAVAILABLE: held (fail-closed)" };
+      }
+      if (cirsdm.reject) {
+        await recordGovernedDecisions(cirsdm.decisions);
+        return {
+          ok: true, ticked: false,
+          reason: `CIR_SDM_REJECTED: ${cirsdm.decisions.map((d) => d.rule_id).join(", ")}`,
+          decisions: cirsdm.decisions,
+        };
+      }
       await appendEvent(decision.wrId, decision.type, decision.payload as Record<string, unknown>);
       const rawNewEvents = await getEvents(wr.work_request_uuid);
       const newState = foldEvents(wr.work_request_uuid, dbEventsToRuntimeEvents(rawNewEvents));

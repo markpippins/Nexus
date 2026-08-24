@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Mapping
+from uuid import UUID, uuid4
 
 from .domain import (
     AdmissionPath,
     AdmissionResponse,
     AdmissionResult,
+    ExecutionClaimAdmission,
     PebTransaction,
     PebViolation,
     ViolationResolution,
@@ -18,7 +20,7 @@ from .domain import (
     utc_now,
 )
 from .hashing import PebHashService
-from .ports import ConduitMcpPort, LosmIrTransitionPort, PebStore
+from .ports import ConduitMcpPort, LosmIrTransitionPort, PebStore, ResolutionExecutionClaimPort
 
 log = logging.getLogger(__name__)
 
@@ -101,6 +103,47 @@ class PebViolationEngine:
         )
         return self.store.save_violation(violation)
 
+    def record_execution_admission_rejection(
+        self, transaction: PebTransaction, reason: str | None
+    ) -> PebViolation:
+        """Record a rejected execution-claim admission as a first-class authority
+        violation. This path is intentionally separate from ingest: the worker
+        does not get to choose whether its own claim is a violation, and the
+        kernel preserves the rejection reason in the violation context.
+        """
+        violation = PebViolation(
+            id=uuid4(),
+            transaction_id=transaction.id,
+            violation_type=ViolationType.AUTHORITY_LEAKAGE,
+            severity=ViolationSeverity.HARD,
+            entity_id=transaction.entity_id,
+            capability_attempted="execution_claim_admission",
+            context={"reason": reason or "UNKNOWN", "input": transaction.input},
+            resolution=ViolationResolution.REJECTED,
+        )
+        return self.store.save_violation(violation)
+
+    def record_capability_rejection(
+        self, transaction: PebTransaction, reason: str
+    ) -> PebViolation:
+        """Record an admission denied by the capability registry gate."""
+        declared = (
+            transaction.input.get("capability_attempted")
+            if isinstance(transaction.input, Mapping)
+            else None
+        )
+        violation = PebViolation(
+            id=uuid4(),
+            transaction_id=transaction.id,
+            violation_type=ViolationType.AUTHORITY_LEAKAGE,
+            severity=ViolationSeverity.HARD,
+            entity_id=transaction.entity_id,
+            capability_attempted=declared if isinstance(declared, str) else "unknown",
+            context={"reason": reason, "input": transaction.input},
+            resolution=ViolationResolution.REJECTED,
+        )
+        return self.store.save_violation(violation)
+
 
 class PebGovernanceEngine:
     """Coordinates validation, audit persistence, violation persistence, and notifications."""
@@ -113,6 +156,7 @@ class PebGovernanceEngine:
         violation_engine: PebViolationEngine | None = None,
         conduit_adapter: ConduitMcpPort | None = None,
         losm_adapter: LosmIrTransitionPort | None = None,
+        resolution_claim_adapter: ResolutionExecutionClaimPort | None = None,
     ) -> None:
         self.store = store
         self.validator = validator or InvariantValidator()
@@ -120,6 +164,7 @@ class PebGovernanceEngine:
         self.violation_engine = violation_engine or PebViolationEngine(store)
         self.conduit_adapter = conduit_adapter
         self.losm_adapter = losm_adapter
+        self.resolution_claim_adapter = resolution_claim_adapter
 
     def process(self, request: PebTransaction) -> None:
         if self.validator.validate(request):
@@ -133,6 +178,16 @@ class PebGovernanceEngine:
         path = path or AdmissionPath.from_tool_name(request.tool_name)
         bypass_validator = path is AdmissionPath.REPORT_VIOLATION
         validator_passed = bypass_validator or self.validator.validate(request)
+        carries_execution_claim = self._carries_execution_claim(request)
+        execution_admission_reason: str | None = None
+        execution_admission_passed = True
+
+        if validator_passed and carries_execution_claim:
+            # Assign the PEB identity before resolution admission so the
+            # resolution-side receipt is correlated to the exact transaction
+            # that will be persisted below.
+            request.on_create()
+
         request.admission_result = (
             AdmissionResult.REJECTED
             if bypass_validator or not validator_passed
@@ -141,6 +196,46 @@ class PebGovernanceEngine:
 
         with self.store.transaction():
             transaction = self.transaction_engine.begin_transaction(request)
+
+            if validator_passed and carries_execution_claim:
+                if self.resolution_claim_adapter is None:
+                    execution_admission_passed = False
+                    execution_admission_reason = "RESOLUTION_ADMISSION_UNAVAILABLE"
+                else:
+                    assert transaction.id is not None  # set by on_create() above
+                    assessment = self.resolution_claim_adapter.admit_verified_execution_claim(
+                        transaction.id, transaction.input
+                    )
+                    execution_admission_passed = assessment.admitted
+                    execution_admission_reason = assessment.reason
+
+                if not execution_admission_passed:
+                    transaction.admission_result = AdmissionResult.REJECTED
+                    self.violation_engine.record_execution_admission_rejection(
+                        transaction, execution_admission_reason
+                    )
+
+            capability_denial_reason = self._capability_gate(request)
+            capability_denied = False
+            if capability_denial_reason is not None and transaction.admission_result != AdmissionResult.REJECTED:
+                transaction.admission_result = AdmissionResult.REJECTED
+                capability_denied = True
+                self.violation_engine.record_capability_rejection(transaction, capability_denial_reason)
+
+            # Kernel linkage (V4__kernel_semantic_kernel_link): every governance
+            # decision is recorded as a kernel transition event and correlated
+            # onto the persisted transaction. Best-effort — a kernel-side
+            # failure degrades to the legacy NULL-linkage state with a logged
+            # warning rather than blocking admission.
+            try:
+                self.store.record_kernel_event(transaction)
+            except Exception:
+                log.warning(
+                    "Kernel event linkage failed for transaction %s",
+                    transaction.id,
+                    exc_info=True,
+                )
+
             self.transaction_engine.commit_transaction(transaction)
             if bypass_validator:
                 self.violation_engine.ingest(transaction)
@@ -148,6 +243,16 @@ class PebGovernanceEngine:
         self._notify_adapters(transaction, path)
         if bypass_validator:
             return AdmissionResponse.accepted("Violation recorded as REJECTED")
+        if not validator_passed:
+            return AdmissionResponse.denied("Admission denied by invariant validator")
+        if not execution_admission_passed:
+            return AdmissionResponse.denied(
+                f"Execution claim admission denied: {execution_admission_reason}"
+            )
+        if capability_denied:
+            return AdmissionResponse.denied(
+                f"Admission denied by capability registry: {capability_denial_reason}"
+            )
         if validator_passed:
             message = {
                 AdmissionPath.VALIDATE: "Validation processed",
@@ -156,6 +261,43 @@ class PebGovernanceEngine:
             }.get(path, "Transaction processed")
             return AdmissionResponse.accepted(message)
         return AdmissionResponse.denied("Admission denied by invariant validator")
+
+    @staticmethod
+    def _carries_execution_claim(request: PebTransaction) -> bool:
+        return (
+            request is not None
+            and isinstance(request.input, Mapping)
+            and isinstance(request.input.get("execution_claim"), Mapping)
+        )
+
+    def _capability_gate(self, request: PebTransaction) -> str | None:
+        """Consult the capability registry when it is populated.
+
+        Enforcement policy (increment 1, to-do de9585fa):
+          - empty registry → no gating (admission behaviour unchanged);
+          - a transaction that DECLARES ``capability_attempted`` which is not
+            an active registered capability → denied with an authority
+            violation.
+        Undeclared capabilities are logged but not yet denied — mandatory
+        capability declarations need an architect ruling before they can gate
+        live traffic.
+        """
+        try:
+            with self.store.transaction():
+                registered = self.store.list_capabilities()
+        except Exception:
+            log.warning("Capability registry read failed; skipping gate", exc_info=True)
+            return None
+        # Empty registry → admission behaviour unchanged (opt-in enforcement).
+        if not registered or not isinstance(request.input, Mapping):
+            return None
+        active = {c.capability for c in registered if c.active}
+        declared = request.input.get("capability_attempted")
+        if not isinstance(declared, str) or not declared:
+            return None
+        if declared in active:
+            return None
+        return f"CAPABILITY_NOT_GRANTED:{declared}"
 
     def _notify_adapters(self, transaction: PebTransaction, path: AdmissionPath) -> None:
         if self.conduit_adapter is not None and path is not AdmissionPath.UNKNOWN:

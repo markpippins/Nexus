@@ -98,7 +98,7 @@ export interface ConduitReceipt extends ReceiptOrderKey {
  * =================================================================== */
 
 /**
- * 11 WRP states defined in schemas/wrp/wrp-state-machine.json
+ * 11 WRP states defined in schemas/protocol/wrp-state-machine.json
  */
 export type WRPState =
   | "CREATED"       // Initial — work request created but not ingested
@@ -178,7 +178,7 @@ export function receiptToWrpState(type: ConduitReceiptType): WRPState {
 
 /**
  * WRP adjacency matrix: valid transitions between WRP states.
- * Derived from schemas/wrp/wrp-state-machine.json adjacency_matrix.matrix.
+ * Derived from schemas/protocol/wrp-state-machine.json adjacency_matrix.matrix.
  *
  * Valid transitions return true. All other state pairs return false.
  * Terminal states (COMPLETED, ARCHIVED, FAILED) have no outgoing transitions.
@@ -225,7 +225,7 @@ export type AbstractionLevel = "L1" | "L2" | "L3" | "L4";
 export type VisibilityScope = "builder" | "architect" | "planner" | "reviewer" | "all";
 
 /**
- * Chunk kinds from schemas/core/stratification-ontology.json
+ * Chunk kinds from schemas/ontology/core/stratification-ontology.json
  */
 export type ChunkKind =
   | "OVERVIEW" | "DEFINITION" | "DATA_MODEL" | "ALGORITHM"
@@ -609,7 +609,7 @@ function buildChunks(
 
 /**
  * Cross-reference relation type constants.
- * Taxonomy: audit/SPECS/CROSSREF_TAXONOMY.md, schemas/relationships/wrp-crossref-taxonomy.jsonld
+ * Taxonomy: audit/SPECS/CROSSREF_TAXONOMY.md, schemas/ontology/relationships/wrp-crossref-taxonomy.jsonld
  */
 export const CROSSREF_TYPES = {
   WRP_DEPENDS_ON:     "wrp:depends_on" as const,

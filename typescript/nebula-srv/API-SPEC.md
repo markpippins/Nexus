@@ -30,7 +30,6 @@
 18. [User Preferences](#18-user-preferences)
 19. [Harvests](#19-harvests)
 20. [Harvest Candidates](#20-harvest-candidates)
-21. [Intent Records](#21-intent-records)
 22. [Specifications](#22-specifications)
 23. [Agendas](#23-agendas)
 24. [Assessments](#24-assessments)
@@ -1271,40 +1270,6 @@ Audit endpoints manage the projection of filesystem `.md` audit files into the `
 
 ---
 
-## 21. Intent Records
-
-### `GET /api/intents`
-
-**Purpose:** List all intent records with pagination.
-
-**Query Parameters:**
-- `page`, `pageSize` — pagination
-
-**Response `200`:** Paginated envelope with intent objects.
-
-### `GET /api/intents/:id`
-
-**Purpose:** Fetch a single intent record.
-
-**Response `200`:**
-```json
-{
-  "id": "uuid",
-  "candidateId": "uuid|null",
-  "parentId": "uuid|null",
-  "title": "string",
-  "description": "string|null",
-  "sourceType": "string",
-  "sourceRef": "string|null",
-  "tags": [],
-  "status": "string",
-  "metadata": {},
-  "createdAt": "ISO timestamp",
-  "updatedAt": "ISO timestamp"
-}
-```
-
----
 
 ## 22. Specifications
 
@@ -1759,7 +1724,6 @@ Audit endpoints manage the projection of filesystem `.md` audit files into the `
 - Harvest Candidates (`nebula.harvest_candidates` — title + intent_description)
 - Harvests (`nebula.harvests` — source_filename + source_text)
 - Open Questions (`nebula.open_questions` — title + description)
-- Intent Records (`nebula.intent_records` — title + description)
 - Assessments (`nebula.assessments` — outcome + analysis_detail)
 - Observations (`nebula.observations` — trigger_type + payload)
 - Agent Records (`nebula.agent_records` — title + content)
@@ -1787,7 +1751,7 @@ All 13 queries run in parallel via `Promise.all`. Results are capped at 100 tota
 }
 ```
 
-Each result has a `type` discriminator (`thread`, `requirement`, `agenda`, `candidate`, `harvest`, `open_question`, `intent`, `assessment`, `observation`, `agent_record`, `specification`, `plan`, `user`) and an `href` for frontend routing. Hrefs use hyphenated route paths (e.g., `open-question` → `/open-questions/{id}`).
+Each result has a `type` discriminator (`thread`, `requirement`, `agenda`, `candidate`, `harvest`, `open_question`, `assessment`, `observation`, `agent_record`, `specification`, `plan`, `user`) and an `href` for frontend routing. Hrefs use hyphenated route paths (e.g., `open-question` → `/open-questions/{id}`).
 
 ---
 
@@ -1806,7 +1770,6 @@ Each result has a `type` discriminator (`thread`, `requirement`, `agenda`, `cand
   "candidates": 30,
   "harvests": 25,
   "openQuestions": 15,
-  "intents": 12,
   "assessments": 8,
   "observations": 20,
   "agentRecords": 150,
@@ -1825,7 +1788,6 @@ Each result has a `type` discriminator (`thread`, `requirement`, `agenda`, `cand
 | `candidates` | `nebula.harvest_candidates` |
 | `harvests` | `nebula.harvests` |
 | `openQuestions` | `nebula.open_questions` |
-| `intents` | `nebula.intent_records` |
 | `assessments` | `nebula.assessments` |
 | `observations` | `nebula.observations` |
 | `agentRecords` | `nebula.agent_records` |
@@ -2577,7 +2539,7 @@ Artifact provenance (`nebula.artifact_provenance`) traces "which exact source ar
 **Purpose:** List provenance records with optional filters and pagination.
 
 **Query Parameters:** (all optional)
-- `subject_type` — filter by subject entity type (e.g. `harvest_candidate`, `intent_record`)
+- `subject_type` — filter by subject entity type (e.g. `harvest_candidate`, `requirement`)
 - `subject_id` — filter by subject entity UUID
 - `source_type` — filter by source entity type (e.g. `harvest`, `requirement`)
 - `source_id` — filter by source entity UUID

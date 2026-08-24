@@ -1,6 +1,7 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { NEBULA_SRV_UNIT, NEBULA_SRV_ENV, NEBULA_SRV_LEGACY, resolveEndpoint } from './endpoint-resolver.js';
 
 export interface NebulaSystem {
   id: string;
@@ -64,13 +65,20 @@ export interface RequirementGroup {
   requirements: NebulaRequirement[];
 }
 
-const BASE_URL = 'http://localhost:3101';
+// T25 3.2 (R-A-2026-08-15-008): runtime lookup > env > legacy localhost.
+// The initial value is synchronous; the terrain lookup refines it once it
+// returns (silent on failure), unless the user set an explicit override.
+const { initial: BASE_URL, refine: refineBaseUrl } = resolveEndpoint(
+  NEBULA_SRV_UNIT, NEBULA_SRV_ENV, NEBULA_SRV_LEGACY
+);
 const KANBAN_COLUMNS: RequirementStatus[] = ['Backlog', 'ToDo', 'InProgress', 'Active', 'Blocked', 'Done', 'Cancelled', 'Accepted'];
 
 @Injectable({ providedIn: 'root' })
 export class NebulaService {
   private http = inject(HttpClient);
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  /** Resolved base URL — starts at env/legacy, refined by terrain lookup. */
+  private resolvedBaseUrl: string = BASE_URL;
 
   systems = signal<NebulaSystem[]>([]);
   requirements = signal<NebulaRequirement[]>([]);
@@ -81,6 +89,20 @@ export class NebulaService {
   readonly columns = KANBAN_COLUMNS;
 
   private nameCache: Map<string, string> = new Map();
+
+  constructor() {
+    // Non-blocking runtime lookup — refines the URL unless the user set an
+    // explicit override in localStorage (refine() no-ops in that case).
+    void refineBaseUrl().then((url) => {
+      if (url) {
+        this.resolvedBaseUrl = url;
+      }
+    });
+  }
+
+  private get baseUrl(): string {
+    return this.resolvedBaseUrl;
+  }
 
   startPolling(intervalMs = 30_000): void {
     if (this.pollTimer) return;
@@ -130,7 +152,7 @@ export class NebulaService {
   }
 
   async updateStatus(requirementId: string, newStatus: RequirementStatus): Promise<void> {
-    const url = `${BASE_URL}/api/requirements/${requirementId}`;
+    const url = `${this.baseUrl}/api/requirements/${requirementId}`;
     try {
       await firstValueFrom(this.http.patch(url, { status: newStatus }));
       this.requirements.update((reqs) =>
@@ -159,7 +181,7 @@ export class NebulaService {
   }
 
   private async fetchSystems(): Promise<NebulaSystem[]> {
-    const data = await firstValueFrom(this.http.get<any>(`${BASE_URL}/api/systems`));
+    const data = await firstValueFrom(this.http.get<any>(`${this.baseUrl}/api/systems`));
     const list: any[] = Array.isArray(data) ? data : data?.systems ?? data?.data ?? [];
     return list.map((s: any) => ({
       id: s.id,
@@ -186,7 +208,7 @@ export class NebulaService {
   }
 
   private async fetchRequirements(): Promise<NebulaRequirement[]> {
-    const data = await firstValueFrom(this.http.get<any>(`${BASE_URL}/api/requirements?limit=500`));
+    const data = await firstValueFrom(this.http.get<any>(`${this.baseUrl}/api/requirements?limit=500`));
     const list: any[] = Array.isArray(data) ? data : data?.requirements ?? data?.data ?? [];
     return list.map((r: any) => ({
       id: r.id,

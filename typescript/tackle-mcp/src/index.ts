@@ -106,8 +106,24 @@ app.post("/", express.json(), async (req, res) => {
         respondError(-32601, `Method not found: ${method}`);
     }
   } catch (err: any) {
-    console.error(`[MCP] Error in ${method}:`, err.message);
-    respondError(-32603, err.message || "Internal error");
+    // Structured AppError throws ({ error: { code, message } }) must surface
+    // as proper JSON-RPC errors — err.message is undefined on that shape,
+    // which used to collapse every domain error into opaque -32603.
+    if (err?.error?.code && err?.error?.message) {
+      const codeMap: Record<string, number> = {
+        INVALID_ARGUMENTS: -32602,
+        TOOL_NOT_FOUND: -32601,
+        NOT_FOUND: -32000,
+        NEBULA_ERROR: -32000,
+        INTERNAL_ERROR: -32603,
+      };
+      const rc = codeMap[err.error.code as string] ?? -32603;
+      console.error(`[MCP] ${method}: ${err.error.code}: ${err.error.message}`);
+      respondError(rc, `${err.error.code}: ${err.error.message}`);
+    } else {
+      console.error(`[MCP] Error in ${method}:`, err.message);
+      respondError(-32603, err.message || "Internal error");
+    }
   }
 });
 

@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import zlib from 'node:zlib';
 import dotenv from 'dotenv';
 import { routes } from './routes/index.js';
 import { errorHandler } from './error-handler.js';
@@ -47,7 +48,46 @@ process.on('uncaughtException', (err) => {
 });
 
 app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '5mb' }));  // raised for transcript ingest comments
+
+// ── Gzip compression (GET responses only) ───────────────────────────
+// The transcripts forum list is a ~140 MB JSON payload; gzip cuts transfer
+// time by an order of magnitude for every list endpoint. Implemented with
+// Node's built-in zlib (no new dependency — `compression` is not installed).
+// ETag stays Express's default weak ETag, which is computed on the
+// uncompressed body and revalidated via the Cache-Control below, so
+// browsers can 304 instead of re-downloading.
+app.use((req, res, next) => {
+  if (req.method !== 'GET') return next();
+  const accept = req.headers['accept-encoding'] || '';
+  if (!/\bgzip\b/.test(accept)) return next();
+  res.setHeader('Vary', 'Accept-Encoding');
+  res.setHeader('Content-Encoding', 'gzip');
+  const gzip = zlib.createGzip();
+  const origWrite = res.write.bind(res);
+  const origEnd = res.end.bind(res);
+  let lengthStripped = false;
+  const send = (chunk) => {
+    // Content-Length was computed for the uncompressed body — strip it once
+    // so the compressed length is sent (or chunked encoding is used). Must
+    // not run per-chunk: headers are flushed on the first write, and
+    // removeHeader after that throws ERR_HTTP_HEADERS_SENT.
+    if (!lengthStripped) {
+      res.removeHeader('Content-Length');
+      lengthStripped = true;
+    }
+    return origWrite(chunk);
+  };
+  res.write = (chunk, encoding, cb) => gzip.write(chunk, encoding, cb);
+  res.end = (chunk, encoding, cb) => {
+    if (chunk) gzip.write(chunk, encoding);
+    gzip.end(cb);
+  };
+  gzip.on('data', (c) => send(c));
+  gzip.on('end', () => origEnd());
+  gzip.on('error', () => origEnd());
+  next();
+});
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 

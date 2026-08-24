@@ -7,8 +7,10 @@ Supports both transport behaviors documented in
 - **sessionful** (nebula-mcp :3102) — performs the `initialize` handshake
   automatically and manages the `mcp-session-id` header on every request.
 - **stateless** (conduit :3100, tackle :3400, semantics :3161,
-  assembly :3113, address-tts :3105, slash-command :3220) — requests work
-  immediately; the client simply skips the handshake headers.
+  assembly :3113, address-tts :3105) — requests work immediately; the
+  client simply skips the handshake headers. (slash-command :3220 retired
+  per D-2026-08-16-002; the command_* tools are served natively by
+  tools-aggregator :3210 via `/tools/call`.)
 
 This is the canonical replacement for the hand-rolled SSE/handshake
 probe scripts that used to live in /home/codex/dev/tmp (to-do 8e09a57f,

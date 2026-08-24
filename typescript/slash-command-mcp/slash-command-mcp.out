@@ -1,0 +1,7 @@
+
+> slash-command-mcp@1.0.0 start
+> node dist/index.js
+
+[slash-command-mcp] Starting (reads mcp.command_registry, executes via tools-aggregator)...
+[slash-command-mcp] Server running on http://localhost:3220
+[slash-command-mcp] MCP endpoint: POST http://localhost:3220/

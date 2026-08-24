@@ -8,6 +8,7 @@ from ..schemas import (
     MembersAddIn,
     ResolvedSegment,
     SegmentSetCreate,
+    SegmentSetFromSegmentsCreate,
     SegmentSetOut,
     SegmentSetUpdate,
 )
@@ -37,6 +38,12 @@ async def cached_resolve(segment_set_id: uuid.UUID) -> SegmentSetOut:
     resolved = await _resolve(segment_set_id)
     await cache.set_segset(segment_set_id, resolved.model_dump(mode="json"))
     return resolved
+
+
+@router.get("", response_model=list[SegmentSetOut])
+async def list_segment_sets(limit: int = 200, offset: int = 0):
+    rows = await repo.list_segment_sets(limit=limit, offset=offset)
+    return [SegmentSetOut.model_validate(dict(r)) for r in rows]
 
 
 @router.post("", response_model=SegmentSetOut, status_code=201)
@@ -77,3 +84,19 @@ async def remove_member(segment_set_id: uuid.UUID, segment_id: uuid.UUID):
     await repo.exclude_member(segment_set_id, segment_id)
     await cache.invalidate_segset(segment_set_id)
     return await _resolve(segment_set_id)
+
+
+@router.post("/from-segments", response_model=SegmentSetOut, status_code=201)
+async def create_from_segments(body: SegmentSetFromSegmentsCreate):
+    """Create a segment set + segments_history rows + members from
+    pre-computed discourse-arc segments (from discourse_segmenter).
+    Atomic — all-or-nothing."""
+    row = await repo.create_segment_set_from_segments(
+        name=body.name,
+        description=body.description,
+        metadata=body.metadata,
+        conversation_id=body.conversation_id,
+        snapshot_id=body.snapshot_id,
+        segments=[s.model_dump() for s in body.segments],
+    )
+    return await _resolve(row["id"])

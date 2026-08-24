@@ -95,3 +95,30 @@ def test_adapter_failures_do_not_rollback_committed_governance_event():
     response = PebGovernanceEngine(store, conduit_adapter=FailingConduit()).process_for_path(request)
     assert response.admitted is True
     assert len(store.transactions) == 1
+
+
+def test_duplicate_idempotency_key_is_rejected():
+    """Mirrors JVM behaviour: a duplicate idempotency key must be rejected,
+    not silently overwritten via upsert.
+    """
+    store = InMemoryPebStore()
+    first = transaction("peb_record_decision")
+    PebGovernanceEngine(store).process_for_path(first)
+    assert len(store.transactions) == 1
+
+    duplicate = transaction("peb_record_decision")
+    with pytest.raises(ValueError, match="duplicate idempotency key"):
+        PebGovernanceEngine(store).process_for_path(duplicate)
+    assert len(store.transactions) == 1
+
+
+def test_duplicate_idempotency_key_rolls_back_transaction():
+    """The failed insert must not leave a partial-state audit row."""
+    store = InMemoryPebStore()
+    first = transaction("peb_validate_transition")
+    PebGovernanceEngine(store).process_for_path(first)
+
+    duplicate = transaction("peb_validate_transition")
+    with pytest.raises(ValueError):
+        PebGovernanceEngine(store).process_for_path(duplicate)
+    assert len(store.transactions) == 1

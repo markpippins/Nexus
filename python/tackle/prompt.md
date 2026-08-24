@@ -3,7 +3,7 @@
 ## `tools_aggregator_client.py`
 
 The `ToolsAggregatorClient` (async) and `SyncToolsAggregatorClient` (sync wrapper)
-provide a Python API for the centralized Tools Aggregator service on port 3200.
+provide a Python API for the centralized Tools Aggregator service on port 3210.
 
 ### Capabilities
 
@@ -17,7 +17,7 @@ provide a Python API for the centralized Tools Aggregator service on port 3200.
 ```python
 from tackle.tools_aggregator_client import SyncToolsAggregatorClient
 
-client = SyncToolsAggregatorClient("http://localhost:3200")
+client = SyncToolsAggregatorClient("http://localhost:3210")
 client.init()
 tools = client.list_tools()
 result = client.call_tool("nebula_health", {})

@@ -17,6 +17,32 @@ from typing import Any, Mapping
 from uuid import UUID, uuid4
 
 
+@dataclass(frozen=True)
+class ExecutionClaimAdmission:
+    """Result of asking resolution whether a verified execution claim/evidence
+    pair is eligible for PEB admission.
+
+    This is an eligibility assessment, not a PEB settlement. PEB still owns
+    the transaction admission result and its durable governance record.
+    """
+
+    is_admitted: bool
+    reason: str | None = None
+    resolution_receipt_id: UUID | None = None
+
+    @property
+    def admitted(self) -> bool:
+        return self.is_admitted
+
+    @classmethod
+    def admitted_claim(cls, reason: str, receipt_id: UUID | None = None) -> "ExecutionClaimAdmission":
+        return cls(True, reason, receipt_id)
+
+    @classmethod
+    def rejected(cls, reason: str) -> "ExecutionClaimAdmission":
+        return cls(False, reason, None)
+
+
 class AdmissionPath(str, Enum):
     VALIDATE = "VALIDATE"
     MUTATE = "MUTATE"
@@ -63,6 +89,16 @@ class DecisionStatus(str, Enum):
     ACCEPTED = "ACCEPTED"
     SUPERSEDED = "SUPERSEDED"
     REJECTED = "REJECTED"
+
+    @classmethod
+    def _missing_(cls, value: object) -> "DecisionStatus | None":
+        if isinstance(value, str):
+            normalized = value.strip().upper()
+            try:
+                return cls(normalized)
+            except ValueError:
+                pass
+        return None
 
 
 class EntropyClass(str, Enum):
@@ -242,7 +278,7 @@ class PebDecision:
     transaction_id: UUID
     id: UUID | None = None
     adr_number: str | None = None
-    status: DecisionStatus = DecisionStatus.DRAFT
+    status: DecisionStatus | None = DecisionStatus.DRAFT
     summary: Any | None = None
     affected_keys: list[str] = field(default_factory=list)
     entropy_class: EntropyClass | None = None

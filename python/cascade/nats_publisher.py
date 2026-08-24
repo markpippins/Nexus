@@ -30,16 +30,8 @@ import datetime
 import json
 import os
 import queue
-import sys
 import threading
 from typing import Any
-
-# ── Ensure shared nats package is importable from cascade subprocesses ──
-# cascade subprocesses run with cascade/ as cwd; the shared nats package
-# lives at nexus/python/nats/ — one level above cascade/.
-_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _PARENT not in sys.path:
-    sys.path.insert(0, _PARENT)
 
 from nats_envelope.envelope import CanonicalEnvelope, Classification
 

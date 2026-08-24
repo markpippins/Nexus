@@ -1,0 +1,13 @@
+[Unit]
+Description=Daily MySQL backup to /home/codex/backups/mysql (03:45)
+
+[Timer]
+# 03:45 — clear of backup-nexus (02:00) and pg-to-barium (03:30) end times.
+# OnCalendar gives a steady-state schedule; Persistent=true catches up
+# after boot/outage (decision 13600407).
+OnCalendar=*-*-* 03:45:00
+Persistent=true
+RandomizedDelaySec=15min
+
+[Install]
+WantedBy=timers.target

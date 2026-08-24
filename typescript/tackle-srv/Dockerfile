@@ -13,6 +13,9 @@ COPY tackle-seeds ../tackle-seeds
 # (npm bug 'Cannot read properties of undefined (reading extraneous)');
 # resolve fresh for the image instead of fighting the stale lock.
 RUN npm install --no-package-lock
+# Build tackle-seeds file: dep so its dist/ exists at runtime (main -> ./dist/index.js).
+# heartbeat-client dist is built further below alongside the tsc workaround.
+RUN cd ../tackle-seeds && npm install --no-package-lock && npm run build
 COPY tackle-srv/tsconfig.json ./
 COPY tackle-srv/src ./src
 # Build the file deps' dist first: the root .dockerignore excludes **/dist,

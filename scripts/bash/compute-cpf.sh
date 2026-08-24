@@ -19,7 +19,7 @@
 #
 # PREREQUISITES:
 #   - Docker container `pgvector_db` running with the nexus database
-#   - Python venv at nexus/python/rover/.venv
+#   - Python venv at nexus/python/conduit/.venv (rover/.venv removed 2026-08-21)
 #
 # USAGE:
 #   cd ~/dev/nexus
@@ -48,9 +48,8 @@ OUTPUT_MODE=""              # "--json" or "--count" or ""
 
 # ── Paths ───────────────────────────────────────────────────────────────
 
-ROVER_DIR="/home/codex/dev/nexus/python/rover"
+VENV_ACTIVATE="/home/codex/dev/nexus/python/conduit/.venv/bin/activate"
 BIN_DIR="/home/codex/dev/nexus/bin"
-VENV_ACTIVATE="${ROVER_DIR}/.venv/bin/activate"
 CPF_COMPUTE="${BIN_DIR}/cpf_compute.py"
 CPF_QUERY="${BIN_DIR}/cpf_query.py"
 

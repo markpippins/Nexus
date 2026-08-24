@@ -1,0 +1,10 @@
+[Unit]
+Description=Gate poll + executor at :45 hourly (plan 0005)
+
+[Timer]
+OnCalendar=*-*-* *:45:00
+Persistent=true
+RandomizedDelaySec=90
+
+[Install]
+WantedBy=timers.target

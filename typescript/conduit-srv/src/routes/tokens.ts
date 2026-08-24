@@ -15,7 +15,7 @@ router.get("/plan/:planId", async (req, res) => {
   }
   const row = await queryOne<any>(
     `SELECT COALESCE(SUM(tokens_used), 0) as total_tokens, COUNT(*) as receipts
-     FROM vision.receipts WHERE plan_id = $1`,
+     FROM nebula.receipts_unified WHERE plan_id = $1`,
     [planId]
   );
   res.json({ plan_id: planId, total_tokens: row?.total_tokens ?? 0, receipts: row?.receipts ?? 0 });
@@ -30,7 +30,7 @@ router.get("/role/:role", async (req, res) => {
   }
   const row = await queryOne<any>(
     `SELECT COALESCE(SUM(tokens_used), 0) as total_tokens, COUNT(*) as receipts
-     FROM vision.receipts WHERE agent_role = $1`,
+     FROM nebula.receipts_unified WHERE agent_role = $1`,
     [role]
   );
   res.json({ role, total_tokens: row?.total_tokens ?? 0, receipts: row?.receipts ?? 0 });

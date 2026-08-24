@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProjectionIREntry",
+  "description": "Normalized, read-only, ephemeral projection IR entry per graph/schema/projection-ir.md §3. Entries carry zero execution authority (CIRS-IR-01) and are never persisted (CIRS-IR-07).",
+  "type": "object",
+  "required": ["source_operator", "domain", "proposition", "confidence", "constraints", "trace"],
+  "properties": {
+    "source_operator": {
+      "type": "string",
+      "description": "Which operator emitted this projection. Must match a registered operator (IR-04)."
+    },
+    "domain": {
+      "type": "string",
+      "description": "Projection domain within the operator. Must be within the operator's declared domains (IR-04)."
+    },
+    "proposition": {
+      "description": "The projected content (operator-specific). Must not contain executable code (IR-01, IR-05)."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Epistemic confidence: 0.0 (speculative) to 1.0 (certain). Set by the operator, not adjustable by consumers (IR-03)."
+    },
+    "constraints": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "CIRS-IR rules that apply to this entry (IR-META-01)."
+    },
+    "trace": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "Observation lineage — IDs of source observations or events (CAUSAL-01)."
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "ProjectionIRStream": {
+      "type": "array",
+      "description": "An ordered, append-only, ephemeral collection of entries from one cycle (projection-ir.md §3).",
+      "items": { "$ref": "#" },
+      "minItems": 1
+    }
+  }
+}

@@ -468,71 +468,6 @@ export default class NebulaMetaController {
     }
   }
 
-  // ── INTENT RECORDS ──────────────────────────────────────────────────
-
-  intentShape(r: any) {
-    return {
-      id: r.id,
-      candidateId: r.candidate_id,
-      parentId: r.parent_id,
-      title: r.title,
-      description: r.description,
-      sourceType: r.source_type,
-      sourceRef: r.source_ref,
-      tags: r.tags,
-      status: r.status,
-      metadata: r.metadata,
-      createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
-      updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
-    }
-  }
-
-  /** GET /api/intents */
-  async listIntents({ request, response }: HttpContext) {
-    try {
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
-      const [dataResult, countResult] = await Promise.all([
-        q(
-          `SELECT id, candidate_id, parent_id, title, description,
-                  source_type, source_ref, tags, status, metadata,
-                  created_at, updated_at
-           FROM nebula.intent_records
-           ORDER BY created_at DESC
-           LIMIT $1 OFFSET $2`,
-          [pageSize, offset]
-        ),
-        q('SELECT COUNT(*)::int AS total FROM nebula.intent_records'),
-      ])
-      return response.json({
-        items: dataResult.rows.map((r: any) => this.intentShape(r)),
-        total: parseInt(countResult.rows[0].total, 10),
-        page,
-        pageSize,
-        limit,
-        offset,
-      })
-    } catch (err: any) {
-      return response.status(500).json({ error: err.message })
-    }
-  }
-
-  /** GET /api/intents/:id */
-  async showIntent({ request, response }: HttpContext) {
-    try {
-      const { rows: [r] } = await q(
-        `SELECT id, candidate_id, parent_id, title, description,
-                source_type, source_ref, tags, status, metadata,
-                created_at, updated_at
-         FROM nebula.intent_records WHERE id = $1`,
-        [request.params().id]
-      )
-      if (!r) { return response.status(404).json({ error: 'Intent not found' }) }
-      return response.json(this.intentShape(r))
-    } catch (err: any) {
-      return response.status(500).json({ error: err.message })
-    }
-  }
-
   // ── ASSESSMENTS ─────────────────────────────────────────────────────
 
   assessmentShape(r: any) {
@@ -671,7 +606,7 @@ export default class NebulaMetaController {
 
       const [
         threadResult, requirementResult, agendaResult, candidateResult,
-        harvestResult, oqResult, intentResult, assessmentResult,
+        harvestResult, oqResult, assessmentResult,
         observationResult, agentRecordResult, specificationResult, planResult,
         userResult, forumResult, commentResult,
       ] = await Promise.all([
@@ -702,11 +637,6 @@ export default class NebulaMetaController {
         ),
         q(
           `SELECT id, title, description, status, 'open_question' AS result_type FROM nebula.open_questions
-           WHERE title ILIKE $1 ESCAPE '\\' OR description ILIKE $1 ESCAPE '\\' LIMIT $2`,
-          [pattern, limit]
-        ),
-        q(
-          `SELECT id, title, description, status, 'intent' AS result_type FROM nebula.intent_records
            WHERE title ILIKE $1 ESCAPE '\\' OR description ILIKE $1 ESCAPE '\\' LIMIT $2`,
           [pattern, limit]
         ),
@@ -761,7 +691,6 @@ export default class NebulaMetaController {
         ...candidateResult.rows,
         ...harvestResult.rows,
         ...oqResult.rows,
-        ...intentResult.rows,
         ...assessmentResult.rows,
         ...observationResult.rows,
         ...agentRecordResult.rows,
@@ -848,7 +777,7 @@ export default class NebulaMetaController {
   async counts(_ctx: HttpContext) {
     const [
       postsResult, requirementsResult, agendasResult, candidatesResult,
-      harvestsResult, oqResult, intentsResult, assessmentsResult,
+      harvestsResult, oqResult, assessmentsResult,
       observationsResult, agentRecordsResult, specificationsResult, plansResult,
       usersResult, toDoThreadsResult, forumsResult,
     ] = await Promise.all([
@@ -859,7 +788,6 @@ export default class NebulaMetaController {
       q('SELECT COUNT(*)::int AS total FROM nebula.harvest_candidates'),
       q('SELECT COUNT(*)::int AS total FROM nebula.harvests'),
       q('SELECT COUNT(*)::int AS total FROM nebula.open_questions'),
-      q('SELECT COUNT(*)::int AS total FROM nebula.intent_records'),
       q('SELECT COUNT(*)::int AS total FROM nebula.assessments'),
       q('SELECT COUNT(*)::int AS total FROM nebula.observations'),
       q('SELECT COUNT(*)::int AS total FROM nebula.agent_records'),
@@ -875,7 +803,6 @@ export default class NebulaMetaController {
       candidates: candidatesResult.rows[0].total,
       harvests: harvestsResult.rows[0].total,
       openQuestions: oqResult.rows[0].total,
-      intents: intentsResult.rows[0].total,
       assessments: assessmentsResult.rows[0].total,
       observations: observationsResult.rows[0].total,
       agentRecords: agentRecordsResult.rows[0].total,

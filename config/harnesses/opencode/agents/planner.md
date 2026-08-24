@@ -14,7 +14,13 @@ description: |
   (to:dba record, type:db-change) BEFORE a Builder starts.
   Data access: conduit-mcp GET /state + nebula_list_agent_records
   Data persistence: nebula_create_agent_record
-  Inbox: nebula_list_agent_records filtered by tags containing "to:planner"
+  Inbox: nebula_get_inbox {"role":"planner"} (or nexus/bin/check-inbox.sh
+  --role planner) — records tagged ["to:planner"] since the stored pointer;
+  REST fallback on :3101 (not :3102 — JSON-RPC only).
+  Knowledge graph: knowledge-mcp (knowledge_list_entities, knowledge_list_edges,
+  knowledge_list_cross_references, knowledge_semantic_search) — read-only
+  grounding for plan discovery/elucidation; check for duplicate/superseded
+  work and dependency lineage via nebula_list_cross_references.
 mode: primary
 permission:
   read: allow

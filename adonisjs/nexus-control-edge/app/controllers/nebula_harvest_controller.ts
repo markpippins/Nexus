@@ -329,24 +329,21 @@ export default class NebulaHarvestController {
     }
   }
 
-  /** POST /api/harvest-candidates/promote-to-plan */
-  async promoteToPlan({ request, response }: HttpContext) {
-    try {
-      const body = request.body()
-      const { candidateIds, project = 'nexus', goal } = body
-      if (!candidateIds || !Array.isArray(candidateIds) || candidateIds.length === 0) {
-        response.status(400).json({ error: 'candidateIds (array of UUIDs) is required' })
-        return
-      }
-      const { rows: [result] } = await q(
-        'SELECT plan_id, plan_title, plan_goal, candidates_used, status_results FROM nebula.candidates_to_plan(?::uuid[], ?, ?)',
-        [candidateIds, project, goal || null]
-      )
-      response.json({ ok: true, ...result })
-    } catch (e: any) {
-      const { status, body } = err(e, 400)
-      response.status(status).json(body)
-    }
+  /** POST /api/harvest-candidates/promote-to-plan
+   * RETIRED (D-2026-08-23-C): the backing procedure nebula.candidates_to_plan
+   * no longer exists and must NOT be resurrected. Mirrors the nebula-srv 410
+   * tombstone so callers migrate to the canonical promotion path instead of
+   * 400-ing mysteriously. Canonical: POST /api/harvest-candidates/:id/spawn-plan
+   */
+  async promoteToPlan({ response }: HttpContext) {
+    response.status(410).json({
+      error:
+        'promote-to-plan was retired: its backing procedure (nebula.candidates_to_plan) no longer exists and will not be restored.',
+      useInstead: 'POST /api/harvest-candidates/:id/spawn-plan',
+      mcpTool: 'nebula_spawn_plan_from_candidate',
+      rationale:
+        'Single canonical promotion flow; the legacy parallel route created two competing promotion paths. See architect ruling on to-do e68449f2.',
+    })
   }
 
   /** POST /api/harvests */
@@ -843,28 +840,15 @@ export default class NebulaHarvestController {
       }
 
       const directCandidateIds: string[] = []
-      const intentRecordIds: string[] = []
       const items = spec.item_snapshot || []
       for (const item of items) {
         if (!item.source_id) continue
         if (item.source_type === 'harvest_candidate') {
           directCandidateIds.push(item.source_id)
-        } else if (item.source_type === 'intent_record') {
-          intentRecordIds.push(item.source_id)
         }
       }
 
-      let candidateIds = [...directCandidateIds]
-      candidateIds = [...new Set(candidateIds)]
-      if (intentRecordIds.length > 0) {
-        const { rows: resolved } = await q(
-          'SELECT candidate_id FROM nebula.intent_records WHERE id = ANY(?::uuid[]) AND candidate_id IS NOT NULL',
-          [intentRecordIds]
-        )
-        for (const r of resolved) {
-          candidateIds.push(r.candidate_id)
-        }
-      }
+      const candidateIds = [...new Set(directCandidateIds)]
 
       if (candidateIds.length === 0) {
         response.json({ ok: true, linked: 0, message: 'No harvest_candidate items in snapshot' })
@@ -904,55 +888,6 @@ export default class NebulaHarvestController {
       }
 
       response.json({ ok: true, linked, candidate_count: candidateIds.length, requirement_count: reqs.length })
-    } catch (e: any) {
-      const { status, body } = err(e)
-      response.status(status).json(body)
-    }
-  }
-
-  // ── INTENT RECORDS ──────────────────────────────────────────────────
-
-  /** GET /api/intent-records */
-  async listIntentRecords({ request, response }: HttpContext) {
-    try {
-      const { offset, limit, page, pageSize } = parsePagination(request.qs())
-      const [dataResult, countResult] = await Promise.all([
-        q(
-          `SELECT ir.*, hc.system_id, hc.subsystem_id, hc.feature_id,
-                  h.source_filename AS harvest_source
-           FROM nebula.intent_records ir
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
-           ORDER BY ir.created_at DESC
-           LIMIT ? OFFSET ?`,
-          [pageSize, offset]
-        ),
-        q('SELECT COUNT(*)::int AS total FROM nebula.intent_records'),
-      ])
-      response.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset })
-    } catch (e: any) {
-      const { status, body } = err(e)
-      response.status(status).json(body)
-    }
-  }
-
-  /** GET /api/intent-records/:id */
-  async getIntentRecord({ request, response }: HttpContext) {
-    try {
-      const { id } = request.params()
-      const { rows: [row] } = await q(
-        `SELECT ir.*, hc.system_id, hc.subsystem_id, hc.feature_id, h.source_filename AS harvest_source
-         FROM nebula.intent_records ir
-         LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-         LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
-         WHERE ir.id = ?`,
-        [id]
-      )
-      if (!row) {
-        response.status(404).json({ error: 'Intent record not found' })
-        return
-      }
-      response.json(row)
     } catch (e: any) {
       const { status, body } = err(e)
       response.status(status).json(body)
@@ -1034,23 +969,19 @@ export default class NebulaHarvestController {
                   a.created_at, a.updated_at
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
-           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
-           WHERE hc.${scopeField} = ? OR req.${scopeField} = ?
+           WHERE req.${scopeField} = ?
            ORDER BY a.created_at DESC
            LIMIT ? OFFSET ?`,
-          [id, id, pageSize, offset]
+          [id, pageSize, offset]
         ),
         q(
           `SELECT COUNT(DISTINCT a.id)::int AS total
            FROM nebula.agendas a
            JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
-           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
-           WHERE hc.${scopeField} = ? OR req.${scopeField} = ?`,
-          [id, id]
+           WHERE req.${scopeField} = ?`,
+          [id]
         ),
       ])
 
@@ -1093,8 +1024,8 @@ export default class NebulaHarvestController {
         return
       }
       const { rowCount } = await q(
-        `UPDATE nebula.agenda_items SET valid_until = now() WHERE agenda_id = ? AND (source_id = ? OR source_id IN (SELECT ir.id FROM nebula.intent_records ir JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id WHERE hc.id = ?)) AND valid_until > now()`,
-        [id, sourceId, sourceId]
+        `UPDATE nebula.agenda_items SET valid_until = now() WHERE agenda_id = ? AND source_id = ? AND valid_until > now()`,
+        [id, sourceId]
       )
       if (rowCount === 0) {
         response.status(404).json({ error: 'Agenda item not found' })
@@ -1233,26 +1164,20 @@ export default class NebulaHarvestController {
                   s.agenda_title,
                   s.agenda_status
            FROM nebula.active_specifications s
-           LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
-               AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
-           WHERE hc.${scopeField} = ? OR req.${scopeField} = ?
+           WHERE req.${scopeField} = ?
            ORDER BY s.created_at DESC
            LIMIT ? OFFSET ?`,
-          [id, id, pageSize, offset]
+          [id, pageSize, offset]
         ),
         q(
           `SELECT COUNT(*)::int AS total
            FROM nebula.active_specifications s
-           LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
-               AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
            LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
                AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
-           WHERE hc.${scopeField} = ? OR req.${scopeField} = ?`,
-          [id, id]
+           WHERE req.${scopeField} = ?`,
+          [id]
         ),
       ])
 
@@ -1315,28 +1240,20 @@ export default class NebulaHarvestController {
       const { offset, limit, page, pageSize } = parsePagination(ctx.request.qs())
       const [dataResult, countResult] = await Promise.all([
         q(
-          `SELECT DISTINCT ON (wr.id) wr.*
+           `SELECT DISTINCT ON (wr.id) wr.*
            FROM nebula.work_requests wr
            LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
-           LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
-           LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
-           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           WHERE req.${scopeField} = ? OR hc.${scopeField} = ?
+           WHERE req.${scopeField} = ?
            ORDER BY wr.id, wr.created_at DESC
            LIMIT ? OFFSET ?`,
-          [id, id, pageSize, offset]
+          [id, pageSize, offset]
         ),
         q(
           `SELECT COUNT(*)::int AS total
            FROM nebula.work_requests wr
            LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
-           LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
-           LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
-           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-           LEFT JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           WHERE req.${scopeField} = ? OR hc.${scopeField} = ?`,
-          [id, id]
+           WHERE req.${scopeField} = ?`,
+          [id]
         ),
       ])
       response.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset })
@@ -1395,46 +1312,6 @@ export default class NebulaHarvestController {
   async subsystemHarvestCandidates(ctx: HttpContext, response: any) { return this.scopedHarvestCandidates(ctx, response, 'subsystem_id') }
   /** GET /api/features/:id/harvest-candidates */
   async featureHarvestCandidates(ctx: HttpContext, response: any) { return this.scopedHarvestCandidates(ctx, response, 'feature_id') }
-
-  // ── HIERARCHY-SCOPED INTENT RECORDS ─────────────────────────────────
-
-  private async scopedIntentRecords(ctx: HttpContext, response: any, scopeField: string) {
-    try {
-      const { id } = ctx.request.params()
-      const { offset, limit, page, pageSize } = parsePagination(ctx.request.qs())
-      const [dataResult, countResult] = await Promise.all([
-        q(
-          `SELECT ir.id, hc.id AS candidate_id, ir.parent_id, ir.title, ir.description,
-                  ir.source_type, ir.source_ref, ir.tags, ir.status, ir.metadata,
-                  ir.created_at, ir.updated_at
-           FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           WHERE hc.${scopeField} = ?
-           ORDER BY ir.created_at DESC
-           LIMIT ? OFFSET ?`,
-          [id, pageSize, offset]
-        ),
-        q(
-          `SELECT COUNT(*)::int AS total
-           FROM nebula.intent_records ir
-           JOIN nebula.harvest_candidates hc ON hc.intent_record_id = ir.id
-           WHERE hc.${scopeField} = ?`,
-          [id]
-        ),
-      ])
-      response.json({ items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize, limit, offset })
-    } catch (e: any) {
-      const { status, body } = err(e)
-      response.status(status).json(body)
-    }
-  }
-
-  /** GET /api/systems/:id/intent-records */
-  async systemIntentRecords(ctx: HttpContext, response: any) { return this.scopedIntentRecords(ctx, response, 'system_id') }
-  /** GET /api/subsystems/:id/intent-records */
-  async subsystemIntentRecords(ctx: HttpContext, response: any) { return this.scopedIntentRecords(ctx, response, 'subsystem_id') }
-  /** GET /api/features/:id/intent-records */
-  async featureIntentRecords(ctx: HttpContext, response: any) { return this.scopedIntentRecords(ctx, response, 'feature_id') }
 
   // ── SPECS (flattened agenda_items) ──────────────────────────────────
 

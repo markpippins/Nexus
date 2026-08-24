@@ -1,3 +1,4 @@
+import datetime
 import uuid
 from typing import Optional
 
@@ -41,6 +42,22 @@ async def create_segment_set(
         name,
         description,
         metadata,
+    )
+
+
+async def list_segment_sets(limit: int = 200, offset: int = 0) -> list[asyncpg.Record]:
+    """List all current-valid segment sets."""
+    pool = get_pool()
+    return await pool.fetch(
+        """
+        select id, name, description, status, metadata, created_at, updated_at
+        from nebula.segment_sets
+        where valid_until > now()
+        order by created_at desc
+        limit $1 offset $2
+        """,
+        limit,
+        offset,
     )
 
 
@@ -216,3 +233,87 @@ async def list_domain_links(
         """,
         domain_id,
     )
+
+
+# ── Transcript-ingest support ────────────────────────────────────────
+
+_SEG_HISTORY_FOREVER = datetime.datetime(9999, 12, 31, 23, 59, 59, tzinfo=datetime.timezone.utc)  # segments_history sentinel
+
+
+async def create_segment_set_from_segments(
+    name: Optional[str],
+    description: Optional[str],
+    metadata: dict,
+    conversation_id: uuid.UUID,
+    snapshot_id: uuid.UUID,
+    segments: list[dict],
+) -> asyncpg.Record:
+    """Create a segment set + segments_history rows + members, atomically.
+
+    ``segments`` is a list of dicts with keys:
+        start_block_id (uuid), end_block_id (uuid),
+        start_block_index (int), end_block_index (int),
+        segment_type (str), title (str|None), notes_md (str|None)
+
+    Returns the segment_sets row.  All writes are in one transaction;
+    failure rolls everything back (strict-atomic per transcript).
+    """
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            # 1) segment_sets row
+            seg_set = await conn.fetchrow(
+                """
+                insert into nebula.segment_sets (name, description, metadata)
+                values ($1, $2, $3::jsonb)
+                returning id
+                """,
+                name,
+                description,
+                metadata,
+            )
+            seg_set_id = seg_set["id"]
+
+            for ordinal, seg in enumerate(segments):
+                # 2) segments_history row
+                seg_id = await conn.fetchval(
+                    """
+                    insert into nebula.segments_history
+                        (id, conversation_id, snapshot_id,
+                         start_block_id, end_block_id,
+                         start_block_index, end_block_index,
+                         segment_type, state, source,
+                         title, notes_md, created_by,
+                         as_of_dt, expiration_dt)
+                    values (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7,
+                            'ACTIVE', 'HARVEST', $8, $9, 'SYSTEM', now(), $10)
+                    returning id
+                    """,
+                    conversation_id,
+                    snapshot_id,
+                    seg["start_block_id"],
+                    seg["end_block_id"],
+                    seg["start_block_index"],
+                    seg["end_block_index"],
+                    seg.get("segment_type", "discussion"),
+                    seg.get("title"),
+                    seg.get("notes_md"),
+                    _SEG_HISTORY_FOREVER,
+                )
+                # 3) segment_set_members link
+                await conn.execute(
+                    """
+                    insert into nebula.segment_set_members
+                        (segment_set_id, segment_id, ordinal, included)
+                    values ($1, $2, $3, true)
+                    """,
+                    seg_set_id,
+                    seg_id,
+                    ordinal,
+                )
+            await conn.execute(
+                "update nebula.segment_sets set updated_at = now() where id = $1",
+                seg_set_id,
+            )
+        await invalidate_segset(seg_set_id)
+    return await get_segment_set(seg_set_id)

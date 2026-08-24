@@ -9,6 +9,7 @@ import org.nexus.peb.domain.enums.AdmissionResult;
 import org.nexus.peb.domain.dto.AdmissionResponse;
 import org.nexus.peb.domain.port.ConduitMcpPort;
 import org.nexus.peb.domain.port.LosmIrTransitionPort;
+import org.nexus.peb.domain.port.ResolutionExecutionClaimPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,17 +52,40 @@ public class PebGovernanceEngine {
     private final PebViolationEngine violationEngine;
     private final ConduitMcpPort conduitAdapter;
     private final LosmIrTransitionPort losmAdapter;
+    private final ResolutionExecutionClaimPort resolutionClaimAdapter;
 
+    /**
+     * Spring wiring constructor. The resolution adapter is optional for
+     * legacy/non-execution transactions, but execution-claim transactions
+     * fail closed when it is absent or unavailable.
+     */
+    @Autowired
     public PebGovernanceEngine(PebTransactionEngine transactionEngine,
                                 InvariantValidator validator,
                                 PebViolationEngine violationEngine,
                                 @Autowired(required = false) ConduitMcpPort conduitAdapter,
-                                @Autowired(required = false) LosmIrTransitionPort losmAdapter) {
+                                @Autowired(required = false) LosmIrTransitionPort losmAdapter,
+                                @Autowired(required = false) ResolutionExecutionClaimPort resolutionClaimAdapter) {
         this.transactionEngine = transactionEngine;
         this.validator = validator;
         this.violationEngine = violationEngine;
         this.conduitAdapter = conduitAdapter;
         this.losmAdapter = losmAdapter;
+        this.resolutionClaimAdapter = resolutionClaimAdapter;
+    }
+
+    /**
+     * Backwards-compatible constructor for narrow unit tests and callers that
+     * do not install external adapters. Claim-bearing requests still fail
+     * closed because the resolution adapter is null.
+     */
+    public PebGovernanceEngine(PebTransactionEngine transactionEngine,
+                                InvariantValidator validator,
+                                PebViolationEngine violationEngine,
+                                ConduitMcpPort conduitAdapter,
+                                LosmIrTransitionPort losmAdapter) {
+        this(transactionEngine, validator, violationEngine, conduitAdapter,
+             losmAdapter, null);
     }
 
     /**
@@ -103,6 +127,16 @@ public class PebGovernanceEngine {
     public AdmissionResponse processForPath(PebTransaction request, AdmissionPath path) {
         boolean bypassValidator = (path == AdmissionPath.REPORT_VIOLATION);
         boolean validatorPassed = bypassValidator || validator.validate(request);
+        boolean carriesExecutionClaim = carriesExecutionClaim(request);
+        String executionAdmissionReason = null;
+        boolean executionAdmissionPassed = true;
+
+        if (validatorPassed && carriesExecutionClaim) {
+            // Assign the PEB identity before resolution admission so the
+            // resolution-side receipt is correlated to the exact transaction
+            // that will be persisted below.
+            request.ensureId();
+        }
 
         request.setAdmissionResult(
             (bypassValidator || !validatorPassed) ? AdmissionResult.REJECTED
@@ -110,6 +144,25 @@ public class PebGovernanceEngine {
         );
 
         PebTransaction tx = transactionEngine.beginTransaction(request);
+
+        if (validatorPassed && carriesExecutionClaim) {
+            if (resolutionClaimAdapter == null) {
+                executionAdmissionPassed = false;
+                executionAdmissionReason = "RESOLUTION_ADMISSION_UNAVAILABLE";
+            } else {
+                var assessment = resolutionClaimAdapter.admitVerifiedExecutionClaim(
+                    tx.ensureId(), tx.getInput());
+                executionAdmissionPassed = assessment.admitted();
+                executionAdmissionReason = assessment.reason();
+            }
+
+            if (!executionAdmissionPassed) {
+                tx.setAdmissionResult(AdmissionResult.REJECTED);
+                violationEngine.recordExecutionAdmissionRejection(
+                    tx, executionAdmissionReason);
+            }
+        }
+
         transactionEngine.commitTransaction(tx);
 
         // Notify external adapters after transaction commits
@@ -119,16 +172,26 @@ public class PebGovernanceEngine {
             violationEngine.ingest(tx);
             return AdmissionResponse.accepted("Violation recorded as REJECTED");
         }
-        if (validatorPassed) {
-            String message = switch (path) {
-                case VALIDATE -> "Validation processed";
-                case MUTATE   -> "Mutation processed";
-                case UNKNOWN  -> "Routed (unknown tool)";
-                default       -> "Transaction processed";
-            };
-            return AdmissionResponse.accepted(message);
+        if (!validatorPassed) {
+            return AdmissionResponse.denied("Admission denied by invariant validator");
         }
-        return AdmissionResponse.denied("Admission denied by invariant validator");
+        if (!executionAdmissionPassed) {
+            return AdmissionResponse.denied(
+                "Execution claim admission denied: " + executionAdmissionReason);
+        }
+        String message = switch (path) {
+            case VALIDATE -> "Validation processed";
+            case MUTATE   -> "Mutation processed";
+            case UNKNOWN  -> "Routed (unknown tool)";
+            default       -> "Transaction processed";
+        };
+        return AdmissionResponse.accepted(message);
+    }
+
+    private static boolean carriesExecutionClaim(PebTransaction request) {
+        return request != null && request.getInput() != null
+            && request.getInput().isObject()
+            && request.getInput().has("execution_claim");
     }
 
     /**

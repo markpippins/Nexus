@@ -22,6 +22,8 @@
  * Terminal states: SETTLED, REJECTED, FAILED, NOOP, DEFERRED
  */
 
+import type { SweepScope } from "./sweep-scope";
+
 // ── Status enum ────────────────────────────────────────────────────
 
 export const WR_STATUSES = [
@@ -75,16 +77,32 @@ export interface WorkRequestState {
   lastEvent: RuntimeEventType;
   lastTimestamp: string;
   createdAt: string;
+  /** D6: held-for-normalization marker — compiled-and-PASSing but deliberately
+   * unreleased. Distinct from "never compiled" and "failed". */
+  normalization_pending?: boolean;
 }
 
 // ── Compiler output (what the compiler is allowed to emit) ─────────
 // This is the contract boundary: NO execution fields allowed.
 
+/**
+ * Canonical compiler intent inputs (D1). `deliverable` / `outputs` are the
+ * first-class output path/kind for read-only/recon nodes — never folded into
+ * the mutation surface. Everything else is passed through opaquely.
+ */
+export interface CompilerIntentInputs {
+  deliverable?: string;
+  outputs?: string[];
+  /** D7: pinned sweep scope (canonical input — feeds entityKey). */
+  scope?: SweepScope;
+  [key: string]: unknown;
+}
+
 export interface CompilerOutput {
   wrId: string;
   intent: {
     type: string;
-    inputs: unknown;
+    inputs: CompilerIntentInputs;
     objective: string;
   };
   constraints: {
@@ -98,6 +116,8 @@ export interface CompilerOutput {
     resolvedOps: string[];
     registryVersion: string;
   };
+  /** D6: mark a WR held-for-normalization (advisory; no conduit plan change). */
+  normalization_pending?: boolean;
 }
 
 // ── Transition table ───────────────────────────────────────────────
@@ -187,6 +207,77 @@ export function validateTransition(
 }
 
 /**
+ * D4: an opTrace with no resolved ops is "UNRESOLVED" — a first-class valid
+ * state for storage/compare/classify/HELD, but NOT admissible to execution.
+ * A missing opTrace is treated as unresolved (fail-closed).
+ */
+export function isUnresolvedOps(opTrace?: {
+  ipNodes?: string[];
+  resolvedOps?: string[];
+  registryVersion?: string;
+}): boolean {
+  if (!opTrace) return true;
+  if (opTrace.registryVersion === "UNRESOLVED") return true;
+  if (!opTrace.resolvedOps || opTrace.resolvedOps.length === 0) return true;
+  return false;
+}
+
+/**
+ * Extract the opTrace from a WR's event log (the WR_SUBMITTED event payload).
+ * Returns undefined when the WR has no submission event yet.
+ */
+export function getOpTrace(
+  events: RuntimeEvent[],
+): { ipNodes?: string[]; resolvedOps?: string[]; registryVersion?: string } | undefined {
+  for (const e of events) {
+    if (e.type === "WR_SUBMITTED" && e.payload?.opTrace) {
+      return e.payload.opTrace as {
+        ipNodes?: string[];
+        resolvedOps?: string[];
+        registryVersion?: string;
+      };
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Validate a transition with D4 op-resolution awareness.
+ *
+ * An UNRESOLVED WR may be stored/HELD at VALIDATED, but the explicit
+ * VALIDATED→QUEUED advance is rejected with `UNRESOLVED_OPS` until its ops are
+ * resolved (registry pin). Delegates to :func:`validateTransition` otherwise.
+ *
+ * CP-4 forward note (architect checklist delta 9bf28fce): when the registry
+ * pin later resolves an UNRESOLVED WR's ops, the upgrade is APPEND-ONLY — the
+ * pin emits a new resolution event; it NEVER rewrites the WR's historical
+ * event log or its existing identity. The acceptance path here must not
+ * preclude that (this guard rejects only the *explicit* VALIDATED→QUEUED
+ * advance, never the append of a resolution event).
+ */
+export function validateTransitionWithOps(
+  currentStatus: WorkRequestStatus,
+  event: RuntimeEventType,
+  opTrace?: {
+    ipNodes?: string[];
+    resolvedOps?: string[];
+    registryVersion?: string;
+  },
+): WorkRequestStatus {
+  if (
+    currentStatus === "VALIDATED" &&
+    event === "WR_VALIDATED" &&
+    isUnresolvedOps(opTrace)
+  ) {
+    throw new Error(
+      "UNRESOLVED_OPS: cannot advance VALIDATED→QUEUED with unresolved opcodes " +
+      "(registryVersion UNRESOLVED or empty resolvedOps)",
+    );
+  }
+  return validateTransition(currentStatus, event);
+}
+
+/**
  * Reduce: apply a single event to a state, producing a new state.
  * This is a PURE function — no side effects, no I/O.
  */
@@ -215,6 +306,10 @@ export function reduce(
       event.type === "WR_FAILED"
         ? (event.payload?.error as string) || undefined
         : undefined,
+    normalization_pending:
+      event.type === "WR_SUBMITTED"
+        ? (event.payload?.normalization_pending as boolean) || state.normalization_pending
+        : state.normalization_pending,
   };
 }
 
@@ -307,6 +402,16 @@ const FORBIDDEN_COMPILER_FIELDS = [
   "queuePosition",
 ];
 
+// D3: identity is owned by the EMISSION BOUNDARY (nexus_core.wrp.identity /
+// compile.py), never the compiler. A compiler emits the derivation rule +
+// canonical inputs; a pre-computed entityKey in compiler output is a contract
+// violation (any compiler change would otherwise silently change identities).
+const FORBIDDEN_IDENTITY_FIELDS = [
+  "entityKey",
+  "entity_key",
+  "identity",
+];
+
 export function validateCompilerOutput(output: unknown): asserts output is CompilerOutput {
   if (!output || typeof output !== "object") {
     throw new Error("Compiler output must be a non-null object");
@@ -320,6 +425,17 @@ export function validateCompilerOutput(output: unknown): asserts output is Compi
       throw new Error(
         `COMPILER_LEAK: Field "${field}" is forbidden in compiler output. ` +
         `Execution semantics belong to the Runtime, not the Compiler.`,
+      );
+    }
+  }
+
+  // D3: reject pre-computed identity (entityKey/identity/entity_key).
+  for (const field of FORBIDDEN_IDENTITY_FIELDS) {
+    if (field in obj) {
+      throw new Error(
+        `IDENTITY_LEAK: Field "${field}" is forbidden in compiler output. ` +
+        `entityKey is derived at the emission boundary, not pre-computed by ` +
+        `the compiler.`,
       );
     }
   }
@@ -359,6 +475,7 @@ export function compilerOutputToEvent(output: CompilerOutput): RuntimeEvent {
       intent: output.intent,
       constraints: output.constraints,
       opTrace: output.opTrace,
+      normalization_pending: output.normalization_pending,
     },
   };
 }

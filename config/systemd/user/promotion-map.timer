@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily stage-0 mapping batch at 04:45 (ollama-gated no-op outside embed windows)
+
+[Timer]
+OnCalendar=*-*-* 04:45:00
+Persistent=true
+RandomizedDelaySec=180
+
+[Install]
+WantedBy=timers.target

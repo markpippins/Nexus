@@ -252,9 +252,6 @@ export default class CascadeController {
              WHERE event_type = 'candidate.promoted'
              AND event_timestamp >= NOW() - INTERVAL '${interval}') AS promoted,
             (SELECT COUNT(DISTINCT aggregate_id)::int FROM cascade.events
-             WHERE event_type = 'intent_record.created'
-             AND event_timestamp >= NOW() - INTERVAL '${interval}') AS intent_records,
-            (SELECT COUNT(DISTINCT aggregate_id)::int FROM cascade.events
              WHERE event_type = 'requirement.promoted_to_plan'
              AND event_timestamp >= NOW() - INTERVAL '${interval}') AS plans`,
           [],

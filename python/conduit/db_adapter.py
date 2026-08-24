@@ -582,7 +582,7 @@ class DBAdapter:
         with self._get_connection() as conn:
             latest = conn.execute(
                 """
-                SELECT type FROM vision.receipts
+                SELECT type FROM nebula.receipts_unified
                 WHERE plan_id = %s
                 ORDER BY created_at DESC LIMIT 1
                 """,
@@ -1266,7 +1266,7 @@ class DBAdapter:
             row = conn.execute(
                 """
                 SELECT COALESCE(SUM(tokens_used), 0) as total_tokens, COUNT(*) as receipts
-                FROM vision.receipts WHERE plan_id = %s
+                FROM nebula.receipts_unified WHERE plan_id = %s
                 """,
                 (plan_id,),
             ).fetchone()
@@ -1284,7 +1284,7 @@ class DBAdapter:
             row = conn.execute(
                 """
                 SELECT COALESCE(SUM(tokens_used), 0) as total_tokens, COUNT(*) as receipts
-                FROM vision.receipts WHERE agent_role = %s
+                FROM nebula.receipts_unified WHERE agent_role = %s
                 """,
                 (role,),
             ).fetchone()

@@ -21,16 +21,7 @@ Design:
 
 from __future__ import annotations
 
-import sys
-import os
 from typing import Any
-
-# Make the shared nats package importable from cascade
-_NATS_PACKAGE = os.path.join(os.path.dirname(__file__), "..", "nats")
-if os.path.isdir(_NATS_PACKAGE):
-    _parent = os.path.dirname(_NATS_PACKAGE)
-    if _parent not in sys.path:
-        sys.path.insert(0, _parent)
 
 from nats_envelope.envelope import CanonicalEnvelope, Classification
 from nats_publisher import event_type_to_subject

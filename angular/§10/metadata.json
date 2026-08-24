@@ -1,0 +1,6 @@
+{
+  "name": "Reactive Relics",
+  "description": "A workbench for building, testing, and sharing interactive widgets and reactive relics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

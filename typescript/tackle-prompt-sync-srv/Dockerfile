@@ -8,6 +8,8 @@ WORKDIR /app/tackle-prompt-sync-srv
 COPY tackle-prompt-sync-srv/package.json ./
 COPY heartbeat-client ../heartbeat-client
 RUN npm install --no-package-lock
+# Build file: sibling so its dist/ exists at runtime (main -> ./dist/index.js)
+RUN cd ../heartbeat-client && npm install --no-package-lock && npm run build
 COPY tackle-prompt-sync-srv/tsconfig.json ./
 COPY tackle-prompt-sync-srv/src ./src
 # Build the file dep's dist first: the root .dockerignore excludes **/dist,

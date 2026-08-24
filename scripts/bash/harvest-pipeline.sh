@@ -55,13 +55,13 @@ SPECIFIC_FILES=()           # optional: specific filenames for Stage 1
 
 # ── Paths ───────────────────────────────────────────────────────────────
 
-ROVER_DIR="/home/codex/dev/nexus/python/rover"
-BIN_DIR="/home/codex/dev/nexus/bin"
+ROVER_DIR="/home/codex/dev/nexus/legacy/python/rover"
+LEGACY_BIN="/home/codex/dev/nexus/legacy/bin"
 LOG_DIR="/home/codex/dev/nexus/logs"
 VENV_ACTIVATE="${ROVER_DIR}/.venv/bin/activate"
-STAGE1="${BIN_DIR}/batch_harvest_to_db.py"
-STAGE1_5="${BIN_DIR}/substance_backfill.py"
-STAGE2="${BIN_DIR}/batch_file_candidates.py"
+STAGE1="${LEGACY_BIN}/batch_harvest_to_db.py"
+STAGE1_5="${LEGACY_BIN}/substance_segment_backfill.py"
+STAGE2="${LEGACY_BIN}/batch_file_candidates.py"
 
 # ── Log files (rotated: timestamped per run) ────────────────────────────
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)

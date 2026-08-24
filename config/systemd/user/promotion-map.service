@@ -1,0 +1,15 @@
+[Unit]
+Description=Promotion flow stage 0: hierarchy mapping batch (plan 0005; ollama-gated)
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/codex/dev/nexus/python/promotion-flow
+ExecStart=/usr/bin/env python3 -u stage0_map.py --limit 25
+Environment=NEBULA_SRV=http://localhost:3101
+Environment=ASSEMBLY_SRV=http://localhost:3107
+Environment=OLLAMA_HOST=http://localhost:11434
+Restart=on-failure
+RestartSec=120
+StandardOutput=append:/tmp/promotion-map.log
+StandardError=inherit

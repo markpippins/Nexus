@@ -53,6 +53,14 @@ SERVICES = {
                 "vision, and session log. The MCP tool surface is served separately "
                 "(Streamable HTTP JSON-RPC on the same port).",
     },
+    "typescript/draft-srv": {
+        "title": "draft-srv — Draft Service Workspace / DB Workbench API",
+        "port": 3170,
+        "desc": "Draft service workspace hosting new backend components pending promotion "
+                "to dedicated services. Current tenant: DB Workbench API (multi-engine "
+                "database browsing, query/DDL execution, schema listing, and connection "
+                "testing) backing data-explorer-ui.",
+    },
     "typescript/execution-srv": {
         "title": "execution-srv — Execution Observability API",
         "port": 3110,
@@ -154,6 +162,13 @@ SERVICES = {
 }
 
 SKIPPED_KEYS = {k for k, v in SERVICES.items() if v.get("skip_openapi")}
+
+# Hand-authored spec section delimiter. Everything in a service's API.md from
+# this marker to the end of file is preserved verbatim across regeneration,
+# so field-level contracts / envelope docs written by hand survive
+# extract_routes.py + gen_openapi.py runs. The generated endpoint table stays
+# the canonical inventory; the hand-authored section is a UI/consumer spec.
+API_SPEC_BEGIN = "<!-- API-SPEC-BEGIN -->"
 
 JSON_BODY_REF = "#/components/schemas/JsonBody"
 ERROR_REF = "#/components/schemas/Error"
@@ -312,6 +327,8 @@ def build_api_md(meta, endpoints, kind):
         "cd nexus && python3 tools/api-docs/extract_routes.py --out /tmp/api_inventory.json",
         f"python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json{'' if kind == 'fastapi' else '   # (vision-srv also refreshes from the live FastAPI spec)'}",
         "```",
+        "",
+        API_SPEC_BEGIN,
     ]
     return "\n".join(lines) + "\n"
 
@@ -352,8 +369,23 @@ def main(argv=None):
         if kind == "generic":
             spec = build_spec(meta, endpoints)
             dump_yaml(spec, os.path.join(svc_dir, "openapi.yaml"))
-        with open(os.path.join(svc_dir, "API.md"), "w") as f:
-            f.write(build_api_md(meta, endpoints, kind))
+        api_path = os.path.join(svc_dir, "API.md")
+        generated = build_api_md(meta, endpoints, kind)
+        # Preserve any hand-authored spec section from the previous file so it
+        # survives regeneration (see API_SPEC_BEGIN).
+        hand = ""
+        if os.path.exists(api_path):
+            with open(api_path, encoding="utf-8", errors="replace") as f:
+                prev = f.read()
+            idx = prev.find(API_SPEC_BEGIN)
+            if idx != -1:
+                hand = prev[idx + len(API_SPEC_BEGIN):]
+        with open(api_path, "w") as f:
+            f.write(generated)
+            if hand:
+                f.write(hand)
+                if not hand.endswith("\n"):
+                    f.write("\n")
         summary[key] = f"{len(endpoints)} endpoints ({kind})"
     for k, v in summary.items():
         print(f"{k}: {v}")

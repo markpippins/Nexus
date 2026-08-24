@@ -49,6 +49,16 @@
     "secure": false,
     "changeOrigin": true
   },
+  "/config/ai": {
+    "target": "http://localhost:3410",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/roles": {
+    "target": "http://localhost:3410",
+    "secure": false,
+    "changeOrigin": true
+  },
   "/config": {
     "target": "http://localhost:3104",
     "secure": false,

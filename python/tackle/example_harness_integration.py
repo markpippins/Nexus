@@ -27,7 +27,7 @@ _log = logging.getLogger(__name__)
 class HarnessWithTools:
     """Example harness that uses the tools aggregator."""
 
-    def __init__(self, aggregator_url: str = "http://localhost:3200"):
+    def __init__(self, aggregator_url: str = "http://localhost:3210"):
         """Initialize the harness with tool support."""
         self.tools_client = SyncToolsAggregatorClient(aggregator_url)
         self.tools_by_name: Dict[str, ToolDefinition] = {}
@@ -130,7 +130,7 @@ class HarnessWithTools:
 class AsyncHarnessWithTools:
     """Example async harness that uses the tools aggregator."""
 
-    def __init__(self, aggregator_url: str = "http://localhost:3200"):
+    def __init__(self, aggregator_url: str = "http://localhost:3210"):
         """Initialize the harness."""
         self.aggregator_url = aggregator_url
         self.tools_client: Optional[ToolsAggregatorClient] = None

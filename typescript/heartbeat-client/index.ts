@@ -210,42 +210,7 @@ export function getHeartbeat(): Heartbeat | null {
   return _active;
 }
 
-// ─── ESM CLI guard ──────────────────────────────────────────────────────────
-// Consumers are "type":"module" at runtime. The previous attempt to use
-// `createRequire(import.meta.url)` and check `require.main === module`
-// crashes with `ReferenceError: module is not defined in ES module scope`
-// because `module` is a CJS global that does not exist under ESM. We avoid
-// the CJS-era idiom entirely and detect "running as the entry point" by
-// comparing the script's own file URL to `process.argv[1]`.
-import { fileURLToPath } from "url";
-const __filename = fileURLToPath(import.meta.url);
-// ─── CLI entry point ───────────────────────────────────────────────────────
-
-if (process.argv[1] === __filename) {
-  const args = process.argv.slice(2);
-  const get = (name: string): string | undefined => {
-    const idx = args.indexOf(name);
-    return idx >= 0 ? args[idx + 1] : undefined;
-  };
-
-  const serviceId = get("--service-id");
-  const serviceName = get("--service-name");
-
-  if (!serviceId || !serviceName) {
-    console.error(
-      "Usage: npx tsx index.ts --service-id <id> --service-name <name>",
-    );
-    process.exit(1);
-  }
-
-  const hb = startHeartbeat({
-    serviceId: parseInt(serviceId, 10),
-    serviceName,
-    log: (...a) => console.log(new Date().toISOString(), ...a),
-  });
-
-  console.log(`Heartbeat running for ${serviceName} (Ctrl+C to stop)...`);
-
-  // Keep process alive
-  setInterval(() => {}, 1000);
-}
+// The ESM CLI entry point lives in ./cli.ts — it uses `import.meta`, which
+// is illegal under `module: commonjs` and broke dockerized builds of every
+// consumer that imports this file (tsc compiles imported files even when
+// outside `include`). Run the CLI via: npx tsx cli.ts --service-id N --service-name X

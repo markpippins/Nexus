@@ -45,7 +45,18 @@ for t in service-types server-types environments operating-systems \
   probe "lookup $t" "$REG/api/v1/$t"
 done
 
-echo "--- terrain :8084 ---"
+echo "--- instance lookup (terrain, T25 1.3) ---"
+probe "lookup single (wind-srv)"    "$TER/api/v1/lookup/wind-srv"
+probe "lookup batch (wind-srv,peb-kernel)" "$TER/api/v1/lookup?units=wind-srv,peb-kernel"
+# unknown unit must 404, not 500
+unknown_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$TER/api/v1/lookup/__no_such_unit__" 2>/dev/null)"
+if [ "$unknown_code" = "404" ]; then
+  echo "PASS  404  lookup unknown unit -> unknown_unit"
+else
+  echo "FAIL  ${unknown_code:-ERR}  lookup unknown unit (expected 404)"
+  FAIL=$((FAIL+1))
+fi
+
 probe "terrain actuator health"         "$TER/actuator/health"
 probe "terrain platform health"         "$TER/api/v1/platform/health"
 probe "terrain servers"                 "$TER/api/v1/servers"

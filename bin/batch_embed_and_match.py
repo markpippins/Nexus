@@ -29,7 +29,7 @@ log = logging.getLogger("batch_embed")
 NEBULA_API = "http://localhost:3101/api"
 OLLAMA_URL = "http://localhost:11434/api/embeddings"
 EMBED_MODEL = "nomic-embed-text"
-DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
+DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus", "-v", "ON_ERROR_STOP=1"]
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,14 +72,13 @@ def nebula_post(path: str, body: dict) -> dict:
 
 
 def get_ollama_embedding(text: str) -> list[float] | None:
-    payload = json.dumps({"model": EMBED_MODEL, "prompt": text}).encode("utf-8")
-    req = urllib.request.Request(OLLAMA_URL, data=payload, headers={"Content-Type": "application/json"})
+    """Tiered provider chain (decision 8ae276bf); name kept for callers."""
     try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            data = json.loads(r.read().decode())
-        return data.get("embedding")
+        from embed_client import embed_one
+        vec, _provider = embed_one(text)
+        return vec
     except Exception as e:
-        log.error("  Ollama error: %s", e)
+        log.error("  E_TRANSIENT_LLM_UNAVAILABLE: %s", e)
         return None
 
 
@@ -97,7 +96,7 @@ def main():
 
     # Step 1: Get all candidates
     log.info("Fetching candidates...")
-    candidates_data = nebula_get("/harvest-candidates?limit=500")
+    candidates_data = nebula_get("/harvest-candidates?limit=1000")
     candidates = candidates_data.get("candidates", [])
     log.info("Total candidates: %d", len(candidates))
 
@@ -113,7 +112,7 @@ def main():
 
     # Step 3: Get existing cross_schema refs to avoid duplicates
     existing_xrefs = set()
-    rc2, out2 = psql("SELECT source_id, target_id FROM nebula.cross_references WHERE rel_type = 'cross_schema';")
+    rc2, out2 = psql("SELECT source_id, target_id FROM nebula.cross_references WHERE rel_type IN ('kv:cross_schema', 'cross_schema');")
     if out2:
         for line in out2.splitlines():
             parts = line.split("|", 1)
@@ -135,9 +134,12 @@ def main():
     to_process = []
     for c in candidates:
         title = c.get("title", "")
-        intent = c.get("intentDescription", "")
+        intent = c.get("intentDescription") or ""
         if title not in embedded:
-            to_process.append({"id": c["id"], "title": title, "intent": intent, "harvest_id": c.get("harvest_id", ""), "source": c.get("harvest_source", "")})
+            to_process.append({"id": c["id"], "title": title, "intent": intent,
+                               # REST returns camelCase (harvestId); older payloads were snake_case.
+                               "harvest_id": c.get("harvest_id") or c.get("harvestId") or None,
+                               "source": c.get("harvest_source") or c.get("harvestSource") or ""})
 
     if args.limit:
         to_process = to_process[:args.limit]
@@ -169,30 +171,44 @@ def main():
 
         vec_str = "[" + ",".join(str(v) for v in embedding) + "]"
         embed_id = str(uuid.uuid4())
+        harvest_id_sql = f"'{c['harvest_id']}'" if c.get("harvest_id") else "NULL"
 
+        # candidate_index is UNIQUE per (harvest_id, candidate_index) on the
+        # history table behind the view — hardcoding 0 silently collapsed all
+        # but one candidate per harvest via ON CONFLICT DO NOTHING. Compute
+        # the next free index for this harvest instead.
         sql = f"""
+        WITH next_idx AS (
+            SELECT COALESCE(MAX(h2.candidate_index) + 1, 0) AS idx
+              FROM nebula.harvest_candidate_embeddings_history h2
+             WHERE h2.harvest_id = {harvest_id_sql}
+        )
         INSERT INTO nebula.harvest_candidate_embeddings
             (id, harvest_id, candidate_index, candidate_title, intent_text,
              embedding, source_filename, model_used, created_at)
-        VALUES
-            ('{embed_id}',
-             '{c['harvest_id']}',
-             0,
-             '{c['title'].replace("'", "''")}',
-             '{c['intent'][:500].replace("'", "''")}',
-             '{vec_str}'::vector(768),
-             '{c['source'].replace("'", "''")}',
-             '{EMBED_MODEL}',
-             NOW())
-        ON CONFLICT DO NOTHING;
+        SELECT
+            '{embed_id}',
+            {harvest_id_sql},
+            next_idx.idx,
+            '{c['title'].replace("'", "''")}',
+            '{c['intent'][:500].replace("'", "''")}',
+            '{vec_str}'::vector(768),
+            '{c['source'].replace("'", "''")}',
+            '{EMBED_MODEL}',
+            NOW()
+        FROM next_idx
+        ON CONFLICT DO NOTHING
+        RETURNING id;
         """
 
-        rc_sql, _ = psql(sql)
-        if rc_sql == 0:
+        rc_sql, inserted = psql(sql)
+        if rc_sql == 0 and inserted:
             embedded[c["title"]] = {"id": embed_id, "model": EMBED_MODEL}
             embedded_count += 1
             if embedded_count % 10 == 0:
                 log.info("  Embedded %d/%d...", embedded_count, len(to_process))
+        elif rc_sql == 0:
+            log.warning("  Insert no-op (conflict) for: %s", c["title"][:40])
         else:
             log.warning("  DB insert failed for: %s", c["title"][:40])
 
@@ -247,7 +263,7 @@ def main():
                 "sourceId": embed_id,
                 "targetType": "knowledge_entity_embedding",
                 "targetId": kg_entity_id,
-                "relType": "cross_schema",
+                "relType": "kv:cross_schema",
                 "metadata": {
                     "version": "v3",
                     "similarity": float(similarity),

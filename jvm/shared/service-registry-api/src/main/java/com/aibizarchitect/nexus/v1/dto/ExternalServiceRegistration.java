@@ -14,6 +14,11 @@ public class ExternalServiceRegistration {
     private Integer port;
     private List<String> dependencies;
     private List<HostedServiceInfo> hostedServices;
+    // Plan 1291 (registration → deployment bridge): optional server identity so
+    // the registry knows WHICH machine a service runs on. Either may be supplied;
+    // when neither is, registration stays Service-only (backward compatible).
+    private Long serverId;
+    private String hostname;
 
     public ExternalServiceRegistration() {
     }
@@ -96,6 +101,22 @@ public class ExternalServiceRegistration {
 
     public void setHostedServices(List<HostedServiceInfo> hostedServices) {
         this.hostedServices = hostedServices;
+    }
+
+    public Long getServerId() {
+        return serverId;
+    }
+
+    public void setServerId(Long serverId) {
+        this.serverId = serverId;
+    }
+
+    public String getHostname() {
+        return hostname;
+    }
+
+    public void setHostname(String hostname) {
+        this.hostname = hostname;
     }
 
     public static class HostedServiceInfo {

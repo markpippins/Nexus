@@ -112,6 +112,7 @@ opencode_model_for() {
         opencode/*)            echo "$id" ;;
         */*)                   echo "${id%%/*}/${id}" ;;
         big-pickle)            echo "opencode/big-pickle" ;;
+        x-preview-f-free)      echo "opencode/x-preview-f-free" ;;
         gemini-3.5-flash)      echo "opencode-go/gemini-3.5-flash" ;;
         qwen2.5-coder)         echo "ollama/qwen2.5-coder" ;;
         *)                     echo "$id" ;;

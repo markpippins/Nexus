@@ -101,7 +101,7 @@ BEGIN
     ON CONFLICT (slug) DO NOTHING
     RETURNING id INTO v_memory_id;
     IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['analyst', 'architect', 'builder', 'critic', 'devops', 'engineer', 'engineer-ii', 'inspector', 'planner', 'reviewer', 'topologist'];
+        v_roles := ARRAY['analyst', 'architect', 'builder', 'critic', 'devops', 'engineer', 'engineer-ii', 'inspector', 'planner', 'reviewer', 'sysadmin', 'tester', 'topologist'];
         FOREACH v_role IN ARRAY v_roles LOOP
             INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
             VALUES (v_memory_id, v_role, NOW(), NULL);
@@ -138,7 +138,7 @@ BEGIN
         '4. **Channel-adaptive extended boot (Freebuff only):**\n'
         '   If you are running on Freebuff (model prefix \`freebuff/*\`, role-lease \`channel\` = \`interactive\`, or harness \`harn-freebuff\`), you have a long-lived session with your own context and the token budget for a deeper boot AFTER the base checks:\n'
         '   - **Scan the change-log forum** (\`GET http://localhost:3107/api/forums/change-log/threads\`) for entries since your last session — learn what has already been completed or reported.\n'
-        '   - **Check to-do threads for completion replies** (\`Completed: ...\` comments) so you do not re-report finished work.\n'
+        '   - **Check to-do threads for completion replies** (\`Completed: ...\` comments) or \`statusRating >= 4\` (Accepted/Rejected/Closed) so you do not re-report finished work. See card \`thread-status-ratings\`.\n'
         '   - **Dedupe your report**: surface only NEW issues or changes since the previous session. Do NOT repeat the same set of issues the previous agent already reported; mention still-open items in one line ("still open").\n'
         '   \n'
         '   On opencode (model prefix \`opencode/*\`, role-lease \`channel\` = \`opencode\`, or one-shot harness runs) you are token-constrained: skip this step and keep the base boot (steps 2–3) only. Redundant reporting across opencode sessions is accepted — the user prefers tokens spent on the task itself.\n'
@@ -1272,7 +1272,7 @@ BEGIN
         '## Creating & Managing Plans\n'
         '\n'
         '### Create a Plan (ready for implementation)\n'
-        'Use \`nebula_create_plan\` (nebula-mcp) with title, project, goal, filesAffected, acceptanceCriteria, and dependencies. conduit-mcp create_plan / create_proposed_plan are REMOVED stubs (TOOL_NOT_FOUND) — do not call them. The plan lands in nebula.implementation_plans (status pending) and conduit-mcp auto-bootstraps a PLAN_CREATE receipt + builder ticket within ~30s.\n'
+        'Use \`nebula_create_plan\` (nebula-mcp) with title, project, goal, filesAffected, acceptanceCriteria, and dependencies. When you scope or schedule work from an Assembly to-do thread, advance its parent-post status: 1 Specified once scope is pinned, 2 Planned when picked up/scheduled (see card \`thread-status-ratings\`). conduit-mcp create_plan / create_proposed_plan are REMOVED stubs (TOOL_NOT_FOUND) — do not call them. The plan lands in nebula.implementation_plans (status pending) and conduit-mcp auto-bootstraps a PLAN_CREATE receipt + builder ticket within ~30s.\n'
         '\n'
         '### Proposed / Planning states\n'
         'There is no create_proposed_plan tool. Start ideas as a full plan via nebula_create_plan; use conduit-mcp_revise_plan to create a revision copy for planning discussion. Use conduit-mcp_update_plan / report_plan_metadata to set filesAffected, acceptanceCriteria, dependencies.\n'
@@ -1457,6 +1457,34 @@ BEGIN
         '- Pipeline orchestration: state machine, receipts, tickets\n'
         '- All plan creation/promotion/state queries go through MCP tools\n'
         '- Never write .md files directly to nexus/graph/IMPLEMENTATION_PLANS/\n'
+        '- \`create_plan\` is DEPRECATED — create plans via \`nebula_create_plan\`\n'
+        '  (rover-mcp/nebula-mcp); conduit issues receipts + tickets automatically\n'
+        '- Read-only state: \`query_conduit_state\` (full pipeline state,\n'
+        '  \`plans.blocked\` for jams), \`query_nebula_backlog\`, \`query_nebula_systems\`\n'
+        '- Transport: Streamable HTTP — JSON-RPC to \`POST http://localhost:3100/\`\n'
+        '  (there is NO \`POST /tools/call\` route on 3100)\n'
+        '\n'
+        '### Nebula-mcp / rover-mcp (nebula-srv port 3101)\n'
+        '- Canonical database-first records and plans\n'
+        '- \`nebula_create_plan\` — create implementation plans (auto plan numbers,\n'
+        '  DB-canonical; never write .md first)\n'
+        '- \`nebula_list_agent_records\`, \`nebula_get_agent_record\`,\n'
+        '  \`nebula_create_agent_record\`, \`nebula_update_agent_record\`\n'
+        '- \`nebula_list_harvest_candidates\`, \`nebula_list_open_questions\`,\n'
+        '  \`nebula_list_cross_references\`, \`nebula_list_evidence_links\`\n'
+        '- REST fallback on :3101 (\`/api/agent-records\`, \`/api/harvest-candidates\`,\n'
+        '  \`/api/open-questions\`)\n'
+        '\n'
+        '### Knowledge-mcp (knowledge-srv port 3109)\n'
+        '- Read-only knowledge graph access (stdio MCP server, global opencode\n'
+        '  config; namespaced \`knowledge-mcp_*\` in opencode)\n'
+        '- Tools: \`knowledge_list_entities\`, \`knowledge_get_entity\`,\n'
+        '  \`knowledge_list_edges\`, \`knowledge_get_entity_relations\`,\n'
+        '  \`knowledge_list_cross_references\`, \`knowledge_list_migrations\`,\n'
+        '  \`knowledge_graph_summary\`, \`knowledge_semantic_search\`\n'
+        '- Semantic search covers 4 embed layers (kg / harvest / observation /\n'
+        '  agent) via pgvector + Ollama (nomic-embed-text)\n'
+        '- See \`knowledge-mcp-tools\` and \`investigation-resources\` cards for usage\n'
         '\n'
         '### Chat Server (port 3101)\n'
         '- Python: nexus/python/conduit/agent_chat.py\n'
@@ -1470,7 +1498,8 @@ BEGIN
         '\n'
         '### Health Check\n'
         '- GET /health returns server status, PID, pipeline state\n'
-        '- OrphanScan section: detects soft-deleted plans with stale .md files, and filesystem artifacts with no DB row',
+        '- OrphanScan section: detects soft-deleted plans with stale .md files, and filesystem artifacts with no DB row\n'
+        '',
         ARRAY['reference', 'config', 'server', 'mcp', 'chat'],
         ARRAY['mcp server', 'chat server', 'health check', 'port 3100', 'port 3101'],
         '{}'
@@ -1678,32 +1707,48 @@ BEGIN
         'You are investigating an inventory / baseline question (e.g. T01): what\n'
         'entities exist, what audit trail exists, or how is X linked to Y. Answer\n'
         'from the database-first resources below — not by scanning filesystem\n'
-        'directories.\n'
+        'directories. Prefer the MCP tool surface over raw REST where available.\n'
         '\n'
-        '## 1. Knowledge graph (knowledge-srv, port 3109)\n'
+        '## 1. Knowledge graph (knowledge-mcp → knowledge-srv :3109)\n'
         '\n'
-        'Serves the \`knowledge\` schema (knowledge.postgres: graph_entities,\n'
-        'graph_edges, graph_cross_references, graph_migrations).\n'
+        '\`knowledge-mcp\` (stdio MCP server, wired into the global opencode config)\n'
+        'proxies read-only SQL to knowledge-srv (:3109), which serves the\n'
+        '\`knowledge\` schema (graph_entities, graph_edges, graph_cross_references,\n'
+        'graph_migrations). Tools (namespaced \`knowledge-mcp_*\` in opencode):\n'
         '\n'
-        'REST endpoints (all GET):\n'
+        '- \`knowledge_graph_summary\` — entity/edge/cross-ref/migration counts.\n'
+        '  **Live state: 2380 entities, 3907 edges, 0 graph cross-refs, 19\n'
+        '  migrations.** Sections: work_requests (1932), plans (448), plus types,\n'
+        '  gaps_and_blockers, actors, rules, architectural_observations, decisions,\n'
+        '  topology, epistemic_types, state_machines, boundaries. Relation types:\n'
+        '  implements (1907), derived_from (1907), depends_on (93).\n'
+        '- \`knowledge_list_entities\` — list entities (filters: section, entity_type,\n'
+        '  status, search, limit/offset).\n'
+        '- \`knowledge_get_entity\` — one entity + full properties JSON.\n'
+        '- \`knowledge_list_edges\` — edges (filters: source/target section+id,\n'
+        '  relation_type).\n'
+        '- \`knowledge_get_entity_relations\` — inbound + outbound relations for an\n'
+        '  entity (section + entity_id).\n'
+        '- \`knowledge_list_cross_references\` — graph-level cross-reference maps.\n'
+        '- \`knowledge_list_migrations\` — import/embed migration history.\n'
+        '- \`knowledge_semantic_search\` — **unified cosine search** across four\n'
+        '  pgvector embed layers: \`kg\` (curated entities: work_requests, plans,\n'
+        '  actors), \`harvest\` (harvest candidates), \`observation\` (transcripts,\n'
+        '  session logs, audit docs), \`agent\` (agent records). Params: query,\n'
+        '  limit, layers (array), recordTypes (agent-layer filter), minSimilarity.\n'
+        '  Returns provenance labels (curated / harvested / observed / agent_record)\n'
+        '  so you can cite which layer a claim came from.\n'
         '\n'
-        '- \`/knowledge/summary\` — entity/edge/cross-ref counts by section and\n'
-        '  relation type. Live state: 2539 entities, 31 edges, 13 cross-refs,\n'
-        '  15 migrations. Sections include work_requests (1897), plans (419),\n'
-        '  types (41), gaps_and_blockers (41), actors (39), rules (32),\n'
-        '  architectural_observations (26), decisions (16), topology (13),\n'
-        '  epistemic_types (8), state_machines (4), boundaries (3).\n'
-        '- \`/knowledge/entities\` — all graph entities\n'
-        '- \`/knowledge/entities/:section/:entity_id\` — single entity\n'
-        '- \`/knowledge/entities/:section/:entity_id/relations\` — outgoing edges\n'
-        '- \`/knowledge/edges\` — all edges\n'
-        '- \`/knowledge/cross-references\` — graph-level cross-references\n'
-        '- \`/knowledge/migrations\` — migration history\n'
+        'REST equivalents on \`http://localhost:3109\` (all GET):\n'
+        '\`/knowledge/summary\`, \`/knowledge/entities\`,\n'
+        '\`/knowledge/entities/:section/:entity_id\`,\n'
+        '\`/knowledge/entities/:section/:entity_id/relations\`, \`/knowledge/edges\`,\n'
+        '\`/knowledge/cross-references\`, \`/knowledge/migrations\`.\n'
         '\n'
         '## 2. Canonical audit database (nebula agent records)\n'
         '\n'
         'The database is the ONLY canonical audit trail (filesystem audit dirs are\n'
-        'derived projections). Query via nebula-mcp tools:\n'
+        'derived projections). Query via nebula-mcp tools (rover-mcp):\n'
         '\n'
         '- \`nebula_list_agent_records\` — filters: role, type, tag(s) (AND\n'
         '  conjunction), search, createdAfter/createdBefore (ISO 8601), level,\n'
@@ -1737,16 +1782,52 @@ BEGIN
         '  kv:description_overlap\n'
         '\n'
         'The knowledge graph also exposes its own cross-refs via\n'
-        'knowledge-srv \`GET /knowledge/cross-references\`\n'
-        '(graph_cross_references — currently 13 links).\n'
+        '\`knowledge_list_cross_references\` (graph_cross_references — currently 0\n'
+        'links at graph level; use nebula.cross_references for the populated\n'
+        'plan/record/entity joins).\n'
+        '\n'
+        '## 4. Evidence links (nebula evidence_links)\n'
+        '\n'
+        'Links between knowledge-graph entities and harvested evidence:\n'
+        '\n'
+        '- \`nebula_list_evidence_links\` — filters: knowledgeEntityId, harvestId,\n'
+        '  candidateId, linkType, provenance, confidence range.\n'
+        '- \`nebula_create_evidence_link\` / \`nebula_get_evidence_link\` /\n'
+        '  \`nebula_delete_evidence_link\` / \`nebula_delete_evidence_links_by_entity\`.\n'
+        '\n'
+        'link_type taxonomy: supports, refines, instantiates, contradicts, supersedes,\n'
+        'mentions, informs, validates.\n'
+        'provenance: auto_ingestor, manual, reconciler, llm_extracted, migration.\n'
+        '\n'
+        '## 5. Harvest candidates & open questions (nebula)\n'
+        '\n'
+        '- \`nebula_list_harvest_candidates\` — candidates with status (pending /\n'
+        '  promoted / useful / superseded), implementationNotes, completed flag,\n'
+        '  harvestId, system/subsystem/feature links.\n'
+        '- \`nebula_list_open_questions\` / \`nebula_list_question_answers\` — open\n'
+        '  questions (blocking flags, answered_by) and multi-role answers.\n'
+        '- \`nebula_list_harvests\` / \`nebula_get_harvest\` — harvest pipeline outputs.\n'
+        '\n'
+        '## Recommended investigation sequence\n'
+        '\n'
+        '1. \`knowledge_semantic_search\` on the topic (all layers) to find what exists.\n'
+        '2. \`knowledge_graph_summary\` to orient, then \`knowledge_list_entities\` /\n'
+        '   \`knowledge_get_entity\` on the relevant section(s).\n'
+        '3. Expand via \`knowledge_list_edges\` / \`knowledge_get_entity_relations\`.\n'
+        '4. Join to nebula: \`nebula_list_cross_references\` (plans ↔ records ↔\n'
+        '   entities), \`nebula_list_evidence_links\` (support/contradiction), then\n'
+        '   \`nebula_list_agent_records\` for the underlying records.\n'
+        '5. Cross-check candidates/open questions if the topic maps to harvest intent.\n'
         '\n'
         '## Anti-patterns\n'
         '\n'
         '- Do not read audit/ or IMPLEMENTATION_PLANS/ markdown as operational\n'
         '  state; query the DB via nebula-mcp.\n'
-        '- Do not guess rel_type strings; use the taxonomy above.\n'
+        '- Do not guess rel_type / link_type strings; use the taxonomies above.\n'
         '- When a question says "who/what references X", start from\n'
         '  nebula.cross_references and expand via relations.\n'
+        '- Do not claim you "used the knowledge graph" when you only listed a\n'
+        '  server''s metadata — say which KG surfaces you actually queried.\n'
         '',
         ARRAY['investigation', 'knowledge-graph', 'audit', 'cross-references', 'database-first', 't01'],
         ARRAY['investigation', 'knowledge graph', 'audit database', 'cross-refs', 'what entities exist', 'what changed', 'linked to', 'baseline', 'inventory', 't01'],
@@ -1755,7 +1836,7 @@ BEGIN
     ON CONFLICT (slug) DO NOTHING
     RETURNING id INTO v_memory_id;
     IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['analyst', 'devops', 'engineer', 'engineer-ii', 'topologist'];
+        v_roles := ARRAY['analyst', 'devops', 'engineer', 'engineer-ii', 'planner', 'topologist'];
         FOREACH v_role IN ARRAY v_roles LOOP
             INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
             VALUES (v_memory_id, v_role, NOW(), NULL);
@@ -1836,7 +1917,7 @@ BEGIN
     ON CONFLICT (slug) DO NOTHING
     RETURNING id INTO v_memory_id;
     IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY['analyst', 'architect', 'inspector', 'operator'];
+        v_roles := ARRAY['analyst', 'architect', 'inspector', 'operator', 'planner'];
         FOREACH v_role IN ARRAY v_roles LOOP
             INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
             VALUES (v_memory_id, v_role, NOW(), NULL);
@@ -2586,6 +2667,525 @@ BEGIN
     RETURNING id INTO v_memory_id;
     IF v_memory_id IS NOT NULL THEN
         v_roles := ARRAY['analyst', 'architect', 'auditor', 'builder', 'critic', 'devops', 'engineer', 'engineer-ii', 'inspector', 'planner', 'reviewer', 'topologist'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 42. DevOps Operations Conventions (thread-reply, escalation, inbox)
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'devops-operations-conventions',
+        'DevOps Operations Conventions (thread-reply, escalation, inbox)',
+        'Mission charter + mandatory thread-reply convention, R12 escalation, and R17 inbox check for the devops role.',
+        '\n'
+        '## Purpose\n'
+        '\n'
+        'Operational conventions for the Devops role. Load when starting work or\n'
+        'when reporting progress. Complements the persona (tackle.prompts\n'
+        '\`devops/opencode-persona\` v3).\n'
+        '\n'
+        '## Mission Charter (binding, from user)\n'
+        '\n'
+        '1. **Containerization (LEAD):** containerize the legacy \`typescript/*-srv\`\n'
+        '   services so they can run **as a group elsewhere** (warm failover standbys\n'
+        '   on a second machine). Dockerfiles, compose, images, group lifecycle.\n'
+        '2. **Ansible failover maintenance:** work with the other machine(s) via\n'
+        '   ansible — playbooks, inventory, idempotent provisioning, standby health.\n'
+        '3. **Cutover oversight (GATED):** oversee cutover to \`python/peb-kernel\` and\n'
+        '   the adonisjs/moleculer stack. **DO NOT cut over until containerization is\n'
+        '   tested locally** (group starts, health checks pass, failover works on the\n'
+        '   local machine first). The local container test is the gate.\n'
+        '\n'
+        '## Thread-Reply Convention (MANDATORY)\n'
+        '\n'
+        '- Work specified in a forum thread (checklist/dispatch/task) → reply to\n'
+        '  **that thread** with progress updates as comments.\n'
+        '- Per-checklist-item progress (\`[x]\`), deliverables **by path** (never paste\n'
+        '  credentials), blockers stated with what you need.\n'
+        '- Post on item completion; post immediately when blocked or at a handoff\n'
+        '  point (e.g. draft awaiting ratification).\n'
+        '- Agent records are supplementary; the forum thread reply is the primary\\n  progress surface.\n'
+        '- **Advance the parent thread status while replying** (\`statusRating\` param\n'
+        '  on the comment POST, or \`PUT /api/forums/threads/:id/status\`) — see card\n'
+        '  \`thread-status-ratings\`. Completion replies → 4 Accepted; blockers stay at\n'
+        '  current status; reopening after regression → 6.\n'
+        '- The issues forum (\`issues-and-open-questions\`) is for blockers/incidents\n'
+        '  and open questions — NOT work updates or ratification requests.\n'
+        '\n'
+        '## Escalation Process (R12)\n'
+        '\n'
+        '1. Try restart/config fix first.\n'
+        '2. Record \`["to:architect","type:escalation"]\` — problem, tried, state.\n'
+        '3. If unresolvable and blocking: also POST to Assembly\n'
+        '   \`issues-and-open-questions\` with \`role\` + \`model\` fields, using the\n'
+        '   devops Assembly user UUID (assembly-srv :3107).\n'
+        '4. DB changes route to **DBA** (\`["to:dba","type:db-change",...]\`); you own\n'
+        '   migration mechanics, the DBA owns DDL.\n'
+        '\n'
+        '## End-of-Turn Inbox Check (MANDATORY, R17)\n'
+        '\n'
+        '- Preferred: \`nexus/bin/check-inbox.sh --role devops\` (or \`nebula_get_inbox\`\n'
+        '  MCP \`{"role":"devops","limit":20}\`).\n'
+        '- Fallback: nebula REST :3101 — GET pointer, query records\n'
+        '  \`role=devops&createdAfter=<pointer_iso>\`, PUT pointer after surfacing.\n'
+        '- Surface items to the user; do NOT silently act on inbox items.\n'
+        '- If nebula-srv unreachable, surface as blocking infra issue.\n'
+        '',
+        ARRAY['devops', 'operations', 'conventions', 'thread-reply', 'escalation', 'inbox'],
+        ARRAY['devops conventions', 'thread reply', 'escalate', 'inbox check', 'containerization', 'ansible', 'cutover'],
+        ARRAY['nebula_get_inbox', 'nebula_create_agent_record', 'nebula_list_agent_records']
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY['devops', 'sysadmin'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 43. Parallel Role Loop (PRL) — cross-role doctrine
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'parallel-role-loop',
+        'Parallel Role Loop (PRL) — cross-role doctrine',
+        'Concurrent role sessions: user is NOT the message bus. Every turn = inbox check → thread sweep → act → post to thread → notify via to:<role> record → advance pointer. Work until blocker/decision, then switch tracks while awaiting.',
+        '## Parallel Role Loop (PRL) — cross-role doctrine\n'
+        '\n'
+        '### Premise\n'
+        'Multiple role sessions run concurrently (e.g., Architect in one terminal, Engineer in another, user supervising). **The user is NOT the message bus.** All cross-role communication flows through the corpus: nebula agent records (tag-routed, pointer-tracked) + Assembly forum threads (durable, timestamped, threaded). The inbox check is the attention filter that lets each role work independently.\n'
+        '\n'
+        '### The loop (every role, every turn)\n'
+        '1. **Inbox check FIRST** — \`nebula_get_inbox\` / \`nexus/bin/check-inbox.sh --role <role>\`: new \`to:<role>\` records since pointer. Surface to the user; never silently process.\n'
+        '2. **Thread sweep** — check threads you participate in (track threads, decisions forum, change-log) for new comments since your last turn.\n'
+        '3. **Act** — proceed with work until a stopping point.\n'
+        '4. **Stopping point → post to the thread** — every completion, blocker, decision, review, or question gets a forum post: decisions → decisions forum (R-A records auto-sync); track status → the track thread; completed work → change-log (R14).\n'
+        '5. **Notify via pointer** — after posting, write a \`to:<dependent-role>\` agent record (short, carrying thread IDs + record IDs + commit refs) so the other role''s next inbox check catches it.\n'
+        '6. **Advance pointer** after surfacing (R17).\n'
+        '\n'
+        '### Autonomy boundary (work until blocker or decision needed)\n'
+        '- Proceed autonomously until: (a) a decision is needed from another role, (b) a blocker surfaces, (c) a work unit completes.\n'
+        '- At each boundary: post to the thread, notify via record, then **STOP that track**.\n'
+        '- **While awaiting a decision or blocker leverage: switch to another project track** — never idle. The decision arrives via inbox on a later turn.\n'
+        '\n'
+        '### Communication rules\n'
+        '- **Never relay via user chat.** If the user relays a message from another role, treat it as out-of-band: immediately write it into the corpus (thread + record) so the loop self-heals.\n'
+        '- **Thread = durable conversation surface.** Comments, not just records. A question asked in chat is not asked until it''s a thread post + routed record.\n'
+        '- **Records carry pointers** — always embed thread IDs, record IDs, commit refs in content so the corpus is self-navigating.\n'
+        '\n'
+        '### Role-specific wiring\n'
+        '- **Engineer**: proceed until blocker/decision; switch projects while awaiting; check inbox after every turn; post to the thread at every stopping point; push cadence follows review gates, never chat acks.\n'
+        '- **Architect**: check inbox for rulings/requests each turn; rule in the decisions forum (decision records auto-sync to threads); reply in-thread; propagate go-aheads via \`to:engineer\` records with thread pointers.\n'
+        '- **All roles**: R13 clock in/out; R17 end-of-turn inbox; R14 change-log after substantive work.\n'
+        '\n'
+        '### Why\n'
+        'Without this loop, the user becomes the relay between sessions — exactly the failure this doctrine removes. Every out-of-band message is a corpus gap: the receiving role cannot see it, the pointer cannot track it, and the audit trail is incomplete.\n'
+        '\n'
+        '### Enforcement\n'
+        '- **Engineer**: doctrine embedded in \`.opencode/agents/engineer.md\` (Parallel Role Loop section) — binding at session start, not just advisory from the registry.\n'
+        '- **Architect**: doctrine embedded in \`.opencode/agents/architect.md\` (Parallel Role Loop section).\n'
+        '- Registry card stays canonical; frontmatter sections mirror it.\n'
+        '\n'
+        '### Future evolution — Question & Decision Cards (QDC)\n'
+        'Planned async mechanism: structured "question cards" and "decision cards"\n'
+        'so the user can be involved **in real time** without relaying between\n'
+        'sessions. When QDC lands:\n'
+        '- PRL becomes the synchronous baseline loop.\n'
+        '- QDCs carry the async path (question raised → card routed → user\n'
+        '  decides in real time → decision card posted → pointer notified).\n'
+        '- Cards are corpus artifacts (records + forum threads), so the audit\n'
+        '  trail stays complete.\n'
+        '',
+        ARRAY['parallel', 'cross-role', 'turn-protocol', 'messaging', 'doctrine', 'threads', 'inbox'],
+        ARRAY['user relays a message', 'out-of-band message', 'another role asked', 'decision needed', 'awaiting decision', 'keep threads up to date', 'parallel session'],
+        ARRAY['nebula_get_inbox', 'nebula_create_agent_record', 'nebula_set_inbox_pointer']
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY['analyst', 'architect', 'builder', 'critic', 'engineer', 'inspector', 'planner', 'reviewer'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 44. Knowledge-MCP Tool Reference (knowledge graph, read-only)
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'knowledge-mcp-tools',
+        'Knowledge-MCP Tool Reference (knowledge graph, read-only)',
+        'Catalog of the 8 knowledge-mcp tools (entities, edges, cross-refs, semantic search) — read-only KG access via knowledge-srv :3109.',
+        '# Knowledge-MCP Tool Reference (knowledge graph, read-only)\n'
+        '\n'
+        '## When to use this card\n'
+        '\n'
+        'Any task that needs to know what exists, how entities relate, what is\n'
+        'already known, or what evidence supports a claim. All knowledge-mcp tools\n'
+        'are READ-ONLY (knowledge-srv :3109); writes go through nebula-mcp instead.\n'
+        '\n'
+        '## Server wiring\n'
+        '\n'
+        '- \`knowledge-mcp\` = stdio MCP server (dist/index.js) → REST proxy of\n'
+        '  knowledge-srv \`http://localhost:3109\` (env \`KNOWLEDGE_SRV_URL\`).\n'
+        '- Registered in the global opencode config, so tools are namespaced\n'
+        '  \`knowledge-mcp_*\` (e.g. \`knowledge-mcp_knowledge_semantic_search\`).\n'
+        '- Backend schema: \`knowledge.graph_entities\`, \`knowledge.graph_edges\`,\n'
+        '  \`knowledge.graph_cross_references\`, \`knowledge.graph_migrations\`,\n'
+        '  plus four pgvector embed layers.\n'
+        '\n'
+        '## Tool catalog (8)\n'
+        '\n'
+        '| Tool | Purpose | Key args |\n'
+        '|------|---------|----------|\n'
+        '| \`knowledge_list_entities\` | List entities, filterable | section, entity_type, status, search, limit (≤500), offset |\n'
+        '| \`knowledge_get_entity\` | One entity + full properties JSON | section, entity_id |\n'
+        '| \`knowledge_list_edges\` | List edges, filterable | source_section/id, target_section/id, relation_type, limit |\n'
+        '| \`knowledge_get_entity_relations\` | Inbound + outbound relations | section, entity_id |\n'
+        '| \`knowledge_list_cross_references\` | Graph-level cross-ref maps | map_name, source_section, target_id |\n'
+        '| \`knowledge_list_migrations\` | Import/embed migration history | limit |\n'
+        '| \`knowledge_graph_summary\` | Counts: entities by section, edges by relation type, migrations | — |\n'
+        '| \`knowledge_semantic_search\` | Unified cosine search over 4 embed layers | query, limit, layers, recordTypes, minSimilarity |\n'
+        '\n'
+        '## knowledge_semantic_search details\n'
+        '\n'
+        '- Layers: \`kg\` (curated: work_requests, plans, actors),\n'
+        '  \`harvest\` (harvest candidates), \`observation\` (transcripts, session\n'
+        '  logs, audit docs), \`agent\` (agent records). Omit \`layers\` to search all.\n'
+        '- \`recordTypes\` (agent layer only): report, engineering_log,\n'
+        '  architecture_note, prompt, assessment, analysis, response, inspection,\n'
+        '  decision — omit \`inspection\` to suppress noise.\n'
+        '- \`minSimilarity\` (0–1): similarity floor, e.g. 0.55.\n'
+        '- Returns merged results with provenance labels (curated / harvested /\n'
+        '  observed / agent_record) — cite the layer in your findings.\n'
+        '- Runs \`nexus/bin/unified_semantic_search.py\` with the rover venv python;\n'
+        '  requires Ollama running with \`nomic-embed-text\` (verified available).\n'
+        '\n'
+        '## Typical sequence\n'
+        '\n'
+        '1. \`knowledge_semantic_search\` — topic-wide recall.\n'
+        '2. \`knowledge_graph_summary\` — orientation (sections, relation types).\n'
+        '3. \`knowledge_list_entities\` (filter section) → \`knowledge_get_entity\`.\n'
+        '4. \`knowledge_list_edges\` / \`knowledge_get_entity_relations\` — expand.\n'
+        '5. \`knowledge_list_cross_references\` — graph maps; then\n'
+        '   \`nebula_list_cross_references\` for plan/record/entity joins.\n'
+        '6. Corroborate with \`nebula_list_evidence_links\` and\n'
+        '   \`nebula_list_agent_records\`.\n'
+        '\n'
+        '## Anti-patterns\n'
+        '\n'
+        '- Do NOT use these tools to write — they are read-only by design.\n'
+        '- Do NOT treat \`knowledge_list_*\` output as canonical audit state; that\n'
+        '  lives in nebula (agent records, cross_references, evidence_links).\n'
+        '- Do NOT fabricate provenance — report which layer returned a result.\n'
+        '- Knowledge Steward owns writes to knowledge.graph_*; all other roles\n'
+        '  are read-only (see knowledge-graph-pipeline card for the write path).\n'
+        '',
+        ARRAY['reference', 'knowledge-graph', 'kg', 'semantic-search', 'tools', 'appendix'],
+        ARRAY['knowledge graph', 'semantic search', 'knowledge-mcp', 'kg tools', 'cross references', 'knowledge_list', 'knowledge_semantic_search', 'investigate what exists'],
+        ARRAY['knowledge_list_entities', 'knowledge_get_entity', 'knowledge_list_edges', 'knowledge_get_entity_relations', 'knowledge_list_cross_references', 'knowledge_list_migrations', 'knowledge_graph_summary', 'knowledge_semantic_search']
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY['analyst', 'planner'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 45. Decision Cards (ask-user vocabulary)
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'decision-cards',
+        'Decision Cards (ask-user vocabulary)',
+        'When to emit interactive decision cards in Assembly threads (checkbox multi-select, radio single-choice, Other free-text) and how to parse the **Agreed selection:** reply.',
+        '## Procedure\n'
+        'Decision cards are the Assembly analogue of the CLI \`ask_user\` contract: interactive markdown blocks you emit in a thread (or comment) so the user can answer with a structured click instead of free prose. The Assembly UI renders them; the user''s selection is written back as a durable \`**Agreed selection:**\` reply you can parse deterministically.\n'
+        '\n'
+        '### When to emit\n'
+        'Use a decision card when the question has a **bounded set of choices** and the answer changes what you do next:\n'
+        '- single decision between options -> radio single-choice\n'
+        '- pick any subset -> checkbox multi-select\n'
+        '- approval / sign-off gates, branch decisions, plan acceptance, option A/B/C, "how should I proceed"\n'
+        '\n'
+        'Do NOT use a card for open-ended questions (ask in prose), or when the answer is obvious (just proceed). If the user replies in prose instead of clicking, treat the prose as the answer - the card is a convenience, never a blocker.\n'
+        '\n'
+        '### Syntax to emit\n'
+        'Checkbox (multi-select) block - one \`- [ ]\` line per option:\n'
+        '\`\`\`\n'
+        'Which of these should I include?\n'
+        '- [ ] option one\n'
+        '- [ ] option two\n'
+        '- [ ] option three\n'
+        '\`\`\`\n'
+        '\n'
+        'Radio (single-choice) block - \`- ( )\` lines; pre-select with \`- (x)\` if one is the default:\n'
+        '\`\`\`\n'
+        'How should we proceed?\n'
+        '- ( ) Option A\n'
+        '- ( ) Option B\n'
+        '- (x) Option C (default)\n'
+        '\`\`\`\n'
+        '\n'
+        '"Other" escape hatch - any option line whose label starts with **Other** (case-insensitive) opens a free-text field when selected; the typed value lands in the reply as \`Other: <text>\`:\n'
+        '\`\`\`\n'
+        '- ( ) Option A\n'
+        '- ( ) Other\n'
+        '\`\`\`\n'
+        '\n'
+        'Rules:\n'
+        '- Keep one decision per card; keep options short.\n'
+        '- A block is interactive only if EVERY line in it is a choice line - never mix prose into a choice block (use a blank line to separate prose from the list).\n'
+        '- The \`[ ]\`/\`[x]\` and \`( )\`/\`(x)\` markers must come right after \`- \` or \`* \` at the start of the line.\n'
+        '\n'
+        '### How to read the reply\n'
+        'After the user submits, the UI posts a reply beginning with \`**Agreed selection:**\` that mirrors the final visual state of the card:\n'
+        '- checkbox: \`- [x] option\` = agreed, \`- [ ] option\` = not agreed\n'
+        '- radio: \`- (x) option\` = the single choice; all others stay \`- ( )\`\n'
+        '- Other text: appended to the chosen line as \`Other: <text>\`\n'
+        '\n'
+        'Parse the block after the header; treat \`[x]\`/\`(x)\` lines as the answer. A radio card yields exactly one \`(x)\` line. If the reply contains no \`[x]\`/\`(x)\` lines, the user submitted no selection - ask again or fall back.\n'
+        '\n'
+        '### Fallbacks\n'
+        '- Card UI unavailable (plain markdown in a non-interactive client): the card renders as ordinary list text - still readable; the user can reply with prose.\n'
+        '- User replies in prose instead of clicking: treat the prose as the answer.\n'
+        '- No selection made: re-ask with a tighter card or proceed with the default.',
+        ARRAY['decision', 'ask-user', 'interactive', 'assembly', 'choice', 'agreement'],
+        ARRAY['decision needed', 'bounded choice', 'approval gate', 'branch decision', 'ask user', 'offer options', 'choose one', 'select', 'how should I proceed'],
+        '{}'
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY['analyst', 'architect', 'builder', 'critic', 'devops', 'engineer', 'engineer-ii', 'inspector', 'planner', 'reviewer', 'tester', 'topologist'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 46. Role Creation (deterministic runbook)
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'role-creation',
+        'Role Creation (deterministic runbook)',
+        'One source-of-truth edit (config/roles/roles.json) plus generated artifacts registers a role across every surface; bin/verify-roles.py proves end-to-end coverage.',
+        '## Procedure\n'
+        'Adding a new role to the system is deterministic: edit the canonical expectations file, emit the artifacts, and verify with the end-to-end check. No undocumented parallel hand-edits.\n'
+        '\n'
+        '### 1. Canonical edit\n'
+        'Add the role to \`nexus/config/roles/roles.json\` under \`roles\` — the key must match the name inserted into \`tackle.roles\`. Inherit \`roleDefaults\` unless the role is special (test/alias roles override surfaces to false).\n'
+        '\n'
+        '### 2. Emit artifacts\n'
+        'For a full agent role, create/update:\n'
+        '- **tackle.roles row** — via the seed arrays (\`tackle-mcp/src/db.ts\` DEFAULT_ROLES, \`conduit-mcp/src/db.ts\` migration defaultRoles) or a migration; the live DB is canonical.\n'
+        '- **Persona prompt** — \`tackle.prompts\` row (role, slug \`opencode-persona\`, version 1) in \`schemas/migrations/tackle/\` (pattern: \`sysadmin_persona_v1.sql\`); apply to the live DB.\n'
+        '- **Harness agent file** — \`config/harnesses/opencode/agents/<role>.md\` (frontmatter: assumes_role, permissions; pattern: \`sysadmin.md\`).\n'
+        '- **Procedure cards** — add the role to the role lists of the relevant \`tackle.memory\` cards (tackle.role_memory assignments); then regenerate the seed: \`python3 bin/regenerate_memory_seed.py --verify\`.\n'
+        '- **Assembly alias** — \`assembly.users\` row with alias = role name (pattern: builder seed in \`assembly-migration.sql\`).\n'
+        '- **nebula role CHECK** — new \`typescript/nebula-srv/migrations/0NN-allow-<role>.sql\` mirroring \`052-allow-sysadmin-dba-role.sql\`; apply + replicate to Strontium.\n'
+        '- **Governance** — add to \`harness-srv/src/governance.ts\` KNOWN_EXECUTORS only if the role issues receipts.\n'
+        '\n'
+        '### 3. Verify\n'
+        'Run \`python3 bin/verify-roles.py\` — it checks every expected surface for every registered role (persona, procedure cards, assembly alias, harness file, nebula CHECK, governance). Exit 0 = all covered. Fix FAILs before closing.\n'
+        '\n'
+        '### 4. Close\n'
+        'Post the walkthrough evidence on the role-creation thread and record an engineering log. Surface the new role to the architect for allowlist ratification if the case/naming deviates from convention.',
+        ARRAY['role', 'runbook', 'bootstrap', 'onboarding', 'deterministic'],
+        ARRAY['add a role', 'new role', 'create role', 'role creation', 'register role', 'onboard role'],
+        '{}'
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY['architect', 'devops', 'engineer', 'engineer-ii'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 47. Operator: Post to Assembly Forums
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'operator-assembly-posting',
+        'Operator: Post to Assembly Forums',
+        'How to create threads and comments in Assembly forums. Use assembly_create_thread for new posts and assembly_create_comment for replies. Known forum slugs and the operator user UUID are listed below.',
+        '# Post to Assembly Forums\n'
+        '\n'
+        '## When to use this card\n'
+        '\n'
+        'The user asks you to post something to Assembly — "post a to-do", "create a thread in the forum", "add a comment", "report this to the issues forum", "post a change log entry", or any request that results in creating content in an Assembly forum.\n'
+        '\n'
+        '## Known Identities\n'
+        '\n'
+        '### Operator user UUID\n'
+        '\n'
+        '\`\`\`\n'
+        '6df32fa2-15eb-45a3-88a6-f11b09923a50\n'
+        '\`\`\`\n'
+        '\n'
+        'Always use this UUID as \`user_id\` when posting as the operator.\n'
+        '\n'
+        '### Forum slug → UUID mapping\n'
+        '\n'
+        '| Slug                       | UUID                                   | Purpose                              |\n'
+        '|----------------------------|----------------------------------------|--------------------------------------|\n'
+        '| to-do                      | 836a1dec-39a7-4c97-8932-472f07fc16f5  | Action items, tasks, work to execute |\n'
+        '| issues-and-open-questions  | e42e48f3-3fa6-4ecf-8914-90022bae1518  | Bugs, blockers, open questions       |\n'
+        '| admin-notes                | d391c07f-6791-4dfd-a451-04151a543cce  | Internal admin notes                 |\n'
+        '| change-log                 | 06bafd38-4b9a-4b3a-bfc3-4d41b31a5eb8  | System change summaries              |\n'
+        '| decisions                  | 703bc0f9-faf4-4c94-a52d-8f0d4024a89b  | Architecture and design decisions    |\n'
+        '| transcripts                | 191e799e-f491-49f1-8bc2-a9be0ac29dd6  | Harvested conversation transcripts   |\n'
+        '| discussions                | 431cdfc9-ea42-46b7-ad2f-3be4e7f4b7d6  | General discussion                   |\n'
+        '| engineering                | 0b079fef-3f6d-4463-b1a2-dc1b718412c7  | Engineering work items               |\n'
+        '| planning                   | b5611775-a471-48ca-b111-56e54b9810c3  | Planning discussions                 |\n'
+        '| doctrine                   | acb756b6-93fb-42c4-aac4-f7c134155f64  | Operating doctrine and governance    |\n'
+        '| drift-reports              | aa39bfea-4f1d-4ee9-9be8-6c2af5a139d3  | Projection drift reports             |\n'
+        '| system-operations          | d2d5f367-c3ae-466d-a75e-c9413d1502f3  | Operational status and incidents     |\n'
+        '\n'
+        'If the user specifies a forum not listed above, call \`assembly_list_forums\` to discover its UUID, or call \`assembly_find_forum_by_name\` with a search term.\n'
+        '\n'
+        '## Procedure\n'
+        '\n'
+        '### Creating a new thread\n'
+        '\n'
+        '1. Determine the target forum. If the user said "to-do", use \`forum_id = 836a1dec-39a7-4c97-8932-472f07fc16f5\`. If the user said "issues", use \`forum_id = e42e48f3-3fa6-4ecf-8914-90022bae1518\`. Otherwise, look it up from the table above or call \`assembly_list_forums\`.\n'
+        '\n'
+        '2. Call \`assembly_create_thread\` with these arguments:\n'
+        '   \`\`\`\n'
+        '   {\n'
+        '     "title": "<concise title>",\n'
+        '     "body": "<markdown body with the full content>",\n'
+        '     "user_id": "6df32fa2-15eb-45a3-88a6-f11b09923a50",\n'
+        '     "forum_id": "<forum UUID>",\n'
+        '     "role": "operator",\n'
+        '     "model": "operator-svc"\n'
+        '   }\n'
+        '   \`\`\`\n'
+        '\n'
+        '3. Report the result to the user — the thread ID and which forum it was posted to.\n'
+        '\n'
+        '### Adding a comment to an existing thread\n'
+        '\n'
+        '1. Call \`assembly_get_thread\` with \`{ "thread_id": "<thread UUID>" }\` to confirm the thread exists and see existing comments.\n'
+        '\n'
+        '2. Call \`assembly_create_comment\` with:\n'
+        '   \`\`\`\n'
+        '   {\n'
+        '     "thread_id": "<thread UUID>",\n'
+        '     "body": "<markdown body>",\n'
+        '     "user_id": "6df32fa2-15eb-45a3-88a6-f11b09923a50",\n'
+        '     "role": "operator",\n'
+        '     "model": "operator-svc"\n'
+        '   }\n'
+        '   \`\`\`\n'
+        '\n'
+        '   To reply to a specific comment, also pass \`"parent_id": "<comment UUID>"\`.\n'
+        '\n'
+        '3. Report the result.\n'
+        '\n'
+        '### Looking up a thread by title\n'
+        '\n'
+        'If the user says "reply to the thread about X" or "comment on the XYZ thread", call \`assembly_find_thread_by_title\` with \`{ "title": "<search term>" }\` to find the thread UUID, then use \`assembly_get_thread\` to read it, then \`assembly_create_comment\` to reply.\n'
+        '\n'
+        '## Anti-patterns\n'
+        '\n'
+        '- Do NOT guess forum UUIDs — always use the known mapping above or look them up.\n'
+        '- Do NOT guess the operator user UUID — always use \`6df32fa2-15eb-45a3-88a6-f11b09923a50\`.\n'
+        '- Do NOT fabricate thread IDs from memory — always use the ID returned by the create call.\n'
+        '- Do NOT post without a title — every thread requires a title.\n'
+        '\n'
+        '## MCP tools used\n'
+        '\n'
+        '- \`assembly_create_thread\` — create a new thread in a forum\n'
+        '- \`assembly_create_comment\` — add a comment or reply\n'
+        '- Thread status (parent-post rating 0-7): set via REST — optional \`statusRating\`\n'
+        '  on the comment POST (advance while replying), or \`PUT /api/forums/threads/:id/status\`\n'
+        '  body \`{"rating":N}\`. Vocabulary + conventions: card \`thread-status-ratings\`.\n'
+        '  (Not yet exposed as an assembly-mcp parameter/tool.)\n'
+        '- \`assembly_get_thread\` — read a thread and its comments\n'
+        '- \`assembly_list_forums\` — list all forums (discovery)\n'
+        '- \`assembly_find_forum_by_name\` — search forums by name\n'
+        '- \`assembly_find_thread_by_title\` — search threads by title\n'
+        '',
+        ARRAY['assembly', 'forum', 'thread', 'posting', 'operator', 'todo', 'to-do'],
+        ARRAY['post a to-do', 'create a thread', 'post to assembly', 'add a comment', 'reply to thread', 'post in forum', 'create todo', 'issues forum', 'change log', 'to-do item'],
+        ARRAY['assembly_create_thread', 'assembly_create_comment', 'assembly_get_thread', 'assembly_list_forums', 'assembly_find_forum_by_name', 'assembly_find_thread_by_title']
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY['operator'];
+        FOREACH v_role IN ARRAY v_roles LOOP
+            INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
+            VALUES (v_memory_id, v_role, NOW(), NULL);
+        END LOOP;
+    END IF;
+    -- ──────────────────────────────────────────────────────────
+    -- 48. Thread Status Ratings (Assembly parent posts)
+    -- ──────────────────────────────────────────────────────────
+    v_memory_id := NULL;
+    INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
+    VALUES (
+        'thread-status-ratings',
+        'Thread Status Ratings (Assembly parent posts)',
+        'Canonical 0-7 rating vocabulary for Assembly parent posts (assembly.posts.rating), wire contract to set it, and per-role advancement conventions.',
+        '## Procedure\n'
+        '\n'
+        'Every forum thread carries a status stored in \`assembly.posts.rating\` on the ROOT post (thread id == root post id). NULL = 0 = Posted. Advance it as work progresses so the UI status bar reflects reality.\n'
+        '\n'
+        '## Vocabulary\n'
+        '| rating | label | meaning |\n'
+        '|---|---|---|\n'
+        '| 0 | Posted | default; no role has picked it up |\n'
+        '| 1 | Specified | requirements/scope pinned down |\n'
+        '| 2 | Planned | scheduled or picked up by a role |\n'
+        '| 3 | Implemented | work done, awaiting acceptance |\n'
+        '| 4 | Accepted | completed and accepted (e.g. \`Completed: ...\` reply ratified) |\n'
+        '| 5 | Rejected | false alarm / rejected outcome |\n'
+        '| 6 | Reopened | regression after fix; needs another pass |\n'
+        '| 7 | Closed | archival / no-action wind-down |\n'
+        '\n'
+        '## Wire contract\n'
+        '- READ: thread list + detail return \`statusRating\`.\n'
+        '- SET: \`PUT /api/forums/threads/:threadId/status\` body \`{"rating":0..7}\`.\n'
+        '- SET in-gesture: \`POST /api/forums/threads/:threadId/comments\` accepts optional \`statusRating\` — advance the parent while replying in one call.\n'
+        '- NOTE: assembly-mcp does not yet expose a status tool/param — REST only until the MCP surface lands.\n'
+        '\n'
+        '## Per-role conventions (ratified 2026-08-22)\n'
+        '- engineer/engineer-ii finishing to-do work → reply \`Completed: ...\` with \`statusRating:4\`.\n'
+        '- sysadmin incidents (issues-and-open-questions): resolution→4, false alarm/test→5, regression after fix→6, new incident stays 0.\n'
+        '- planner/architect scoping a to-do thread → 1 Specified when scope is pinned, 2 Planned when scheduled/picked up.\n'
+        '- reviewer rejection → 5; critic reopen → 6.\n'
+        '- 7 Closed reserved for archival/no-action-needed wind-downs.\n'
+        '\n'
+        'Rule of thumb: every substantive thread reply SHOULD advance the parent status in the same call.',
+        ARRAY['reference', 'assembly', 'thread-status', 'messaging', 'ratings'],
+        '{}',
+        '{}'
+    )
+    ON CONFLICT (slug) DO NOTHING
+    RETURNING id INTO v_memory_id;
+    IF v_memory_id IS NOT NULL THEN
+        v_roles := ARRAY[]::TEXT[];
         FOREACH v_role IN ARRAY v_roles LOOP
             INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
             VALUES (v_memory_id, v_role, NOW(), NULL);

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run-peb-kernel.sh — peb-kernel systemd wrapper (Spring Boot, port 8080)
+# run-peb-kernel.sh — peb-kernel systemd wrapper (Spring Boot, port 8098)
 #
 # WHY: `mvn -pl peb-bootstrap spring-boot:run` invoked with no lifecycle
 # phase resolves sibling reactor modules (peb-domain, peb-store, peb-hash,

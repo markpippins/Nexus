@@ -6,12 +6,14 @@ import { runMigrations } from './migrate';
 import { initRedis, closeRedis } from './services/block-segmentation-redis.service';
 
 // ── PostgreSQL Connection ──────────────────────────────────────────
+// Env overrides added for container deploys (vanadium failover tier);
+// defaults preserve the native localhost configuration.
 const pool = new Pool({
-  host: 'localhost',
-  port: 5432,
-  user: 'pguser',
-  password: 'pgpass',
-  database: 'nexus',
+  host: process.env.PG_HOST || 'localhost',
+  port: parseInt(process.env.PG_PORT || '5432', 10),
+  user: process.env.PG_USER || 'pguser',
+  password: process.env.PG_PASSWORD || process.env.PG_PASS || 'pgpass',
+  database: process.env.PG_DB_NAME || 'nexus',
   options: '-c search_path=nebula',
   max: 10,
   idleTimeoutMillis: 30000,
@@ -23,7 +25,7 @@ const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3101;
 
 app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '5mb' }));  // raised for transcript docklang payloads
 
 // ── API Routes ────────────────────────────────────────────────────
 app.use('/api', createRoutes(pool));
@@ -53,6 +55,17 @@ try {
 // ── Migrations + Start ─────────────────────────────────────────────
 let server: ReturnType<typeof app.listen> | undefined;
 
+// D-2026-08-16-007 (R5): sweep stale ACTIVE role leases → EXPIRED on start
+// and periodically. Non-destructive (never RELEASED mid-session).
+function sweepRoleLeases() {
+  fetch(`http://localhost:${PORT}/api/role-leases/sweep`, { method: 'POST' })
+    .then((r) => r.json())
+    .then((body: any) => {
+      if (body && body.swept > 0) console.log(`[role-leases] swept ${body.swept} stale lease(s)`);
+    })
+    .catch((err: any) => console.warn('[role-leases] sweep failed:', err.message));
+}
+
 async function start() {
   try {
     await runMigrations(pool);
@@ -61,8 +74,13 @@ async function start() {
     process.exit(1);
     return;
   }
-  server = app.listen(PORT, () => {
-    console.log(`nebula-srv listening on http://localhost:${PORT}`);
+  // G4 decommission (df8ff49d edge-monopoly): default bind is loopback;
+    // LAN exposure must come from the control-edge (:8082), not this service.
+  const BIND_HOST = process.env.BIND_HOST || "127.0.0.1";
+  server = app.listen(Number(PORT), BIND_HOST, () => {
+    console.log(`nebula-srv listening on http://${BIND_HOST}:${PORT}`);
+    sweepRoleLeases();
+    setInterval(sweepRoleLeases, 10 * 60 * 1000).unref();
   });
 
   // Handle listen-time errors (e.g. EADDRINUSE) cleanly so a port conflict

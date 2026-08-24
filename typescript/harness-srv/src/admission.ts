@@ -34,6 +34,13 @@ export const ADMISSION_OUTCOME = {
   CONFIG_INVALIDATED: "CONFIG_INVALIDATED",
   /** Role has no config bundle rows at all. */
   NO_CONFIG: "NO_CONFIG",
+  // D-2026-08-16-009 (R6) — governance-side denial reasons.
+  /** Role has no canonical key — neither a governance role nor a runtime persona. */
+  ROLE_MISSING: "ROLE_MISSING",
+  /** Role exists in history but its validity window is not current. */
+  ROLE_EXPIRED: "ROLE_EXPIRED",
+  /** Role is current but owns no capabilities (owns_domains empty). */
+  CAPABILITY_INSUFFICIENT: "CAPABILITY_INSUFFICIENT",
   /**
    * Model credential not yet verifiable (G1, binding ruling D-2026-08-14-001).
    *
@@ -52,6 +59,9 @@ export const ADMISSION_OUTCOME = {
 /** Denial reason values actually produced by the harness-srv admission gate. */
 export type ConfigDenialReason = "ROLE_REVOKED" | "CONFIG_INVALIDATED" | "NO_CONFIG";
 
+/** D-2026-08-16-009 (R6) governance-side denial reasons. */
+export type GovernanceDenialReason = "ROLE_MISSING" | "ROLE_EXPIRED" | "CAPABILITY_INSUFFICIENT";
+
 /** Minimal structural snapshot of a role's config bundles (DB-agnostic). */
 export interface ConfigBundleSnapshot {
   is_active: number;
@@ -63,7 +73,62 @@ export interface ConfigBundleSnapshot {
 
 export type ConfigAdmission =
   | { valid: true }
-  | { valid: false; outcome: ConfigDenialReason; message: string };
+  | { valid: false; outcome: ConfigDenialReason | GovernanceDenialReason; message: string };
+
+/**
+ * D-2026-08-16-009 (R6): governance-side role snapshot for capability-proof
+ * admission. The DB layer resolves a role to one of four states:
+ *   - current           — present in nebula.roles (bitemporal view current)
+ *   - expired           — present in roles_history but not in the current view
+ *   - runtime_persona   — a runtime-only role in tackle.roles, not a governance role
+ *   - missing           — no canonical key (neither governance nor runtime)
+ */
+export type RoleGovernanceInput =
+  | { kind: "current"; owns_domains: string[] | null }
+  | { kind: "expired" }
+  | { kind: "runtime_persona" }
+  | { kind: "missing" };
+
+export type RoleGovernanceAdmission =
+  | { valid: true }
+  | { valid: false; outcome: GovernanceDenialReason; message: string };
+
+/**
+ * Decide capability-proof admission from a resolved role snapshot (pure).
+ *
+ * Missing (no canonical key) and expired (validity window not current) are
+ * denied. Runtime personas are legitimate — their capability proof is the
+ * runtime config_bundle, so they are admitted here (config admission gates
+ * them downstream). Governance roles are admitted only when they own at
+ * least one capability.
+ */
+export function decideRoleGovernance(input: RoleGovernanceInput): RoleGovernanceAdmission {
+  if (input.kind === "missing") {
+    return {
+      valid: false,
+      outcome: "ROLE_MISSING",
+      message: "role has no canonical key — not a governance role or runtime persona",
+    };
+  }
+  if (input.kind === "expired") {
+    return {
+      valid: false,
+      outcome: "ROLE_EXPIRED",
+      message: "role validity window expired or not yet active",
+    };
+  }
+  if (input.kind === "runtime_persona") {
+    return { valid: true };
+  }
+  if (!input.owns_domains || input.owns_domains.length === 0) {
+    return {
+      valid: false,
+      outcome: "CAPABILITY_INSUFFICIENT",
+      message: "role has no owned capabilities (owns_domains empty)",
+    };
+  }
+  return { valid: true };
+}
 
 /**
  * Decide whether a role is admissible given its config_bundle rows.

@@ -15,6 +15,18 @@ export interface MCPToolDefinition {
 
 type ToolHandler = (args: Record<string, any>) => Promise<any>;
 
+// ── Thread status vocabulary helper ─────────────────────────────────
+// Canonical mapping shared with assembly-srv, assembly-ui and the backfill
+// script: 0 Posted · 1 Specified · 2 Planned · 3 Implemented · 4 Accepted ·
+// 5 Rejected · 6 Reopened · 7 Closed. Returns the rating, or null when the
+// value is absent/invalid (callers distinguish via the raw argument).
+function normalizeStatusRating(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 7) {
+    return null;
+  }
+  return value;
+}
+
 // ── Tool registry ───────────────────────────────────────────────────
 
 export const toolDefinitions: MCPToolDefinition[] = [
@@ -180,7 +192,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
   // ── Comment tools ───────────────────────────────────────────────
   {
     name: "assembly_create_comment",
-    description: "Add a comment to a thread or reply to another comment",
+    description: "Add a comment to a thread or reply to another comment. Optionally advance the thread's colored status indicator (posts.rating) in the same call.",
     inputSchema: {
       type: "object",
       properties: {
@@ -190,8 +202,31 @@ export const toolDefinitions: MCPToolDefinition[] = [
         parent_id: { type: "string", description: "Parent comment UUID (for replies)" },
         role: { type: "string", description: "Posting agent role (e.g. sysadmin, architect)" },
         model: { type: "string", description: "Posting model ID (e.g. opencode/big-pickle)" },
+        statusRating: {
+          type: "integer",
+          minimum: 0,
+          maximum: 7,
+          description: "Optional thread status advance applied with this comment. Vocabulary (thread-status-ratings card): 0 Posted, 1 Specified, 2 Planned, 3 Implemented, 4 Accepted, 5 Rejected, 6 Reopened, 7 Closed.",
+        },
       },
       required: ["text", "user_id", "post_id"],
+    },
+  },
+  {
+    name: "assembly_set_thread_status",
+    description: "Set a thread's colored status indicator (root post rating). Vocabulary: 0 Posted, 1 Specified, 2 Planned, 3 Implemented, 4 Accepted, 5 Rejected, 6 Reopened, 7 Closed. Any commenter may update it.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        post_id: { type: "string", description: "Thread (root post) UUID" },
+        rating: {
+          type: "integer",
+          minimum: 0,
+          maximum: 7,
+          description: "Status value 0-7 per the thread-status-ratings vocabulary.",
+        },
+      },
+      required: ["post_id", "rating"],
     },
   },
   // ── Bridge: forum ↔ agenda ──────────────────────────────────────
@@ -245,14 +280,14 @@ export const toolDefinitions: MCPToolDefinition[] = [
   // ── Bridge: post ↔ artifact ─────────────────────────────────────
   {
     name: "assembly_link_post_artifact",
-    description: "Link a post (thread) to a domain artifact (intent_record, requirement, agenda_item, spec, implementation_plan)",
+    description: "Link a post (thread) to a domain artifact (requirement, agenda_item, spec, implementation_plan)",
     inputSchema: {
       type: "object",
       properties: {
         post_id: { type: "string", description: "Post UUID" },
         artifact_type: {
           type: "string",
-          enum: ["intent_record", "requirement", "agenda_item", "spec", "implementation_plan"],
+          enum: ["requirement", "agenda_item", "spec", "implementation_plan"],
           description: "Type of domain artifact",
         },
         artifact_id: { type: "string", description: "Artifact UUID in nebula schema" },
@@ -571,15 +606,38 @@ const handlers: Record<string, ToolHandler> = {
 
   // ── Comments ────────────────────────────────────────────────────
   assembly_create_comment: async (args) => {
-    const { text, user_id, post_id, parent_id, role, model } = args;
+    const { text, user_id, post_id, parent_id, role, model, statusRating } = args;
     if (!text || !user_id || !post_id) {
       return createError("INVALID_ARGUMENTS", "text, user_id, and post_id are required");
     }
+    const hasStatus = statusRating !== undefined && statusRating !== null;
+    const status = hasStatus ? normalizeStatusRating(statusRating) : null;
+    if (hasStatus && status === null) {
+      return createError("INVALID_ARGUMENTS", "statusRating must be an integer 0..7");
+    }
     try {
-      const comment = await api.createComment(post_id, text, user_id, parent_id, role, model);
+      const comment = await api.createComment(post_id, text, user_id, parent_id, role, model, status ?? undefined);
       return createSuccess(comment);
     } catch (err: any) {
       if (err.message?.includes("404")) return createError("POST_NOT_FOUND", `Post not found: ${post_id}`);
+      throw err;
+    }
+  },
+
+  assembly_set_thread_status: async (args) => {
+    const { post_id, thread_id, rating } = args;
+    const targetId = post_id || thread_id;
+    if (!targetId) {
+      return createError("INVALID_ARGUMENTS", "post_id is required");
+    }
+    if (typeof rating !== "number" || !Number.isInteger(rating) || rating < 0 || rating > 7) {
+      return createError("INVALID_ARGUMENTS", "rating must be an integer 0..7 (thread-status-ratings vocabulary)");
+    }
+    try {
+      const out = await api.setThreadStatus(targetId, rating);
+      return createSuccess(out);
+    } catch (err: any) {
+      if (err.message?.includes("404")) return createError("POST_NOT_FOUND", `Thread not found: ${targetId}`);
       throw err;
     }
   },
@@ -619,7 +677,7 @@ const handlers: Record<string, ToolHandler> = {
     if (!post_id || !artifact_type || !artifact_id) {
       return createError("INVALID_ARGUMENTS", "post_id, artifact_type, and artifact_id are required");
     }
-    const validTypes = ["intent_record", "requirement", "agenda_item", "spec", "implementation_plan"];
+    const validTypes = ["requirement", "agenda_item", "spec", "implementation_plan"];
     if (!validTypes.includes(artifact_type)) {
       return createError("VALIDATION_ERROR", `artifact_type must be one of: ${validTypes.join(", ")}`);
     }

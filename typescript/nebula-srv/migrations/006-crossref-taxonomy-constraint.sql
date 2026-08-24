@@ -2,7 +2,7 @@
 -- Adds CHECK constraint on nebula.cross_references.rel_type to enforce
 -- the formal rel_type enumeration from CROSSREF_TAXONOMY.md (plan #0175).
 --
--- Declared valid rel_type values (from schemas/relationships/wrp-crossref-taxonomy.jsonld):
+-- Declared valid rel_type values (from schemas/ontology/relationships/wrp-crossref-taxonomy.jsonld):
 --
 --   WRP domain:  wrp:depends_on, wrp:implements, wrp:tracked_by, wrp:impacts_system, wrp:supersedes
 --   Agent domain: ag:references_plan, ag:same_thread_as, ag:prompted_by, ag:spawns_plan

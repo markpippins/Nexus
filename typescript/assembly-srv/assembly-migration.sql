@@ -29,13 +29,13 @@ CREATE TABLE IF NOT EXISTS assembly.forum_agendas (
     PRIMARY KEY (forum_id, agenda_id)
 );
 
--- 4. Bridge: posts ↔ nebula artifacts (intent_records, requirements, agenda_items, specs)
+-- 4. Bridge: posts ↔ nebula artifacts (requirements, agenda_items, specs)
 --   A post (thread root) can reference one or more domain artifacts.
 --   An artifact can be discussed in multiple posts.
 CREATE TABLE IF NOT EXISTS assembly.post_artifact_refs (
     post_id       UUID NOT NULL REFERENCES assembly.posts(id) ON DELETE CASCADE,
     artifact_type TEXT NOT NULL CHECK (artifact_type IN (
-        'intent_record', 'requirement', 'agenda_item', 'spec', 'implementation_plan'
+        'requirement', 'agenda_item', 'spec', 'implementation_plan'
     )),
     artifact_id   UUID NOT NULL,
     label         TEXT,     -- optional: "proposes", "discusses", "resolves", etc.
@@ -73,7 +73,7 @@ CREATE INDEX IF NOT EXISTS idx_post_supporting_comment ON assembly.post_supporti
 ALTER TABLE assembly.post_artifact_refs DROP CONSTRAINT IF EXISTS post_artifact_refs_artifact_type_check;
 ALTER TABLE assembly.post_artifact_refs ADD CONSTRAINT post_artifact_refs_artifact_type_check
   CHECK (artifact_type IN (
-    'intent_record', 'requirement', 'agenda_item', 'spec', 'implementation_plan',
+    'requirement', 'agenda_item', 'spec', 'implementation_plan',
     'harvest', 'harvest_candidate'
   ));
 
@@ -99,6 +99,17 @@ ON CONFLICT (slug) DO NOTHING;
 -- 8. Seed Rover user (idempotent)
 INSERT INTO assembly.users (id, alias, email, password, admin)
 VALUES (gen_random_uuid(), 'Rover', 'rover@nexus.local', 'rover-bot', false)
+ON CONFLICT (alias) DO NOTHING;
+
+-- 8a. Seed builder user (idempotent) — role-surface parity (b80f0fdb):
+--     builder is a canonical agent role but had no posting alias.
+INSERT INTO assembly.users (id, alias, email, password, admin)
+VALUES (gen_random_uuid(), 'builder', 'builder@nexus.local', 'builder-bot', false)
+ON CONFLICT (alias) DO NOTHING;
+
+-- 8b. Seed tester user (idempotent) — role-creation walkthrough (b80f0fdb).
+INSERT INTO assembly.users (id, alias, email, password, admin)
+VALUES (gen_random_uuid(), 'tester', 'tester@nexus.local', 'tester-bot', false)
 ON CONFLICT (alias) DO NOTHING;
 
 -- 9. Forums: as_of_dt / expiration_dt — soft-delete via row expiry.
@@ -139,3 +150,13 @@ SET role = u.alias
 FROM assembly.users u
 WHERE u.id = c.posted_by_id AND c.role IS NULL
   AND u.alias IN ('sysadmin','architect','planner','engineer','engineer-ii','devops','topologist','reviewer','critic','analyst','inspector');
+
+-- 11. Duality session-watch TTL — add 'expired' status. Lazy expiry runs in
+--     the assembly-srv duality routes (GET /api/duality/watches/*): watches
+--     idle past GREATEST(idle_timeout_ms, 1h) are marked expired and are no
+--     longer resumable, so stale test sessions stop piling up while recent
+--     closed/paused sessions stay visible for their error history.
+ALTER TABLE duality.session_watches DROP CONSTRAINT IF EXISTS session_watches_status_check;
+ALTER TABLE duality.session_watches
+  ADD CONSTRAINT session_watches_status_check
+  CHECK (status = ANY (ARRAY['active'::text, 'paused'::text, 'closed'::text, 'expired'::text]));

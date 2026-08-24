@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: tackle-srv — Tackle Role Memory + Agent Orchestration
-  version: 1.0.93c006c2
+  version: 1.0.51c60128
   description: 'Tackle role memory and orchestration: AI config, sessions, roles, scheduler, memory, prompts, tool access,
     failure recovery, tasks, and logs.
 
@@ -53,6 +53,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Full snapshot
   /config/ai/bundle:
     post:
       tags:
@@ -184,6 +185,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Config Bundles
   /config/ai/bundles/{role}:
     get:
       tags:
@@ -386,6 +388,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Harnesses
   /config/ai/import:
     post:
       tags:
@@ -416,6 +419,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Import full snapshot
   /config/ai/model:
     post:
       tags:
@@ -547,6 +551,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Models
   /config/ai/provider:
     post:
       tags:
@@ -678,6 +683,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Providers
   /config/ai/resolve/{role}:
     get:
       tags:
@@ -708,6 +714,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Resolved Config
       parameters:
       - name: role
         in: path
@@ -845,6 +852,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Role Configs
   /config/ai/seed-defaults:
     post:
       tags:
@@ -875,6 +883,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Seed defaults
   /config/ai/test:
     post:
       tags:
@@ -905,6 +914,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Test Invoke
   /config/ai/tool-access:
     get:
       tags:
@@ -935,6 +945,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - config
+      operationId: post_config_ai_tool_access
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'POST /config/ai/tool-access — bulk-create allowlist rows for a role. Body: { role, tools: [{ mcp_id, tool_slug
+        }] } or { role, tools: [tool_'
   /config/ai/tool-access/{id}:
     patch:
       tags:
@@ -1007,6 +1048,38 @@ paths:
         required: true
         schema:
           type: string
+  /config/ai/tool-access/seed:
+    post:
+      tags:
+      - config
+      operationId: post_config_ai_tool_access_seed
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'POST /config/ai/tool-access/seed — bulk-populate a role''s allowlist from a template role (default-deny: new
+        roles start with zero tools). Bo'
   /config/ai/validate:
     get:
       tags:
@@ -1037,6 +1110,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Validate
   /config/ai/verify:
     post:
       tags:
@@ -1192,6 +1266,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Health
   /health/history:
     get:
       tags:
@@ -1415,6 +1490,69 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       summary: POST /logs/emit — insert a single log entry
+  /memory/assign:
+    delete:
+      tags:
+      - memory
+      operationId: delete_memory_assign
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: DELETE /memory/assign — unassign a procedure card from a role by expiring the active assignment (bitemporal-preserving
+        soft delete). Body or
+    post:
+      tags:
+      - memory
+      operationId: post_memory_assign
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'POST /memory/assign — assign procedure cards to a role. Body: { role, slugs: ["slug", ...] }. Writes tackle.role_memory,
+        then triggers the P'
   /memory/check-since:
     post:
       tags:
@@ -1639,6 +1777,42 @@ paths:
                 $ref: '#/components/schemas/Error'
       summary: POST /projections — create new projection config
   /projections/{id}:
+    delete:
+      tags:
+      - projections
+      operationId: delete_projections_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: DELETE /projections/:id — delete a projection config
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
     get:
       tags:
       - projections
@@ -2074,6 +2248,76 @@ paths:
                 $ref: '#/components/schemas/Error'
       parameters:
       - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /roles/provision:
+    post:
+      tags:
+      - roles
+      operationId: post_roles_provision
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'POST /roles/provision — atomic role setup orchestrator (Gap 1). Collapses role identity + config bundle +
+        persona + tool access + procedure '
+  /roles/readiness/{name}:
+    get:
+      tags:
+      - roles
+      operationId: get_roles_readiness_name
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: GET /roles/readiness/:name — readiness checklist (must be registered BEFORE /:id so "readiness" isn't captured
+        as an id).
+      parameters:
+      - name: name
         in: path
         required: true
         schema:

@@ -1,0 +1,61 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "nx": "https://nexus.local/schema/",
+
+    "ft": "https://nexus.local/schema/ontology/extensions/fact/",
+    "id": "@id",
+    "type": "@type",
+    "comment": {"@id": "http://www.w3.org/2000/01/rdf-schema#comment"},
+
+    "Fact":          "ft:Fact",
+    "FactSource":    "ft:FactSource",
+    "FactAssertion": "ft:FactAssertion",
+
+    "namespace":    "ft:namespace",
+    "factType":     "ft:factType",
+    "factValue":    "ft:factValue",
+    "factSubject":  "ft:factSubject",
+    "observedAt":   {"@id": "ft:observedAt", "@type": "xsd:dateTime"},
+    "recordedAt":   {"@id": "ft:recordedAt", "@type": "xsd:dateTime"},
+    "expiresAt":    {"@id": "ft:expiresAt", "@type": "xsd:dateTime"},
+    "sourceUrl":    "ft:sourceUrl",
+    "sourceName":   "ft:sourceName",
+    "factContext":  "ft:factContext",
+    "unit":         "ft:unit"
+  },
+
+  "@graph": [
+    {
+      "@id": "ft:Fact",
+      "@type": "rdfs:Class",
+      "subClassOf": {"@id": "nx:Fact"},
+      "comment": "An immutable, provenance-tracked fact about the real world. Stored in the OLAP fact database. Never opinion — always attributed to a source.",
+      "properties": [
+        "ft:namespace", "ft:factType", "ft:factSubject", "ft:factValue",
+        "ft:observedAt", "ft:recordedAt", "ft:expiresAt",
+        "nx:source", "nx:confidence", "ft:unit", "ft:factContext",
+        "nx:timestamp", "nx:tags"
+      ]
+    },
+    {
+      "@id": "ft:FactSource",
+      "@type": "rdfs:Class",
+      "comment": "The origin of a fact — an API endpoint, manual entry, sensor reading, or derived computation.",
+      "properties": [
+        "ft:sourceName", "ft:sourceUrl", "ft:factType",
+        "nx:description", "nx:confidence"
+      ]
+    },
+    {
+      "@id": "ft:FactAssertion",
+      "@type": "rdfs:Class",
+      "comment": "An assertion that a fact was true at a given time. Immutable once written.",
+      "properties": [
+        "ft:namespace", "ft:factType", "ft:factSubject",
+        "ft:factValue", "ft:observedAt", "ft:recordedAt",
+        "ft:sourceUrl", "nx:confidence"
+      ]
+    }
+  ]
+}

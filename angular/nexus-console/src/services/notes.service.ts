@@ -32,9 +32,10 @@ export class NotesService {
     const rootName = path[0];
     const sessionName = this.localConfigService.sessionName();
 
-    // Notes only available under Local Session and File Systems
+    // Notes only available under Local Session, Files, and File Systems
     if (rootName === sessionName) return true;
     if (rootName === 'File Systems') return true;
+    if (rootName === 'Files') return true;
 
     return false;
   }

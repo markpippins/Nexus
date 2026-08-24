@@ -147,6 +147,7 @@ export class FileExplorerComponent implements OnDestroy {
   // --- README Banner State ---
   readmeContent = signal<string | null>(null);
   isReadmeLoading = signal(false);
+  isReadmeDismissed = signal(false);
   renderedReadmeHtml = computed(() => {
     const content = this.readmeContent();
     if (!content) return null;
@@ -195,6 +196,11 @@ export class FileExplorerComponent implements OnDestroy {
       return p.slice(2);
     }
 
+    // For Files node (direct filesystem on port 4042), slice off just the root name
+    if (rootName === 'Files') {
+      return p.slice(1);
+    }
+
     // Gateways and Service Registries now live nested under Platform Management.
     // For ['Platform Management', 'Gateways', <brokerName>, ...] (or 'Service Registries'),
     // strip both container levels so the per-profile remoteProvider receives only the inner path.
@@ -241,6 +247,8 @@ export class FileExplorerComponent implements OnDestroy {
     // but NOT at the system mount folder level
     if (p.length > 0 && p[0] === 'File Systems' && !this.isInFileSystemsRoot()) return true;
     if (p.length > 0 && p[0] === sessionName) return true;
+    // Files node (direct filesystem) — always allowed
+    if (p.length > 0 && p[0] === 'Files') return true;
     return false;
   });
 
@@ -358,6 +366,7 @@ export class FileExplorerComponent implements OnDestroy {
     this.state.set({ status: 'loading', items: [] });
     this.readmeContent.set(null); // Clear readme on navigation
     this.isReadmeLoading.set(false);
+    this.isReadmeDismissed.set(false);
     try {
       const items = await this.fileSystemProvider().getContents(requestedPath);
 
@@ -367,7 +376,7 @@ export class FileExplorerComponent implements OnDestroy {
       this.state.set({ status: 'success', items: items });
 
       // Determine whether the directory we just entered is itself magnetized.
-      // RemoteFileSystemService.getContents only flags *child* folders via hasFile,
+      // SecureFileSystemService.getContents only flags *child* folders via hasFile,
       // so we must explicitly check the CURRENT folder here to surface its magnet
       // status in the footer.
       try {

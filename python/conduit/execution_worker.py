@@ -610,6 +610,21 @@ def _role_lease_blocked(role: str) -> str | None:
     validity) in harness-srv, not by lease expiry here.
     """
     try:
+        # D-008 R2: lease-derived REVOKED blocks the worker pool; NEVER_LEASED
+        # is advisory (warn-and-proceed).
+        try:
+            status_url = f"http://localhost:3101/api/role-leases/{role}/status"
+            status_req = urllib.request.Request(status_url, method="GET")
+            with urllib.request.urlopen(status_req, timeout=5) as resp:
+                status = json.loads(resp.read())
+            state = status.get("state")
+            if state == "REVOKED":
+                return "ROLE_REVOKED"
+            if state == "NEVER_LEASED":
+                _log.info("role %s is NEVER_LEASED — advisory (warn-and-proceed)", role)
+        except Exception as e:  # noqa: BLE001
+            _log.warning("role-lease status check failed (proceeding): %s", e)
+
         url = f"http://localhost:3101/api/role-leases?role={role}"
         req = urllib.request.Request(url, headers={"Content-Type": "application/json"}, method="GET")
         with urllib.request.urlopen(req, timeout=5) as resp:
@@ -617,6 +632,11 @@ def _role_lease_blocked(role: str) -> str | None:
         now = datetime.now(timezone.utc)
         for item in data.get("items", []):
             if item.get("status") != "ACTIVE":
+                continue
+            # D-007 R4: interactive-channel leases are consumed by the
+            # interactive turn subscriber, not the worker pool. The worker
+            # gate honors {opencode, ollama, unknown} only.
+            if item.get("channel") == "interactive":
                 continue
             window_end = item.get("window_end")
             budget = item.get("budget_units")

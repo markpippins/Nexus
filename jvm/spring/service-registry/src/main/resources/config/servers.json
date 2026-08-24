@@ -37,7 +37,7 @@
   },
   {
     "hostname": "barium",
-    "ipAddress": "172.16.30.20",
+    "ipAddress": "192.168.1.212",
     "type": "PHYSICAL",
     "environment": "PRODUCTION",
     "operatingSystem": "LINUX",

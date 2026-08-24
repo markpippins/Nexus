@@ -1,0 +1,66 @@
+{
+  "id": "plan-execution",
+  "description": "PlanExecutionWorkflow (conduit/temporal) — plan from intent, validate the plan, dispatch execution.",
+  "domain": "execution",
+  "nodes": [
+    {
+      "id": "reason.plan",
+      "type": "inference",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "goal": {"type": "string"},
+          "context": {"type": "object"}
+        },
+        "required": ["goal"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "steps": {"type": "array", "items": {"type": "object"}},
+          "strategy": {"type": "string"}
+        }
+      },
+      "model_hint": "pro",
+      "validation_strategy": "human_review"
+    },
+    {
+      "id": "reason.validate",
+      "type": "deterministic",
+      "input_schema": {
+        "type": "object",
+        "properties": {"plan": {"type": "object"}},
+        "required": ["plan"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "valid": {"type": "boolean"},
+          "errors": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "implementation": "python/conduit/plan_validator.py:validate"
+    },
+    {
+      "id": "conduit.execute",
+      "type": "external_tool",
+      "input_schema": {
+        "type": "object",
+        "properties": {"plan": {"type": "object"}},
+        "required": ["plan"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {"receipt": {"type": "object"}}
+      },
+      "interface": {"protocol": "temporal_activity", "endpoint": "conduit/execute"},
+      "retry_policy": {"max_retries": 2, "backoff_seconds": 2.0}
+    }
+  ],
+  "edges": [
+    {"source": "reason.plan", "target": "reason.validate", "semantics": "validation"},
+    {"source": "reason.validate", "target": "conduit.execute", "semantics": "control_flow"}
+  ],
+  "entry_point": "reason.plan",
+  "output_node": "conduit.execute"
+}

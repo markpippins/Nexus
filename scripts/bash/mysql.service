@@ -1,0 +1,30 @@
+[Unit]
+Description=MySQL — Kodi shared library database via Docker Compose
+Documentation=https://github.com/nexus/docker/mysql/docker-compose.yml
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=codex
+Group=codex
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=PATH=/usr/bin:/bin:/usr/local/bin
+Environment=COMPOSE_FILE=/home/codex/dev/nexus/docker/mysql/docker-compose.yml
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/usr/bin/docker compose -f ${COMPOSE_FILE} up -d
+ExecStop=/usr/bin/docker compose -f ${COMPOSE_FILE} stop
+
+# ── Restart behavior ───────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=5
+
+# ── Timeouts ───────────────────────────────────────────────────────────
+TimeoutStartSec=120
+TimeoutStopSec=60
+
+[Install]
+WantedBy=default.target

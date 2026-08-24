@@ -47,8 +47,9 @@ outage detector on UP→DOWN transitions. Both paths run the same duties.
   Only if `NEXUS_AGENT_USER_ID` is unset, fall back to
   `GET /api/users` matching name "$NEXUS_AGENT_ROLE" exactly.
 - **Inbox** (nebula agent records, `to:sysadmin` tag) — check every cycle,
-  act within authority ladder, reply when done. Pointer at
-  `GET /api/inbox-pointer/sysadmin`, query via `nebula_list_agent_records`.
+  act within authority ladder, reply when done. Preferred:
+  `nebula_get_inbox {"role":"sysadmin"}` or `nexus/bin/check-inbox.sh --role
+  sysadmin`; REST fallback on :3101 (not :3102).
 - **Ticket registry** (`stateDir/tickets.json`) — gates re-dispatch. When
   woken for an outage, a ticket with `status: "open"` exists. Resolve →
   close ticket entry. Cannot resolve → leave open, add notes. Maintenance

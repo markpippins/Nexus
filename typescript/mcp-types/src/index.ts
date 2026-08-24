@@ -2,9 +2,10 @@
  * Shared MCP tool-surface type contracts.
  *
  * Single source of truth for the tool-surface contract consumed by:
- *   - tools-aggregator (discovery + invocation)
+ *   - tools-aggregator (discovery + invocation, incl. command-router)
  *   - mcp-registry-seeder (Phase-1 command registry seeding)
- *   - slash-command-mcp (Phase-2 DSL parser, future)
+ *   - slash-command-mcp (Phase-2 DSL parser, folded into tools-aggregator
+ *     command-router per D-2026-08-16-002; :3220 retired)
  *
  * Extracted from tools-aggregator/src/types.ts so the registry schemas
  * never drift from the live tool surface.
@@ -59,8 +60,11 @@ export interface MCPToolDefinition {
  *              migrates protocols under us. Note: `sse` is never tried under
  *              `auto` — it requires explicit opt-in because its persistent
  *              connection cost differs from the stateless REST/JSON-RPC path.
+ * - `local`:   Native in-process tool served by the aggregator itself (the
+ *              command-router namespace: command_lookup / command_execute /
+ *              command_completions). No remote hop — dispatched directly.
  */
-export type MCPProtocol = "rest" | "jsonrpc" | "sse" | "auto";
+export type MCPProtocol = "rest" | "jsonrpc" | "sse" | "auto" | "local";
 
 export interface MCPServiceConfig {
   /** Service name (e.g., "conduit-mcp") */
@@ -94,9 +98,10 @@ export interface AggregatedTool extends MCPToolDefinition {
    * Discovery protocol that worked for this service.
    * Stored per-tool so callRemoteTool can route to the same protocol the
    * tool was discovered through, avoiding cross-protocol mismatches if an
-   * MCP ever exposed both endpoints.
+   * MCP ever exposed both endpoints. `local` = native aggregator tool
+   * (command-router namespace), dispatched in-process.
    */
-  protocol: Extract<MCPProtocol, "rest" | "jsonrpc" | "sse">;
+  protocol: Extract<MCPProtocol, "rest" | "jsonrpc" | "sse" | "local">;
 }
 
 // ── Tool Registry ───────────────────────────────────────────────────

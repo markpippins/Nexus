@@ -89,7 +89,7 @@ router.get("/receipts", async (req, res) => {
     const receipts = await query(
       `SELECT id, plan_id, type, agent_role, session_id, ticket_id,
               artifact_path, summary, metadata_json, tokens_used, created_at, sequence
-       FROM ${VISION_SCHEMA}.receipts
+       FROM nebula.receipts_unified
        WHERE plan_id = $1
        ORDER BY sequence ASC NULLS LAST, created_at ASC`,
       [planId]

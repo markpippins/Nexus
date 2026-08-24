@@ -497,7 +497,7 @@ export class AppComponent implements OnInit, OnDestroy {
   get funnelMax(): number {
     const f = this.analytics()?.pipelineFunnel;
     if (!f) return 1;
-    return Math.max(f.harvests, f.candidates, f.promoted, f.intent_records, f.plans, 1);
+    return Math.max(f.harvests, f.candidates, f.promoted, f.plans, 1);
   }
 
   get pages(): number[] {

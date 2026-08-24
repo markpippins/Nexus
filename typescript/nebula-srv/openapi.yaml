@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: nebula-srv — Nebula Knowledge-Graph API
-  version: 1.0.e02e35a2
+  version: 1.0.79b7ed9a
   description: 'Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge
     graph, and cross-references.
 
@@ -36,8 +36,6 @@ tags:
 - name: import
 - name: inbox-pointer
 - name: inbox-pointers
-- name: intent-records
-- name: intents
 - name: inventory
 - name: knowledge
 - name: observations
@@ -93,8 +91,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: 'AGENDAS (scoped by hierarchy via agenda_items → intent_records → harvest_candidates) GET /api/agendas — list
-        ALL agendas (unscoped, when no '
+      summary: AGENDAS (scoped by hierarchy via agenda_items → requirements) GET /api/agendas — list ALL agendas (unscoped,
+        when no hierarchy selected)
   /api/agendas/{id}:
     get:
       tags:
@@ -979,6 +977,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: /candidates alias — mirrors /harvest-candidates for Assembly UI
   /api/candidates/{id}:
     get:
       tags:
@@ -1108,8 +1107,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: CONDUIT — plan history & point-in-time queries (conduit + vision schemas) Reads from nebula.plans, vision.receipts,
-        vision.tickets via fully
+      summary: CONDUIT — plan history & point-in-time queries (conduit + vision schemas) Reads from nebula.plans, nebula.receipts_unified,
+        vision.tickets v
   /api/conduit/plans/{id}/history:
     get:
       tags:
@@ -2536,43 +2535,6 @@ paths:
         required: true
         schema:
           type: string
-  /api/features/{id}/intent-records:
-    get:
-      tags:
-      - features
-      operationId: get_features_id_intent_records
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JsonBody'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      summary: GET /api/features/:id/intent-records — list intent records scoped to a feature
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
   /api/features/{id}/specifications:
     get:
       tags:
@@ -2708,7 +2670,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: GET /api/harvest-candidates — list candidates, filterable by harvest or hierarchy
+      summary: 'GET /api/harvest-candidates — list candidates, filterable by harvest or hierarchy Sweep-tooling extras (to-do
+        7e2d116f): ?completed=true|fal'
     post:
       tags:
       - harvest-candidates
@@ -2808,6 +2771,42 @@ paths:
                 $ref: '#/components/schemas/Error'
       summary: PATCH /api/harvest-candidates/:id — update candidate (primarily for linking to hierarchy) When systemId is
         set, auto-upserts the candidate's
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/harvest-candidates/{id}/completion:
+    get:
+      tags:
+      - harvest-candidates
+      operationId: get_harvest_candidates_id_completion
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
       parameters:
       - name: id
         in: path
@@ -2918,14 +2917,84 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: 'POST /api/harvest-candidates/:id/spawn-plan — full flow: link candidate to system, create a requirement derived
-        from the candidate, and opti'
+      summary: 'POST /api/harvest-candidates/:id/spawn-plan — DEPRECATED alias (decision 319defa5): candidates promote ONLY
+        to requirements; verb renamed to'
       parameters:
       - name: id
         in: path
         required: true
         schema:
           type: string
+  /api/harvest-candidates/{id}/spawn-requirement:
+    post:
+      tags:
+      - harvest-candidates
+      operationId: post_harvest_candidates_id_spawn_requirement
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'POST /api/harvest-candidates/:id/spawn-requirement — full flow: link candidate to system, create a requirement
+        derived from the candidate, a'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/harvest-candidates/completion-sweep:
+    post:
+      tags:
+      - harvest-candidates
+      operationId: post_harvest_candidates_completion_sweep
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'Batch variant: POST /api/harvest-candidates/completion-sweep { ids: [...] } Missing/unknown ids are reported
+        per-id rather than failing the '
   /api/harvest-candidates/discover:
     post:
       tags:
@@ -2988,7 +3057,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: POST /api/harvest-candidates/promote-to-plan — collate useful candidates into a conduit plan
+      summary: 'POST /api/harvest-candidates/promote-to-plan — RETIRED (architect ruling on to-do e68449f2): the backing nebula.candidates_to_plan()
+        procedu'
   /api/harvests:
     get:
       tags:
@@ -3391,143 +3461,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       summary: GET /api/inbox-pointers — list all inbox pointers (debugging)
-  /api/intent-records:
-    get:
-      tags:
-      - intent-records
-      operationId: get_intent_records
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JsonBody'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      summary: INTENT RECORDS (scoped by hierarchy via harvest_candidates JOIN) GET /api/intent-records — list ALL intent
-        records with pagination
-  /api/intent-records/{id}:
-    get:
-      tags:
-      - intent-records
-      operationId: get_intent_records_id
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JsonBody'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      summary: GET /api/intent-records/:id — full intent record with candidate info
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-  /api/intents:
-    get:
-      tags:
-      - intents
-      operationId: get_intents
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JsonBody'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      summary: INTENT RECORDS GET /api/intents — list with pagination
-  /api/intents/{id}:
-    get:
-      tags:
-      - intents
-      operationId: get_intents_id
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JsonBody'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      summary: GET /api/intents/:id — single intent record
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
   /api/inventory:
     get:
       tags:
@@ -3591,7 +3524,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       summary: GET /api/knowledge/cross-references — list cross-references for graph overlay with pagination. Also includes
-        harvest_candidate spawn-plan cr
+        harvest_candidate spawn-require
   /api/knowledge/edges:
     get:
       tags:
@@ -5515,6 +5448,44 @@ paths:
         required: true
         schema:
           type: string
+  /api/role-leases/{role}/status:
+    get:
+      tags:
+      - role-leases
+      operationId: get_role_leases_role_status
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: GET /api/role-leases/:role/status — derived lease state for (role, channel) (D-2026-08-16-008 R1). NEVER_LEASED
+        / ACTIVE / REVOKED / EXPIRED
+      parameters:
+      - name: role
+        in: path
+        required: true
+        schema:
+          type: string
   /api/role-leases/consume:
     post:
       tags:
@@ -5610,6 +5581,38 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       summary: GET /api/role-leases/stale — ACTIVE leases past window/budget (for sweep)
+  /api/role-leases/sweep:
+    post:
+      tags:
+      - role-leases
+      operationId: post_role_leases_sweep
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'POST /api/role-leases/sweep — transition stale ACTIVE leases → EXPIRED (D-2026-08-16-007 R5). Idempotent;
+        non-destructive (never RELEASED — '
   /api/roles:
     get:
       tags:
@@ -5641,7 +5644,74 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       summary: ROLES GET /api/roles — list all roles (governance roles with capabilities)
+    post:
+      tags:
+      - roles
+      operationId: post_roles
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'POST /api/roles — create role metadata (Gap 2: nebula.roles create API)'
   /api/roles/{id}:
+    delete:
+      tags:
+      - roles
+      operationId: delete_roles_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'DELETE /api/roles/:id — remove role metadata (Gap 2). Accepts a UUID or a role name (architect review: previously
+        UUID-only). Hard delete gu'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
     get:
       tags:
       - roles
@@ -5678,6 +5748,74 @@ paths:
         required: true
         schema:
           type: string
+    patch:
+      tags:
+      - roles
+      operationId: patch_roles_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: PATCH /api/roles/:id — update capabilities/visibility/description (Gap 2)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/roles/drift:
+    get:
+      tags:
+      - roles
+      operationId: get_roles_drift
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: '(D-2026-08-16-009 R5). Three planes: governance = nebula.roles (current bitemporal view) + roles_history runtime
+        = tackle.roles (runtime per'
   /api/search:
     get:
       tags:
@@ -6617,43 +6755,6 @@ paths:
         required: true
         schema:
           type: string
-  /api/subsystems/{id}/intent-records:
-    get:
-      tags:
-      - subsystems
-      operationId: get_subsystems_id_intent_records
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JsonBody'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      summary: GET /api/subsystems/:id/intent-records — list intent records scoped to a subsystem
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
   /api/subsystems/{id}/specifications:
     get:
       tags:
@@ -7348,43 +7449,6 @@ paths:
         schema:
           type: string
       - name: tabId
-        in: path
-        required: true
-        schema:
-          type: string
-  /api/systems/{id}/intent-records:
-    get:
-      tags:
-      - systems
-      operationId: get_systems_id_intent_records
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JsonBody'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      summary: GET /api/systems/:id/intent-records — list intent records scoped to a system
-      parameters:
-      - name: id
         in: path
         required: true
         schema:

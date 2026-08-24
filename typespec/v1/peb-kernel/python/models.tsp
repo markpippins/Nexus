@@ -8,18 +8,19 @@ namespace org.nexus.pebkernel {
 
   /** Admission request for a PEB transaction. */
   model PebTransactionRequest {
+    /** Optional caller-supplied UUID; the Python domain assigns one when omitted. */
+    @format("uuid")
+    id?: string;
     idempotencyKey: string;
     entityId: string;
     toolName: string;
-    input: Record<unknown>;
+    input: unknown;
   }
 
-  /** Admission decision. */
+  /** Admission decision shared with the Spring PEB contract. */
   model AdmissionResponse {
+    message: string;
     admitted: boolean;
-    /** Admission path / disposition. */
-    path?: string;
-    decision?: Record<unknown>;
   }
 
   /** Health response. */
@@ -27,5 +28,19 @@ namespace org.nexus.pebkernel {
     status: string;
     database?: string;
     schema?: string;
+  }
+
+  /** State digest served at GET /api/v1/peb/state/hash. */
+  model PebStateHashResponse {
+    /** Sorted-leaf Merkle root over state rows + latest decision after_hash. */
+    peb_state_hash: string;
+    /** state_key -> checksum for every state row (keys sorted). */
+    document_hashes: Record<string, string>;
+    /** Latest decision after_hash (before_hash fallback), "" when none. */
+    last_decision_hash: string;
+    /** Digest over peb_state_hash + last_decision_hash (no separate store). */
+    thought_context_hash: string;
+    /** Static "operational" — no cognitive-mode store exists. */
+    cognitive_mode: string;
   }
 }

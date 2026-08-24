@@ -25,10 +25,15 @@ Tested invariants:
         and the derivation is stable across calls (pure function).
   AC6 — Q4 P1 (plan 1287): the canonical WR birth shape (built by
         ccnf_input_from_dco_json / ccnf_input_from_intent_string) hashes to
-        the golden value, and no live vision.work_requests row carries a NULL
-        entity_key — every stored key must equal the pure-Python mirror
-        re-derived from the row's dco_json + wr_id (locks the V093 SQL
-        backfill). DB-backed test skips when the local nexus DB is absent.
+        the golden value, and no live vision.work_requests row with a
+        compile-unit identity (non-empty wr_id) carries a NULL entity_key —
+        every stored key must equal the pure-Python mirror re-derived from
+        the row's dco_json + wr_id (locks the V093 SQL backfill). Identity-
+        less rows (wr_id NULL/'') are resolution-comparator fixtures (e.g.
+        the `wr-mongo-wiring` seed) with no compile-unit identity, exactly
+        the class conduit's v17 event-log backfill skips — they are not WRs
+        and cannot carry a birth identity. DB-backed test skips when the
+        local nexus DB is absent.
 
 Deterministic and LLM-free. The Go/Rust binaries are repo-committed under
 go/wrp/ccnf-ref/bin and rust/wrp/ccnf-verifier/target/release; tests skip
@@ -289,16 +294,23 @@ class TestNoLiveWrNullEntityKey(unittest.TestCase):
         conn = _connect()
         try:
             cur = conn.cursor()
+            # Scope: rows with a compile-unit identity only (wr_id present).
+            # Identity-less rows are resolution-comparator fixtures, not WRs
+            # (see module docstring AC6) — same convention as conduit's v17
+            # event-log backfill, which skips them.
             cur.execute(
                 "SELECT count(*) FILTER (WHERE entity_key IS NULL), count(*) "
-                "FROM vision.work_requests")
+                "FROM vision.work_requests "
+                "WHERE wr_id IS NOT NULL AND wr_id <> ''")
             nulls, total = cur.fetchone()
             cur.execute(
-                "SELECT wr_id, dco_json, entity_key FROM vision.work_requests")
+                "SELECT wr_id, dco_json, entity_key FROM vision.work_requests "
+                "WHERE wr_id IS NOT NULL AND wr_id <> ''")
             rows = cur.fetchall()
         finally:
             conn.close()
-        self.assertEqual(nulls, 0, f"{nulls}/{total} live WRs have NULL entity_key")
+        self.assertEqual(
+            nulls, 0, f"{nulls}/{total} compile-unit WRs have NULL entity_key")
         for wr_id, dco_json, ek in rows:
             with self.subTest(wr_id=wr_id):
                 self.assertEqual(

@@ -1,0 +1,63 @@
+# ============================================================
+# chat-export-markdown — deterministic vertical slice profile
+# Source material: nexus/utils/chat-export (ChatGPT exports)
+# Ratified spec v0.2 · no LLM stages
+# ============================================================
+id: chat-export-markdown
+version: 1
+schema_version: "1.0"
+enabled: true
+description: >
+  Ingests ChatGPT conversations rendered by nexus/utils/chat-export.
+  Filename date prefixes are extracted as metadata (source_date) and
+  stripped from titles; discourse-arc segmentation groups turns into
+  coherent arcs so downstream candidates never start on filler.
+
+sources:
+  # NOTE 2026-08-22: chat-export was moved out of the repo by the user and
+  # now lives at /home/codex/dev/chat-export. Absolute globs are supported
+  # per spec C5; switch back to repo-relative if it returns in-tree.
+  - glob: /home/codex/dev/chat-export/exports/markdown/*.md
+    exclude:
+      - "**/archive/**"
+      - "**/*.draft.md"
+      - "**/*.tmp"
+    max_depth: 5
+    follow_symlinks: false
+
+detect:
+  # 0.75 rationale: frontmatter(0.35)+title(0.2)+create_time(0.15)=0.70 is the
+  # floor for ANY chat-export file; turn markers supply the rest. Two real
+  # exports scored 0.80 under 0.85 (big first message pushed '## Assistant'
+  # out of the scan window) and fail_early correctly refused them.
+  confidence_threshold: 0.75
+  fallback: fail_early        # curated single-format profile: surface problems loudly
+
+enrich:
+  filename_metadata:
+    pattern: '^(?P<date>\d{4}-\d{2}-\d{2})_(?P<title>.+)_(?P<conv_id>[0-9a-f-]{8,36})\.md$'
+    strip_from_title: true
+    fallback:
+      title: "Untitled Conversation"
+
+segment:
+  strategy: discourse-arcs
+  options:
+    drift_threshold: 0.08     # Jaccard overlap floor between consecutive user turns
+
+sinks:
+  # Canonical store — fail_run default expanded + logged at registration
+  - type: pg.harvests
+    policy: default
+  # Optional research mirror — never blocks the run
+  - type: mongo.mirror
+    policy: default
+  # Assembly Transcripts forum — thread per conversation, reply per arc
+  - type: assembly.forum
+    slug: transcripts
+    granularity: segment
+    author_user_alias: engineer-ii
+    policy:
+      on_failure: skip_sink
+      retry: { max_attempts: 3, backoff: exponential }
+      timeout_seconds: 60

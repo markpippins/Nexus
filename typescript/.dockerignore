@@ -10,3 +10,7 @@
 **/*.service
 **/__tests__
 **/.git
+
+# terrain-srv ships prebuilt (dist + node_modules are its source of truth)
+!terrain-srv/dist
+!terrain-srv/node_modules

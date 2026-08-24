@@ -184,3 +184,96 @@ export interface TopologyEdge {
   label?: string;
   status: HealthStatus;
 }
+
+// ── Jenkins CI/CD types ──────────────────────────────────────────────
+
+export type JenkinsJobStatus = 'success' | 'failure' | 'building' | 'aborted' | 'unstable' | 'not_built';
+
+export interface JenkinsJob {
+  id: string;
+  name: string;
+  url: string;
+  status: JenkinsJobStatus;
+  lastBuildNumber: number;
+  lastBuildTimestamp: string;
+  lastBuildDuration: number; // seconds
+  scmBranch: string;
+  triggeredBy: string;
+  description?: string;
+}
+
+export interface JenkinsBuild {
+  id: string;
+  jobId: string;
+  jobName: string;
+  buildNumber: number;
+  status: JenkinsJobStatus;
+  timestamp: string;
+  duration: number; // seconds
+  scmBranch: string;
+  commitHash: string;
+  triggeredBy: string;
+  consoleUrl: string;
+}
+
+// ── SonarQube code quality types ───────────────────────────────────
+
+export type QualityGateStatus = 'passed' | 'failed' | 'none';
+export type SonarRating = 'A' | 'B' | 'C' | 'D' | 'E';
+
+export interface SonarProject {
+  id: string;
+  key: string;
+  name: string;
+  gate: QualityGateStatus;
+  reliabilityRating: SonarRating;
+  securityRating: SonarRating;
+  maintainabilityRating: SonarRating;
+  coveragePercent: number;
+  duplicationsPercent: number;
+  linesOfCode: number;
+  lastAnalysis: string;
+  url: string;
+  description?: string;
+}
+
+export interface SonarMetricPoint {
+  id: string;
+  projectId: string;
+  projectKey: string;
+  timestamp: string;
+  coveragePercent: number;
+  duplicationsPercent: number;
+  reliabilityRating: SonarRating;
+  securityRating: SonarRating;
+  maintainabilityRating: SonarRating;
+}
+
+// ── Ballerina integration platform types ─────────────────────────────────────
+
+export interface BallerinaDependency {
+  org: string;
+  name: string;
+  version: string;
+}
+
+export interface BallerinaPackage {
+  id: string;
+  org: string;
+  name: string;
+  version: string;
+  platform: string; // e.g. "Ballerina 2201.8.x"
+  license: string;
+  description?: string;
+  dependencies: BallerinaDependency[];
+  lastUpdated: string;
+}
+
+export interface BallerinaService {
+  id: string;
+  packageRef: string;
+  name: string;
+  endpoint: string;
+  listenerPort: string;
+  status: HealthStatus;
+}

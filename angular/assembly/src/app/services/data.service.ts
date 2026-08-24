@@ -23,7 +23,6 @@ export interface Counts {
   candidates: number;
   harvests: number;
   openQuestions: number;
-  intents: number;
   assessments: number;
   observations: number;
   agentRecords: number;
@@ -216,20 +215,6 @@ export interface OpenQuestion {
   answeredAt?: string | null;
 }
 
-export interface IntentRecord {
-  id: string;
-  candidateId: string | null;
-  parentId: string | null;
-  title: string | null;
-  description: string | null;
-  sourceType: string | null;
-  sourceRef: string | null;
-  tags: string[] | null;
-  status: string | null;
-  metadata: Record<string, unknown> | null;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export interface Assessment {
   id: string;
@@ -521,14 +506,6 @@ export class DataService {
 
   createOpenQuestion(payload: Partial<OpenQuestion>) {
     return this.http.post<{ id: string }>(`${this.base}/open-questions`, payload);
-  }
-
-  getIntents(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
-    return this.http.get<Paged<IntentRecord>>(`${this.base}/intents?page=${page}&pageSize=${pageSize}`);
-  }
-
-  getIntent(id: string) {
-    return this.http.get<IntentRecord>(`${this.base}/intents/${id}`);
   }
 
   getAssessments(page = 1, pageSize = DEFAULT_PAGE_SIZE) {

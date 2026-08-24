@@ -20,10 +20,6 @@ function loadDotEnv() {
 
 loadDotEnv();
 
-export const ASSEMBLY_MODE = (
-  process.env.ASSEMBLY_MODE || process.env.VITE_ASSEMBLY_MODE || 'mock'
-).toLowerCase();
-
-export const IS_MOCK_MODE = ASSEMBLY_MODE === 'mock';
-export const DEFAULT_PORT = IS_MOCK_MODE ? 3000 : 4204;
-export const ASSEMBLY_PORT = parseInt(process.env.PORT || String(DEFAULT_PORT), 10);
+// Live-only runtime. The UI talks to assembly-srv (/api) and nebula-srv
+// (/nebula) through the dev-server proxy or the production-style server.
+export const ASSEMBLY_PORT = parseInt(process.env.PORT || '4204', 10);

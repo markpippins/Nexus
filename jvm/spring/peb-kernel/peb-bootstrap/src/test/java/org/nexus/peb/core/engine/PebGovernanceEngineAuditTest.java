@@ -221,8 +221,8 @@ class PebGovernanceEngineAuditTest {
     // ---------------------------------------------------------------
 
     @Test
-    @DisplayName("UNKNOWN path writes ROUTED audit row")
-    void unknownPath_writesRoutedAuditRow() throws Exception {
+    @DisplayName("UNKNOWN path writes REJECTED audit row")
+    void unknownPath_writesRejectedAuditRow() throws Exception {
         PebTransaction tx = buildTransaction("peb_nonexistent_tool", "{}");
         AdmissionPath path = AdmissionPath.fromToolName(tx.getToolName());
 
@@ -231,17 +231,17 @@ class PebGovernanceEngineAuditTest {
         assertAll(
             () -> assertEquals(AdmissionPath.UNKNOWN, path,
                 "unrecognized toolName maps to UNKNOWN"),
-            () -> assertTrue(response.admitted(),
-                "UNKNOWN path should be admitted (row is still recorded)"),
-            () -> assertEquals("Routed (unknown tool)", response.message(),
-                "UNKNOWN path returns expected message"),
-            () -> assertEquals(AdmissionResult.ROUTED, tx.getAdmissionResult(),
-                "Engine sets admissionResult to ROUTED for UNKNOWN"),
+            () -> assertFalse(response.admitted(),
+                "UNKNOWN path must fail closed"),
+            () -> assertEquals("Admission denied by invariant validator", response.message(),
+                "UNKNOWN path returns the validator rejection"),
+            () -> assertEquals(AdmissionResult.REJECTED, tx.getAdmissionResult(),
+                "Engine sets admissionResult to REJECTED for UNKNOWN"),
             () -> {
                 PebTransaction saved = transactionRepository.findById(tx.getId())
                     .orElseThrow(() -> new AssertionError("UNKNOWN row not found in DB"));
-                assertEquals(AdmissionResult.ROUTED, saved.getAdmissionResult(),
-                    "DB row has admission_result = ROUTED");
+                assertEquals(AdmissionResult.REJECTED, saved.getAdmissionResult(),
+                    "DB row has admission_result = REJECTED");
                 assertEquals("peb_nonexistent_tool", saved.getToolName(),
                     "DB row has correct tool_name");
                 assertNotNull(saved.getCreatedAt(),

@@ -37,3 +37,16 @@ export async function closeRedis(): Promise<void> {
     await redis.quit();
   }
 }
+
+/** Count keys matching a glob via SCAN (non-blocking, safe on big sets). */
+export async function countKeys(pattern: string): Promise<number> {
+  const r = getRedis();
+  let cursor = "0";
+  let count = 0;
+  do {
+    const [next, keys] = await r.scan(cursor, "MATCH", pattern, "COUNT", 200);
+    cursor = next;
+    count += keys.length;
+  } while (cursor !== "0");
+  return count;
+}

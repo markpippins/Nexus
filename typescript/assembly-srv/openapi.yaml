@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: assembly-srv — Assembly Forum REST API
-  version: 1.0.e097829f
+  version: 1.0.729bee08
   description: 'Assembly forum service: forums, threads, comments, users, harvests, work requests, agent records, agendas,
     plans, specifications, assessments, observations, search, counts, and stats refresh.
 
@@ -23,7 +23,6 @@ tags:
 - name: forums
 - name: harvests
 - name: health
-- name: intents
 - name: observations
 - name: open-questions
 - name: plans
@@ -440,6 +439,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Forum ↔ Agenda
   /api/bridges/forums-by-agenda/{agendaId}:
     get:
       tags:
@@ -535,6 +535,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Post ↔ Artifact
   /api/bridges/supporting-refs:
     post:
       tags:
@@ -565,6 +566,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Supporting Refs
   /api/bridges/supporting-refs/comment/{commentId}:
     get:
       tags:
@@ -775,6 +777,174 @@ paths:
       tags:
       - counts
       operationId: get_counts
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/duality/sessions/{threadId}/events:
+    get:
+      tags:
+      - duality
+      operationId: get_duality_sessions_threadId_events
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: threadId
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/duality/sessions/{threadId}/messages:
+    post:
+      tags:
+      - duality
+      operationId: post_duality_sessions_threadId_messages
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: threadId
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/duality/turns:
+    get:
+      tags:
+      - duality
+      operationId: get_duality_turns
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/duality/turns/{turnId}:
+    get:
+      tags:
+      - duality
+      operationId: get_duality_turns_turnId
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: turnId
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/duality/turns/latest:
+    get:
+      tags:
+      - duality
+      operationId: get_duality_turns_latest
       responses:
         '200':
           description: Success
@@ -1021,6 +1191,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Forum CRUD
     post:
       tags:
       - forums
@@ -1151,6 +1322,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: param is present the response is an envelope { items, total, page, pageSize }; without them it stays a flat
+        array for legacy consumers (Angu
       parameters:
       - name: slug
         in: path
@@ -1257,6 +1430,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: UUID-based thread endpoints (avoids slug resolution round-trip)
       parameters:
       - name: forumId
         in: path
@@ -1329,6 +1503,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Forum management (missing from original — migrated from assembly-mcp db.ts)
       parameters:
       - name: slug
         in: path
@@ -1336,6 +1511,41 @@ paths:
         schema:
           type: string
   /api/forums/comments/{id}:
+    delete:
+      tags:
+      - forums
+      operationId: delete_forums_comments_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
     get:
       tags:
       - forums
@@ -1365,6 +1575,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Comment management
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    put:
+      tags:
+      - forums
+      operationId: put_forums_comments_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'PUT /forums/comments/:id — edit a comment''s body. Body: { body (**req**) }. Soft-adjacent semantics: keeps
+        created timestamp, bumps updated.'
       parameters:
       - name: id
         in: path
@@ -1401,6 +1649,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Thread management
   /api/forums/reorder:
     put:
       tags:
@@ -1431,6 +1680,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Reorder
   /api/forums/search/by-name:
     get:
       tags:
@@ -1461,6 +1711,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Search
   /api/forums/search/by-thread-title:
     get:
       tags:
@@ -1563,6 +1814,44 @@ paths:
         required: true
         schema:
           type: string
+  /api/forums/threads/{threadId}/status:
+    put:
+      tags:
+      - forums
+      operationId: put_forums_threads_threadId_status
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: PUT /threads/:threadId/status — set the colored status indicator on a thread (root post rating). Any commenter
+        may update; no auth by design
+      parameters:
+      - name: threadId
+        in: path
+        required: true
+        schema:
+          type: string
   /api/harvests:
     get:
       tags:
@@ -1659,72 +1948,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /api/intents:
-    get:
-      tags:
-      - intents
-      operationId: get_intents
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JsonBody'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  /api/intents/{id}:
-    get:
-      tags:
-      - intents
-      operationId: get_intents_id
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JsonBody'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
   /api/observations:
     get:
       tags:
@@ -2384,6 +2607,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Missing routes (migrated from assembly-mcp db.ts)
       parameters:
       - name: alias
         in: path

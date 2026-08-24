@@ -430,15 +430,16 @@ export const NebulaClient = {
   getFeatureHarvestCandidates: (featureId: string) =>
     httpGet(`/api/features/${encodeURIComponent(featureId)}/harvest-candidates`),
 
-  // ── Candidate → Plan spawn (full flow) ─────────────────────
-  /** POST /api/harvest-candidates/:id/spawn-plan — link + requirement + cross-reference */
-  spawnPlanFromCandidate: (id: string, body: {
+  // ── Candidate → Requirement spawn (full flow) ─────────────
+  /** POST /api/harvest-candidates/:id/spawn-requirement — link + requirement + cross-reference
+   * (renamed from spawn-plan per decision 319defa5) */
+  spawnRequirementFromCandidate: (id: string, body: {
     systemId: string; subsystemId?: string | null; featureId?: string | null;
     planRef?: string; priority?: string; status?: string;
     title?: string; description?: string;
     parentId?: string | null; reqType?: string | null;
     acceptanceCriteria?: string[] | null;
-  }) => httpRequest("POST", `/api/harvest-candidates/${encodeURIComponent(id)}/spawn-plan`, body),
+  }) => httpRequest("POST", `/api/harvest-candidates/${encodeURIComponent(id)}/spawn-requirement`, body),
 
   // ── Conduit History (Plan 0169 recovery queries) ──────────
   /** GET /api/conduit/plans?includeDeleted=&asOf=&status=&limit=&offset= */

@@ -1,0 +1,849 @@
+{
+ "components": {
+  "schemas": {
+   "CapabilitiesResponse": {
+    "properties": {
+     "httpInvocable": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "note": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "httpInvocable",
+     "note"
+    ],
+    "type": "object"
+   },
+   "ConfigBundle": {
+    "description": "A priority-ordered configuration bundle binding a role to a model.",
+    "properties": {
+     "command": {
+      "type": "string"
+     },
+     "endpointUrl": {
+      "type": "string"
+     },
+     "harnessId": {
+      "type": "string"
+     },
+     "id": {
+      "type": "string"
+     },
+     "invocationMode": {
+      "type": "string"
+     },
+     "isActive": {
+      "type": "boolean"
+     },
+     "modelId": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "priority": {
+      "format": "int32",
+      "type": "integer"
+     },
+     "providerId": {
+      "type": "string"
+     },
+     "role": {
+      "type": "string"
+     },
+     "timeoutMs": {
+      "format": "int32",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "role",
+     "modelId",
+     "priority",
+     "invocationMode"
+    ],
+    "type": "object"
+   },
+   "ErrorResponse": {
+    "properties": {
+     "error": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "error"
+    ],
+    "type": "object"
+   },
+   "Harness": {
+    "description": "An invocation harness (CLI/HTTP wrapper description).",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "invocationSemantics": {
+      "additionalProperties": {},
+      "type": "object"
+     },
+     "name": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "invocationSemantics"
+    ],
+    "type": "object"
+   },
+   "HelloResponse": {
+    "properties": {
+     "model": {
+      "type": "string"
+     },
+     "reply": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "reply"
+    ],
+    "type": "object"
+   },
+   "InvokeRequest": {
+    "description": "Request body for POST /ai/invoke. Field names accept snake_case on the wire.",
+    "properties": {
+     "apiKey": {
+      "type": "string"
+     },
+     "endpointUrl": {
+      "type": "string"
+     },
+     "modelIdentifier": {
+      "type": "string"
+     },
+     "prompt": {
+      "type": "string"
+     },
+     "providerType": {
+      "description": "Direct mode fields.",
+      "type": "string"
+     },
+     "role": {
+      "description": "Role-resolved mode: resolve active bundle via /config/resolve/{role}.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "prompt"
+    ],
+    "type": "object"
+   },
+   "InvokeResponse": {
+    "properties": {
+     "reply": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "reply"
+    ],
+    "type": "object"
+   },
+   "ModelRow": {
+    "description": "A model row joined to its harness/provider.",
+    "properties": {
+     "harnessId": {
+      "type": "string"
+     },
+     "id": {
+      "type": "string"
+     },
+     "modelIdentifier": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "providerId": {
+      "type": "string"
+     },
+     "verified": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "harnessId",
+     "modelIdentifier",
+     "verified"
+    ],
+    "type": "object"
+   },
+   "ModelsResponse": {
+    "properties": {
+     "count": {
+      "format": "int32",
+      "type": "integer"
+     },
+     "models": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     }
+    },
+    "required": [
+     "count",
+     "models"
+    ],
+    "type": "object"
+   },
+   "PingResponse": {
+    "properties": {
+     "modelsAvailable": {
+      "format": "int32",
+      "type": "integer"
+     },
+     "service": {
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "service",
+     "status",
+     "modelsAvailable"
+    ],
+    "type": "object"
+   },
+   "Provider": {
+    "description": "An AI provider registered in the tackle schema.",
+    "properties": {
+     "apiKey": {
+      "type": "string"
+     },
+     "configJson": {
+      "additionalProperties": {},
+      "type": "object"
+     },
+     "endpointUrl": {
+      "type": "string"
+     },
+     "id": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "type": {
+      "description": "Controlled vocabulary incl. openai|anthropic|google|ollama|opencode|codex|spring_ai|lm_server|custom",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "type",
+     "configJson"
+    ],
+    "type": "object"
+   },
+   "ResolvedFallback": {
+    "description": "Winning bundle resolution \u2014 mirrors tackle-srv getResolvedRoleConfig.",
+    "properties": {
+     "modelIdentifier": {
+      "type": "string"
+     },
+     "priority": {
+      "format": "int32",
+      "type": "integer"
+     },
+     "providerName": {
+      "type": "string"
+     },
+     "providerType": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "priority",
+     "modelIdentifier",
+     "providerType",
+     "providerName"
+    ],
+    "type": "object"
+   },
+   "ResolvedRoleConfig": {
+    "properties": {
+     "apiKey": {
+      "type": "string"
+     },
+     "endpointUrl": {
+      "type": "string"
+     },
+     "fallbacks": {
+      "items": {
+       "$ref": "#/components/schemas/ResolvedFallback"
+      },
+      "type": "array"
+     },
+     "harnessName": {
+      "type": "string"
+     },
+     "modelIdentifier": {
+      "type": "string"
+     },
+     "providerId": {
+      "type": "string"
+     },
+     "providerName": {
+      "type": "string"
+     },
+     "providerType": {
+      "type": "string"
+     },
+     "role": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "role",
+     "modelIdentifier",
+     "providerId",
+     "providerName",
+     "providerType",
+     "harnessName",
+     "fallbacks"
+    ],
+    "type": "object"
+   },
+   "RoleRow": {
+    "description": "A governance role entry.",
+    "properties": {
+     "description": {
+      "type": "string"
+     },
+     "id": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "description"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ "info": {
+  "title": "Tackle Registry Service",
+  "version": "0.0.0"
+ },
+ "openapi": "3.0.0",
+ "paths": {
+  "/ai/hello": {
+   "get": {
+    "description": "Spring AI hello-world one-shot; degrades gracefully without configured providers.",
+    "operationId": "hello",
+    "parameters": [
+     {
+      "explode": false,
+      "in": "query",
+      "name": "name",
+      "required": false,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/HelloResponse"
+          },
+          {
+           "$ref": "#/components/schemas/ErrorResponse"
+          }
+         ]
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/ai/invoke": {
+   "post": {
+    "description": "Run a prompt through the resolved bundle (role mode) or an explicit provider (direct mode). CLI-harness provider types are refused with 415.",
+    "operationId": "invoke",
+    "parameters": [],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/InvokeRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/InvokeResponse"
+          },
+          {
+           "$ref": "#/components/schemas/ErrorResponse"
+          }
+         ]
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/ai/invoke/capabilities": {
+   "get": {
+    "description": "Which provider types this service can serve over HTTP.",
+    "operationId": "capabilities",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CapabilitiesResponse"
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/ai/models": {
+   "get": {
+    "description": "Introspect ChatModel beans auto-configured by Spring AI.",
+    "operationId": "aiModels",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ModelsResponse"
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/ai/ping": {
+   "get": {
+    "description": "Liveness probe; never touches a model.",
+    "operationId": "ping",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PingResponse"
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/config/ai/bundles": {
+   "get": {
+    "description": "Alias of /config/bundles (tackle-srv mount parity).",
+    "operationId": "listBundlesAlias",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ConfigBundle"
+         },
+         "type": "array"
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/config/ai/bundles/{role}": {
+   "get": {
+    "description": "Alias of /config/bundles/{role} (tackle-srv mount parity).",
+    "operationId": "listBundlesForRoleAlias",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "role",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ConfigBundle"
+         },
+         "type": "array"
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/config/ai/harnesses": {
+   "get": {
+    "description": "Alias of /config/harnesses (tackle-srv mount parity).",
+    "operationId": "listHarnessesAlias",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Harness"
+         },
+         "type": "array"
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/config/ai/models": {
+   "get": {
+    "description": "Alias of /config/models (tackle-srv mount parity).",
+    "operationId": "listModelsAlias",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ModelRow"
+         },
+         "type": "array"
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/config/ai/providers": {
+   "get": {
+    "description": "Alias of /config/providers (tackle-srv mount parity).",
+    "operationId": "listProvidersAlias",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Provider"
+         },
+         "type": "array"
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/config/ai/resolve/{role}": {
+   "get": {
+    "description": "Alias of /config/resolve/{role} (tackle-srv mount parity).",
+    "operationId": "resolveRoleAlias",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "role",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/ResolvedRoleConfig"
+          },
+          {
+           "$ref": "#/components/schemas/ErrorResponse"
+          }
+         ]
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/config/ai/roles": {
+   "get": {
+    "description": "Alias of /config/roles (tackle-srv mount parity).",
+    "operationId": "listRolesAlias",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/RoleRow"
+         },
+         "type": "array"
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/config/bundles": {
+   "get": {
+    "description": "List all config bundles ordered by role and priority.",
+    "operationId": "listBundles",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ConfigBundle"
+         },
+         "type": "array"
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/config/bundles/{role}": {
+   "get": {
+    "description": "List config bundles for one role.",
+    "operationId": "listBundlesForRole",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "role",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ConfigBundle"
+         },
+         "type": "array"
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/config/harnesses": {
+   "get": {
+    "description": "List invocation harnesses.",
+    "operationId": "listHarnesses",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Harness"
+         },
+         "type": "array"
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/config/models": {
+   "get": {
+    "description": "List models.",
+    "operationId": "listModels",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ModelRow"
+         },
+         "type": "array"
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/config/providers": {
+   "get": {
+    "description": "List AI providers from the tackle schema.",
+    "operationId": "listProviders",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Provider"
+         },
+         "type": "array"
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/config/resolve/{role}": {
+   "get": {
+    "description": "Resolve the winning active bundle for a role (mirrors tackle-srv getResolvedRoleConfig).",
+    "operationId": "resolveRole",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "role",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/ResolvedRoleConfig"
+          },
+          {
+           "$ref": "#/components/schemas/ErrorResponse"
+          }
+         ]
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  },
+  "/config/roles": {
+   "get": {
+    "description": "List governance roles.",
+    "operationId": "listRoles",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/RoleRow"
+         },
+         "type": "array"
+        }
+       }
+      },
+      "description": "The request has succeeded."
+     }
+    }
+   }
+  }
+ },
+ "servers": [
+  {
+   "description": "Tackle Registry Service",
+   "url": "http://localhost:8765",
+   "variables": {}
+  }
+ ],
+ "tags": []
+}

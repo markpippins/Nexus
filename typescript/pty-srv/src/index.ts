@@ -72,8 +72,11 @@ const healthServer = http.createServer((_req, res) => {
   res.end(JSON.stringify({ status: 'ok', backend: 'direct' }));
 });
 
-healthServer.listen(PORT + 1, '127.0.0.1', () => {
-  console.log(`pty-srv health check on http://localhost:${PORT + 1}/`);
+// Bind address: loopback by default (PTY security posture); containers set
+// PTY_HOST=0.0.0.0 so the published health port is reachable from outside.
+const HEALTH_HOST = process.env.PTY_HOST || '127.0.0.1';
+healthServer.listen(PORT + 1, HEALTH_HOST, () => {
+  console.log(`pty-srv health check on http://${HEALTH_HOST}:${PORT + 1}/`);
 
   startHeartbeat({
     serviceId: 115,

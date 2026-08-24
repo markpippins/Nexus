@@ -48,18 +48,34 @@
       (mousedown)="onMainAreaMouseDown($event)"
     >
       <!-- README Banner -->
-      @if (isReadmeLoading()) {
-        <div
-          class="p-4 border-b border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]"
-        >
-          <div class="h-24 bg-[rgb(var(--color-surface))] rounded animate-pulse"></div>
-        </div>
-      } @else if (renderedReadmeHtml(); as readmeHtml) {
-        <div
-          class="p-4 border-b border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]"
-        >
-          <div class="prose prose-sm max-w-none" [innerHTML]="readmeHtml"></div>
-        </div>
+      @if (!isReadmeDismissed()) {
+        @if (isReadmeLoading()) {
+          <div
+            class="border-b border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]"
+          >
+            <div class="p-4">
+              <div class="h-16 bg-[rgb(var(--color-surface))] rounded animate-pulse"></div>
+            </div>
+          </div>
+        } @else if (renderedReadmeHtml(); as readmeHtml) {
+          <div
+            class="relative border-b border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]"
+          >
+            <div class="p-3 overflow-y-auto max-h-[33vh]">
+              <div class="prose prose-sm max-w-none" [innerHTML]="readmeHtml"></div>
+            </div>
+            <button
+              (click)="isReadmeDismissed.set(true)"
+              class="absolute top-1.5 right-1.5 p-1 rounded-md text-[rgb(var(--color-text-subtle))] hover:text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+              title="Dismiss README"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        }
       }
       @switch (state().status) {
         @case ('loading') {

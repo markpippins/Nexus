@@ -3,6 +3,8 @@ import cors from "cors";
 import { v4 as uuidv4 } from "uuid";
 import { ToolDiscovery } from "./discovery";
 import { ToolCallRequest, ToolCallResponse, AggregatedTool, JsonRpcRequest, JsonRpcResponse, McpToolCallResult, MCPProtocol } from "./types";
+import { commandToolDefinitions, handleCommandToolCall, type CommandDispatch } from "./command-router";
+import { listCommands, searchCommands } from "./command-registry";
 
 const PORT = process.env.TOOLS_AGGREGATOR_PORT || 3210;
 const HOST = process.env.TOOLS_AGGREGATOR_HOST || "127.0.0.1";
@@ -27,6 +29,39 @@ app.use(express.json());
 // Global tool discovery instance
 const discovery = new ToolDiscovery();
 let isInitialized = false;
+
+// Command-router namespace (folded in from slash-command-mcp, D-2026-08-16-002):
+// the 3 DSL tools are served natively — registered in the registry under the
+// synthetic service "command-router" and dispatched in-process via the
+// aggregator's own registry (single hop, no :3220).
+const COMMAND_ROUTER_SERVICE = "command-router";
+
+function registerCommandRouter(): void {
+  for (const tool of commandToolDefinitions) {
+    discovery.registerNativeTool({
+      ...tool,
+      service: COMMAND_ROUTER_SERVICE,
+      serviceUrl: "local://command-router",
+      protocol: "local" as const,
+    } as unknown as AggregatedTool);
+  }
+}
+
+// Dispatch a resolved command through the aggregator's own registry — the
+// same single-hop path /tools/call uses, so a DSL execution never opens a
+// second client connection.
+const commandDispatch: CommandDispatch = async (command, args) => {
+  const tool = discovery.getTool(command);
+  if (!tool) {
+    return { success: false, error: `Tool not found: ${command}` };
+  }
+  try {
+    const result = await callRemoteTool(tool, command, args);
+    return { success: true, result, service: tool.service, tool: command };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Tool execution failed" };
+  }
+};
 
 // ── Middleware ──────────────────────────────────────────────────────
 
@@ -218,6 +253,31 @@ app.post("/tools/call", async (req: Request, res: Response) => {
     });
   }
 
+  // Native command-router tools are dispatched in-process (no remote hop).
+  if (tool.protocol === "local") {
+    try {
+      const result = await handleCommandToolCall(name, toolArgs || {}, commandDispatch);
+      return res.json({
+        success: true,
+        result,
+        service: COMMAND_ROUTER_SERVICE,
+        tool: name,
+        requestId,
+        timestamp: Date.now(),
+      } as ToolCallResponse);
+    } catch (error: any) {
+      console.error(`[${requestId}] Command-router call failed for ${name}:`, error.message);
+      return res.status(500).json({
+        success: false,
+        error: error.message || "Tool execution failed",
+        service: COMMAND_ROUTER_SERVICE,
+        tool: name,
+        requestId,
+        timestamp: Date.now(),
+      } as ToolCallResponse);
+    }
+  }
+
   try {
     const response = await callRemoteTool(tool, name, toolArgs || {});
 
@@ -266,6 +326,111 @@ app.get("/registry", (_req: Request, res: Response) => {
   });
 });
 
+// ── Command-router REST namespace (/commands/*) ────────────────────
+//
+// Direct clients (slash bars, CLIs) may use this namespace instead of the
+// native MCP tools. Each route mirrors one of the command_* tools:
+//   GET  /commands/services        → list services (mirrors completions stage=service)
+//   GET  /commands/:service/commands   → list commands for a service
+//   GET  /commands/:service/:command   → describe one command
+//   POST /commands/execute         → parse + coerce + dispatch a DSL line
+//   GET  /commands/completions     → completions for a partial DSL string
+
+app.get("/commands/services", async (_req: Request, res: Response) => {
+  try {
+    const r = await handleCommandToolCall("command_completions", { partial: "" }, commandDispatch);
+    res.json({ services: r.result?.services || [], total: (r.result?.services || []).length });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message, code: "REGISTRY_ERROR" });
+  }
+});
+
+app.get("/commands/search/:prefix", async (req: Request, res: Response) => {
+  try {
+    const limit = Number(req.query.limit) || 20;
+    const matches = await searchCommands(String(req.params.prefix), limit);
+    res.json({ commands: matches, total: matches.length });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message, code: "REGISTRY_ERROR" });
+  }
+});
+
+app.get("/commands/resolve/:command", async (req: Request, res: Response) => {
+  const r = await handleCommandToolCall(
+    "command_lookup",
+    { command: String(req.params.command) },
+    commandDispatch
+  );
+  if (r.isError) {
+    const code = r.result?.code;
+    if (code === "AMBIGUOUS_COMMAND") {
+      const m = String(r.result?.error || "").match(/exists on multiple services: (.+)\./);
+      return res.json({ matches: m ? m[1].split(", ") : [] });
+    }
+    return res.json({ row: null, matches: [] });
+  }
+  res.json({ row: r.result?.command || null, matches: [] });
+});
+
+app.get("/commands/:service/commands", async (req: Request, res: Response) => {
+  try {
+    const rows = await listCommands(String(req.params.service));
+    res.json({ service: req.params.service, commands: rows, total: rows.length });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message, code: "REGISTRY_ERROR" });
+  }
+});
+
+app.get("/commands/:service/:command", async (req: Request, res: Response) => {
+  const r = await handleCommandToolCall(
+    "command_lookup",
+    { command: `${req.params.service} ${req.params.command}` },
+    commandDispatch
+  );
+  if (r.isError) {
+    return res.status(404).json({ error: r.result?.error, code: r.result?.code });
+  }
+  res.json({ command: r.result?.command });
+});
+
+app.post("/commands/execute", async (req: Request, res: Response) => {
+  // Two shapes accepted:
+  //   { command: "<raw DSL line>" }                          → parsed + coerced here
+  //   { command: "<tool name>", args: {...} }                → pre-parsed/coerced (slash adapter)
+  const { command, args, allowExtra } = req.body || {};
+  let r;
+  if (args && typeof args === "object" && !Array.isArray(args)) {
+    // Pre-parsed path: dispatch the tool directly through the registry.
+    const resp = await commandDispatch(String(command), args);
+    r = {
+      isError: !resp.success,
+      result: resp.success
+        ? { dispatch: { success: true, service: resp.service, tool: resp.tool }, result: resp.result }
+        : { error: resp.error },
+    };
+  } else {
+    r = await handleCommandToolCall(
+      "command_execute",
+      { command, allowExtra },
+      commandDispatch
+    );
+  }
+  if (r.isError) {
+    return res.status(400).json({ error: r.result?.error, code: r.result?.code });
+  }
+  res.json(r.result);
+});
+
+app.get("/commands/completions", async (req: Request, res: Response) => {
+  const partial = String(req.query.partial || "");
+  const limit = Number(req.query.limit) || 20;
+  const r = await handleCommandToolCall("command_completions", { partial, limit }, commandDispatch);
+  if (r.isError) {
+    return res.status(400).json({ error: r.result?.error, code: r.result?.code });
+  }
+  res.json(r.result);
+});
+
 // ── Remote Tool Call Helper ─────────────────────────────────────────
 
 /**
@@ -284,8 +449,13 @@ async function callRemoteTool(
   toolName: string,
   toolArgs: Record<string, any>
 ): Promise<any> {
-  const protocol: Extract<MCPProtocol, "rest" | "jsonrpc" | "sse"> = tool.protocol;
+  const protocol: MCPProtocol = tool.protocol;
 
+  if (protocol === "local") {
+    // Native command-router tools are intercepted in the /tools/call
+    // handler before reaching here; this branch is defensive only.
+    throw new Error(`Tool ${toolName} is a native command-router tool; call it via /tools/call directly`);
+  }
   if (protocol === "rest") {
     return callRemoteToolRest(tool.serviceUrl, toolName, toolArgs);
   }
@@ -429,9 +599,12 @@ async function start() {
     // Continue anyway - will retry on /init or on-demand
   }
 
+  registerCommandRouter();
+
   const server = app.listen(Number(PORT), HOST, () => {
     console.error(`[Tools Aggregator] Server running at http://${HOST}:${PORT}`);
     console.error(`[Tools Aggregator] Tools discovered: ${discovery.getRegistry().totalTools}`);
+    console.error(`[Tools Aggregator] Command-router namespace registered: ${commandToolDefinitions.length} native tools (${COMMAND_ROUTER_SERVICE})`);
   });
 
   server.on('error', (err: NodeJS.ErrnoException) => {

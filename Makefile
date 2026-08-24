@@ -1,7 +1,8 @@
 .PHONY: cir1 cir1-scan cir1-lint cir1-fix cir1-validate \
         cir2-lint cir2-validate cir3-lint cir3-validate cir4-lint cir4-validate \
         cir5-lint cir5-validate \
-        cir-arl cir-verify install-hooks \
+        cir-arl authority-check jsonld-check jsonld-map cir-verify contract-audit install-hooks \
+        import-boundaries \
         test-db-setup test-db-reset test \
         mesh-test seed-guard-bootstrap seed-guard-test \
         apidocs-extract apidocs-gen apidocs-validate apidocs-regen \
@@ -20,8 +21,8 @@ cir1-scan:
 	@rg -n "intent_source|\.pipeline/|PIPELINE_|ExecutionState|ExecutorRegistry" . -g '!.git' -g '!*.lock' || true
 
 cir1-lint:
-	@echo "[CIR-1] AST linting JSON..."
-	@python3 tools/cir1/lint.py
+	@echo "[CIR-1] AST linting JSON (full CIR-1..5 -- default path includes CIR-5)..."
+	@python3 tools/cir1/lint.py --all
 
 cir1-fix:
 	@echo "[CIR-1] WARNING: patch.py is opt-in. Use 'make cir1-apply' or run patch.py --apply directly."
@@ -32,8 +33,8 @@ cir1-apply:
 	@python3 tools/cir1/patch.py --apply
 
 cir1-validate:
-	@echo "[CIR-1] validation gate..."
-	@python3 tools/cir1/lint.py --strict
+	@echo "[CIR-1] validation gate (full CIR-1..5)..."
+	@python3 tools/cir1/lint.py --all --strict
 
 # ─── CIR-2: Cross-layer isolation ────────────────────────────────────────────
 
@@ -75,6 +76,18 @@ cir5-validate:
 	@echo "[CIR-5] strict authority gate..."
 	@python3 tools/cir1/lint.py --cir5 --strict
 
+# ─── Authority matrix: single-canonical-authority validator ─────────────────
+
+authority-check:
+	@echo "[AUTHORITY] single-canonical-authority check..."
+	@python3 tools/authority/check_authority.py
+
+# ─── Import boundaries: forbidden reverse-dependency enforcement (T05) ───────
+
+import-boundaries:
+	@echo "[IMPORT-BOUNDARIES] named import-boundary / forbidden reverse-dependency check..."
+	@python3 tools/authority/check_import_boundaries.py
+
 # ─── CIR v2: Anti-Recursion Linter ────────────────────────────────────────────
 
 cir-arl:
@@ -83,6 +96,24 @@ cir-arl:
 
 cir-arl-json:
 	@python3 tools/arl_linter.py --json
+
+# ─── JSON-LD resolver + validator (contract-stack Step 11) ──────────────────
+
+jsonld-check:
+	@echo "[JSONLD] resolving nexus.local @context URLs + validating vocabulary..."
+	@python3 tools/authority/check_jsonld.py
+
+jsonld-map:
+	@python3 tools/authority/check_jsonld.py --map
+
+# ─── Contract audit: one entrypoint for the whole contract stack ────────────
+
+contract-audit:
+	@echo "Running full contract audit (arl + cir1-5 + authority + projection-ir + graph + jsonld + apidocs)..."
+	@python3 tools/contract_audit.py
+
+contract-audit-json:
+	@python3 tools/contract_audit.py --json
 
 # ─── CIR v2: Full verification suite ─────────────────────────────────────────
 
@@ -93,6 +124,7 @@ cir-verify:
 	@$(MAKE) cir3-lint
 	@$(MAKE) cir4-lint
 	@$(MAKE) cir5-lint
+	@$(MAKE) authority-check
 	@$(MAKE) cir-arl
 
 cir-validate:
@@ -102,6 +134,7 @@ cir-validate:
 	@$(MAKE) cir3-validate
 	@$(MAKE) cir4-validate
 	@$(MAKE) cir5-validate
+	@$(MAKE) authority-check
 	@$(MAKE) cir-arl
 
 # ─── Test database ────────────────────────────────────────────────────────────

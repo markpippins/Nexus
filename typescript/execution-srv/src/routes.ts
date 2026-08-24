@@ -676,7 +676,7 @@ export function createRoutes(pool: Pool): Router {
         // vision.receipts.id is stored as text), so cast it for the JOIN.
         const visionQ = await pool.query(
           `SELECT *
-             FROM vision.receipts
+             FROM nebula.receipts_unified
             WHERE id::text = $1
             LIMIT 1`,
           [local.lineage_original_id]

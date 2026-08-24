@@ -6,7 +6,7 @@ tools from all MCP services through the centralized tools aggregator.
 Usage:
     from nexus.python.tackle.tools_aggregator_client import ToolsAggregatorClient
 
-    client = ToolsAggregatorClient("http://localhost:3200")
+    client = ToolsAggregatorClient("http://localhost:3210")
     
     # Initialize and discover tools
     await client.init()
@@ -64,7 +64,7 @@ class ToolDefinition:
 class ToolsAggregatorClient:
     """Client for the tools aggregator service."""
 
-    def __init__(self, base_url: str = "http://localhost:3200"):
+    def __init__(self, base_url: str = "http://localhost:3210"):
         """Initialize the client.
 
         Args:
@@ -233,14 +233,14 @@ class SyncToolsAggregatorClient:
     """Synchronous wrapper for the tools aggregator client.
 
     Usage:
-        client = SyncToolsAggregatorClient("http://localhost:3200")
+        client = SyncToolsAggregatorClient("http://localhost:3210")
         client.init()
         
         tools = client.list_tools()
         result = client.call_tool("query_conduit_state", {})
     """
 
-    def __init__(self, base_url: str = "http://localhost:3200"):
+    def __init__(self, base_url: str = "http://localhost:3210"):
         """Initialize the synchronous client."""
         import asyncio
 

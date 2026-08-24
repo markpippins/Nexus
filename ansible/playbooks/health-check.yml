@@ -1,0 +1,61 @@
+# health-check.yml — probe every failover-tier endpoint on vanadium.
+# Fails on any non-200 except endpoints marked tolerate_amber (terrain-ts,
+# pending W2 backlog: source recovery / PG* env repack for arm64).
+---
+- name: Health-check the vanadium failover tier
+  hosts: vanadium
+  gather_facts: false
+
+  tasks:
+    - name: Wait for SSH
+      ansible.builtin.wait_for_connection:
+        timeout: 180
+
+    - name: Probe tier endpoints
+      ansible.builtin.uri:
+        url: "http://localhost:{{ item.port }}{{ item.path }}"
+        status_code: 200
+        timeout: 8
+      loop: "{{ tier_endpoints }}"
+      loop_control:
+        label: "{{ item.name }}:{{ item.port }}{{ item.path }}"
+      ignore_errors: true
+      register: probes
+
+    - name: Results table
+      ansible.builtin.debug:
+        msg: >-
+          {{ '%-18s' | format(item.item.name) }}
+          {{ 'OK' if (item.status is defined and item.status == 200)
+             else ('AMBER (tolerated)' if item.item.tolerate_amber | default(false)
+                   else 'DOWN') }}
+      loop: "{{ probes.results }}"
+      loop_control:
+        label: "check"
+
+    - name: Init failure list
+      ansible.builtin.set_fact:
+        down_services: []
+
+    - name: Collect failures (excluding tolerated amber)
+      ansible.builtin.set_fact:
+        down_services: "{{ down_services + [item.item.name] }}"
+      loop: "{{ probes.results }}"
+      when: >-
+        (item.status is not defined or item.status != 200)
+        and not (item.item.tolerate_amber | default(false))
+
+    - name: Assert all required endpoints healthy
+      ansible.builtin.fail:
+        msg: "DOWN services: {{ down_services | join(', ') }}"
+      when: down_services | length > 0
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg: >-
+          {{ tier_endpoints | length - (probes.results
+             | selectattr('status', 'defined')
+             | selectattr('status', 'eq', 200)
+             | list | length) }} down /
+          {{ tier_endpoints | length }} checked — tier HEALTHY
+      when: down_services | length == 0

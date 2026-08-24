@@ -1,0 +1,9 @@
+# Ballerina build artifacts
+target/
+Dependencies.toml
+
+# Local config & secrets (never commit)
+**/Config.toml
+
+# Generated code is rebuilt from specs; keep diffs reviewable but ignore build noise
+*.balx

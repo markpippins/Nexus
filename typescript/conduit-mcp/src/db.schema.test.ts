@@ -17,7 +17,17 @@
 
 import { describe, test, expect, beforeAll, afterAll } from "vitest";
 import { Pool } from "pg";
-import { initDb } from "./db";
+import {
+  initDb,
+  insertCompileVerdict,
+  getNewestCompileVerdict,
+  getNewestCompileVerdictForPlan,
+  resolveEntityKeysForPlan,
+  createWorkRequest,
+  getCompileVerdictStats,
+  runCompileGate,
+  verdictBlocksBootstrap,
+} from "./db";
 
 const DSN = process.env.CONDUIT_PG_DSN || "postgresql://pguser:pgpass@localhost:5432/nexus";
 
@@ -206,7 +216,7 @@ describe("createSchema on fresh database", () => {
         `SELECT version FROM schema_version ORDER BY version`
       );
       expect(svAfterFirst.rows.map((r: any) => r.version).sort((a: number, b: number) => a - b))
-        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]);
     } finally {
       await pool1.end();
     }
@@ -223,7 +233,7 @@ describe("createSchema on fresh database", () => {
       const versions = svAfterSecond.rows.map((r: any) => r.version);
       // Still exactly [1..35] — no duplicate rows from re-applying
       expect(versions.sort((a: number, b: number) => a - b))
-        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]);
 
       // The v2 index should still exist (not re-created, just still there)
       const indexResult = await pool2.query(
@@ -251,7 +261,7 @@ describe("createSchema on fresh database", () => {
         `SELECT version FROM schema_version ORDER BY version`
       );
       expect(svBefore.rows.map((r: any) => r.version).sort((a: number, b: number) => a - b))
-        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]);
     } finally {
       await poolV6.end();
     }
@@ -330,7 +340,7 @@ describe("createSchema on fresh database", () => {
       );
       // v6..v35 should all be re-applied from the v5 baseline (replay path)
       expect(svResult.rows.map((r: any) => r.version).sort((a: number, b: number) => a - b))
-        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]);
 
       // deadline column exists on shared vision.tickets (createSchema DDL;
       // v6 replay is a no-op on fresh schemas)
@@ -655,7 +665,7 @@ describe("createSchema on fresh database", () => {
         `SELECT version FROM schema_version ORDER BY version`
       );
       expect(svResult.rows.map((r: any) => r.version))
-        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]);
 
       // v7/v8: role_config CHECK constraint migrations are no-ops
       // (table replaced by config_bundle, tables removed 2026-08-07).
@@ -728,6 +738,326 @@ describe("createSchema on fresh database", () => {
       expect(tables).toContain("sessions");
       expect(tables).toContain("circuit_breaker");
     } finally {
+      await pool.end();
+    }
+  }, 30000);
+
+  // ── WR compile verdict store (R-A-2026-08-15-010 option c) ──────────
+  // vision.wr_compile_verdicts is created by v38. Behaviour lock: insert is
+  // idempotent, newest verdict wins the gate, re-parented verdicts resolve by
+  // plan_id, and UPDATE/DELETE are rejected by the immutability guard.
+  test("v38 wr_compile_verdicts: idempotent insert + newest-wins + re-parent + immutability", async () => {
+    const pool = await initDb();
+    const suite = `test:wr-verdict:${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      const ek = `${suite}:ek`;
+      const planId = `test-plan-${suite}`;
+
+      // AC2 — idempotent: same verdict twice → one row.
+      const pass = {
+        entity_key: ek,
+        verdict_type: "WR_COMPILE_PASS" as const,
+        rule_version: "1",
+        description: "idempotency probe",
+      };
+      await insertCompileVerdict(pass);
+      await insertCompileVerdict(pass);
+      const cnt = await adminPool.query(
+        `SELECT count(*)::int AS cnt FROM vision.wr_compile_verdicts WHERE entity_key = $1`,
+        [ek],
+      );
+      expect(cnt.rows[0].cnt).toBe(1);
+
+      // AC3 — newest wins: a later FAIL is returned over the earlier PASS.
+      await new Promise((r) => setTimeout(r, 10));
+      await insertCompileVerdict({
+        entity_key: ek,
+        verdict_type: "WR_COMPILE_FAIL",
+        rule_version: "1",
+        description: "later fail",
+      });
+      const newest = await getNewestCompileVerdict(ek);
+      expect(newest?.verdict_type).toBe("WR_COMPILE_FAIL");
+      expect(newest?.entity_key).toBe(ek);
+
+      // AC4 — re-parented verdict resolves by plan_id.
+      await insertCompileVerdict({
+        entity_key: `${suite}:ek2`,
+        plan_id: planId,
+        verdict_type: "WR_COMPILE_PASS",
+        rule_version: "1",
+        description: "re-parented at release",
+      });
+      const byPlan = await getNewestCompileVerdictForPlan(planId);
+      expect(byPlan?.plan_id).toBe(planId);
+      expect(byPlan?.verdict_type).toBe("WR_COMPILE_PASS");
+
+      // AC5 — immutability guard rejects UPDATE and DELETE.
+      await expect(
+        adminPool.query(
+          `UPDATE vision.wr_compile_verdicts SET description = 'mutated' WHERE entity_key = $1`,
+          [ek],
+        ),
+      ).rejects.toThrow(/immutable/);
+      await expect(
+        adminPool.query(
+          `DELETE FROM vision.wr_compile_verdicts WHERE entity_key = $1`,
+          [ek],
+        ),
+      ).rejects.toThrow(/immutable/);
+    } finally {
+      // vision.wr_compile_verdicts is shared (VISION_SCHEMA is not
+      // test-isolated) and append-only, so lift the guard, remove this
+      // suite's rows, and restore the guard.
+      try {
+        await adminPool.query(
+          `DROP TRIGGER IF EXISTS trg_wr_compile_verdicts_immutable ON vision.wr_compile_verdicts`,
+        );
+        await adminPool.query(
+          `DELETE FROM vision.wr_compile_verdicts WHERE entity_key LIKE $1`,
+          [`${suite}:%`],
+        );
+      } catch (e: any) {
+        console.warn("verdict test cleanup failed:", e?.message);
+      } finally {
+        await adminPool.query(
+          `CREATE TRIGGER trg_wr_compile_verdicts_immutable
+             BEFORE UPDATE OR DELETE ON vision.wr_compile_verdicts
+             FOR EACH ROW
+             EXECUTE FUNCTION vision.wr_compile_verdicts_immutable()`,
+        );
+      }
+      await pool.end();
+    }
+  }, 30000);
+
+  // CP-9 delta sub-item 1 — analytics surface: pass/fail counts measurable
+  // by verdict_type and rule_version (D5 downstream).
+  test("v38 analytics: compile verdict counts by verdict_type/rule_version", async () => {
+    const pool = await initDb();
+    const suite = `test:wr-stats:${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const ekP = `${suite}:pass`;
+    const ekF = `${suite}:fail`;
+    try {
+      const before = await getCompileVerdictStats();
+      await insertCompileVerdict({
+        entity_key: ekP,
+        verdict_type: "WR_COMPILE_PASS",
+        rule_version: "1",
+        description: "stats pass",
+      });
+      await insertCompileVerdict({
+        entity_key: ekF,
+        verdict_type: "WR_COMPILE_FAIL",
+        rule_version: "1",
+        description: "stats fail",
+      });
+      const after = await getCompileVerdictStats();
+      expect(after.total).toBe(before.total + 2);
+      expect(after.byVerdictType.find((r) => r.verdict_type === "WR_COMPILE_PASS")).toBeDefined();
+      expect(after.byVerdictType.find((r) => r.verdict_type === "WR_COMPILE_FAIL")).toBeDefined();
+      const v1 = after.byRuleVersion.find((r) => r.rule_version === "1");
+      expect(v1).toBeDefined();
+      expect(v1!.count).toBeGreaterThanOrEqual(2);
+    } finally {
+      try {
+        await adminPool.query(
+          `DROP TRIGGER IF EXISTS trg_wr_compile_verdicts_immutable ON vision.wr_compile_verdicts`,
+        );
+        await adminPool.query(`DELETE FROM vision.wr_compile_verdicts WHERE entity_key IN ($1, $2)`, [ekP, ekF]);
+      } catch (e: any) {
+        console.warn("stats cleanup failed:", e?.message);
+      } finally {
+        await adminPool.query(
+          `CREATE TRIGGER trg_wr_compile_verdicts_immutable
+             BEFORE UPDATE OR DELETE ON vision.wr_compile_verdicts
+             FOR EACH ROW
+             EXECUTE FUNCTION vision.wr_compile_verdicts_immutable()`,
+        );
+      }
+      await pool.end();
+    }
+  }, 30000);
+
+  // CP-9 end-to-end core: runCompileGate fuses compare → classify → persist.
+  test("v38 runCompileGate: compare → classify → persist verdict", async () => {
+    const pool = await initDb();
+    const suite = `test:gate:${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const ek = `${suite}:ek`;
+    const ek2 = `${suite}:ek2`;
+    const plan = {
+      goal: "inventory hardcoded ports",
+      filesAffected: [],
+      acceptanceCriteria: ["inventory of ports"],
+      deliverable: "docs/inventory.md",
+    };
+    try {
+      const pass = await runCompileGate({
+        wr: { ...plan },
+        plan,
+        assignment: { ripple: "R0", shape: "E" },
+        entityKey: ek,
+      });
+      expect(pass.verdict).toBe("WR_COMPILE_PASS");
+      expect(pass.release).toBe(true);
+      const newestPass = await getNewestCompileVerdict(ek);
+      expect(newestPass?.verdict_type).toBe("WR_COMPILE_PASS");
+      expect(newestPass?.verdict_id).toBe(pass.verdict_id);
+
+      const fail = await runCompileGate({
+        wr: { ...plan, filesAffected: ["extra.ts"] },
+        plan,
+        assignment: { ripple: "R1", shape: "E" },
+        entityKey: ek2,
+      });
+      expect(fail.verdict).toBe("WR_COMPILE_FAIL");
+      expect(fail.release).toBe(false);
+      expect((await getNewestCompileVerdict(ek2))?.verdict_type).toBe("WR_COMPILE_FAIL");
+    } finally {
+      try {
+        await adminPool.query(
+          `DROP TRIGGER IF EXISTS trg_wr_compile_verdicts_immutable ON vision.wr_compile_verdicts`,
+        );
+        await adminPool.query(`DELETE FROM vision.wr_compile_verdicts WHERE entity_key LIKE $1`, [`${suite}:%`]);
+      } catch (e: any) {
+        console.warn("gate cleanup failed:", e?.message);
+      } finally {
+        await adminPool.query(
+          `CREATE TRIGGER trg_wr_compile_verdicts_immutable
+             BEFORE UPDATE OR DELETE ON vision.wr_compile_verdicts
+             FOR EACH ROW
+             EXECUTE FUNCTION vision.wr_compile_verdicts_immutable()`,
+        );
+      }
+      await pool.end();
+    }
+  }, 30000);
+
+  // CP-9 review (a5f096e9): a PASS verdict on a reserved (R3/R4) route must
+  // block the bootstrap gate — route is persisted and verdictBlocksBootstrap
+  // holds it (R-A-003: reserved is never auto-armed).
+  test("v39 route: PASS + reserved → bootstrap blocked; conduit PASS releases", async () => {
+    const pool = await initDb();
+    const suite = `test:reserved:${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const ek = `${suite}:ek`;
+    const plan = {
+      goal: "inventory hardcoded ports",
+      filesAffected: [],
+      acceptanceCriteria: ["inventory of ports"],
+      deliverable: "docs/inventory.md",
+    };
+    try {
+      // R3 → reserved route; compare passes → PASS verdict, release=false.
+      const decision = await runCompileGate({
+        wr: { ...plan },
+        plan,
+        assignment: { ripple: "R3", shape: "E" },
+        entityKey: ek,
+      });
+      expect(decision.verdict).toBe("WR_COMPILE_PASS");
+      expect(decision.classification.route).toBe("reserved");
+      expect(decision.release).toBe(false);
+
+      const newest = await getNewestCompileVerdict(ek);
+      expect(newest?.verdict_type).toBe("WR_COMPILE_PASS");
+      expect(newest?.route).toBe("reserved");
+      expect(verdictBlocksBootstrap(newest)).toBe(true);
+
+      // A conduit PASS (R0) must NOT block — the gate only holds reserved.
+      const ek2 = `${suite}:ek2`;
+      await runCompileGate({
+        wr: { ...plan },
+        plan,
+        assignment: { ripple: "R0", shape: "E" },
+        entityKey: ek2,
+      });
+      const conduitPass = await getNewestCompileVerdict(ek2);
+      expect(conduitPass?.route).toBe("conduit");
+      expect(verdictBlocksBootstrap(conduitPass)).toBe(false);
+
+      // No verdict → legacy unchanged (not blocked).
+      expect(verdictBlocksBootstrap(undefined)).toBe(false);
+    } finally {
+      try {
+        await adminPool.query(
+          `DROP TRIGGER IF EXISTS trg_wr_compile_verdicts_immutable ON vision.wr_compile_verdicts`,
+        );
+        await adminPool.query(`DELETE FROM vision.wr_compile_verdicts WHERE entity_key LIKE $1`, [`${suite}:%`]);
+      } catch (e: any) {
+        console.warn("reserved test cleanup failed:", e?.message);
+      } finally {
+        await adminPool.query(
+          `CREATE TRIGGER trg_wr_compile_verdicts_immutable
+             BEFORE UPDATE OR DELETE ON vision.wr_compile_verdicts
+             FOR EACH ROW
+             EXECUTE FUNCTION vision.wr_compile_verdicts_immutable()`,
+        );
+      }
+      await pool.end();
+    }
+  }, 30000);
+
+  // CP-9 back-compat: a plan with no verdict/entityKey is legacy-unchanged
+  // (the gate resolves nothing → bootstrap proceeds as today).
+  test("v38 back-compat: no verdict/entityKey → legacy unchanged", async () => {
+    const pool = await initDb();
+    const planId = `legacy-${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      expect(await resolveEntityKeysForPlan(planId)).toEqual([]);
+      expect(await getNewestCompileVerdictForPlan(planId)).toBeUndefined();
+    } finally {
+      await pool.end();
+    }
+  }, 30000);
+
+  // D5 gate entityKey linkage: a plan resolves its compile-unit entityKey
+  // from the released WorkRequest (context.plan_id) so a pre-release verdict
+  // keyed by entityKey (plan_id NULL) still gates the bootstrap pass.
+  test("v38 gate resolves plan entityKey for the D5 verdict lookup", async () => {
+    const pool = await initDb();
+    const suite = `test:wr-link:${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const planId = `plan-${suite}`;
+    const wrId = `wr-${suite}`;
+    const ek = `ek-${suite}`;
+    try {
+      // The release-emission boundary (CP-9) writes the plan link into the
+      // WR's context.plan_id; the WR carries its D3 entityKey from birth.
+      await createWorkRequest({
+        id: wrId,
+        dco_json: "{}",
+        context: { plan_id: planId },
+        status: "VALIDATED",
+        entity_key: ek,
+      });
+      expect(await resolveEntityKeysForPlan(planId)).toContain(ek);
+
+      // A pre-release verdict (plan_id NULL) keyed by entityKey must gate.
+      await insertCompileVerdict({
+        entity_key: ek,
+        verdict_type: "WR_COMPILE_FAIL",
+        rule_version: "1",
+        description: "pre-release fail",
+      });
+      const verdict = await getNewestCompileVerdictForPlan(planId);
+      expect(verdict?.verdict_type).toBe("WR_COMPILE_FAIL");
+      expect(verdict?.entity_key).toBe(ek);
+    } finally {
+      try {
+        await adminPool.query(`DELETE FROM vision.work_requests WHERE wr_id = $1`, [wrId]);
+        await adminPool.query(
+          `DROP TRIGGER IF EXISTS trg_wr_compile_verdicts_immutable ON vision.wr_compile_verdicts`,
+        );
+        await adminPool.query(`DELETE FROM vision.wr_compile_verdicts WHERE entity_key = $1`, [ek]);
+      } catch (e: any) {
+        console.warn("linkage test cleanup failed:", e?.message);
+      } finally {
+        await adminPool.query(
+          `CREATE TRIGGER trg_wr_compile_verdicts_immutable
+             BEFORE UPDATE OR DELETE ON vision.wr_compile_verdicts
+             FOR EACH ROW
+             EXECUTE FUNCTION vision.wr_compile_verdicts_immutable()`,
+        );
+      }
       await pool.end();
     }
   }, 30000);

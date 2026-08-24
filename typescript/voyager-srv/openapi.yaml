@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: voyager-srv — Filesystem / Entity Voyager API
-  version: 1.0.508b8b20
+  version: 1.0.acf59d2d
   description: 'Voyager over filesystems and entities: scan epochs, file/directory observations, topology signals and edge
     hints, identity candidates, entities, spans, requirements, and stats.
 
@@ -459,6 +459,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: 'Requirement candidates removed (T04: claim extraction lives above Voyager). STATS — summary across all voyager
+        tables'
   /api/topology/edge-hints:
     get:
       tags:

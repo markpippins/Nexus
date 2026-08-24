@@ -89,6 +89,10 @@ At the **end of every turn** in interactive sessions, check your inbox
 for new messages and surface them to the user. This catches incident
 escalations from the sysadmin agent and cross-role updates between turns.
 
+**Preferred — one call:** `nebula_get_inbox {"role":"engineer"}` or
+`nexus/bin/check-inbox.sh --role engineer` — records tagged
+`["to:engineer"]` since the stored pointer. Manual fallback (REST :3101):
+
 1. **Get your inbox pointer** (last-seen timestamp):
 
 ```bash
@@ -125,6 +129,47 @@ curl -s -X PUT http://localhost:3101/api/inbox-pointer/engineer \
 
 If nebula-srv (3101) is unreachable during the inbox check, surface this
 as a blocking infrastructure issue — do not silently proceed.
+
+## Parallel Role Loop (PRL) — doctrine 2026-08-16 (R-A-2026-08-16-012)
+
+You run in a **parallel session** — the Architect (and possibly other
+roles) is in another terminal, the user supervises. **The user is NOT
+the message bus.** All cross-role communication flows through the corpus
+(nebula records + forum threads). Load the procedure card
+`parallel-role-loop` (tackle.role_memory) at turn start for full detail.
+The enforced loop:
+
+1. **Inbox check FIRST every turn** — `nebula_get_inbox` /
+   `nexus/bin/check-inbox.sh --role engineer` before acting.
+2. **Thread sweep** — check threads you participate in (track threads,
+   decisions forum, change-log) for new comments since your last turn.
+3. **Act until a stopping point** — proceed autonomously until:
+   (a) a decision is needed from another role, (b) a blocker surfaces,
+   (c) a work unit completes.
+4. **Post to the thread at EVERY stopping point** — completions,
+   blockers, decisions, reviews, questions all get forum posts:
+   change-log for completed work (R14), track thread for status,
+   decisions forum for decision requests.
+5. **Notify via pointer** — after posting, write a `to:architect`
+   (or dependent-role) record carrying thread IDs + record IDs +
+   commit refs, so the other session's next inbox check catches it.
+6. **Switch tracks while awaiting** — when blocked on a decision or
+   blocker leverage, switch to another project track; never idle. The
+   decision arrives via inbox on a later turn.
+7. **Advance pointer** after surfacing new items (R17).
+
+**Never relay via user chat.** If the user relays a message from
+another role, treat it as out-of-band: immediately write it into the
+corpus (thread + record) so the loop self-heals.
+
+**Push cadence:** pushes follow review gates, never chat acks. When a
+review is approved, push with the audit trail attached (commit →
+change-log → thread).
+
+**Future evolution (QDC):** an async "question and decision cards"
+mechanism is planned so the user can be involved in real time without
+relaying — when it lands, this loop becomes the synchronous baseline
+and QDCs carry the async path. Until then, the loop above is binding.
 
 ## DB-Change Work (doctrine 2026-08-07, amended)
 

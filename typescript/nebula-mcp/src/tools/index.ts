@@ -906,8 +906,8 @@ export function registerTools(server: McpServer) {
   );
 
   server.tool(
-    "nebula_spawn_plan_from_candidate",
-    "Full flow: link a harvest candidate to a system/subsystem, create a requirement derived from the candidate's title and intent, and optionally cross-reference a conduit plan — all in one atomic transaction. Returns the updated candidate, the new requirement, and the cross-reference (if planRef was provided).",
+    "nebula_spawn_requirement_from_candidate",
+    "Full flow: link a harvest candidate to a system/subsystem, create a requirement derived from the candidate's title and intent, and optionally cross-reference a conduit plan — all in one atomic transaction. Returns the updated candidate, the new requirement, and the cross-reference (if planRef was provided). (Renamed from nebula_spawn_plan_from_candidate per decision 319defa5: candidates promote only to requirements.)",
     {
       id: z.string().describe("Harvest candidate UUID"),
       systemId: z.string().describe("System UUID to link the candidate to (also used for the requirement and info tab)"),
@@ -924,8 +924,28 @@ export function registerTools(server: McpServer) {
     },
     async (args) => {
       const { id, ...body } = args;
-      const result = await NebulaClient.spawnPlanFromCandidate(id, body);
+      const result = await NebulaClient.spawnRequirementFromCandidate(id, body);
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // DEPRECATED alias — decision 319defa5 renamed spawn_plan -> spawn_requirement.
+  // Kept as a loud pointer so old callers migrate instead of failing mysteriously
+  // (same pattern as conduit-mcp's removed create_plan deprecation).
+  server.tool(
+    "nebula_spawn_plan_from_candidate",
+    "DEPRECATED — renamed to nebula_spawn_requirement_from_candidate (decision 319defa5). This stub only returns the migration pointer; it does not execute.",
+    {
+      id: z.string().describe("Harvest candidate UUID"),
+    },
+    async () => {
+      const notice = {
+        error: "nebula_spawn_plan_from_candidate was renamed nebula_spawn_requirement_from_candidate (decision 319defa5: candidates promote ONLY to requirements; plans come from requirements).",
+        useInstead: "nebula_spawn_requirement_from_candidate",
+        restEndpoint: "POST /api/harvest-candidates/:id/spawn-requirement",
+        note: "Arguments unchanged — re-invoke under the new tool name.",
+      };
+      return { content: [{ type: "text" as const, text: JSON.stringify(notice, null, 2) }] };
     }
   );
 

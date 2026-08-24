@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: conduit-srv — WorkRequest Pipeline Orchestrator (REST surface)
-  version: 1.0.9456b346
+  version: 1.0.87110272
   description: 'REST surface of the conduit pipeline orchestrator: workflows, tickets, tokens, config (cron, failure-recovery),
     governance (replay, events), vision, and session log. The MCP tool surface is served separately (Streamable HTTP JSON-RPC
     on the same port).
@@ -53,6 +53,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Root health check
   /config/cron:
     get:
       tags:

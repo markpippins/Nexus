@@ -2,11 +2,10 @@
 """
 Deduplication Gate for the front-half pipeline.
 
-Checks harvest candidates against four sources before promotion:
+Checks harvest candidates against three sources before promotion:
 1. implementation_plans — work that was planned in the new system
 2. work_requests — work that was planned (canonical, via nebula.work_requests VIEW)
-3. intent_records — work captured as intent
-4. git history — work that was actually committed
+3. git history — work that was actually committed
 
 Usage:
     python3 dedup_gate.py [--dry-run] [--verbose] [--threshold 0.8]
@@ -41,7 +40,7 @@ class DedupResult:
     candidate_title: str
     is_duplicate: bool = False
     duplicate_of: str = ""  # Source + ID of the match
-    match_type: str = ""  # implementation_plan, work_request, intent_record, git
+    match_type: str = ""  # implementation_plan, work_request, git
     match_score: float = 0.0
     classification: str = "new"  # new, duplicate, in_progress, backlog
 
@@ -90,20 +89,6 @@ def check_work_request_history(cur, title: str, threshold: float = 0.8) -> dict 
     return None
 
 
-def check_intent_records(cur, title: str, threshold: float = 0.8) -> dict | None:
-    """Check if title matches an existing intent record."""
-    cur.execute("""
-        SELECT id, title,
-               similarity(title, %s) as score
-        FROM nebula.intent_records
-        WHERE similarity(title, %s) > %s
-        ORDER BY score DESC
-        LIMIT 1
-    """, (title, title, threshold))
-    row = cur.fetchone()
-    if row:
-        return {"source": "intent_record", "id": str(row[0]), "title": row[1], "score": float(row[2])}
-    return None
 
 
 def check_git_history(title: str, min_commits: int = 3) -> dict | None:
@@ -131,11 +116,10 @@ def classify_candidate(cur, title: str, threshold: float = 0.8) -> DedupResult:
     """Classify a candidate by checking all four sources."""
     result = DedupResult(candidate_id="", candidate_title=title)
 
-    # Check in priority order: implementation_plans > work_requests > intent_records > git
+    # Check in priority order: implementation_plans > work_requests > git
     for check_fn, source_name in [
         (lambda: check_implementation_plans(cur, title, threshold), "implementation_plan"),
         (lambda: check_work_request_history(cur, title, threshold), "work_requests"),
-        (lambda: check_intent_records(cur, title, threshold), "intent_record"),
         (lambda: check_git_history(title), "git"),
     ]:
         match = check_fn()

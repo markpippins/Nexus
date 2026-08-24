@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: execution-srv — Execution Observability API
-  version: 1.0.f2f50288
+  version: 1.0.c57a2049
   description: 'Read-only API over the execution schema: requests, leases, attempts, receipts, integrity scans, and cross-schema
     lineage.
 
@@ -74,6 +74,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Health inline — GET /api/execution/health Lightweight entry point distinct from /health (the root-level check).
+        Returns just the live counts
   /api/execution/health/by-executor:
     get:
       tags:
@@ -136,6 +138,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: GET /api/execution/health/integrity-scan Same shape as Vision's check_receipt_integrity() — a named, growing
+        list of specific pathologies, e
   /api/execution/health/status-distribution:
     get:
       tags:
@@ -328,6 +332,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: Follows lineage_original_id → vision.receipts.id and returns both records side by side, explicitly labeled
+        by which audit trail each came fr
       parameters:
       - name: id
         in: path
@@ -364,6 +370,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: 'GET /api/execution/receipts ?type=&search=&limit=20&offset=0 Each returns { total, limit, offset, items: [...]
+        } with DB-native column shape'
   /api/execution/requests/{id}/attempts:
     get:
       tags:
@@ -469,6 +477,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      summary: GET /api/execution/requests/{id}/state Returns the request, its current lease (if any), its latest attempt,
+        and all of its receipts — the "w
       parameters:
       - name: id
         in: path

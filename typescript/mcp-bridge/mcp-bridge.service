@@ -51,8 +51,8 @@ Environment=MCP_BRIDGE_TERRAIN_CWD=/home/codex/dev/nexus/typescript/terrain-mcp
 # spawned child runs from src/ directly — keeps the dep surface minimal
 # for this stdio MCP.
 Environment=MCP_BRIDGE_PROMPT_PORT=3135
-Environment=MCP_BRIDGE_PROMPT_CMD=npx
-Environment=MCP_BRIDGE_PROMPT_ARGS=tsx;src/index.ts
+Environment=MCP_BRIDGE_PROMPT_CMD=/home/codex/dev/nexus/typescript/tackle-prompt-bridge/node_modules/.bin/tsx
+Environment=MCP_BRIDGE_PROMPT_ARGS=src/index.ts
 Environment=MCP_BRIDGE_PROMPT_CWD=/home/codex/dev/nexus/typescript/tackle-prompt-bridge
 Environment=MCP_BRIDGE_PROMPT_ENV_PROMPT_REDIS_URL=redis://localhost:6379
 

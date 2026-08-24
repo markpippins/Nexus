@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
 """
-intent_requirement_promote.py — IntentRecord → Requirement Promotion Gate
+intent_requirement_promote.py — Candidate → Requirement Promotion Gate
 
-Takes draft IntentRecords and promotes them to requirements in the backlog,
-where they await human-in-the-loop triage (drag to todo → triggers inference).
+Takes promoted harvest candidates and promotes them to requirements in the
+backlog, where they await human-in-the-loop triage.
+
+V115 removed nebula.intent_records. This script now reads candidates
+directly from harvest_candidates instead of intent_records.
 
 Promotion criteria (all must pass):
   1. CPF >= threshold (default 0.7) OR candidate has code snippets
   2. No blocking open_questions for the candidate
-  3. IntentRecord is in 'draft' status
+  3. Candidate status is 'promoted' (not yet promoted to requirement)
 
 Non-blocking: questions with blocking=false are ignored.
 
 Usage:
     source /home/codex/dev/nexus/python/rover/.venv/bin/activate
 
-    # Promote all eligible draft IRs
+    # Promote all eligible candidates
     python3 python/tackle/intent_requirement_promote.py
 
-    # Promote a specific IR
-    python3 python/tackle/intent_requirement_promote.py --intent-record <uuid>
+    # Promote a specific candidate
+    python3 python/tackle/intent_requirement_promote.py --candidate <uuid>
 
     # Dry run
     python3 python/tackle/intent_requirement_promote.py --dry-run
@@ -58,27 +61,23 @@ def psql(sql: str, timeout: int = 30) -> tuple[int, str, str]:
         return 1, "(timeout)", ""
 
 
-def fetch_draft_intents(limit: int = 100) -> list[dict]:
-    """Fetch draft intent_records with candidate info."""
+def fetch_promoted_candidates(limit: int = 100) -> list[dict]:
+    """Fetch promoted candidates ready for requirement creation."""
     sql = f"""
         SELECT row_to_json(r)::text FROM (
             SELECT
-                ir.id,
-                ir.title,
-                ir.description,
-                ir.candidate_id,
-                ir.tags,
-                ir.metadata,
-                hc.title AS candidate_title,
+                hc.id,
+                hc.title,
+                hc.intent_description,
                 hc.compilation_readiness AS cpf,
                 hc.code_snippets,
                 hc.system_id,
                 hc.subsystem_id,
                 hc.feature_id,
-                hc.tags AS candidate_tags
-            FROM nebula.intent_records ir
-            LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
-            WHERE ir.status = 'draft'
+                hc.tags AS candidate_tags,
+                hc.status
+            FROM nebula.harvest_candidates hc
+            WHERE hc.status = 'promoted'
             ORDER BY hc.compilation_readiness DESC NULLS LAST
             LIMIT {limit}
         ) r;
@@ -87,32 +86,30 @@ def fetch_draft_intents(limit: int = 100) -> list[dict]:
     if rc != 0 or not out:
         return []
 
-    intents = []
+    candidates = []
     for line in out.splitlines():
         if not line:
             continue
         try:
-            intents.append(json.loads(line))
+            candidates.append(json.loads(line))
         except json.JSONDecodeError:
             continue
-    return intents
+    return candidates
 
 
-def fetch_single_intent(ir_id: str) -> dict | None:
-    """Fetch a single intent_record."""
+def fetch_single_candidate(candidate_id: str) -> dict | None:
+    """Fetch a single promoted candidate."""
     sql = f"""
         SELECT row_to_json(r)::text FROM (
             SELECT
-                ir.id, ir.title, ir.description, ir.candidate_id,
-                ir.tags, ir.metadata,
-                hc.title AS candidate_title,
+                hc.id, hc.title, hc.intent_description,
                 hc.compilation_readiness AS cpf,
                 hc.code_snippets,
                 hc.system_id, hc.subsystem_id, hc.feature_id,
-                hc.tags AS candidate_tags
-            FROM nebula.intent_records ir
-            LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
-            WHERE ir.id = '{ir_id}'
+                hc.tags AS candidate_tags,
+                hc.status
+            FROM nebula.harvest_candidates hc
+            WHERE hc.id = '{candidate_id}'
         ) r;
     """
     rc, out, err = psql(sql)
@@ -173,28 +170,26 @@ def check_existing_requirement(candidate_id: str) -> str | None:
     return None
 
 
-def create_requirement(intent: dict, dry_run: bool = False) -> str | None:
-    """Create a requirement in backlog status from an intent_record.
+def create_requirement(candidate: dict, dry_run: bool = False) -> str | None:
+    """Create a requirement in backlog status from a candidate.
 
     Returns the requirement UUID or None on failure.
     """
     req_id = str(uuidlib.uuid4())
-    title = intent["title"].replace("'", "''")
-    description = (intent.get("description") or "").replace("'", "''")
-    candidate_id = intent.get("candidate_id")
-    system_id = intent.get("system_id")
-    subsystem_id = intent.get("subsystem_id")
-    feature_id = intent.get("feature_id")
+    title = candidate["title"].replace("'", "''")
+    description = (candidate.get("intent_description") or "").replace("'", "''")
+    candidate_id = candidate["id"]
+    system_id = candidate.get("system_id")
+    subsystem_id = candidate.get("subsystem_id")
+    feature_id = candidate.get("feature_id")
 
-    # Build metadata from intent metadata + CPF
-    meta = intent.get("metadata") or {}
-    cpf = meta.get("cpf") or intent.get("cpf")
-    acceptance_criteria = json.dumps({"cpf": cpf, "source": "intent_record_promotion"}) if cpf else None
+    # Build metadata from CPF
+    cpf = candidate.get("cpf")
+    acceptance_criteria = json.dumps({"cpf": cpf, "source": "candidate_promotion"}) if cpf else None
 
-    # Combine tags from intent + candidate
-    tags = intent.get("tags") or []
-    candidate_tags = intent.get("candidate_tags") or []
-    all_tags = list(set(tags + candidate_tags + ["promoted-from-intent-record"]))
+    # Tags from candidate
+    tags = candidate.get("candidate_tags") or []
+    all_tags = list(set(tags + ["promoted-from-candidate"]))
 
     now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
@@ -243,39 +238,38 @@ def create_requirement(intent: dict, dry_run: bool = False) -> str | None:
     return req_id
 
 
-def update_intent_status(ir_id: str, new_status: str, requirement_id: str, dry_run: bool = False) -> bool:
-    """Update intent_record status after promotion."""
+def update_candidate_status(candidate_id: str, new_status: str, dry_run: bool = False) -> bool:
+    """Update candidate status after promotion to requirement."""
     if dry_run:
-        log.info("  [DRY RUN] Would update IR %s → %s", ir_id[:8], new_status)
+        log.info("  [DRY RUN] Would update candidate %s -> %s", candidate_id[:8], new_status)
         return True
 
     sql = f"""
-        UPDATE nebula.intent_records
+        UPDATE nebula.harvest_candidates
         SET status = '{new_status}',
             updated_at = now()
-        WHERE id = '{ir_id}'::uuid;
+        WHERE id = '{candidate_id}'::uuid;
     """
     rc, out, err = psql(sql)
     if rc != 0:
-        log.warning("  Could not update IR status: %s", (err or out)[:100])
+        log.warning("  Could not update candidate status: %s", (err or out)[:100])
         return False
     return True
 
 
-def promote_intent(intent: dict, threshold: float, dry_run: bool = False) -> dict:
-    """Evaluate and promote a single intent_record to requirement.
+def promote_candidate(candidate: dict, threshold: float, dry_run: bool = False) -> dict:
+    """Evaluate and promote a single candidate to requirement.
 
     Returns a result dict with outcome and reasoning.
     """
-    ir_id = intent["id"]
-    title = intent.get("title", "?")
-    cpf = intent.get("cpf")
-    code_snippets = intent.get("code_snippets") or []
-    candidate_id = intent.get("candidate_id")
+    cid = candidate["id"]
+    title = candidate.get("title", "?")
+    cpf = candidate.get("cpf")
+    code_snippets = candidate.get("code_snippets") or []
     has_code = len(code_snippets) > 0
 
     result = {
-        "intent_record_id": ir_id,
+        "candidate_id": cid,
         "title": title,
         "requirement_id": None,
         "success": False,
@@ -288,29 +282,29 @@ def promote_intent(intent: dict, threshold: float, dry_run: bool = False) -> dic
     meets_cpf = cpf is not None and cpf >= threshold
     if not meets_cpf and not has_code:
         result["reason"] = f"CPF={cpf} < {threshold} and no code snippets"
-        log.info("  ⊘ %s — %s", title[:50], result["reason"])
+        log.info("  %s -- %s", title[:50], result["reason"])
         return result
 
     # Gate 2: No blocking questions
-    blocked, questions = has_blocking_questions(candidate_id)
+    blocked, questions = has_blocking_questions(cid)
     if blocked:
         q_summary = "; ".join(q["title"][:40] for q in questions[:3])
         result["reason"] = f"Blocked by {len(questions)} open question(s): {q_summary}"
-        log.info("  ⊘ %s — %s", title[:50], result["reason"])
+        log.info("  %s -- %s", title[:50], result["reason"])
         return result
 
     # Gate 3: No existing requirement for this candidate
-    existing = check_existing_requirement(candidate_id)
+    existing = check_existing_requirement(cid)
     if existing:
         result["reason"] = f"Requirement {existing[:8]} already exists for this candidate"
-        log.info("  ⊘ %s — %s", title[:50], result["reason"])
+        log.info("  %s -- %s", title[:50], result["reason"])
         return result
 
-    # All gates passed — promote
+    # All gates passed -- promote
     signal = f"CPF={cpf}" if meets_cpf else f"code={len(code_snippets)} snippets"
-    log.info("  ✓ Promoting (%s): %s", signal, title[:55])
+    log.info("  Promoting (%s): %s", signal, title[:55])
 
-    req_id = create_requirement(intent, dry_run)
+    req_id = create_requirement(candidate, dry_run)
     if not req_id:
         result["reason"] = "Requirement creation failed"
         return result
@@ -318,55 +312,55 @@ def promote_intent(intent: dict, threshold: float, dry_run: bool = False) -> dic
     result["requirement_id"] = req_id
     result["success"] = True
 
-    update_intent_status(ir_id, "decomposed", req_id, dry_run)
+    update_candidate_status(cid, "decomposed", dry_run)
 
     return result
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="IntentRecord → Requirement promotion gate"
+        description="Candidate -> Requirement promotion gate"
     )
-    parser.add_argument("--intent-record", type=str, default=None,
-                        help="Promote a specific intent_record UUID")
+    parser.add_argument("--candidate", type=str, default=None,
+                        help="Promote a specific candidate UUID")
     parser.add_argument("--threshold", type=float, default=0.7,
                         help="CPF threshold (default 0.7)")
     parser.add_argument("--limit", type=int, default=50,
-                        help="Max intent_records to process")
+                        help="Max candidates to process")
     parser.add_argument("--dry-run", action="store_true",
                         help="Preview without DB writes")
     args = parser.parse_args()
 
     log.info("=" * 60)
-    log.info("IntentRecord → Requirement Promotion Gate")
+    log.info("Candidate -> Requirement Promotion Gate")
     log.info("Time: %s", datetime.now().isoformat())
     log.info("Mode: %s", "DRY RUN" if args.dry_run else "LIVE")
     log.info("Threshold: CPF >= %.2f OR has code snippets", args.threshold)
     log.info("=" * 60)
 
-    # Fetch intents
-    if args.intent_record:
-        intent = fetch_single_intent(args.intent_record)
-        if not intent:
-            log.error("Intent record not found: %s", args.intent_record)
+    # Fetch candidates
+    if args.candidate:
+        candidate = fetch_single_candidate(args.candidate)
+        if not candidate:
+            log.error("Candidate not found: %s", args.candidate)
             return 1
-        intents = [intent]
+        candidates = [candidate]
     else:
-        intents = fetch_draft_intents(args.limit)
-        log.info("Draft intent_records: %d", len(intents))
+        candidates = fetch_promoted_candidates(args.limit)
+        log.info("Promoted candidates: %d", len(candidates))
 
-    if not intents:
+    if not candidates:
         log.info("Nothing to promote.")
         return 0
 
     stats = {"promoted": 0, "skipped_cpf": 0, "skipped_blocked": 0,
              "skipped_existing": 0, "failed": 0}
 
-    for intent in intents:
+    for candidate in candidates:
         log.info("-" * 50)
-        log.info("Processing: %s", intent.get("title", "?")[:60])
+        log.info("Processing: %s", candidate.get("title", "?")[:60])
 
-        result = promote_intent(intent, args.threshold, args.dry_run)
+        result = promote_candidate(candidate, args.threshold, args.dry_run)
 
         if result["success"]:
             stats["promoted"] += 1

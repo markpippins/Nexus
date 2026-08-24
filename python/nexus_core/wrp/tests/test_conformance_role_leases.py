@@ -361,12 +361,16 @@ class TestAc6StaleLeaseSweep(unittest.TestCase):
 #  AC7 — Admission enforcement (T20 B3): config validity gates harness work
 # ═══════════════════════════════════════════════════════════════════════
 
-# wr-conf-002 has NO config_bundle rows → the admission gate must deny
-# /run-direct with reason=NO_CONFIG (deterministic, no real role touched).
-# ROLE_REVOKED / CONFIG_INVALIDATED are covered at the unit level
+# `inspector` is a canonical governance role (nebula.roles) with NO
+# config_bundle rows → the admission gate must deny /run-direct with
+# reason=NO_CONFIG (deterministic, no real work touched — denied pre-spawn).
+# NOTE (D-009 R6): a *nonexistent* role (e.g. wr-conf-002) is now denied
+# earlier at the governance gate with ROLE_MISSING, so NO_CONFIG is only
+# reachable for a canonical role lacking a bundle — exactly what `inspector`
+# provides. ROLE_REVOKED / CONFIG_INVALIDATED are covered at the unit level
 # (tests/admission.test.ts). Lease outcomes are enforced on the worker-pool
 # path (execution_worker.py), not harness-srv.
-NO_CONFIG_ROLE = "wr-conf-002"
+NO_CONFIG_ROLE = "inspector"
 
 
 def _run_direct(role: str, prompt: str = "ping", timeout_ms: int = 2000) -> tuple:

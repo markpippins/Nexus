@@ -47,7 +47,7 @@ done
 if [ $STARTED -eq 0 ]; then
   echo "  ERROR: kernel did not start within 60s"
 fi
-echo "  port 8080 check: $(ss -tlnp 2>&1 | grep ':8080\b' || echo 'free')"
+echo "  port 8098 check: $(ss -tlnp 2>&1 | grep ':8098\b' || echo 'free')"
 
 echo
 echo "=== STEP 4: clean DB rows from prior MCP smoke runs ==="
@@ -59,7 +59,7 @@ docker exec pgvector_db psql -U pguser -d nexus -c \
 echo
 echo "=== STEP 5: run PebApiClient smoke.ts (real TS MCP client code) ==="
 cd /home/codex/dev/nexus/typescript/peb-mcp
-PEB_KERNEL_URL=http://localhost:8080/api/v1/peb \
+PEB_KERNEL_URL=http://localhost:8098/api/v1/peb \
   timeout 60 npx ts-node smoke.ts > /tmp/peb_mcp_smoke_stdout.out \
                                   2> /tmp/peb_mcp_smoke_stderr.out
 SMOKE_EXIT=$?

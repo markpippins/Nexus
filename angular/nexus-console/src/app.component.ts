@@ -13,7 +13,8 @@ import { DetailPaneComponent } from './components/detail-pane/detail-pane.compon
 import { SessionService } from './services/in-memory-file-system.service.js';
 import { BrokerProfile } from './models/broker-profile.model.js';
 import { PlatformManagementService, ServicePayload, FrameworkPayload, Server, LOOKUP_SERVER_TYPES, LOOKUP_ENVIRONMENTS, LOOKUP_OPERATING_SYSTEMS, LOOKUP_SERVICE_TYPES, LOOKUP_FRAMEWORK_CATEGORIES, LOOKUP_FRAMEWORK_LANGUAGES } from './services/platform-management.service.js';
-import { RemoteFileSystemService } from './services/remote-file-system.service.js';
+import { SecureFileSystemService } from './services/secure-file-system.service.js';
+import { DirectFileSystemService } from './services/direct-file-system.service.js';
 import { FsService } from './services/fs.service.js';
 import { ImageService } from './services/image.service.js';
 import { ImageClientService } from './services/image-client.service.js';
@@ -288,6 +289,20 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   /** When true, the terminal fills the entire viewport (fixed overlay). */
   isTerminalMaximized = signal(false);
 
+  /**
+   * Dock height for the messagebox above the viewport bottom (px). Clears the
+   * console pane when it is open so the messagebox docks above the console
+   * panel instead of overlapping it (and its resize handles stay clear of the
+   * console resizer). Bottom bar 30px + console resizer 6px + console pane
+   * height; when collapsed the console strip is h-6 (24px).
+   */
+  messageBoxDockOffset = computed(() => {
+    const bottomBar = 30;
+    if (this.isTerminalMaximized()) return bottomBar;
+    if (this.isConsoleCollapsed()) return bottomBar + 24; // h-6 collapsed console strip
+    return bottomBar + 6 + this.consolePaneHeight(); // resizer (h-1.5) + console pane
+  });
+
   toggleMaximize(): void {
     this.isTerminalMaximized.update(v => !v);
   }
@@ -300,7 +315,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     if (path.length === 0) return false;
 
     const sessionName = this.localConfigService.sessionName();
-    return path[0] === sessionName || path[0] === 'File Systems';
+    return path[0] === sessionName || path[0] === 'File Systems' || path[0] === 'Files';
   });
 
   // --- Content Status Bar (CRUD screens) ---
@@ -318,8 +333,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   mountedProfileTokens = signal<Map<string, string>>(new Map());
   mountedProfileMounts = signal<Map<string, Mount[]>>(new Map());
   mountedProfileIds = computed(() => this.mountedProfiles().map(p => p.id));
-  private remoteProviders = signal<Map<string, RemoteFileSystemService>>(new Map());
+  private remoteProviders = signal<Map<string, SecureFileSystemService>>(new Map());
   private remoteImageServices = signal<Map<string, ImageService>>(new Map());
+  /** Direct filesystem provider backed by the file-system-server on port 4042. */
+  private directFs = new DirectFileSystemService();
   filesystemHealth = signal<Map<string, boolean>>(new Map());
 
   // --- Status Bar State ---
@@ -803,7 +820,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     const sessionName = this.localConfigService.sessionName();
 
     // sessionName or File Systems as root
-    if (path.length === 0 || path[0] === sessionName || path[0] === 'File Systems') {
+    if (path.length === 0 || path[0] === sessionName || path[0] === 'File Systems' || path[0] === 'Files') {
       return true;
     }
 
@@ -1199,6 +1216,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
             }));
           }
 
+          // Files node — direct filesystem on port 4042 (browser-based surrogate)
+          if (rootName === 'Files') {
+            const providerPath = path.slice(1);
+            return this.directFs.getContents(providerPath);
+          }
+
           // Gateways / Service Registries virtual containers (now nested under Platform Management).
           // Handles ['Platform Management', 'Gateways'] and ['Platform Management', 'Service Registries'].
           if (rootName === 'Platform Management' && path.length === 2 && path[1] === 'Gateways') {
@@ -1404,6 +1427,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     if (rootName === sessionName) {
       // Path is like ['Local Session', ...], use session provider
       return this.sessionFs;
+    }
+
+    // Handle "Files" node — direct filesystem on port 4042
+    if (rootName === 'Files') {
+      return this.directFs;
     }
 
     // Handle "File Systems" folder - contains connected gateways that offer file services
@@ -1727,6 +1755,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       } else if (rootName === 'File Systems' && path.length > 1) {
         // Path is ['File Systems', 'Local Session', ...], provider expects path without both prefixes
         providerPath = path.slice(2);
+      } else if (rootName === 'Files') {
+        // Path is ['Files', ...], directFs expects path without root name
+        providerPath = path.slice(1);
       } else if (rootName === 'Platform Management') {
         // Platform Management uses homeProvider with full path
         providerPath = path;
@@ -2209,7 +2240,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
    * (after fresh login) and restoreSessions (after page refresh).
    */
   private async connectProfile(profile: BrokerProfile, token: string, user: User): Promise<{ fsHealthy: boolean }> {
-    const provider = new RemoteFileSystemService(profile, this.fsService, token);
+    const provider = new SecureFileSystemService(profile, this.fsService, token);
     const imageService = new ImageService(profile, this.imageClientService, this.preferencesService, this.healthCheckService, this.localConfigService);
 
     // Pulse check the file-system server before listing mounts
@@ -2410,7 +2441,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   private syncProviderMounts(): void {
     this.mountedProfileMounts().forEach((mounts, profileName) => {
       const provider = this.remoteProviders().get(profileName);
-      if (provider instanceof RemoteFileSystemService) {
+      if (provider instanceof SecureFileSystemService) {
         provider.setMounts(mounts);
       }
     });

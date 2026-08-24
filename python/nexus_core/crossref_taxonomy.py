@@ -5,7 +5,7 @@ Formal enumerated taxonomy of all valid rel_type values for
 the nebula.cross_references table.
 
 Spec: audit/SPECS/CROSSREF_TAXONOMY.md
-Ontology: schemas/relationships/wrp-crossref-taxonomy.jsonld
+Ontology: schemas/ontology/relationships/wrp-crossref-taxonomy.jsonld
 Plan reference: #0175
 """
 

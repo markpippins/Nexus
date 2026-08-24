@@ -1,0 +1,24 @@
+[Unit]
+# cascade-turn-dispatcher — polls for pending freebuff turns, invokes the agent,
+# posts the response to Assembly, and updates the turn state.
+# Completes the freebuff pipeline: subscriber → bridge → consumer → dispatcher
+Documentation=https://github.com/markpippins/nexus
+After=network.target postgresql.service cascade-freebuff-turn-consumer.service
+Wants=postgresql.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=/home/codex/dev/nexus/python/cascade
+EnvironmentFile=/home/codex/dev/nexus/python/cascade/.env
+Environment=PYTHONPATH=/home/codex/dev/nexus/python
+ExecStart=/home/codex/opt/anaconda3/bin/python3 -u turn_dispatcher.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cascade-turn-dispatcher
+
+[Install]
+WantedBy=default.target

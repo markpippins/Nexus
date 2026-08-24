@@ -696,12 +696,14 @@ export default class NebulaHierarchyController {
         response.status(404).json({ error: 'Requirement not found' })
         return
       }
-      // Backlog→ToDo auto-compile trigger (Plan 1062) — fire-and-forget
+      // Backlog→ToDo auto-compile trigger (Plan 1062) — fire-and-forget.
+      // D2 (CP-2): compile is pre-row — no conduit plan implied; plan creation
+      // is a separate release-time step (CP-9 release gate).
       if (status !== undefined && reqt.status === 'ToDo') {
         fetch(`http://localhost:3101/api/requirements/${id}/compile`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ createPlan: true }),
+          body: JSON.stringify({ createPlan: false }),
         }).catch(() => { /* best-effort */ })
       }
       response.json(await this.reqJson(reqt))

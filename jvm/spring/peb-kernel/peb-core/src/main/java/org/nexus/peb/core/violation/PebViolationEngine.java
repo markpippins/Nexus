@@ -61,6 +61,33 @@ public class PebViolationEngine {
      *                                           partial-state row is left in
      *                                           the audit log.
      */
+    /**
+     * Record a rejected execution-claim admission as a first-class authority
+     * violation. This path is intentionally separate from
+     * {@code peb_report_violation}: the worker does not get to choose whether
+     * its own claim is a violation, and the kernel preserves the rejection
+     * reason in the violation context.
+     */
+    @Transactional
+    public PebViolation recordExecutionAdmissionRejection(
+            PebTransaction transaction, String reason) {
+        PebViolation violation = new PebViolation();
+        violation.setId(UUID.randomUUID());
+        violation.setTransactionId(transaction.getId());
+        violation.setViolationType(ViolationType.AUTHORITY_LEAKAGE);
+        violation.setSeverity(ViolationSeverity.HARD);
+        violation.setEntityId(transaction.getEntityId());
+        violation.setCapabilityAttempted("execution_claim_admission");
+        violation.setContext(
+            com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode()
+        );
+        ((com.fasterxml.jackson.databind.node.ObjectNode) violation.getContext())
+            .put("reason", reason == null ? "UNKNOWN" : reason)
+            .set("input", transaction.getInput());
+        violation.setResolution(ViolationResolution.REJECTED);
+        return repository.save(violation);
+    }
+
     @Transactional
     public PebViolation ingest(PebTransaction transaction) {
         JsonNode input = transaction.getInput();

@@ -67,7 +67,10 @@ IGNORED_PATTERNS = [
 ]
 
 def classify_one(path: Path) -> str | None:
-    p = path.as_posix().lstrip("./")
+    # strip only a leading ./ prefix — never the leading dot of hidden dirs
+    p = path.as_posix().strip()
+    if p.startswith("./"):
+        p = p[2:]
 
     for ign in IGNORED_PATTERNS:
         if ign in p:

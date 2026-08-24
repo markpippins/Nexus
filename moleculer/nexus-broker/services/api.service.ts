@@ -26,7 +26,7 @@ export default class ApiService extends Service {
           {
             path: "/api",
 
-            whitelist: ["api.*", "worker.**", "solir.*"],
+            whitelist: ["api.*", "worker.**", "sol-ir-snapshot.**"],
 
             aliases: {
               "GET /health": "api.health",
@@ -39,18 +39,18 @@ export default class ApiService extends Service {
               "POST /workers/harness/run": "worker.harness.run",
               "POST /workers/harness/resolve-context": "worker.harness.resolveContext",
               "GET /workers/harness/sessions": "worker.harness.sessions",
-              "GET /solir/status": "solir.status",
-              "POST /solir/snapshot": "solir.snapshot",
+              "GET /sol-ir-snapshot/status": "sol-ir-snapshot.status",
+              "POST /sol-ir-snapshot/snapshot": "sol-ir-snapshot.snapshot",
             },
 
             bodyParsers: {
               json: {
                 strict: false,
-                limit: "1MB",
+                limit: "5mb", // parity with legacy tier (raised for transcript docklang payloads)
               },
               urlencoded: {
                 extended: true,
-                limit: "1MB",
+                limit: "5mb",
               },
             },
 

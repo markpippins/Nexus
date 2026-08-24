@@ -12,6 +12,18 @@ Design principle:
     CIR-1 violations are auto-removed (they are structurally broken).
     CIR-2/3/4/5 violations are reported but NOT wrapped by default.
     Use --apply to quarantine violations in-place.
+
+Quarantine-envelope contract (reconciled with tools/arl/invariants.py):
+    every quarantine writes the SAME sanctioned envelope shape:
+
+        {"status": "quarantined_CIRn" | "blocked_by_CIRn",
+         "reason":  "<machine-readable reason>",
+         "original": <the wrapped value — may be a nested object>}
+
+    The `status` prefix is the reserved marker. ARL's I1 exempts this exact
+    envelope (object-valued `original` is the wrapped value, not recursion)
+    and flags only envelope-inside-envelope nesting. Keep this shape — do not
+    rename `original`, add keys, or write bare `original` wrappers.
 """
 
 import difflib
@@ -38,7 +50,10 @@ SCHEMA_STATE_KEYS = [
 ]
 
 SEMANTIC_CLASSES = {
-    "execution_state": ["execution_state", "mode", "state"],
+    # Intent-vs-state split: `execution_state` is event-derived runtime state,
+    # `ir_layer` is the 3-layer IR mode (INTENT/BINDING/EXECUTION-BOUND).
+    "execution_state": ["execution_state", "state"],
+    "ir_layer": ["metadata.mode"],
     "pipeline_intent": ["intent_source", "PIPELINE_INTENT"],
     "decision": ["decision", "result", "score"],
     "runtime_snapshot": ["snapshot", "snapshot_ref"],
@@ -48,7 +63,11 @@ SEMANTIC_CLASSES = {
 # ─── CIR-SDM: Semantic Domain Model ─────────────────────────────────────────
 
 def classify(path: str):
-    p = path.lstrip("./")
+    # strip only a leading ./ prefix — never the leading dot of hidden dirs
+    # (lstrip("./") stripped ALL leading '.'/'/' chars, corrupting .agents/ → agents/)
+    p = path.strip()
+    if p.startswith("./"):
+        p = p[2:]
     if any(x in p for x in [
         "node_modules", "__pycache__", ".git",
         "package-lock.json", "package.json",
@@ -152,7 +171,11 @@ def load_native_domains():
 
 
 def get_native_tokens_for_path(path: str):
-    p = path.lstrip("./")
+    # strip only a leading ./ prefix — never the leading dot of hidden dirs
+    # (lstrip("./") stripped ALL leading '.'/'/' chars, corrupting .agents/ → agents/)
+    p = path.strip()
+    if p.startswith("./"):
+        p = p[2:]
     for prefix, tokens in _NATIVE_DOMAINS.items():
         if p.startswith(prefix) or ("/" + prefix) in p:
             return set(tokens)
@@ -295,7 +318,20 @@ def patch_cir4(obj, mode, domain):
 
 # ─── CIR-5: Quarantine duplicate semantic authority ─────────────────────────
 
-def _cir5_collect(obj, path, index, mode, domain):
+def _semantic_key_matches(key, ancestors, class_keys):
+    """Qualified-key matching: a class key like `metadata.mode` matches the
+    bare key `mode` only when `metadata` is among its ancestors."""
+    for ck in class_keys:
+        if "." in ck:
+            head, tail = ck.split(".", 1)
+            if tail == key and head in ancestors:
+                return True
+        elif ck == key:
+            return True
+    return False
+
+
+def _cir5_collect(obj, path, index, mode, domain, ancestors=()):
     level = CIR_APPLY.get((domain, mode, 5))
     if level is None or level == "MINIMAL" or level == "LIMITED":
         return
@@ -307,16 +343,16 @@ def _cir5_collect(obj, path, index, mode, domain):
             if _is_quarantined(v):
                 continue
             for cls, keys in SEMANTIC_CLASSES.items():
-                if k in keys:
+                if _semantic_key_matches(k, ancestors, keys):
                     index.setdefault(cls, []).append({
                         "path": fpath,
                         "key": k,
                         "value": v,
                     })
-            _cir5_collect(v, path, index, mode, domain)
+            _cir5_collect(v, path, index, mode, domain, ancestors + (k,))
     elif isinstance(obj, list):
         for v in obj:
-            _cir5_collect(v, path, index, mode, domain)
+            _cir5_collect(v, path, index, mode, domain, ancestors)
 
 
 def _cir5_find_duplicates(index):
@@ -332,7 +368,7 @@ def _cir5_find_duplicates(index):
     return duplicates
 
 
-def patch_cir5(obj, path, duplicates_set, mode, domain):
+def patch_cir5(obj, path, duplicates_set, mode, domain, ancestors=()):
     level = CIR_APPLY.get((domain, mode, 5))
     if level is None or level == "MINIMAL" or level == "LIMITED":
         return obj
@@ -342,7 +378,7 @@ def patch_cir5(obj, path, duplicates_set, mode, domain):
         for k in list(obj.keys()):
             v = obj[k]
             for cls, keys in SEMANTIC_CLASSES.items():
-                if k in keys and (str(path), k) in duplicates_set:
+                if _semantic_key_matches(k, ancestors, keys) and (str(path), k) in duplicates_set:
                     if not _is_quarantined(v):
                         obj[k] = {
                             "status": "quarantined_CIR5",
@@ -351,9 +387,9 @@ def patch_cir5(obj, path, duplicates_set, mode, domain):
                             "original": v,
                         }
             if not _is_quarantined(v):
-                obj[k] = patch_cir5(v, path, duplicates_set, mode, domain)
+                obj[k] = patch_cir5(v, path, duplicates_set, mode, domain, ancestors + (k,))
     elif isinstance(obj, list):
-        return [patch_cir5(x, path, duplicates_set, mode, domain) for x in obj]
+        return [patch_cir5(x, path, duplicates_set, mode, domain, ancestors) for x in obj]
     return obj
 
 

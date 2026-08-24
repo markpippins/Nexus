@@ -20,28 +20,94 @@ ARTIFACT_ROLES = {
     "pgv.phase":                    "STATE_MACHINE",
 }
 
+# ─── Quarantine-envelope contract (reconciled with tools/cir1/patch.py) ─────
+# patch.py writes a SINGLE sanctioned envelope shape when quarantining a
+# violating value:
+#
+#     {"status": "quarantined_CIRn" | "blocked_by_CIRn",
+#      "reason":  "<machine-readable reason>",
+#      "original": <the wrapped value — may be a nested object>}
+#
+# The `status` prefix marks the envelope as sanctioned. ARL must NOT treat the
+# envelope's object-valued `original` payload as RECURSIVE_WRAPPER (that is the
+# wrapped value, not recursion), and must NOT count two SIBLING envelopes in one
+# file as NESTED_QUARANTINE. Recursion is only envelope-inside-envelope-payload.
+QUARANTINE_STATUS_PREFIXES = ("quarantined_CIR", "blocked_by_CIR")
+
+
+def _is_quarantine_envelope(obj):
+    """True if `obj` is a sanctioned patch.py quarantine envelope."""
+    if not isinstance(obj, dict):
+        return False
+    s = obj.get("status")
+    if not (isinstance(s, str) and s.startswith(QUARANTINE_STATUS_PREFIXES)):
+        return False
+    return isinstance(obj.get("reason"), str) and "original" in obj
+
+
+def _contains_envelope(obj, depth=0):
+    """True if a sanctioned quarantine envelope appears anywhere in `obj`."""
+    if depth > 10:
+        return False
+    if isinstance(obj, dict):
+        if _is_quarantine_envelope(obj):
+            return True
+        for v in obj.values():
+            if _contains_envelope(v, depth + 1):
+                return True
+    elif isinstance(obj, list):
+        for item in obj:
+            if _contains_envelope(item, depth + 1):
+                return True
+    return False
+
+
+def _has_unsanctioned_original(obj, depth=0):
+    """RECURSIVE_WRAPPER: an object-valued `original` key OUTSIDE a sanctioned
+    envelope. Sanctioned envelopes are exempt; their payload is the wrapped
+    value, not recursion."""
+    if depth > 10:
+        return False
+    if isinstance(obj, dict):
+        if _is_quarantine_envelope(obj):
+            return False  # sanctioned envelope — payload is exempt
+        for k, v in obj.items():
+            if k == "original" and isinstance(v, dict):
+                return True
+            if _has_unsanctioned_original(v, depth + 1):
+                return True
+    elif isinstance(obj, list):
+        for item in obj:
+            if _has_unsanctioned_original(item, depth + 1):
+                return True
+    return False
+
+
+def _has_nested_envelope(obj, depth=0):
+    """NESTED_QUARANTINE: a sanctioned envelope inside another envelope's
+    payload (envelope-in-envelope = true recursion). Sibling envelopes at the
+    same level are fine."""
+    if depth > 10:
+        return False
+    if isinstance(obj, dict):
+        if _is_quarantine_envelope(obj):
+            if _contains_envelope(obj.get("original"), depth + 1):
+                return True
+        for v in obj.values():
+            if _has_nested_envelope(v, depth + 1):
+                return True
+    elif isinstance(obj, list):
+        for item in obj:
+            if _has_nested_envelope(item, depth + 1):
+                return True
+    return False
+
 LAYER_DEFINITIONS = {
     "SCHEMA":         {"keywords": [], "forbidden": ["states", "transitions", "entropy_cost"]},
     "CONFIG":         {"keywords": [], "forbidden": ["states", "transitions", "invariants", "events"]},
     "LEDGER":         {"keywords": ["events"], "forbidden": ["states", "transitions", "invariants", "entropy_scale", "guards"]},
     "STATE_MACHINE":  {"keywords": ["states", "transitions", "guards", "invariants"], "forbidden": ["events"]},
 }
-
-
-def _has_recursive_original(obj, depth=0):
-    if depth > 10:
-        return False
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if k == "original" and isinstance(v, dict):
-                return True
-            if _has_recursive_original(v, depth + 1):
-                return True
-    elif isinstance(obj, list):
-        for item in obj:
-            if _has_recursive_original(item, depth + 1):
-                return True
-    return False
 
 
 def i1_no_recursive_wrappers(paths: list[Path], violations: list[dict]):
@@ -53,22 +119,19 @@ def i1_no_recursive_wrappers(paths: list[Path], violations: list[dict]):
         except (json.JSONDecodeError, Exception):
             continue
 
-        raw = p.read_text()
-
-        if _has_recursive_original(data):
+        if _has_unsanctioned_original(data):
             violations.append({
                 "violation_type": "RECURSIVE_WRAPPER",
                 "location": str(p),
-                "description": "Contains 'original' with nested object value (indicates recursive state wrapping)",
+                "description": "Contains 'original' with nested object value outside a sanctioned quarantine envelope (indicates recursive state wrapping)",
                 "severity": "CRITICAL",
             })
 
-        count = raw.count("quarantined_")
-        if count > 1:
+        if _has_nested_envelope(data):
             violations.append({
                 "violation_type": "NESTED_QUARANTINE",
                 "location": str(p),
-                "description": f"Multiple quarantine markers ({count}) suggest recursive nesting",
+                "description": "A quarantine envelope is nested inside another envelope's payload (recursive quarantine)",
                 "severity": "CRITICAL",
             })
 

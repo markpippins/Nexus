@@ -9,6 +9,9 @@ import { DeploymentsTable } from './components/DataViews/DeploymentsTable';
 import { SystemsTable } from './components/DataViews/SystemsTable';
 import { FrameworksLibrariesTable } from './components/DataViews/FrameworksLibrariesTable';
 import { LookupTablesView } from './components/DataViews/LookupTablesView';
+import { JenkinsTable } from './components/DataViews/JenkinsTable';
+import { SonarQubeTable } from './components/DataViews/SonarQubeTable';
+import { BallerinaTable } from './components/DataViews/BallerinaTable';
 import { DetailContextPanel } from './components/DetailContextPanel';
 import { EntityModal } from './components/Modals/EntityModal';
 import {
@@ -234,6 +237,27 @@ export default function App() {
 
             {activeTab === 'lookup-tables' && (
               <LookupTablesView refreshTrigger={refreshTrigger} />
+            )}
+
+            {activeTab === 'jenkins' && (
+              <JenkinsTable
+                searchQuery={searchQuery}
+                refreshTrigger={refreshTrigger}
+              />
+            )}
+
+            {activeTab === 'sonarqube' && (
+              <SonarQubeTable
+                searchQuery={searchQuery}
+                refreshTrigger={refreshTrigger}
+              />
+            )}
+
+            {activeTab === 'ballerina' && (
+              <BallerinaTable
+                searchQuery={searchQuery}
+                refreshTrigger={refreshTrigger}
+              />
             )}
           </main>
         </div>
