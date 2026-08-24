@@ -34,7 +34,7 @@ logging.basicConfig(
 log = logging.getLogger("embed_knowledge")
 
 # ── Config ─────────────────────────────────────────────────────
-OLLAMA_URL = "http://localhost:11434"
+OLLAMA_URL = "http://localhost:11434"  # legacy local leg (tiered chain in embed_client)
 EMBED_MODEL = "nomic-embed-text"
 EMBED_DIM = 768
 
@@ -154,12 +154,8 @@ def generate_embeddings(entities):
             continue
 
         try:
-            resp = client.post(
-                f"{OLLAMA_URL}/api/embeddings",
-                json={"model": EMBED_MODEL, "prompt": e["embed_text"]},
-            )
-            resp.raise_for_status()
-            emb = resp.json().get("embedding", [])
+            from embed_client import embed_one  # tiered chain (8ae276bf)
+            emb, _prov = embed_one(e["embed_text"])
 
             if emb and len(emb) == EMBED_DIM:
                 embeddings.append({**e, "embedding": emb})
@@ -263,15 +259,10 @@ def run_semantic_test():
     log.info("Running semantic search test on knowledge entity embeddings...")
 
     try:
-        resp = httpx.post(
-            f"{OLLAMA_URL}/api/embeddings",
-            json={"model": EMBED_MODEL, "prompt": "TypeSpec contract architecture governance"},
-            timeout=30,
-        )
-        resp.raise_for_status()
-        query_embedding = resp.json()["embedding"]
+        from embed_client import embed_one
+        query_embedding, _prov = embed_one("TypeSpec contract architecture governance")
     except Exception as e:
-        log.warning("Test query embedding failed: %s", e)
+        log.warning("Test query embedding failed (E_TRANSIENT_LLM_UNAVAILABLE): %s", e)
         return
 
     vec_str = "[" + ",".join(str(x) for x in query_embedding) + "]"

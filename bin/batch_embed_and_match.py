@@ -72,14 +72,13 @@ def nebula_post(path: str, body: dict) -> dict:
 
 
 def get_ollama_embedding(text: str) -> list[float] | None:
-    payload = json.dumps({"model": EMBED_MODEL, "prompt": text}).encode("utf-8")
-    req = urllib.request.Request(OLLAMA_URL, data=payload, headers={"Content-Type": "application/json"})
+    """Tiered provider chain (decision 8ae276bf); name kept for callers."""
     try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            data = json.loads(r.read().decode())
-        return data.get("embedding")
+        from embed_client import embed_one
+        vec, _provider = embed_one(text)
+        return vec
     except Exception as e:
-        log.error("  Ollama error: %s", e)
+        log.error("  E_TRANSIENT_LLM_UNAVAILABLE: %s", e)
         return None
 
 

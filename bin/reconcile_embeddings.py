@@ -305,15 +305,13 @@ def main() -> int:
         for f in CACHE_DIR.glob("*.npy"):
             f.unlink()
 
-    # Pre-flight Ollama health check
+    # Pre-flight embed-tier health check (decision 8ae276bf chain)
     try:
-        with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=5) as r:
-            models = json.loads(r.read().decode()).get("models", [])
-            model_names = {m["name"] for m in models}
-            if args.model not in model_names and f"{args.model}:latest" not in model_names:
-                log.warning("Model %s not found in Ollama. Available: %s", args.model, ", ".join(sorted(model_names)[:10]))
+        from embed_client import embed_one
+        _v, provider = embed_one("preflight probe")
+        log.info("Embed tier online: %s", provider)
     except Exception as e:
-        log.error("Ollama not reachable at localhost:11434 — %s", e)
+        log.error("E_TRANSIENT_LLM_UNAVAILABLE (all embed tiers down) — %s", e)
         return 1
 
     log.info("Fetching completed plans...")
