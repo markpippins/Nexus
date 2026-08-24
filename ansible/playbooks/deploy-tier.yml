@@ -1,0 +1,62 @@
+# deploy-tier.yml — sync code, render tier .env, bring the failover tier up.
+# Idempotent: re-running converges (git no-op, .env unchanged, compose recreates
+# only what changed). Run against the [vanadium] inventory group only.
+---
+- name: Deploy nexus failover tier on vanadium
+  hosts: vanadium
+  gather_facts: false
+  vars:
+    ansible_become: false
+
+  tasks:
+    - name: Wait for SSH to settle (Pi can stall during container-start storms)
+      ansible.builtin.wait_for_connection:
+        timeout: 180
+
+    - name: Sync nexus repo to {{ nexus_branch }}
+      ansible.builtin.git:
+        repo: "{{ nexus_repo }}"
+        dest: "{{ nexus_root }}"
+        version: "{{ nexus_branch }}"
+        force: false
+        update: true
+      register: git_sync
+
+    - name: Report repo state
+      ansible.builtin.debug:
+        msg: "repo at {{ git_sync.after | default('unchanged') }}"
+      when: git_sync is not skipped
+
+    - name: Render tier .env
+      ansible.builtin.copy:
+        dest: "{{ compose_dir }}/.env"
+        mode: "0600"
+        content: |
+          # Managed by ansible (nexus/ansible/playbooks/deploy-tier.yml).
+          # Manual edits will be overwritten on next deploy.
+          {% for k, v in tier_env.items() %}
+          {{ k }}={{ v }}
+          {% endfor %}
+      register: env_render
+
+    - name: Bring up the tier (base manifest + W2 override)
+      ansible.builtin.command:
+        cmd: >
+          docker compose
+          {% for f in compose_files %}-f {{ f }} {% endfor %}
+          up -d --build --remove-orphans
+        chdir: "{{ compose_dir }}"
+      environment:
+        DOCKER_BUILDKIT: "1"
+      register: compose_up
+      changed_when: compose_up.stdout != ''
+
+    - name: Prune dangling images from rebuilds
+      ansible.builtin.command:
+        cmd: docker image prune -f
+      changed_when: false
+
+    - name: Wait for containers to reach running/healthy
+      ansible.builtin.pause:
+        seconds: 45
+      when: compose_up is changed

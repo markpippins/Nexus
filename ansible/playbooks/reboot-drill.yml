@@ -1,0 +1,40 @@
+# reboot-drill.yml — full failover drill: reboot vanadium, verify the tier
+# self-recovers (restart: unless-stopped), then re-run health checks.
+# Touches ONLY vanadium. Titanium is never contacted.
+---
+- name: Failover drill — reboot vanadium and verify auto-recovery
+  hosts: vanadium
+  gather_facts: false
+
+  tasks:
+    - name: Pre-drill container count
+      ansible.builtin.command:
+        cmd: docker ps --format '{{ '{{.Names}}' }}'
+      register: pre_containers
+      changed_when: false
+
+    - name: Reboot
+      become: true
+      ansible.builtin.reboot:
+        reboot_timeout: 600
+        pre_reboot_delay: 5
+        test_command: uptime
+
+    - name: Post-drill container count
+      ansible.builtin.command:
+        cmd: docker ps --format '{{ '{{.Names}}' }}'
+      register: post_containers
+      changed_when: false
+
+    - name: Verify all pre-reboot containers came back
+      ansible.builtin.set_fact:
+        missing_containers: "{{ pre_containers.stdout_lines | difference(post_containers.stdout_lines) }}"
+
+    - name: Report missing containers
+      ansible.builtin.fail:
+        msg: "Containers that did not come back: {{ missing_containers | join(', ') }}"
+      when: missing_containers | length > 0
+
+    - name: All containers recovered
+      ansible.builtin.debug:
+        msg: "{{ post_containers.stdout_lines | length }}/{{ pre_containers.stdout_lines | length }} containers up after reboot"

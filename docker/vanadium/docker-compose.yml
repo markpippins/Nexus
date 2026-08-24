@@ -237,7 +237,10 @@ services:
     container_name: vd-service-registry
     restart: unless-stopped
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://${PG_HOST}:${PG_PORT}/${PG_DB_NAME}?currentSchema=registry
+      # Registry keeps its OWN database (vanadium_registry) so the standby
+      # registry never clobbers titanium's registry schema. Falls back to
+      # PG_DB_NAME when unset (local smoke tests).
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${PG_HOST}:${PG_PORT}/${REGISTRY_DB_NAME:-${PG_DB_NAME}}?currentSchema=registry
       SPRING_DATASOURCE_USERNAME: ${PG_USER}
       SPRING_DATASOURCE_PASSWORD: ${PG_PASS}
       SPRING_DATA_REDIS_HOST: ${REGISTRY_REDIS_HOST:-172.17.0.1}

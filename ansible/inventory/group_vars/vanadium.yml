@@ -1,0 +1,92 @@
+# group_vars/vanadium.yml — failover tier deployment parameters.
+#
+# NOTE ON SECRETS: pguser/pgpass are the long-standing LAN dev credentials
+# already documented in docs/VANADIUM_BRING_UP_PROMPT.md and nexus/.env —
+# this file adds no new exposure. If the LAN ever gets real secrets, move
+# these to ansible-vault.
+
+# ── Host topology ─────────────────────────────────────────────────────
+authority_host: 192.168.1.120      # titanium — PostgreSQL + Redis authority
+standby_host: 192.168.1.209        # vanadium — this machine
+
+# ── Code & compose ────────────────────────────────────────────────────
+nexus_repo: https://github.com/markpippins/nexus.git
+nexus_branch: dev
+nexus_root: /home/codex/dev/nexus
+compose_dir: /home/codex/dev/nexus/docker/vanadium
+
+# W2 (f17d973d) approves HOST NETWORKING for terrain-ts so its hardcoded
+# localhost PG becomes correct once vanadium has its own co-located PG
+# (middle-path DB plan). Under the CURRENT over-LAN posture (this file's
+# PG_HOST = titanium) a host-netted terrain-ts would find no local PG —
+# it is expected amber regardless (prebuilt x86 dist cannot run on arm64).
+# The override ships with every deploy so the ruling's posture is already
+# in place when the middle-path DB lands.
+compose_files:
+  - docker-compose.yml
+  - docker-compose.vanadium.yml
+
+# ── Tier .env (rendered by deploy-tier.yml) ───────────────────────────
+# Faithful superset of the hand-maintained vanadium .env (audited
+# 2026-08-24) plus the keys the W1/W3 services need. If the remote file
+# gains new keys, mirror them HERE before running deploy-tier.yml — the
+# render overwrites the whole file.
+tier_env:
+  PG_HOST: "{{ authority_host }}"
+  PG_PORT: "5432"
+  PG_USER: pguser
+  PG_PASS: pgpass
+  PG_DB_NAME: nexus
+  # Per-service DSNs (legacy tier convention)
+  NEXUS_PG_DSN: "postgres://pguser:pgpass@{{ authority_host }}:5432/nexus"
+  PEB_PG_DSN: "postgres://pguser:pgpass@{{ authority_host }}:5432/nexus"
+  TACKLE_PG_DSN: "postgres://pguser:pgpass@{{ authority_host }}:5432/nexus"
+  CONDUIT_PG_DSN: "postgres://pguser:pgpass@{{ authority_host }}:5432/nexus"
+  MEMORY_PG_DSN: "postgres://pguser:pgpass@{{ authority_host }}:5432/nexus"
+  PROMPT_PG_DSN: "postgres://pguser:pgpass@{{ authority_host }}:5432/nexus"
+  SEMANTICS_PG_DSN: "postgres://pguser:pgpass@{{ authority_host }}:5432/nexus"
+  ASSEMBLY_PG_DSN: "postgres://pguser:pgpass@{{ authority_host }}:5432/nexus"
+  # Redis: memory/prompt reach titanium over LAN; in-compose services use DNS
+  MEMORY_REDIS_URL: "redis://{{ authority_host }}:6379"
+  PROMPT_REDIS_URL: "redis://{{ authority_host }}:6379"
+  REDIS_HOST: "{{ authority_host }}"
+  REGISTRY_REDIS_HOST: redis          # vd-redis via compose network DNS
+  BROKER_REDIS_HOST: redis            # same for broker-gateway (W1)
+  # Cross-service URLs on the authority host
+  NEBULA_URL: "http://{{ authority_host }}:3101"
+  CONDUIT_MCP_URL: "http://{{ authority_host }}:3100"
+  OLLAMA_URL: "http://{{ authority_host }}:11434"
+  PTY_HOST: 0.0.0.0
+  HARNESS_WORK_DIR: ./work
+  OPENCODE_BIN: opencode
+  # Registry DB isolation + registration (standby announces to ITS registry)
+  REGISTRY_DB_NAME: vanadium_registry
+  HEARTBEAT_REGISTRY_URL: "http://{{ standby_host }}:8085"
+  REGISTRY_URL: "http://{{ standby_host }}:8085"
+  # W1 broker-gateway (added 2026-08-24; absent from legacy .env)
+  SPRING_DATA_MONGODB_URI: "mongodb://mongoUser:mongoPass@{{ authority_host }}:27017/nexus?authSource=admin"
+  SERVICE_REGISTRY_URL: "http://vd-service-registry:8085"
+
+# ── Health endpoints (health-check.yml) ───────────────────────────────
+# name → { port, path }. terrain-ts listed but tolerated amber on arm64.
+tier_endpoints:
+  - { name: wind,            port: 3300, path: /health }
+  - { name: tackle,          port: 3410, path: /health }
+  - { name: kernel,          port: 8100, path: /health }
+  - { name: peb,             port: 3111, path: /health }
+  - { name: cascade,         port: 3106, path: /cascade/health }
+  - { name: harness,         port: 3420, path: /health }
+  - { name: pty,             port: 3120, path: / }
+  - { name: execution,       port: 3110, path: /health }
+  - { name: prompt-sync,     port: 3501, path: /health }
+  - { name: memory,          port: 3500, path: /health }
+  - { name: assembly,        port: 3107, path: /health }
+  - { name: conduit,         port: 3104, path: /health }
+  - { name: knowledge,       port: 3109, path: /health }
+  - { name: nebula,          port: 3101, path: /health }
+  - { name: semantics,       port: 3160, path: /health }
+  - { name: voyager,         port: 3114, path: /health }
+  - { name: service-registry, port: 8085, path: /actuator/health }
+  - { name: broker,          port: 8081, path: /actuator/health }
+  - { name: peb-kernel,      port: 8098, path: /actuator/health }
+  - { name: terrain-ts,      port: 8084, path: /health, tolerate_amber: true }
