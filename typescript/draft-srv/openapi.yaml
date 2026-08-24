@@ -1,0 +1,186 @@
+openapi: 3.0.3
+info:
+  title: draft-srv — Draft Service Workspace / DB Workbench API
+  version: 1.0.aebc10de
+  description: 'Draft service workspace hosting new backend components pending promotion to dedicated services. Current tenant:
+    DB Workbench API (multi-engine database browsing, query/DDL execution, schema listing, and connection testing) backing
+    data-explorer-ui.
+
+
+    Endpoint inventory generated from source route registrations by `nexus/tools/api-docs/`. Request/response bodies are generic;
+    field-level contracts live in the service code and its README.'
+servers:
+- url: http://localhost:3170
+tags:
+- name: db
+- name: health
+paths:
+  /api/db/engines:
+    get:
+      tags:
+      - db
+      operationId: get_db_engines
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: Engine capability catalog (NEW, additive — lets the UI grey out not-yet-enabled engines instead of failing
+        opaquely).
+  /api/db/query:
+    post:
+      tags:
+      - db
+      operationId: post_db_query
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/db/schemas:
+    post:
+      tags:
+      - db
+      operationId: post_db_schemas
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/db/test-connection:
+    post:
+      tags:
+      - db
+      operationId: post_db_test_connection
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/health:
+    get:
+      tags:
+      - health
+      operationId: get_health
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    JsonBody:
+      type: object
+      additionalProperties: true
+      description: Generic JSON body (fields are service-specific).
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code (e.g. not_found, validation_failed).
+        message:
+          type: string
+          description: Human-readable error detail.
+      additionalProperties: true
+x-generated-by: nexus/tools/api-docs/gen_openapi.py

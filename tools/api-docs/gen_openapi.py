@@ -53,6 +53,14 @@ SERVICES = {
                 "vision, and session log. The MCP tool surface is served separately "
                 "(Streamable HTTP JSON-RPC on the same port).",
     },
+    "typescript/draft-srv": {
+        "title": "draft-srv — Draft Service Workspace / DB Workbench API",
+        "port": 3170,
+        "desc": "Draft service workspace hosting new backend components pending promotion "
+                "to dedicated services. Current tenant: DB Workbench API (multi-engine "
+                "database browsing, query/DDL execution, schema listing, and connection "
+                "testing) backing data-explorer-ui.",
+    },
     "typescript/execution-srv": {
         "title": "execution-srv — Execution Observability API",
         "port": 3110,
