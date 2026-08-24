@@ -62,6 +62,7 @@ from cascade.conversation_coordinator import (
     OUTCOME_CONTINUE,
     OUTCOME_DELEGATE,
 )
+from cascade.sol_gate import evaluate_lease_dispatch  # SOL-framed gate (v36)
 
 # ── Configuration ───────────────────────────────────────────────────
 DATABASE_URL = os.getenv(
@@ -169,18 +170,35 @@ def _lease_failure_reason(lease: dict[str, Any] | None) -> str:
     return "No active role lease"
 
 
-def _query_lease(pg_conn: Any, lease_id: str) -> dict[str, Any] | None:
-    """Return the active lease row, or None."""
+def _query_lease(
+    pg_conn: Any,
+    lease_id: str,
+    role: str | None = None,
+    backend: str | None = None,
+) -> dict[str, Any] | None:
+    """Return the exact active lease bound to a watch, or None.
+
+    Role and channel are checked here as a second admission boundary for
+    direct database-created watches. A lease ID alone is not authority if it
+    belongs to another role or execution channel.
+    """
     if not lease_id:
         return None
+    predicates = ["id = %s::uuid", "status = 'ACTIVE'"]
+    params: list[Any] = [lease_id]
+    if role:
+        predicates.append(f"role = %s")
+        params.append(role)
+    if backend == "freebuff":
+        predicates.append("channel = 'interactive'")
     with pg_conn.cursor() as cur:
         cur.execute(
-            """SELECT id, role, channel, model,
+            f"""SELECT id, role, channel, model,
                       budget_units, consumed_units,
                       status, window_end, expires_at
                FROM tackle.role_leases
-               WHERE id = %s::uuid AND status = 'ACTIVE'""",
-            (lease_id,),
+               WHERE {' AND '.join(predicates)}""",
+            params,
         )
         cols = [d[0] for d in cur.description]
         row = cur.fetchone()
@@ -188,29 +206,14 @@ def _query_lease(pg_conn: Any, lease_id: str) -> dict[str, Any] | None:
 
 
 def _query_active_lease_for_role(pg_conn: Any, role: str) -> dict[str, Any] | None:
-    """Return the most recent ACTIVE role lease for a role, or None.
+    """Deprecated compatibility helper; role-level fallback is forbidden.
 
-    Fallback when a watch has no lease_id (every watch created through the
-    assembly-srv POST /api/duality/watches API, which does not set the
-    column). One ACTIVE lease per role is enforced at issue time (409), so
-    this lookup is deterministic. Without a resolved lease the coordinator
-    closes the watch after one turn (R1: no active lease) and the harness
-    falls back to the config_bundle default model.
+    Lease authority must come from ``session_watches.lease_id``. This helper
+    remains available to old callers during the migration window, but returns
+    no lease so an unbound watch fails closed instead of drifting to another
+    active lease.
     """
-    with pg_conn.cursor() as cur:
-        cur.execute(
-            """SELECT id, role, channel, model,
-                      budget_units, consumed_units,
-                      status, window_end, expires_at
-               FROM tackle.role_leases
-               WHERE role = %s AND status = 'ACTIVE'
-               ORDER BY created_at DESC
-               LIMIT 1""",
-            (role,),
-        )
-        cols = [d[0] for d in cur.description]
-        row = cur.fetchone()
-        return dict(zip(cols, row)) if row else None
+    return None
 
 
 def _bump_turn_count(pg_conn: Any, watch_id: str) -> None:
@@ -345,19 +348,20 @@ def _create_turn(
     backend: str,
     request_comment_id: str | None,
     execution_plan_version: str | None = None,
+    lease_id: str | None = None,
 ) -> str:
     """Create a turn row in 'accepted' state. Returns turn_id."""
     with pg_conn.cursor() as cur:
         cur.execute(
             """INSERT INTO duality.session_turns
-                 (thread_id, watch_id, role, execution_backend, state,
+                 (thread_id, watch_id, lease_id, role, execution_backend, state,
                   request_comment_id, subscriber_id, execution_plan_version,
                   accepted_at, created_at, updated_at)
-               VALUES (%s::uuid, %s::uuid, %s, %s, 'accepted',
+               VALUES (%s::uuid, %s::uuid, %s::uuid, %s, %s, 'accepted',
                        %s::uuid, 'cascade-interactive-turn', %s,
                        now(), now(), now())
                RETURNING id""",
-            (thread_id, watch_id, role, backend,
+            (thread_id, watch_id, lease_id, role, backend,
              request_comment_id, execution_plan_version),
         )
         turn_id = cur.fetchone()[0]
@@ -377,6 +381,7 @@ def _create_turn(
             "backend": backend,
             "request_comment_id": request_comment_id,
             "execution_plan_version": execution_plan_version,
+            "lease_id": lease_id,
         },
     )
     return str(turn_id)
@@ -421,7 +426,7 @@ def _set_turn_state(
                SET {', '.join(sets)}
                WHERE id = %s::uuid
                  AND state = ANY(ARRAY['accepted','running']::text[])
-               RETURNING thread_id, role, execution_backend""",
+               RETURNING thread_id, role, execution_backend, lease_id""",
             params + [turn_id],
         )
         row = cur.fetchone()
@@ -444,6 +449,7 @@ def _set_turn_state(
         payload: dict[str, Any] = {
             "role": row[1],
             "backend": row[2],
+            "lease_id": str(row[3]) if row[3] else None,
         }
         if failure_detail is not None:
             payload["failure_detail"] = failure_detail[:2000]
@@ -820,6 +826,8 @@ async def _emit_turn_requested(
     thread_id: str,
     role: str,
     comment_role: str,
+    lease_id: str | None,
+    turn_id: str,
 ) -> bool:
     """Emit conversation.turn.requested on NATS for freebuff backends.
 
@@ -838,6 +846,8 @@ async def _emit_turn_requested(
             "thread_id": thread_id,
             "role": role,
             "comment_role": comment_role,
+            "lease_id": str(lease_id) if lease_id else None,
+            "turn_id": turn_id,
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }).encode()
         await nc.publish("nexus.duality.v1.conversation.turn.requested", payload)
@@ -1170,18 +1180,18 @@ async def handle_comment_created(
              watch_id[:8], watch_role,
              watch.get("turn_count", 0), watch.get("max_turns", "?"))
 
-        # 2. Check lease — watch.lease_id is the explicit binding, but the
-        #    assembly-srv watch API doesn't set it; fall back to the role's
-        #    most recent ACTIVE lease so the model + budget governance work.
-        lease = _query_lease(pg_conn, watch.get("lease_id"))
-        if lease is None:
-            lease = _query_active_lease_for_role(pg_conn, watch_role)
-            if lease:
-                _log("Watch %s: no lease_id, resolved active lease %s for role %s",
-                     watch_id[:8], str(lease["id"])[:8], watch_role)
+        # 2. Check the watch's explicit lease binding. There is no role-level
+        # fallback: rebinding to another active lease would make the turn's
+        # authority non-deterministic and permit lease drift.
+        backend = watch.get("execution_backend", "operator")
+        lease = _query_lease(
+            pg_conn,
+            watch.get("lease_id"),
+            role=watch_role,
+            backend=backend,
+        )
 
         # ── Invoke the agent (backend dispatch) ──────────────────
-        backend = watch.get("execution_backend", "operator")
         plan_version = lease.get("model") if lease else None
         # P1 item 7: for the harness (ephemeral opencode) backend the
         # Tackle-resolved execution plan is authoritative — the lease model
@@ -1197,6 +1207,7 @@ async def handle_comment_created(
         turn_id = _create_turn(
             pg_conn, thread_id, watch_id, watch_role, backend,
             request_comment_id, execution_plan_version=initial_plan,
+            lease_id=watch.get("lease_id"),
         )
 
         # ── Leased-mode gate (R1 hard stop, pre-invocation) ──────
@@ -1216,8 +1227,9 @@ async def handle_comment_created(
         # (so idle sweeps keep the session fresh while the user tries) but
         # turn_count is left alone — a lease-less role that keeps failing
         # must not burn its 20-turn budget on failures that never ran.
-        if backend == "freebuff" and not _lease_valid(lease):
-            reason = _lease_failure_reason(lease)
+        if backend == "freebuff":
+            admitted, reason = evaluate_lease_dispatch(lease)
+        if backend == "freebuff" and not admitted:
             _log("Watch %s: leased role %s has no valid lease — failing turn (%s)",
                  watch_id[:8], watch_role, reason)
             _post_assembly_comment(
@@ -1237,7 +1249,10 @@ async def handle_comment_created(
             # accounting. Lease consumption also handled by the session.
             # The turn stays 'accepted': the freebuff session owns the
             # reply, so the subscriber cannot observe completion.
-            await _emit_turn_requested(nc, thread_id, watch_role, comment_role)
+            await _emit_turn_requested(
+                nc, thread_id, watch_role, comment_role,
+                watch.get("lease_id"), turn_id,
+            )
             continue
 
         # Build context appropriate for the backend
