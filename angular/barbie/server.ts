@@ -10,8 +10,10 @@ const PORT = parseInt(process.env.PORT || '3010', 10);
 
 // ── Proxy to real Nexus backend ──────────────────────────────────
 // When BACKEND_URL is set, forward all /api/ requests to the real
-// service-registry backend and use its data. Falls through to mock
-// data when the backend is unreachable or BACKEND_URL is not set.
+// service-registry backend. Live mode is authoritative: backend
+// failures surface as errors (502) instead of silently serving
+// embedded mock data. Mock data only serves when BACKEND_URL is
+// unset (local dev without a backend).
 const BACKEND_URL = process.env.BACKEND_URL || '';
 
 if (BACKEND_URL) {
@@ -50,13 +52,18 @@ if (BACKEND_URL) {
         return res.status(backendRes.status).json(data);
       }
 
-      // Backend returned an error — fall through to mock data
-      console.warn(`[barbie] Backend returned ${backendRes.status} for ${req.method} ${req.originalUrl}, falling back to mock`);
+      // Live mode is authoritative: surface backend errors instead of
+      // silently falling through to embedded mock data.
+      if (backendRes.status === 404 || backendRes.status === 400) {
+        const errText = await backendRes.text().catch(() => "");
+        return res.status(backendRes.status).type("application/json").send(errText);
+      }
+      console.warn(`[barbie] Backend returned ${backendRes.status} for ${req.method} ${req.originalUrl}`);
+      return res.status(502).json({ error: `Registry backend returned ${backendRes.status}`, path: req.originalUrl });
     } catch (err: any) {
-      console.warn(`[barbie] Backend unreachable for ${req.method} ${req.originalUrl}: ${err?.message || err}, falling back to mock`);
+      console.error(`[barbie] Backend unreachable for ${req.method} ${req.originalUrl}: ${err?.message || err}`);
+      return res.status(502).json({ error: "Registry backend unreachable", detail: String(err?.message || err) });
     }
-
-    next();
   });
 } else {
   console.log('[barbie] BACKEND_URL not set — using embedded mock data');

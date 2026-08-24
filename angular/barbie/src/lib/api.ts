@@ -41,7 +41,9 @@ import {
 const STORAGE_MODE_KEY = 'platform_api_mode';
 const STORAGE_URL_KEY = 'platform_api_base_url';
 
-let currentMode: 'live' | 'mock' = (localStorage.getItem(STORAGE_MODE_KEY) as 'live' | 'mock') || 'mock';
+// Live mode is authoritative by default (matches BACKEND_URL proxy in
+// server.ts). Mock is an explicit dev opt-in via localStorage.
+let currentMode: 'live' | 'mock' = (localStorage.getItem(STORAGE_MODE_KEY) as 'live' | 'mock') || 'live';
 let currentBaseUrl: string = localStorage.getItem(STORAGE_URL_KEY) || '/api/v1/registry';
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
