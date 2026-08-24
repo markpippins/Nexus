@@ -29,6 +29,10 @@ from promotion_gate import evaluate_candidate_ready
 ENGINEER_AUTHORS = {"engineer", "engineer-ii", "promotion-flow/0005", None, ""}
 
 STRIKE_RE = re.compile(r"STRIKE\s+([0-9a-f]{8}|[0-9a-f-]{36})", re.I)
+# kiro survey #9: a later REVOKE invalidates any prior approval for the
+# referenced candidate (approval-proposition on batch_id; no cached
+# verdict survives a revoke).
+REVOKE_RE = re.compile(r"REVOKE\s+([0-9a-f]{8}|[0-9a-f-]{36})", re.I)
 APPROVE_RE = re.compile(r"\bAPPROVE\b", re.I)  # DETECTOR-only: never approves (C2)
 MAP_RE = re.compile(
     r"MAP\s+([0-9a-f]{8}|[0-9a-f-]{36})\s*(?:->|→|:)\s*(.+?)\s*(?:::|->|—)\s*(.+)", re.I
@@ -204,14 +208,27 @@ def parse_verdicts(manifest, systems):
     """Returns (approved_items, newly_seen_comment_ids)."""
     items = {c["id"]: c for c in manifest["candidates"]}
     approved, struck = set(), set()
+    revocations = {}
     seen = list(manifest.get("verdicts_seen", []))
     new_comments = []
     for c in thread_comments(manifest["thread_id"]):
         cid = c.get("id") or ""
         author = ((c.get("author") or {}).get("name") or "").lower()
+        # ── Attribution guard (halt resumption criterion 2) ──
+        # Agent-posted comments carry a non-empty `model` field (per R14).
+        # They are NEVER accepted as operator/planner verdict input — only
+        # human-authored comments count.  Engineer-authored comments are
+        # already excluded by ENGINEER_AUTHORS; this second guard prevents
+        # agent-simulated operator/planner posts from injecting verdicts.
+        comment_model = c.get("model") or ""
         if author in ENGINEER_AUTHORS or cid in seen:
             continue
+        if comment_model:
+            log(f"  SKIP agent comment {cid[:8]} (model={comment_model}, author={author}) — not a human verdict")
+            continue
         body = c.get("body") or ""
+        for m in REVOKE_RE.finditer(body):
+            revocations[m.group(1).lower()] = author
         # C2 fix: card replies often contain NO prose keyword (e.g.
         # "- (x) abc12345: Requirement"), so the Agreed-selection header
         # itself counts as signal. APPROVE_RE here is DETECTOR-only.
@@ -307,9 +324,16 @@ def parse_verdicts(manifest, systems):
         # classifier ("approved by nobody present" would slip through);
         # acceptance requires verdicts keyed on structured card sections
         # ONLY. Approvals arrive exclusively via **Agreed selection:** blocks.
+    def _revoked(iid: str) -> bool:
+        short = iid[:8].lower()
+        if short in revocations or iid.lower() in revocations:
+            log(f"proposition invalidated: {short} revoked by {revocations.get(short, revocations.get(short))}")
+            return True
+        return False
+
     final = [
         items[i] for i in sorted(approved - struck)
-        if not items[i].get("struck")
+        if not items[i].get("struck") and not _revoked(i)
     ]
     return final, new_comments
 
