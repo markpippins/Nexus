@@ -48,6 +48,31 @@ dualityRouter.post('/watches', async (req, res, next) => {
         && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(leaseId))) {
       throw new BadRequestError('leaseId must be a UUID');
     }
+    const backend = executionBackend || 'freebuff';
+    if (backend === 'freebuff' && !leaseId) {
+      throw new BadRequestError('leaseId is required for freebuff watches');
+    }
+    if (leaseId) {
+      const leaseResult = await pool.query(
+        `SELECT id, role, channel, status, expires_at, budget_units, consumed_units
+         FROM tackle.role_leases
+         WHERE id = $1::uuid`,
+        [leaseId]
+      );
+      const lease = leaseResult.rows[0];
+      if (!lease) throw new BadRequestError('leaseId does not reference a role lease');
+      if (lease.role !== role) throw new BadRequestError('leaseId role does not match watch role');
+      if (backend === 'freebuff' && lease.channel !== 'interactive') {
+        throw new BadRequestError('freebuff watches require an interactive role lease');
+      }
+      if (lease.status !== 'ACTIVE') throw new BadRequestError('leaseId must reference an ACTIVE role lease');
+      if (lease.expires_at && new Date(lease.expires_at).getTime() <= Date.now()) {
+        throw new BadRequestError('leaseId references an expired role lease');
+      }
+      if (lease.budget_units !== null && lease.consumed_units >= lease.budget_units) {
+        throw new BadRequestError('leaseId references an exhausted role lease');
+      }
+    }
     const result = await pool.query(
       `INSERT INTO duality.session_watches
          (thread_id, forum_slug, role, execution_backend, max_turns, idle_timeout_ms,
@@ -58,7 +83,7 @@ dualityRouter.post('/watches', async (req, res, next) => {
          execution_backend = EXCLUDED.execution_backend,
          max_turns = EXCLUDED.max_turns,
          idle_timeout_ms = EXCLUDED.idle_timeout_ms,
-         lease_id = COALESCE(EXCLUDED.lease_id, duality.session_watches.lease_id),
+         lease_id = EXCLUDED.lease_id,
          turn_count = 0,
          last_activity = now(),
          updated_at = now()
@@ -67,7 +92,7 @@ dualityRouter.post('/watches', async (req, res, next) => {
         threadId,
         forumSlug,
         role,
-        executionBackend || 'freebuff',
+        backend,
         maxTurns ?? 20,
         idleTimeoutMs ?? 300_000,
         leaseId ?? null,
@@ -90,15 +115,16 @@ dualityRouter.post('/watches', async (req, res, next) => {
           JSON.stringify({
             status: 'active',
             role,
-            execution_backend: executionBackend || 'freebuff',
+            execution_backend: backend,
             forum_slug: forumSlug,
+            lease_id: leaseId ?? null,
           }),
         ]
       );
     } catch (err) {
       console.error('[duality] watch.status event failed:', err.message);
     }
-    res.status(201).json({ id: watchId });
+    res.status(201).json({ id: watchId, lease_id: leaseId ?? null, execution_backend: backend });
   } catch (err) { next(err); }
 });
 
@@ -132,7 +158,7 @@ dualityRouter.get('/watches/active', async (req, res, next) => {
       backendClause = ` AND execution_backend = $${params.length}`;
     }
     const result = await pool.query(
-      `SELECT thread_id, role, execution_backend, status, last_activity
+      `SELECT thread_id, role, execution_backend, lease_id, status, last_activity
        FROM duality.session_watches
        WHERE role = $1 AND forum_slug = $2 AND status <> 'expired'${backendClause}
        ORDER BY last_activity DESC
@@ -156,6 +182,7 @@ dualityRouter.get('/watches/active', async (req, res, next) => {
       role: row.role,
       status: row.status,
       execution_backend: row.execution_backend,
+      lease_id: row.lease_id,
     });
   } catch (err) { next(err); }
 });
@@ -165,8 +192,8 @@ dualityRouter.get('/watches/:threadId', async (req, res, next) => {
   try {
     await expireStaleWatches();
     const result = await pool.query(
-      `SELECT id, thread_id, forum_slug, role, execution_backend, max_turns,
-              turn_count, idle_timeout_ms, status, last_activity, created_at
+      `SELECT id, thread_id, forum_slug, role, execution_backend, lease_id,
+              max_turns, turn_count, idle_timeout_ms, status, last_activity, created_at
        FROM duality.session_watches
        WHERE thread_id = $1 AND status = 'active'
        ORDER BY created_at DESC`,
@@ -186,7 +213,7 @@ dualityRouter.get('/watches/:threadId', async (req, res, next) => {
  *
  *  Each envelope: { id (turn_id), thread_id, role, execution_backend, state,
  *  request_comment_id, response_comment_id, subscriber_id, job_id,
- *  execution_plan_version, failure_detail, *_at timestamps }.
+ *  lease_id, execution_plan_version, failure_detail, *_at timestamps }.
  *
  *  The optional state filter (accepted|running|completed|failed|timed_out|
  *  cancelled) lets the UI ask specifically for the in-flight turn.
@@ -208,9 +235,9 @@ dualityRouter.get('/turns', async (req, res, next) => {
       stateClause = ` AND state = $${params.length}`;
     }
     const lim = Math.min(Math.max(Number(limit) || 10, 1), 100);
-    params.push(lim);
+    params.push(String(lim));
     const result = await pool.query(
-      `SELECT id, thread_id, watch_id, role, execution_backend, state,
+      `SELECT id, thread_id, watch_id, role, execution_backend, lease_id, state,
               request_comment_id, response_comment_id, subscriber_id, job_id,
               execution_plan_version, failure_detail,
               created_at, updated_at, accepted_at, running_at, completed_at,
@@ -235,7 +262,7 @@ dualityRouter.get('/turns/latest', async (req, res, next) => {
       throw new BadRequestError('threadId query param is required');
     }
     const result = await pool.query(
-      `SELECT id, thread_id, watch_id, role, execution_backend, state,
+      `SELECT id, thread_id, watch_id, role, execution_backend, lease_id, state,
               request_comment_id, response_comment_id, subscriber_id, job_id,
               execution_plan_version, failure_detail,
               created_at, updated_at, accepted_at, running_at, completed_at,
@@ -367,7 +394,7 @@ dualityRouter.post('/sessions/:threadId/messages', async (req, res, next) => {
 dualityRouter.get('/turns/:turnId', async (req, res, next) => {
   try {
     const result = await pool.query(
-      `SELECT id, thread_id, watch_id, role, execution_backend, state,
+      `SELECT id, thread_id, watch_id, role, execution_backend, lease_id, state,
               request_comment_id, response_comment_id, subscriber_id, job_id,
               execution_plan_version, failure_detail,
               created_at, updated_at, accepted_at, running_at, completed_at,
