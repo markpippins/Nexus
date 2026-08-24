@@ -16,6 +16,7 @@ corpus-delta feedback.
 Usage: stage3_execute.py [--dry-run] [--batch <id>]
 """
 import argparse
+import time
 import re
 import sys
 from pathlib import Path
@@ -167,11 +168,23 @@ def gate_guard_check():
         )
         log(reason)
         try:
-            forum_post(
-                "planning",
-                "[gate-guard] stage-3 execution REFUSED — active promotion halt",
-                reason + "\n\nThis refusal is automatic (stage3_execute.py gate-state guard, required by c19018b3).",
-            )
+            # O5 dedup (audit 8bfe6519): one refusal note per halt per day,
+            # not per timer fire (~24/day was noise). Marker carries the
+            # governing halt id so a NEW halt posts immediately.
+            import pathlib as _pl
+            marker = _pl.Path("/home/codex/dev/nexus/state/promotion-flow/"
+                              f".guard-refused-{str(halt.get('id'))[:8]}")
+            today = time.strftime("%Y-%m-%d", time.gmtime())
+            if marker.exists() and marker.read_text().strip() == today:
+                log("gate-guard: refusal already noted today (dedup)")
+            else:
+                marker.parent.mkdir(parents=True, exist_ok=True)
+                marker.write_text(today)
+                forum_post(
+                    "planning",
+                    "[gate-guard] stage-3 execution REFUSED — active promotion halt",
+                    reason + "\n\nThis refusal is automatic (stage3_execute.py gate-state guard, required by c19018b3). Deduped to once/day per halt.",
+                )
         except Exception as e:
             log(f"WARNING: could not post refusal note to forum: {e}")
         return False, reason
@@ -277,8 +290,9 @@ def parse_verdicts(manifest, systems):
                 approved.add(full)
                 log(f"card sandbox {short} (by {author})")
             elif verdict == "approve":
-                # Approve-as-mapped / Requirement: only promotable when actually mapped.
-                if items[full].get("system_name") and items[full]["system_name"] != "(none)":
+                # Approve-as-mapped / Requirement: promotable iff identity-bound
+                # (Gap C: systemId is the frame; names are display-only).
+                if items[full].get("systemId") or items[full].get("system_id"):
                     items[full]["card_destination"] = "requirement"
                     items[full]["approved_by"] = author      # resumption criterion 2
                     items[full]["approved_at"] = now_iso()
@@ -346,10 +360,16 @@ def promote(item, systems):
     system_id = item.get("systemId")
     subsystem_id = item.get("subsystemId")
     if not system_id:
+        # Legacy-manifest shim: ONE-TIME name→id resolution at execute,
+        # stamped back so the id becomes authoritative going forward
+        # (Gap C transition aid — new frames never rely on this).
         sid, subid = resolve_mapping(
             item.get("system_name") or "", item.get("subsystem_name") or "(none)", systems
         )
         system_id, subsystem_id = sid, subid
+        if system_id:
+            item["systemId"], item["subsystemId"] = system_id, subsystem_id
+            log(f"gapC shim: {item['id'][:8]} name->id resolved+stamped")
     if not system_id:
         return "failed-no-mapping", f"no resolvable system for {item.get('system_name')}"
     payload = {
