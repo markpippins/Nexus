@@ -13,6 +13,19 @@
       ansible.builtin.wait_for_connection:
         timeout: 180
 
+    # Mongo credential lives ONLY in the controller's untracked nexus/.env —
+    # never committed to the repo. Fail loudly if absent.
+    - name: Load Mongo URI from controller-local .env
+      ansible.builtin.set_fact:
+        # The controller .env targets titanium-local services (@localhost);
+        # retarget to the authority host for the standby context.
+        mongo_uri: "{{ ((lookup('file', nexus_controller_env).splitlines()
+                        | select('match', '^SPRING_DATA_MONGODB_URI=')
+                        | first) | regex_replace('^SPRING_DATA_MONGODB_URI=', ''))
+                        | regex_replace('@localhost:', '@' ~ authority_host ~ ':') }}"
+      delegate_to: localhost
+      run_once: true
+
     # NOTE: plain command-based sync — the git module trips over the repo's
     # broken/stale submodule registrations (angular/*), which the tier does
     # not need. reset --hard is intentional: vanadium is a managed deploy

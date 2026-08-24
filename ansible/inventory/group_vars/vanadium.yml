@@ -13,6 +13,8 @@ standby_host: 192.168.1.209        # vanadium — this machine
 nexus_repo: https://github.com/markpippins/nexus.git
 nexus_branch: dev
 nexus_root: /home/codex/dev/nexus
+# Controller-side untracked env (holds SPRING_DATA_MONGODB_URI etc.)
+nexus_controller_env: /home/codex/dev/nexus/.env
 compose_dir: /home/codex/dev/nexus/docker/vanadium
 
 # W2 (f17d973d) approves HOST NETWORKING for terrain-ts so its hardcoded
@@ -71,8 +73,10 @@ tier_env:
   REGISTRY_DB_NAME: vanadium_registry
   HEARTBEAT_REGISTRY_URL: "http://{{ standby_host }}:8085"
   REGISTRY_URL: "http://{{ standby_host }}:8085"
-  # W1 broker-gateway (added 2026-08-24; absent from legacy .env)
-  SPRING_DATA_MONGODB_URI: "mongodb://mongoUser:mongoPass@{{ authority_host }}:27017/nexus?authSource=admin"
+  # W1 broker-gateway (added 2026-08-24; absent from legacy .env).
+  # The URI is injected at deploy time from the CONTROLLER's untracked
+  # nexus/.env (deploy-tier.yml 'Load Mongo URI' task) — never committed.
+  SPRING_DATA_MONGODB_URI: "{{ mongo_uri }}"
   SERVICE_REGISTRY_URL: "http://vd-service-registry:8085"
 
 # ── Health endpoints (health-check.yml) ───────────────────────────────
