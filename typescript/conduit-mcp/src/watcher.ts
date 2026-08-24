@@ -324,6 +324,11 @@ export class PipelineWatcher {
          ORDER BY p.created_at ASC
          LIMIT 50`
       );
+      if (rows.length > 0) {
+        console.log(
+          `[bootstrap] discovery: ${rows.length} nebula-first plan(s) awaiting lifecycle: ${rows.map((r: any) => r.plan_number).join(", ")}`
+        );
+      }
 
       for (const plan of rows) {
         try {
@@ -349,16 +354,37 @@ export class PipelineWatcher {
           const now = new Date().toISOString();
           const receiptId = crypto.randomUUID();
 
-          // Create builder ticket so the conduit can pick this up
-          const ticketId = await createTicketIfMissing(
-            plan.plan_number,
-            "builder",
-            receiptId,
-            now,
-            plan.title,
-            "",
-            "builder",
-          );
+          // Create builder ticket so the conduit can pick this up.
+          // A stale open ticket (earlier half-completed bootstrap: ticket
+          // written, receipt lost) raises 23505 on the (plan_id, role)
+          // WHERE status='open' index. That is NOT a failure — reuse the
+          // existing ticket and continue to the receipt, which is the
+          // missing half. Silent-skip here is what permanently wedged
+          // nebula-first plans (see ruling on escalation 3cf0b72e).
+          let ticketId: string | null = null;
+          try {
+            ticketId = await createTicketIfMissing(
+              plan.plan_number,
+              "builder",
+              receiptId,
+              now,
+              plan.title,
+              "",
+              "builder",
+            );
+          } catch (tickErr: any) {
+            if (tickErr?.code !== "23505") throw tickErr;
+            const ex = await db.query(
+              `SELECT id FROM vision.tickets
+               WHERE plan_id = $1 AND role = 'builder' AND status = 'open'
+               ORDER BY created_at DESC LIMIT 1`,
+              [plan.plan_number]
+            );
+            ticketId = ex.rows[0]?.id ?? null;
+            console.warn(
+              `[bootstrap] plan ${plan.plan_number}: reused stale open ticket ${ticketId} (23505 on insert)`
+            );
+          }
 
           // Issue PLAN_CREATE receipt with ticket reference
           await api.insertReceipt({
@@ -398,7 +424,12 @@ export class PipelineWatcher {
           bootstrapped++;
         } catch (planErr: any) {
           // 23505 = unique_violation — another bootstrapper already handled this plan
-          if (planErr?.code === "23505") continue;
+          if (planErr?.code === "23505") {
+            console.warn(
+              `[bootstrap] plan ${plan.plan_number}: 23505 during bootstrap pass (skipped)`
+            );
+            continue;
+          }
           failed++;
           console.warn(
             `Auto-bootstrap failed for plan ${plan.plan_number}:`,

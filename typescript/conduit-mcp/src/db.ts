@@ -4868,9 +4868,14 @@ export async function listWorkRequestStates(filters?: {
   }
   const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
   const limit = filters?.limit ?? 50;
+  // Guard: work_request_uuid is TEXT and legacy rows may hold non-uuid ids
+  // (e.g. 'wr-test-p11-local'); casting those to uuid throws and kills the
+  // whole unfiltered listing. Only cast well-formed uuids.
   return qAll(
     `SELECT wr.*,
-            (SELECT count(*) FROM ${PG_SCHEMA}.work_request_events e WHERE e.work_request_id = wr.work_request_uuid::uuid) AS event_count
+            (SELECT count(*) FROM ${PG_SCHEMA}.work_request_events e
+             WHERE wr.work_request_uuid ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+               AND e.work_request_id = wr.work_request_uuid::uuid) AS event_count
      FROM ${VISION_SCHEMA}.work_requests wr
      ${where}
      ORDER BY wr.recorded_on_dt DESC
