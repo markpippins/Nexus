@@ -8825,18 +8825,21 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
         vals
       );
 
+      // NOTE: harvest_candidates.compilation_readiness is a NUMERIC column;
+      // node-postgres returns those as strings. Coerce so API consumers
+      // always get numbers (UI calls .toFixed() on this).
       let data = rows.map((r: any) => ({
         id: r.id,
         title: r.title,
         intent_description: r.intent_description,
         status: r.status,
-        compilation_readiness: r.compilation_readiness,
+        compilation_readiness: r.compilation_readiness == null ? null : Number(r.compilation_readiness),
         completed: r.completed,
         tags: r.tags || [],
         system_name: r.system_name,
         subsystem_name: r.subsystem_name,
         dep_count: r.dep_count,
-        promotable: r.compilation_readiness != null && r.compilation_readiness >= 0.7,
+        promotable: r.compilation_readiness != null && Number(r.compilation_readiness) >= 0.7,
       }));
 
       // Hierarchy filter
