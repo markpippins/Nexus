@@ -85,6 +85,6 @@ log "bundle complete: $DAY_DIR ($SIZE)"
 # ── 6. Optional push leg (needs SSH key authorized on target) ────────
 if [ "${1:-}" = "--push" ]; then
   log "pushing to $BACKUP_TARGET ..."
-  rsync -az --partial "$DAY_DIR/" "$BACKUP_TARGET/$STAMP/"
+  rsync -az --partial --mkpath "$DAY_DIR/" "$BACKUP_TARGET/$STAMP/"
   log "pushed."
 fi
