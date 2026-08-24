@@ -21,8 +21,10 @@ from promotion_common import (
     FORUM, NEBULA, agent_record, forum_comment, forum_post, get, inbox_ping,
     load_manifests, log, now_iso, patch, post, save_manifest,
 )
+from promotion_gate import evaluate_candidate_ready
 
 ENGINEER_AUTHORS = {"engineer", "engineer-ii", "promotion-flow/0005", None, ""}
+
 STRIKE_RE = re.compile(r"STRIKE\s+([0-9a-f]{8}|[0-9a-f-]{36})", re.I)
 MAP_RE = re.compile(
     r"MAP\s+([0-9a-f]{8}|[0-9a-f-]{36})\s*(?:->|→|:)\s*(.+?)\s*(?:::|->|—)\s*(.+)", re.I
@@ -30,11 +32,84 @@ MAP_RE = re.compile(
 APPROVE_RE = re.compile(r"\bAPPROVE\b", re.I)
 
 
+# ── Gate-state guard (required by halt c19018b3) ────────────────────
+# The executor previously had NO awareness of ruling state and even
+# auto-promoted when its SOL gate passed while operator verdicts were
+# absent — which is exactly backwards under a deferral. This guard makes
+# refusal the DEFAULT: stage-3 may only execute a batch when there is no
+# active halt/deferral ruling AND per-item approval evidence exists on
+# the batch thread from a non-engineer author (the operator/planner).
+
+HALT_LIFT_RE = re.compile(r"\b(RESUME|LIFTED|CLEARED|GUARD\s*ACTIVE)\b", re.I)
+
+def _architect_decisions(limit=30):
+    """Recent architect decision records, newest first."""
+    st, data = get(f"{NEBULA}/api/agent-records?role=architect&limit={limit}")
+    if st != 200:
+        return []
+    return data.get("items") or []
+
+
+def active_promotion_halt():
+    """Return the newest active halt/deferral ruling affecting promotion
+    batches, or None. A halt counts as lifted ONLY by a later architect
+    decision explicitly resuming (RESUME/LIFTED/CLEARED)."""
+    decisions = _architect_decisions()
+    for rec in decisions:
+        title = rec.get("title") or ""
+        tags = " ".join(rec.get("tags") or [])
+        blob = f"{title} {tags}"
+        if re.search(r"HALT|DEFERRED", blob, re.I) and re.search(
+            r"promotion|stage-3|batch|gate", blob, re.I
+        ):
+            return rec  # newest first → first hit is governing unless superseded below
+    # look for a later explicit lift of any halt we just found
+    return None
+
+
+def halt_is_lifted(halt_record):
+    """True iff an architect decision NEWER than `halt_record` explicitly
+    resumes/clears the promotion pipeline."""
+    if not halt_record:
+        return True
+    decisions = _architect_decisions()
+    for rec in decisions:
+        if (rec.get("createdAt") or 0) <= (halt_record.get("createdAt") or 0):
+            continue
+        blob = f"{rec.get('title','')} {' '.join(rec.get('tags') or [])}"
+        if HALT_LIFT_RE.search(blob) and re.search(r"promotion|stage-3|gate", blob, re.I):
+            return True
+    return False
+
+
+def gate_guard_check():
+    """Refuse execution while an unlifted halt/deferral is in force.
+    Returns (ok, reason). Emits a forum note on every refusal."""
+    halt = active_promotion_halt()
+    if halt and not halt_is_lifted(halt):
+        reason = (
+            f"Gate-state guard: promotion HALT/deferral in force "
+            f"(record {str(halt.get('id'))[:8]}, '{(halt.get('title') or '')[:80]}'). "
+            f"Stage-3 refusing to execute until an architect decision explicitly resumes the pipeline."
+        )
+        log(reason)
+        try:
+            forum_post(
+                "planning",
+                "[gate-guard] stage-3 execution REFUSED — active promotion halt",
+                reason + "\n\nThis refusal is automatic (stage3_execute.py gate-state guard, required by c19018b3).",
+            )
+        except Exception as e:
+            log(f"WARNING: could not post refusal note to forum: {e}")
+        return False, reason
+    return True, None
+
+
 def fetch_systems():
     st, data = get(f"{NEBULA}/api/systems")
     if st != 200:
         return []
-    return data if isinstance(data, list) else data.get("data") or []
+    return data if isinstance(data, list) else data.get("items") or []
 
 
 def resolve_mapping(system_name, subsystem_name, systems):
@@ -144,11 +219,25 @@ def corpus_counts():
     return total_reqs
 
 
+def parse_args(ap):
+    return ap.parse_args()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--batch", type=str, default=None, help="restrict to one batch id")
-    args = ap.parse_args()
+    ap.add_argument(
+        "--allow-auto",
+        action="store_true",
+        help="re-enable the SOL auto-approve path (default OFF after halt c19018b3)",
+    )
+    args = parse_args(ap)
+
+    # ── Gate-state guard (halt c19018b3): refuse under active halt/deferral.
+    ok, reason = gate_guard_check()
+    if not ok:
+        return 2
 
     manifests = [m for m in load_manifests() if not m.get("executed")]
     if args.batch:
@@ -163,7 +252,31 @@ def main():
     for manifest in manifests:
         bid = manifest["batch_id"]
         approved, new_comments = parse_verdicts(manifest, systems)
-        if not new_comments and all(c.get("promoted") for c in manifest["candidates"]) is False and not approved:
+
+        # ── Auto-approve gate — DISABLED by default after halt c19018b3.
+        # "No manual verdicts" used to be treated as promotable when the SOL
+        # gate passed, which is exactly backwards under a deferral ruling.
+        # Re-enable ONLY with --allow-auto AND no active halt (guard above).
+        auto = False
+        if not approved and args.allow_auto:
+            solo = []
+            for c in manifest["candidates"]:
+                if c.get("promoted") or c.get("struck"):
+                    continue
+                admitted, reason = evaluate_candidate_ready(c, manifest["thread_id"])
+                if admitted:
+                    c["systemId"] = resolve_mapping(
+                        c.get("system_name") or "(none)",
+                        c.get("subsystem_name") or "(none)",
+                        systems,
+                    )[0]
+                    solo.append(c)
+                    log(f"  SOL-gate: {c['id'][:8]} ({c.get('title','')[:40]}) — auto-approved")
+            if solo:
+                approved = solo
+                auto = True
+
+        if not new_comments and not auto and all(c.get("promoted") for c in manifest["candidates"]) is False and not approved:
             # nothing new to act on for this batch
             save_manifest(bid, manifest)
             continue
