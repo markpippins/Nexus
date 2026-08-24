@@ -17,7 +17,7 @@ This is the tracked copy that gets applied to the `nexus` database's
 |---|---|
 | `resolution_schema_consolidated.sql` | Base full schema dump (pg_dump); apply the post-dump v28-v33 chain below to reach the current live contract |
 | `resolution_data_consolidated.sql` | Full data dump (pg_dump) — **current canonical seed data** |
-| `resolution_migration_v{3,4,5,6,7,11,12,13,17,18,19,20,21,22,23,23b,24b,28,29,30,31,32,33}.sql` | Incremental migrations (v3 → v33) |
+| `resolution_migration_v{3,4,5,6,7,11,12,13,17,18,19,20,21,22,23,23b,24b,28,29,30,31,32,33,34,35}.sql` | Incremental migrations (v3 → v35) |
 | `resolution_evaluate_proposition_v1.sql` | Proposition evaluation function (disposition fast path) |
 | `resolution_comparator_v1.sql` | Cross-representation disagreement detection (`detect_disagreement`) |
 | `resolution_authority_resolution_v1.sql` | Authority resolution via verified statement |
@@ -54,11 +54,29 @@ Notes:
   production" per its own comment. No external schema depends on it.
 - Last verified live chain: v28 execution claims + evidence vocabulary, v29 T24
   graph-edge evidence bridge, v30 verified execution admission bridge, v31 frame
-  dimensions, v32 context-aware proposition evaluation, and v33 unambiguous sweep
-  overloads. v28-v33 are incremental migrations on top of v24b. The consolidated
-  dump is a base recovery artifact and does not yet include the v31-v33 delta;
-  apply the ordered migrations after restoring it, or regenerate the dump from
-  the live catalog before using it as a full recovery source.
+  dimensions, v32 context-aware proposition evaluation, v33 unambiguous sweep
+  overloads, v34 verified_statement immutability trigger (adopted from the
+  /claude experimental branch), and v35 frame semantics (meaning of frame
+  dimensions as first-class proposition vocabulary). v28-v35 are incremental
+  migrations on top of v24b. The consolidated dump is a base recovery artifact
+  and does not yet include the v31-v35 delta; apply the ordered migrations
+  after restoring it, or regenerate the dump from the live catalog before
+  using it as a full recovery source.
+
+## claude/ — deviation branch
+
+The `claude/` directory below this one is a deviation/experimental branch that
+forked at the v30/v31 boundary. It does NOT carry authority — it is a
+laboratory for candidate deltas:
+
+- `resolution_migration_v33.sql` → `verified_statement_immutable()` trigger
+  (adopted into canonical v34, 2026-08-24)
+- `resolution_schema_consolidated.sql` and `resolution_data_consolidated.sql`
+  diverge from canonical after v30 — NOT a baseline for migration
+
+Rule: /claude content is reviewed and selectively adopted; it is never applied
+as a schema snapshot. Diffs against canonical are interpreted as candidate
+semantic deltas, not drift to be repaired.
 
 ## Related
 
