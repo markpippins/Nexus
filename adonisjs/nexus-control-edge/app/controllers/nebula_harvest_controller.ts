@@ -329,24 +329,21 @@ export default class NebulaHarvestController {
     }
   }
 
-  /** POST /api/harvest-candidates/promote-to-plan */
-  async promoteToPlan({ request, response }: HttpContext) {
-    try {
-      const body = request.body()
-      const { candidateIds, project = 'nexus', goal } = body
-      if (!candidateIds || !Array.isArray(candidateIds) || candidateIds.length === 0) {
-        response.status(400).json({ error: 'candidateIds (array of UUIDs) is required' })
-        return
-      }
-      const { rows: [result] } = await q(
-        'SELECT plan_id, plan_title, plan_goal, candidates_used, status_results FROM nebula.candidates_to_plan(?::uuid[], ?, ?)',
-        [candidateIds, project, goal || null]
-      )
-      response.json({ ok: true, ...result })
-    } catch (e: any) {
-      const { status, body } = err(e, 400)
-      response.status(status).json(body)
-    }
+  /** POST /api/harvest-candidates/promote-to-plan
+   * RETIRED (D-2026-08-23-C): the backing procedure nebula.candidates_to_plan
+   * no longer exists and must NOT be resurrected. Mirrors the nebula-srv 410
+   * tombstone so callers migrate to the canonical promotion path instead of
+   * 400-ing mysteriously. Canonical: POST /api/harvest-candidates/:id/spawn-plan
+   */
+  async promoteToPlan({ response }: HttpContext) {
+    response.status(410).json({
+      error:
+        'promote-to-plan was retired: its backing procedure (nebula.candidates_to_plan) no longer exists and will not be restored.',
+      useInstead: 'POST /api/harvest-candidates/:id/spawn-plan',
+      mcpTool: 'nebula_spawn_plan_from_candidate',
+      rationale:
+        'Single canonical promotion flow; the legacy parallel route created two competing promotion paths. See architect ruling on to-do e68449f2.',
+    })
   }
 
   /** POST /api/harvests */

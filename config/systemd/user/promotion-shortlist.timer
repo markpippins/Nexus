@@ -1,0 +1,10 @@
+[Unit]
+Description=Hourly promotion shortlist at :15 (staggered off absorb-hourly top-of-hour)
+
+[Timer]
+OnCalendar=*-*-* *:15:00
+Persistent=true
+RandomizedDelaySec=90
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,14 @@
+[Unit]
+Description=Promotion flow stage 1: hourly shortlist proposal (plan 0005)
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/codex/dev/nexus/python/promotion-flow
+ExecStart=/usr/bin/env python3 -u stage1_shortlist.py --cap 20
+Environment=NEBULA_SRV=http://localhost:3101
+Environment=ASSEMBLY_SRV=http://localhost:3107
+Restart=on-failure
+RestartSec=60
+StandardOutput=append:/tmp/promotion-shortlist.log
+StandardError=inherit
