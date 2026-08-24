@@ -26,6 +26,14 @@ compose_files:
   - docker-compose.yml
   - docker-compose.vanadium.yml
 
+# Services the deploy playbook builds on-target. Full-tier `--build` is
+# blocked until terrain-ts source is recovered (its prebuilt dist+node_modules
+# are gitignored; a fresh clone cannot rebuild it — W2 backlog). Legacy
+# services reuse the images already on the host.
+build_services:
+  - broker
+  - peb-kernel
+
 # ── Tier .env (rendered by deploy-tier.yml) ───────────────────────────
 # Faithful superset of the hand-maintained vanadium .env (audited
 # 2026-08-24) plus the keys the W1/W3 services need. If the remote file

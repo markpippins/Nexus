@@ -1,30 +1,25 @@
-# Use Bun runtime for TypeScript in assembly-srv
-FROM oven/bun:1-alpine
+# syntax=docker/dockerfile:1
+# assembly-srv — legacy REST API (plain JS, no build step).
+# Build context is the typescript/ repo root so file:../heartbeat-client
+# resolves — same pattern as wind-srv. (The previous version of this file
+# assumed a per-service context and a Bun runtime; it could never build via
+# docker-compose, which passes the shared context.)
+FROM node:20-bookworm-slim
 
-# Install build dependencies
-RUN apk add --no-cache python3 make g++ git
+ENV NODE_ENV=production
+WORKDIR /app/assembly-srv
 
-# Create app directory
-WORKDIR /app
+COPY assembly-srv/package.json ./
+COPY heartbeat-client ../heartbeat-client
+RUN npm install --omit=dev --no-package-lock \
+ && cd ../heartbeat-client && npm install --no-package-lock --include=dev && npm run build
 
-# Copy package files for dependency installation
-COPY package*.json ./
+COPY assembly-srv/src ./src
 
-# Install dependencies - bun handles file:../heartbeat-client when context includes sibling
-RUN bun install --production
+ENV PORT=3107
+EXPOSE 3107
 
-# Copy source code
-COPY . .
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/health || exit 1
 
-# Build TypeScript
-RUN bun run build
-
-# Expose the default port
-EXPOSE 8080
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
-
-# Run the service
-CMD ["bun", "run", "start"]
+CMD ["node", "src/index.js"]

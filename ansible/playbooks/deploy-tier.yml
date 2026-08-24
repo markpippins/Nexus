@@ -13,13 +13,28 @@
       ansible.builtin.wait_for_connection:
         timeout: 180
 
-    - name: Sync nexus repo to {{ nexus_branch }}
-      ansible.builtin.git:
-        repo: "{{ nexus_repo }}"
-        dest: "{{ nexus_root }}"
-        version: "{{ nexus_branch }}"
-        force: false
-        update: true
+    # NOTE: plain command-based sync — the git module trips over the repo's
+    # broken/stale submodule registrations (angular/*), which the tier does
+    # not need. reset --hard is intentional: vanadium is a managed deploy
+    # target; local edits there are not preserved.
+    - name: Fetch latest {{ nexus_branch }}
+      ansible.builtin.command:
+        cmd: git fetch origin {{ nexus_branch }}
+        chdir: "{{ nexus_root }}"
+      changed_when: false
+
+    - name: Read local and remote HEADs
+      ansible.builtin.command:
+        cmd: "git rev-parse HEAD origin/{{ nexus_branch }}"
+        chdir: "{{ nexus_root }}"
+      changed_when: false
+      register: heads
+
+    - name: Fast-forward to origin/{{ nexus_branch }}
+      ansible.builtin.command:
+        cmd: git reset --hard origin/{{ nexus_branch }}
+        chdir: "{{ nexus_root }}"
+      when: heads.stdout_lines[0] != heads.stdout_lines[1]
       register: git_sync
 
     - name: Report repo state
@@ -39,15 +54,28 @@
           {% endfor %}
       register: env_render
 
-    - name: Bring up the tier (base manifest + W2 override)
+    - name: Build managed tier images ({{ build_services | join(', ') }})
       ansible.builtin.command:
-        cmd: >
+        cmd: >-
           docker compose
           {% for f in compose_files %}-f {{ f }} {% endfor %}
-          up -d --build --remove-orphans
+          build {{ build_services | join(' ') }}
         chdir: "{{ compose_dir }}"
       environment:
         DOCKER_BUILDKIT: "1"
+      register: compose_build
+
+    # --no-build: full-context rebuilds are currently blocked by terrain-ts
+    # (its prebuilt dist/node_modules are gitignored and absent from a fresh
+    # clone — W2 backlog). Legacy images already on the host are reused;
+    # flip to `up -d --build` once terrain source is recovered.
+    - name: Bring up the tier (base manifest + W2 override)
+      ansible.builtin.command:
+        cmd: >-
+          docker compose
+          {% for f in compose_files %}-f {{ f }} {% endfor %}
+          up -d --no-build --remove-orphans
+        chdir: "{{ compose_dir }}"
       register: compose_up
       changed_when: compose_up.stdout != ''
 
