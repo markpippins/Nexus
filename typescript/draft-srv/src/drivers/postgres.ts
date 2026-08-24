@@ -41,6 +41,15 @@ export class PostgresDriver implements DbDriver {
   private poolCache = new Map<string, CachedPool>();
   private sweeper: NodeJS.Timeout | null = null;
 
+  /**
+   * TLS verification policy (Audit II D3): certificate verification is ON by
+   * default. Escape hatch for self-signed LAN certs: set
+   * NEXUS_PG_TLS_INSECURE=1 (documented risk — MITM possible on that path).
+   */
+  private tlsConfig(): { rejectUnauthorized: boolean } {
+    return { rejectUnauthorized: process.env.NEXUS_PG_TLS_INSECURE !== '1' };
+  }
+
   private specKey(spec: ConnSpec): string {
     return JSON.stringify([
       spec.host || 'localhost',
@@ -69,7 +78,7 @@ export class PostgresDriver implements DbDriver {
       database: spec.database || 'postgres',
       user: spec.username || 'postgres',
       password: spec.password || '',
-      ssl: spec.ssl ? { rejectUnauthorized: false } : undefined,
+      ssl: spec.ssl ? this.tlsConfig() : undefined,
       max: 1,
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 5000,
@@ -117,7 +126,7 @@ export class PostgresDriver implements DbDriver {
       database: spec.database || 'postgres',
       user: spec.username || 'postgres',
       password: spec.password || '',
-      ssl: spec.ssl ? { rejectUnauthorized: false } : undefined,
+      ssl: spec.ssl ? this.tlsConfig() : undefined,
       max: 1,
       connectionTimeoutMillis: 5000,
       statement_timeout: 15000,

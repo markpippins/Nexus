@@ -8,6 +8,7 @@
  * Env:
  *   PORT            — listen port (default 3170)
  *   CORS_ORIGINS    — comma-separated allowed origins (default: loopback UIs)
+ *   NEXUS_INTERNAL_SECRET — fleet-internal shared secret (required; fail-closed)
  */
 import express from 'express';
 import cors from 'cors';
@@ -52,6 +53,23 @@ async function startServer() {
     console.warn('[draft-srv] DRAFT_SRV_REGISTRY_ID not set — skipping heartbeat registration');
   }
 
+  // Security Pass Alpha (audit C1, decision 22fe12bc): internal-only surface.
+  // Loopback bind + mandatory X-Nexus-Internal fleet secret on every route
+  // except the liveness probe. Fail-closed if the secret is not configured.
+  const NEXUS_INTERNAL_SECRET = process.env.NEXUS_INTERNAL_SECRET;
+  app.use((req, res, next) => {
+    if (!NEXUS_INTERNAL_SECRET) {
+      console.error('[draft-srv] NEXUS_INTERNAL_SECRET not set — refusing requests (fail-closed)');
+      return res.status(503).json({ error: 'service misconfigured: missing internal secret' });
+    }
+    if (req.path === '/api/health') return next();
+    if (req.get('X-Nexus-Internal') === NEXUS_INTERNAL_SECRET) return next();
+    console.warn(
+      `[draft-srv] rejected ${req.method} ${req.path} from ${req.ip} (missing/invalid X-Nexus-Internal)`
+    );
+    return res.status(403).json({ error: 'forbidden' });
+  });
+
   app.get('/api/health', (_req, res) => {
     res.json({
       status: 'ok',
@@ -64,7 +82,7 @@ async function startServer() {
 
   app.use('/api', dbWorkbenchRoutes());
 
-  app.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, '127.0.0.1', () => {
     console.log(`[draft-srv] listening on http://localhost:${PORT} (engines: ${listCapabilities().map((c) => `${c.id}:${c.available ? 'on' : 'off'}`).join(', ')})`);
   });
 }

@@ -121,3 +121,4 @@ tools/api-docs/certs/
 cir1_ref_index.txt
 docker/candidate-stack/.env
 state/promotion-flow/
+nexus/etc/fleet-internal.env
