@@ -41,7 +41,7 @@ callable Python functions, and evaluates them against live entity state.
 
 | Module | Responsibility |
 |--------|---------------|
-| `models.py` | All enums and dataclasses — the type vocabulary for the resolution language |
+| `models.py` | All enums and dataclasses — the type vocabulary for the resolution language (incl. v31 frame dimensions + v35 frame-dimension meanings) |
 | `expression_compiler.py` | Compiles `Expression` trees into executable `(ctx) -> value` callables with caching |
 | `interpreter.py` | Core engine: concept graph, entity store, proposition evaluation, invariant checking, change events |
 | `inference_engine.py` | Forward/backward chaining with confidence scoring and external knowledge base delegation |
@@ -294,6 +294,10 @@ It correlates to the schema tables but does not depend on them at runtime:
 | `resolution.expression` | `Expression` |
 | `resolution.rule` | `Rule` |
 | `resolution.proposition` | `Proposition` |
+| `resolution.frame_dimension` | `FrameDimension` |
+| `resolution.frame_dimension_value` | `FrameDimensionValue` |
+| `resolution.proposition_frame_value` | `PropositionFrameValue` |
+| `resolution.frame_dimension_meaning` | `FrameDimensionMeaning` |
 | `resolution.representation` | `Representation` |
 | `resolution.execution_claim` | *(evaluated via InferenceEngine)* |
 

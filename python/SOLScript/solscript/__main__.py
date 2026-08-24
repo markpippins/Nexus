@@ -115,8 +115,8 @@ def main() -> None:
 
     # Evaluate proposition
     prop = list(interp.propositions.values())[0]
-    result = interp.evaluate_proposition(prop)
-    print(f"Proposition evaluation: {result}")
+    result, _, ctx_status = interp.evaluate_proposition(prop)
+    print(f"Proposition evaluation: {result} (context: {ctx_status})")
 
     # Change event
     entity = list(interp.entities.values())[0]

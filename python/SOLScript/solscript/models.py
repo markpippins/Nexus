@@ -210,6 +210,45 @@ class Representation:
 
 
 @dataclass
+class FrameDimension:
+    """v31: A scoping axis for proposition evaluation (governed_reference or typed_scalar)."""
+    id: str
+    name: str
+    description: Optional[str]
+    value_kind: str  # 'governed_reference' | 'typed_scalar'
+    scalar_type: Optional[str] = None  # 'text'|'integer'|'boolean'|'timestamp'|'numeric' for typed_scalar
+
+
+@dataclass
+class FrameDimensionValue:
+    """v31: A governed value within a frame_dimension (per-dimension private lists)."""
+    id: str
+    dimension_id: str
+    value: str
+    description: Optional[str] = None
+
+
+@dataclass
+class PropositionFrameValue:
+    """v31: An instance-level frame commitment on a proposition."""
+    id: str
+    proposition_id: str
+    dimension_id: str
+    reference_value_id: Optional[str] = None  # for governed_reference
+    scalar_value: Optional[str] = None         # for typed_scalar
+
+
+@dataclass
+class FrameDimensionMeaning:
+    """v35: A proposition that describes the meaning of a frame dimension
+    (whole-dimension) or one of its values (value-level)."""
+    id: str
+    proposition_id: str
+    dimension_id: Optional[str] = None
+    frame_dimension_value_id: Optional[str] = None
+
+
+@dataclass
 class Proposition:
     id: str
     title: str
@@ -222,6 +261,9 @@ class Proposition:
     assertions: List[Rule] = field(default_factory=list)
     comparisons: List[RepresentationComparison] = field(default_factory=list)
     last_evaluated_at: Optional[datetime] = None
+    # v31: frame discipline
+    semantic_type_id: Optional[str] = None
+    frame_values: List[PropositionFrameValue] = field(default_factory=list)
 
 
 @dataclass

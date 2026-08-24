@@ -15,6 +15,9 @@ from solscript import (
     Entity,
     Expression,
     ExpressionKind,
+    FrameDimension,
+    FrameDimensionMeaning,
+    FrameDimensionValue,
     Proposition,
     ResolutionInterpreter,
     Rule,
@@ -192,7 +195,7 @@ class TestPropositionEvaluation:
             assertions=[wr_invariant],
         )
         interp.add_proposition(prop)
-        result = interp.evaluate_proposition(prop)
+        result, _, _ = interp.evaluate_proposition(prop)
         assert result == Disposition.ASSERTED
 
     def test_evaluate_proposition_rejects_when_entity_missing(
@@ -207,7 +210,7 @@ class TestPropositionEvaluation:
             assertions=[wr_invariant],
         )
         interp.add_proposition(prop)
-        result = interp.evaluate_proposition(prop)
+        result, _, _ = interp.evaluate_proposition(prop)
         assert result == Disposition.REJECTED
 
     def test_evaluate_proposition_rejects_when_assertion_fails(
@@ -237,7 +240,7 @@ class TestPropositionEvaluation:
             assertions=[rule],
         )
         interp.add_proposition(prop)
-        result = interp.evaluate_proposition(prop)
+        result, _, _ = interp.evaluate_proposition(prop)
         # entity.attributes["status"] doesn't exist → get returns None → bool(None) = False
         assert result == Disposition.REJECTED
 
@@ -420,3 +423,79 @@ class TestReopen:
         interp.add_proposition(prop)
         result = interp.reopen_disputed_proposition(prop, "WR-001")
         assert result == Disposition.ASSERTED
+
+
+# ── Frame dimension meanings (v35) ───────────────────────────────────
+
+
+class TestFrameMeanings:
+    def _build_dimension(
+        self, interp: ResolutionInterpreter,
+    ) -> tuple[FrameDimension, FrameDimensionValue, FrameDimensionValue]:
+        dim = FrameDimension(
+            id=_uid(), name="migration_phase",
+            description="deployment migration phase",
+            value_kind="governed_reference", scalar_type=None,
+        )
+        interp.add_frame_dimension(dim)
+        pre = FrameDimensionValue(
+            id=_uid(), dimension_id=dim.id, value="pre_migration",
+        )
+        post = FrameDimensionValue(
+            id=_uid(), dimension_id=dim.id, value="post_migration",
+        )
+        interp.add_frame_dimension_value(pre)
+        interp.add_frame_dimension_value(post)
+        return dim, pre, post
+
+    def _add_meaning(
+        self, interp: ResolutionInterpreter, prop: Proposition,
+        dimension_id: str | None = None,
+        value_id: str | None = None,
+    ) -> None:
+        interp.add_frame_dimension_meaning(FrameDimensionMeaning(
+            id=_uid(), proposition_id=prop.id,
+            dimension_id=dimension_id, frame_dimension_value_id=value_id,
+        ))
+
+    def test_meanings_of_returns_dimension_and_value_meanings(
+        self, interp: ResolutionInterpreter,
+    ) -> None:
+        dim, pre, post = self._build_dimension(interp)
+
+        dim_prop = Proposition(
+            id=_uid(), title="dim meaning", description=None,
+            asset_concept_id="fd", subject_entity_id="",
+            disposition=Disposition.PENDING,
+        )
+        pre_prop = Proposition(
+            id=_uid(), title="pre meaning", description=None,
+            asset_concept_id="fdv", subject_entity_id="",
+            disposition=Disposition.PENDING,
+        )
+        post_prop = Proposition(
+            id=_uid(), title="post meaning", description=None,
+            asset_concept_id="fdv", subject_entity_id="",
+            disposition=Disposition.PENDING,
+        )
+        for p in (dim_prop, pre_prop, post_prop):
+            interp.add_proposition(p)
+        self._add_meaning(interp, dim_prop, dimension_id=dim.id)
+        self._add_meaning(interp, pre_prop, value_id=pre.id)
+        self._add_meaning(interp, post_prop, value_id=post.id)
+
+        # Whole dimension: dimension meaning + both value meanings.
+        titles = {p.title for p in interp.meanings_of("migration_phase")}
+        assert titles == {"dim meaning", "pre meaning", "post meaning"}
+
+        # Scoped to one value: dimension meaning + that value only.
+        titles = {
+            p.title
+            for p in interp.meanings_of("migration_phase", value="post_migration")
+        }
+        assert titles == {"dim meaning", "post meaning"}
+
+    def test_meanings_of_unknown_dimension_is_empty(
+        self, interp: ResolutionInterpreter,
+    ) -> None:
+        assert interp.meanings_of("nope") == []

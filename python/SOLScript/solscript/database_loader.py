@@ -13,8 +13,12 @@ from .models import (
     Entity,
     Expression,
     ExpressionKind,
+    FrameDimension,
+    FrameDimensionMeaning,
+    FrameDimensionValue,
     Operator,
     Proposition,
+    PropositionFrameValue,
     Quantifier,
     RelationshipBinding,
     Representation,
@@ -47,7 +51,9 @@ class DatabaseLoader:
         await self.load_relationships()
         await self.load_expressions()
         await self.load_rules()
+        await self.load_frame_dimensions()
         await self.load_propositions()
+        await self.load_frame_dimension_meanings()
         await self.load_entities()
 
     # ── Concepts ─────────────────────────────────────────────────
@@ -265,6 +271,57 @@ class DatabaseLoader:
                     if trans and rule.rule_type == RuleType.GUARD:
                         trans.guards.append(rule)
 
+    # ── Frame dimensions (v31) ──────────────────────────────────
+
+    async def load_frame_dimensions(self) -> None:
+        """Load frame_dimension, frame_dimension_value, and proposition_frame_value."""
+        async with self.pool.acquire() as conn:
+            fd_rows = await conn.fetch(
+                "SELECT id, name, description, value_kind, scalar_type "
+                "FROM resolution.frame_dimension"
+            )
+            for row in fd_rows:
+                dim = FrameDimension(
+                    id=str(row["id"]),
+                    name=row["name"],
+                    description=row["description"],
+                    value_kind=row["value_kind"],
+                    scalar_type=row["scalar_type"],
+                )
+                self.interpreter.frame_dimensions[dim.id] = dim
+
+            fdv_rows = await conn.fetch(
+                "SELECT id, dimension_id, value, description "
+                "FROM resolution.frame_dimension_value"
+            )
+            for row in fdv_rows:
+                val = FrameDimensionValue(
+                    id=str(row["id"]),
+                    dimension_id=str(row["dimension_id"]),
+                    value=row["value"],
+                    description=row["description"],
+                )
+                self.interpreter.frame_dimension_values[val.id] = val
+
+            pfv_rows = await conn.fetch(
+                "SELECT id, proposition_id, dimension_id, "
+                "reference_value_id, scalar_value "
+                "FROM resolution.proposition_frame_value"
+            )
+            for row in pfv_rows:
+                pfv = PropositionFrameValue(
+                    id=str(row["id"]),
+                    proposition_id=str(row["proposition_id"]),
+                    dimension_id=str(row["dimension_id"]),
+                    reference_value_id=(
+                        str(row["reference_value_id"])
+                        if row["reference_value_id"]
+                        else None
+                    ),
+                    scalar_value=row["scalar_value"],
+                )
+                self.interpreter.add_proposition_frame_value(pfv)
+
     # ── Propositions ─────────────────────────────────────────────
 
     async def load_propositions(self) -> None:
@@ -272,7 +329,7 @@ class DatabaseLoader:
             rows = await conn.fetch(
                 "SELECT id, title, description, asset_concept_id, "
                 "subject_entity_id, disposition_value_id, value, "
-                "grounding_status_value_id "
+                "grounding_status_value_id, semantic_type_id "
                 "FROM resolution.proposition"
             )
             for row in rows:
@@ -291,8 +348,37 @@ class DatabaseLoader:
                     disposition=disp,
                     value=row["value"],
                     grounding_status=str(row["grounding_status_value_id"]) if row["grounding_status_value_id"] else None,
+                    semantic_type_id=(
+                        str(row["semantic_type_id"])
+                        if row["semantic_type_id"]
+                        else None
+                    ),
                 )
                 self.interpreter.propositions[prop.id] = prop
+
+    # ── Frame dimension meanings (v35) ──────────────────────────
+
+    async def load_frame_dimension_meanings(self) -> None:
+        """Load frame_dimension_meaning bridge rows (proposition → dimension/value)."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT id, proposition_id, dimension_id, frame_dimension_value_id "
+                "FROM resolution.frame_dimension_meaning"
+            )
+            for row in rows:
+                meaning = FrameDimensionMeaning(
+                    id=str(row["id"]),
+                    proposition_id=str(row["proposition_id"]),
+                    dimension_id=(
+                        str(row["dimension_id"]) if row["dimension_id"] else None
+                    ),
+                    frame_dimension_value_id=(
+                        str(row["frame_dimension_value_id"])
+                        if row["frame_dimension_value_id"]
+                        else None
+                    ),
+                )
+                self.interpreter.frame_dimension_meanings[meaning.id] = meaning
 
     # ── Entities ─────────────────────────────────────────────────
 
