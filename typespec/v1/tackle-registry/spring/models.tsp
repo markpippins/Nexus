@@ -117,7 +117,8 @@ namespace org.nexus.tackleregistry {
 
   model HelloResponse {
     reply: string;
-    model?: string;
+    @encodedName("application/json", "model")
+    modelName?: string;
   }
 
   model ModelsResponse {

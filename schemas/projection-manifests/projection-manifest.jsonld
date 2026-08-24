@@ -1,168 +1,181 @@
 {
-  "@context": {
-    "@version": 1.1,
-    "nx": "https://nexus.local/schema/",
-    "pr": "https://nexus.local/schema/projection-manifests/",
-    "id": "@id",
-    "type": "@type",
-    "comment": {
-      "@id": "http://www.w3.org/2000/01/rdf-schema#comment"
-    },
-    "ProjectionManifest": "pr:ProjectionManifest",
-    "ProjectionTarget": "pr:ProjectionTarget",
-    "ProjectionFormat": "pr:ProjectionFormat",
-    "sourceSchema": "pr:sourceSchema",
-    "targetFormat": "pr:targetFormat",
-    "generator": "pr:generator",
-    "outputPath": "pr:outputPath",
-    "lifecycle": "pr:lifecycle",
-    "active": {
-      "@id": "pr:active",
-      "@type": "xsd:boolean"
-    },
-    "verify": "pr:verify",
-    "mode": "pr:verifyMode",
-    "command": "pr:verifyCommand",
-    "algorithm": "pr:digestAlgorithm",
-    "digest": "pr:digest"
+ "@context": {
+  "@version": 1.1,
+  "nx": "https://nexus.local/schema/",
+  "pr": "https://nexus.local/schema/projection-manifests/",
+  "id": "@id",
+  "type": "@type",
+  "comment": {
+   "@id": "http://www.w3.org/2000/01/rdf-schema#comment"
   },
-  "@graph": [
-    {
-      "@id": "pr:ProjectionManifest",
-      "@type": "rdfs:Class",
-      "comment": "Records which schemas project to which dev artifacts, and what tool generates each projection.",
-      "properties": [
-        "pr:sourceSchema",
-        "pr:targetFormat",
-        "pr:generator",
-        "pr:outputPath",
-        "pr:lifecycle",
-        "pr:active"
-      ]
-    }
-  ],
-  "projections": [
-    {
-      "sourceSchema": "schemas/validation/wrp/work-request.schema.json",
-      "targetFormat": "typescript-type",
-      "generator": "TypeSpec",
-      "outputPath": "angular/nexus-console/src/models/work-request.model.ts",
-      "lifecycle": "on-schema-change",
-      "active": false,
-      "comment": "cannot wire — no TypeScript emitter is installed in typespec/v1 (only http-client-java/python + openapi3). Flip active once a TS emitter lands.",
-      "verify": {
-        "mode": "regenerate",
-        "command": "npx tsp compile typespec/v1 --emit @typespec/openapi3"
-      }
-    },
-    {
-      "sourceSchema": "typespec/v1/conduit-kernel/python/main.tsp",
-      "targetFormat": "python-client",
-      "generator": "TypeSpec",
-      "outputPath": "python/conduit/generated/",
-      "lifecycle": "on-schema-change",
-      "active": true,
-      "comment": "Real TypeSpec emitter wiring (Wave 4): conduit-kernel spec -> http-client-python client package, emitted deterministically. Follows the peb-kernel precedent (python/peb-kernel/generated).",
-      "verify": {
-        "mode": "regenerate",
-        "command": "cd typespec/v1/conduit-kernel/python && ../../node_modules/.bin/tsp compile main.tsp"
-      }
-    },
-    {
-      "sourceSchema": "python/conduit/work_request.py",
-      "targetFormat": "pydantic-model",
-      "generator": "manual",
-      "outputPath": "python/conduit/work_request.py",
-      "lifecycle": "manual",
-      "active": false,
-      "comment": "LEGACY DOMAIN CANONICAL (conduit_wr_dco), NOT a projection: the seven-state WorkRequest DCO is hand-maintained pydantic models and is no longer labeled an active digest-locked projection of the eleven-state WRP machine (D-2026-08-16-003). Retained inactive here for provenance; the authority matrix records the conduit_wr_dco domain with a migration edge to work_request for the future WRP flip."
-    },
-    {
-      "sourceSchema": "schemas/validation/wrp/work-request.schema.json",
-      "targetFormat": "json-ld",
-      "generator": "manual",
-      "outputPath": "schemas/ontology/core/work-request.jsonld",
-      "lifecycle": "on-schema-change",
-      "active": true,
-      "verify": {
-        "mode": "digest",
-        "algorithm": "sha256",
-        "digest": "9d817fa8b2b45a3149323b088112afd967d6010759b61aa9bc469a2e19b10265"
-      }
-    },
-    {
-      "sourceSchema": "schemas/validation/wrp/wrp-event.schema.json",
-      "targetFormat": "json-ld",
-      "generator": "manual",
-      "outputPath": "schemas/ontology/core/event.jsonld",
-      "lifecycle": "on-schema-change",
-      "active": true,
-      "verify": {
-        "mode": "digest",
-        "algorithm": "sha256",
-        "digest": "8b82d2f40bab33c9eaf121770dd7cd9116c9cf5537b5530d990e003d85632410"
-      }
-    },
-    {
-      "sourceSchema": "schemas/validation/wrp/wrp-event.schema.json",
-      "targetFormat": "python-model",
-      "generator": "TypeSpec",
-      "outputPath": "python/cascade/events/schemas.py",
-      "lifecycle": "on-schema-change",
-      "active": false,
-      "comment": "cannot wire — no cascade TypeSpec spec exists in typespec/v1. Remove or add the spec first.",
-      "verify": {
-        "mode": "regenerate",
-        "command": "npx tsp compile typespec/v1 --emit @typespec/http-client-python"
-      }
-    },
-    {
-      "sourceSchema": "schemas/ontology/core/harvest.jsonld",
-      "targetFormat": "pydantic-model",
-      "generator": "manual",
-      "outputPath": "python/rover/schemas.py",
-      "lifecycle": "on-schema-change",
-      "active": true,
-      "comment": "HAND-MAINTAINED, not TypeSpec-generated: the rover spec models MCP request/response types, not the harvest schemas in this file. Digest-locked against silent edits.",
-      "verify": {
-        "mode": "digest",
-        "algorithm": "sha256",
-        "digest": "df33bc74d60455b4fd7a97e4804b333003e81c50e65996f80af7362817567ae2"
-      }
-    },
-    {
-      "sourceSchema": "schemas/ontology/core/knowledge-graph.jsonld",
-      "targetFormat": "postgres-ddl",
-      "generator": "manual",
-      "outputPath": "schemas/projection-manifests/knowledge-graph.sql",
-      "lifecycle": "on-schema-change",
-      "active": true,
-      "verify": {
-        "mode": "digest",
-        "algorithm": "sha256",
-        "digest": "4a14b0d5312b1b8ab467dc7686d2f2e0e03140327cd3bac2168bf9b75f222614"
-      }
-    },
-    {
-      "sourceSchema": "schemas/ontology/core/knowledge-graph.jsonld",
-      "targetFormat": "python-migration-script",
-      "generator": "manual",
-      "outputPath": "python/knowledge_steward/migrate_graph.py",
-      "lifecycle": "on-schema-change",
-      "active": false
-    },
-    {
-      "sourceSchema": "schemas/ontology/core/service.jsonld",
-      "targetFormat": "angular-service",
-      "generator": "TypeSpec",
-      "outputPath": "angular/nexus-console/src/models/service-mesh.model.ts",
-      "lifecycle": "on-schema-change",
-      "active": false,
-      "comment": "cannot wire — no TypeScript emitter is installed in typespec/v1. Flip active once a TS emitter lands.",
-      "verify": {
-        "mode": "regenerate",
-        "command": "npx tsp compile typespec/v1 --emit @typespec/openapi3"
-      }
-    }
-  ]
+  "ProjectionManifest": "pr:ProjectionManifest",
+  "ProjectionTarget": "pr:ProjectionTarget",
+  "ProjectionFormat": "pr:ProjectionFormat",
+  "sourceSchema": "pr:sourceSchema",
+  "targetFormat": "pr:targetFormat",
+  "generator": "pr:generator",
+  "outputPath": "pr:outputPath",
+  "lifecycle": "pr:lifecycle",
+  "active": {
+   "@id": "pr:active",
+   "@type": "xsd:boolean"
+  },
+  "verify": "pr:verify",
+  "mode": "pr:verifyMode",
+  "command": "pr:verifyCommand",
+  "algorithm": "pr:digestAlgorithm",
+  "digest": "pr:digest"
+ },
+ "@graph": [
+  {
+   "@id": "pr:ProjectionManifest",
+   "@type": "rdfs:Class",
+   "comment": "Records which schemas project to which dev artifacts, and what tool generates each projection.",
+   "properties": [
+    "pr:sourceSchema",
+    "pr:targetFormat",
+    "pr:generator",
+    "pr:outputPath",
+    "pr:lifecycle",
+    "pr:active"
+   ]
+  }
+ ],
+ "projections": [
+  {
+   "sourceSchema": "schemas/validation/wrp/work-request.schema.json",
+   "targetFormat": "typescript-type",
+   "generator": "TypeSpec",
+   "outputPath": "angular/nexus-console/src/models/work-request.model.ts",
+   "lifecycle": "on-schema-change",
+   "active": false,
+   "comment": "cannot wire \u2014 no TypeScript emitter is installed in typespec/v1 (only http-client-java/python + openapi3). Flip active once a TS emitter lands.",
+   "verify": {
+    "mode": "regenerate",
+    "command": "npx tsp compile typespec/v1 --emit @typespec/openapi3"
+   }
+  },
+  {
+   "sourceSchema": "typespec/v1/conduit-kernel/python/main.tsp",
+   "targetFormat": "python-client",
+   "generator": "TypeSpec",
+   "outputPath": "python/conduit/generated/",
+   "lifecycle": "on-schema-change",
+   "active": true,
+   "comment": "Real TypeSpec emitter wiring (Wave 4): conduit-kernel spec -> http-client-python client package, emitted deterministically. Follows the peb-kernel precedent (python/peb-kernel/generated).",
+   "verify": {
+    "mode": "regenerate",
+    "command": "cd typespec/v1/conduit-kernel/python && ../../node_modules/.bin/tsp compile main.tsp"
+   }
+  },
+  {
+   "sourceSchema": "python/conduit/work_request.py",
+   "targetFormat": "pydantic-model",
+   "generator": "manual",
+   "outputPath": "python/conduit/work_request.py",
+   "lifecycle": "manual",
+   "active": false,
+   "comment": "LEGACY DOMAIN CANONICAL (conduit_wr_dco), NOT a projection: the seven-state WorkRequest DCO is hand-maintained pydantic models and is no longer labeled an active digest-locked projection of the eleven-state WRP machine (D-2026-08-16-003). Retained inactive here for provenance; the authority matrix records the conduit_wr_dco domain with a migration edge to work_request for the future WRP flip."
+  },
+  {
+   "sourceSchema": "schemas/validation/wrp/work-request.schema.json",
+   "targetFormat": "json-ld",
+   "generator": "manual",
+   "outputPath": "schemas/ontology/core/work-request.jsonld",
+   "lifecycle": "on-schema-change",
+   "active": true,
+   "verify": {
+    "mode": "digest",
+    "algorithm": "sha256",
+    "digest": "9d817fa8b2b45a3149323b088112afd967d6010759b61aa9bc469a2e19b10265"
+   }
+  },
+  {
+   "sourceSchema": "schemas/validation/wrp/wrp-event.schema.json",
+   "targetFormat": "json-ld",
+   "generator": "manual",
+   "outputPath": "schemas/ontology/core/event.jsonld",
+   "lifecycle": "on-schema-change",
+   "active": true,
+   "verify": {
+    "mode": "digest",
+    "algorithm": "sha256",
+    "digest": "8b82d2f40bab33c9eaf121770dd7cd9116c9cf5537b5530d990e003d85632410"
+   }
+  },
+  {
+   "sourceSchema": "schemas/validation/wrp/wrp-event.schema.json",
+   "targetFormat": "python-model",
+   "generator": "TypeSpec",
+   "outputPath": "python/cascade/events/schemas.py",
+   "lifecycle": "on-schema-change",
+   "active": false,
+   "comment": "cannot wire \u2014 no cascade TypeSpec spec exists in typespec/v1. Remove or add the spec first.",
+   "verify": {
+    "mode": "regenerate",
+    "command": "npx tsp compile typespec/v1 --emit @typespec/http-client-python"
+   }
+  },
+  {
+   "sourceSchema": "schemas/ontology/core/harvest.jsonld",
+   "targetFormat": "pydantic-model",
+   "generator": "manual",
+   "outputPath": "python/rover/schemas.py",
+   "lifecycle": "on-schema-change",
+   "active": true,
+   "comment": "HAND-MAINTAINED, not TypeSpec-generated: the rover spec models MCP request/response types, not the harvest schemas in this file. Digest-locked against silent edits.",
+   "verify": {
+    "mode": "digest",
+    "algorithm": "sha256",
+    "digest": "df33bc74d60455b4fd7a97e4804b333003e81c50e65996f80af7362817567ae2"
+   }
+  },
+  {
+   "sourceSchema": "schemas/ontology/core/knowledge-graph.jsonld",
+   "targetFormat": "postgres-ddl",
+   "generator": "manual",
+   "outputPath": "schemas/projection-manifests/knowledge-graph.sql",
+   "lifecycle": "on-schema-change",
+   "active": true,
+   "verify": {
+    "mode": "digest",
+    "algorithm": "sha256",
+    "digest": "4a14b0d5312b1b8ab467dc7686d2f2e0e03140327cd3bac2168bf9b75f222614"
+   }
+  },
+  {
+   "sourceSchema": "schemas/ontology/core/knowledge-graph.jsonld",
+   "targetFormat": "python-migration-script",
+   "generator": "manual",
+   "outputPath": "python/knowledge_steward/migrate_graph.py",
+   "lifecycle": "on-schema-change",
+   "active": false
+  },
+  {
+   "sourceSchema": "schemas/ontology/core/service.jsonld",
+   "targetFormat": "angular-service",
+   "generator": "TypeSpec",
+   "outputPath": "angular/nexus-console/src/models/service-mesh.model.ts",
+   "lifecycle": "on-schema-change",
+   "active": false,
+   "comment": "cannot wire \u2014 no TypeScript emitter is installed in typespec/v1. Flip active once a TS emitter lands.",
+   "verify": {
+    "mode": "regenerate",
+    "command": "npx tsp compile typespec/v1 --emit @typespec/openapi3"
+   }
+  },
+  {
+   "sourceSchema": "typespec/v1/tackle-registry/spring/main.tsp",
+   "targetFormat": "openapi3",
+   "generator": "TypeSpec",
+   "outputPath": "jvm/spring/service-broker/tackle-registry-service/openapi.yaml",
+   "lifecycle": "on-schema-change",
+   "active": true,
+   "comment": "D-C step 3 governance registration (D-2026-08-23-C): the tackle-registry TypeSpec contract projects to a committed openapi.yaml, which is the drift-sentinel probe target for the JVM service. Follows the conduit-kernel regenerate-verify precedent.",
+   "verify": {
+    "mode": "regenerate",
+    "command": "cd typespec/v1/tackle-registry/spring && ../../node_modules/.bin/tsp compile main.tsp"
+   }
+  }
+ ]
 }

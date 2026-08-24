@@ -11,11 +11,8 @@ import "./operations.tsp";
 
 using Http;
 
-@service({
+@service(#{
   title: "Tackle Registry Service",
-  description: "JVM mirror of the tackle AI-config registry + Spring AI HTTP inference.",
 })
-@server("Tackle Registry Service", "{endpoint}", {
-  endpoint: "http://localhost:8765",
-})
+@server("http://localhost:8765", "Tackle Registry Service")
 namespace org.nexus.tackleregistry;
