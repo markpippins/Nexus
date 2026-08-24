@@ -23,7 +23,9 @@ Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr
 # Environment=BROKER_URL=http://localhost:8081/api/v1/broker/submitRequest
 
 # ── Executable ─────────────────────────────────────────────────────────
-ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/npx tsx src/sse.ts
+# Use the project-local tsx binary directly — `npx` cannot run here because
+# ProtectHome=read-only makes the npm cache (~/.npm) unwritable (EROFS).
+ExecStart=/home/codex/dev/nexus/typescript/service-broker-mcp/node_modules/.bin/tsx src/sse.ts
 ExecReload=/bin/kill -HUP $MAINPID
 
 # ── Restart behavior ───────────────────────────────────────────────────
