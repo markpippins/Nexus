@@ -31,7 +31,12 @@ OUT_DIR = REPO / "ballerina" / "ci-gateway" / "snapshots"
 def main() -> int:
     args = sys.argv[1:]
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    specs = sorted(REPO.glob("typescript/*/openapi.yaml"))
+    # Discover committed specs across both runtimes: TypeScript services keep
+    # their openapi.yaml under typescript/<svc>/; JVM services keep theirs next
+    # to the Spring service module (jvm/spring/service-broker/<svc>/). The
+    # service key is the immediate parent dir name in both cases.
+    specs = sorted(REPO.glob("typescript/*/openapi.yaml")) + \
+            sorted(REPO.glob("jvm/spring/service-broker/*/openapi.yaml"))
     count = 0
     for spec_path in specs:
         svc = spec_path.parent.name

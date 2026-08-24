@@ -25,7 +25,7 @@
  "info": {
   "description": "Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge graph, and cross-references.\n\nEndpoint inventory generated from source route registrations by `nexus/tools/api-docs/`. Request/response bodies are generic; field-level contracts live in the service code and its README.",
   "title": "nebula-srv \u2014 Nebula Knowledge-Graph API",
-  "version": "1.0.82db4bc8"
+  "version": "1.0.1bf389e9"
  },
  "openapi": "3.0.3",
  "paths": {
@@ -4350,6 +4350,57 @@
     ]
    }
   },
+  "/api/harvest-candidates/completion-sweep": {
+   "post": {
+    "operationId": "post_harvest_candidates_completion_sweep",
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
+    "summary": "Batch variant: POST /api/harvest-candidates/completion-sweep { ids: [...] } Missing/unknown ids are reported per-id rather than failing the ",
+    "tags": [
+     "harvest-candidates"
+    ]
+   }
+  },
   "/api/harvest-candidates/discover": {
    "post": {
     "operationId": "post_harvest_candidates_discover",
@@ -4567,6 +4618,66 @@
      }
     },
     "summary": "PATCH /api/harvest-candidates/:id \u2014 update candidate (primarily for linking to hierarchy) When systemId is set, auto-upserts the candidate's",
+    "tags": [
+     "harvest-candidates"
+    ]
+   }
+  },
+  "/api/harvest-candidates/{id}/completion": {
+   "get": {
+    "operationId": "get_harvest_candidates_id_completion",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JsonBody"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Bad request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Not found"
+     },
+     "500": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Server error"
+     }
+    },
     "tags": [
      "harvest-candidates"
     ]
