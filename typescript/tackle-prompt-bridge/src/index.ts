@@ -79,14 +79,28 @@ async function readPromptCard(
   role: string,
   slug: string
 ): Promise<CachedPromptCard | null> {
+  const redis = getRedis();
+  // Transport-down must NOT masquerade as a cache miss. When Redis isn't
+  // reachable, say so loudly — agents were debugging phantom "prompt not
+  // cached" errors during outages (see to-do: return 503-equivalent).
+  if (redis.status !== "ready") {
+    throw new Error(
+      `Redis unavailable (status: ${redis.status}). The prompt cache is unreachable; cannot serve "${role}/${slug}". Verify Redis on ${
+        process.env.PROMPT_REDIS_URL || process.env.MEMORY_REDIS_URL || "redis://localhost:6379"
+      } and retry.`
+    );
+  }
   try {
-    const redis = getRedis();
     const raw = await redis.get(PROC_KEY(role, slug));
     if (!raw) return null;
     return JSON.parse(raw) as CachedPromptCard;
   } catch (err: any) {
+    // An actual GET failure mid-request is also a transport problem,
+    // not evidence the prompt doesn't exist.
     console.error(`[prompt-bridge] readPromptCard(${role}, ${slug}) failed: ${err.message}`);
-    return null;
+    throw new Error(
+      `Redis read failed while fetching prompt "${role}/${slug}": ${err.message}. The prompt cache is unreachable — this is an infrastructure error, not a missing prompt.`
+    );
   }
 }
 
