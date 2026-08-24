@@ -2952,15 +2952,15 @@ export function createRoutes(pool: Pool): Router {
 
   // POST /api/harvest-candidates/promote-to-plan — RETIRED (architect ruling on
   // to-do e68449f2): the backing nebula.candidates_to_plan() procedure was dropped
-  // in a migration and must NOT be resurrected — spawn_plan_from_candidate is the
-  // canonical promotion path (MCP-surfaced, sets requirements.candidate_id).
+  // in a migration and must NOT be resurrected — spawn_requirement_from_candidate is
+  // the canonical promotion path (MCP-surfaced, sets requirements.candidate_id).
   // This route now fails loudly so callers migrate instead of 400-ing mysteriously.
   router.post('/harvest-candidates/promote-to-plan', async (_req: Request, res: Response) => {
     res.status(410).json({
       error: 'promote-to-plan was retired: its backing procedure (nebula.candidates_to_plan) no longer exists and will not be restored.',
-      useInstead: 'POST /api/harvest-candidates/:id/spawn-plan',
-      mcpTool: 'nebula_spawn_plan_from_candidate',
-      rationale: 'Single canonical promotion flow; the legacy parallel route created two competing promotion paths. See architect ruling on to-do e68449f2.',
+      useInstead: 'POST /api/harvest-candidates/:id/spawn-requirement',
+      mcpTool: 'nebula_spawn_requirement_from_candidate',
+      rationale: 'Single canonical promotion flow; the legacy parallel route created two competing promotion paths. See architect ruling on to-do e68449f2; verb renamed per decision 319defa5.',
     });
   });
 
@@ -4219,10 +4219,23 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
-  // POST /api/harvest-candidates/:id/spawn-plan — full flow: link candidate
+  // POST /api/harvest-candidates/:id/spawn-plan — DEPRECATED alias (decision
+  // 319defa5): candidates promote ONLY to requirements; verb renamed to
+  // spawn-requirement. Fails loudly with a pointer so callers migrate.
+  router.post('/harvest-candidates/:id/spawn-plan', async (_req: Request, res: Response) => {
+    res.status(410).json({
+      error: 'spawn-plan was renamed spawn-requirement (decision 319defa5: candidates promote only to requirements; plans come from requirements).',
+      useInstead: 'POST /api/harvest-candidates/:id/spawn-requirement',
+      mcpTool: 'nebula_spawn_requirement_from_candidate',
+      rationale: 'No candidate-to-plan path exists. Request body semantics unchanged — re-point and retry.',
+    });
+  });
+
+  // POST /api/harvest-candidates/:id/spawn-requirement — full flow: link candidate
   // to system, create a requirement derived from the candidate, and optionally
   // cross-reference a conduit plan — all in one atomic transaction.
-  router.post('/harvest-candidates/:id/spawn-plan', async (req: Request, res: Response) => {
+  // (Renamed from spawn-plan per decision 319defa5.)
+  router.post('/harvest-candidates/:id/spawn-requirement', async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
       const { id } = req.params;
@@ -6338,7 +6351,7 @@ export function createRoutes(pool: Pool): Router {
   });
 
   // GET /api/knowledge/view — combined data payload for graph visualization
-  // Returns all entities (including linked harvest_candidates) + all edges in one call, with optional limit. Harvest_candidates are unioned so spawn-plan cross-references render as dashed edges in graph-view X-Refs mode.
+  // Returns all entities (including linked harvest_candidates) + all edges in one call, with optional limit. Harvest_candidates are unioned so spawn-requirement cross-references render as dashed edges in graph-view X-Refs mode.
   router.get('/knowledge/view', async (req: Request, res: Response) => {
     try {
       const limit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
@@ -6388,12 +6401,12 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
-  // GET /api/knowledge/cross-references — list cross-references for graph overlay with pagination. Also includes harvest_candidate spawn-plan cross-references from nebula.cross_references.
+  // GET /api/knowledge/cross-references — list cross-references for graph overlay with pagination. Also includes harvest_candidate spawn-requirement cross-references from nebula.cross_references.
   router.get('/knowledge/cross-references', async (req: Request, res: Response) => {
     try {
       const { offset, limit, page, pageSize } = parsePagination(req.query);
 
-      // Union knowledge cross-references with harvest_candidate spawn-plan xrefs
+      // Union knowledge cross-references with harvest_candidate spawn-requirement xrefs
       const xrefSubquery = `(
         SELECT xr.id, xr.map_name, xr.source_section, xr.source_id,
                xr.target_section, xr.target_id, xr.weight
