@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: nebula-srv — Nebula Knowledge-Graph API
-  version: 1.0.1bf389e9
+  version: 1.0.79b7ed9a
   description: 'Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge
     graph, and cross-references.
 
@@ -2670,7 +2670,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: GET /api/harvest-candidates — list candidates, filterable by harvest or hierarchy
+      summary: 'GET /api/harvest-candidates — list candidates, filterable by harvest or hierarchy Sweep-tooling extras (to-do
+        7e2d116f): ?completed=true|fal'
     post:
       tags:
       - harvest-candidates
@@ -2916,8 +2917,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: 'POST /api/harvest-candidates/:id/spawn-plan — full flow: link candidate to system, create a requirement derived
-        from the candidate, and opti'
+      summary: 'POST /api/harvest-candidates/:id/spawn-plan — DEPRECATED alias (decision 319defa5): candidates promote ONLY
+        to requirements; verb renamed to'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/harvest-candidates/{id}/spawn-requirement:
+    post:
+      tags:
+      - harvest-candidates
+      operationId: post_harvest_candidates_id_spawn_requirement
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'POST /api/harvest-candidates/:id/spawn-requirement — full flow: link candidate to system, create a requirement
+        derived from the candidate, a'
       parameters:
       - name: id
         in: path
@@ -3018,7 +3057,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: POST /api/harvest-candidates/promote-to-plan — collate useful candidates into a conduit plan
+      summary: 'POST /api/harvest-candidates/promote-to-plan — RETIRED (architect ruling on to-do e68449f2): the backing nebula.candidates_to_plan()
+        procedu'
   /api/harvests:
     get:
       tags:
@@ -3484,7 +3524,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       summary: GET /api/knowledge/cross-references — list cross-references for graph overlay with pagination. Also includes
-        harvest_candidate spawn-plan cr
+        harvest_candidate spawn-require
   /api/knowledge/edges:
     get:
       tags:

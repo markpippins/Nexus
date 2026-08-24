@@ -5,7 +5,7 @@
 
 Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge graph, and cross-references.
 
-**224 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**225 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -85,17 +85,18 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | GET | `/api/features/:id/specifications` | GET /api/features/:id/specifications — list specification revisions scoped to a feature |
 | GET | `/api/features/:id/work-requests` | GET /api/features/:id/work-requests — list work requests scoped to a feature |
 | POST | `/api/features/move` | COMPLEX OPERATIONS (transactional) POST /api/features/move — re-parent a feature to a different subsystem |
-| GET | `/api/harvest-candidates` | GET /api/harvest-candidates — list candidates, filterable by harvest or hierarchy |
+| GET | `/api/harvest-candidates` | GET /api/harvest-candidates — list candidates, filterable by harvest or hierarchy Sweep-tooling extras (to-do 7e2d116f): ?completed=true\|false, ?status=<value>, and an endpoint-local page cap of 1000 (global default stays 100) so a sweep can pull the full ~100+ candidate set in one call. `total` is  |
 | POST | `/api/harvest-candidates` | POST /api/harvest-candidates — create a standalone candidate (e.g. manually linked). When systemId is set, auto-upserts a harvest_context info tab on the target system. |
 | GET | `/api/harvest-candidates/:id` | GET /api/harvest-candidates/:id — full candidate with all fields |
 | PATCH | `/api/harvest-candidates/:id` | PATCH /api/harvest-candidates/:id — update candidate (primarily for linking to hierarchy) When systemId is set, auto-upserts the candidate's intent into a harvest_context info tab. |
 | GET | `/api/harvest-candidates/:id/completion` |  |
 | GET | `/api/harvest-candidates/:id/dependencies` | CANDIDATE DEPENDENCIES sub-resource GET /api/harvest-candidates/:id/dependencies |
 | POST | `/api/harvest-candidates/:id/promote` | POST /api/harvest-candidates/:id/promote — mark candidate as useful |
-| POST | `/api/harvest-candidates/:id/spawn-plan` | POST /api/harvest-candidates/:id/spawn-plan — full flow: link candidate to system, create a requirement derived from the candidate, and optionally cross-reference a conduit plan — all in one atomic transaction. |
+| POST | `/api/harvest-candidates/:id/spawn-plan` | POST /api/harvest-candidates/:id/spawn-plan — DEPRECATED alias (decision 319defa5): candidates promote ONLY to requirements; verb renamed to spawn-requirement. Fails loudly with a pointer so callers migrate. |
+| POST | `/api/harvest-candidates/:id/spawn-requirement` | POST /api/harvest-candidates/:id/spawn-requirement — full flow: link candidate to system, create a requirement derived from the candidate, and optionally cross-reference a conduit plan — all in one atomic transaction. (Renamed from spawn-plan per decision 319defa5.) |
 | POST | `/api/harvest-candidates/completion-sweep` | Batch variant: POST /api/harvest-candidates/completion-sweep { ids: [...] } Missing/unknown ids are reported per-id rather than failing the batch. |
 | POST | `/api/harvest-candidates/discover` | HARVEST CANDIDATE DISCOVERY — semantic search against project hierarchy POST /api/harvest-candidates/discover — match unlinked candidates to systems/subsystems/features via semantic search, flagging undocumented projects below confidence threshold. |
-| POST | `/api/harvest-candidates/promote-to-plan` | POST /api/harvest-candidates/promote-to-plan — collate useful candidates into a conduit plan |
+| POST | `/api/harvest-candidates/promote-to-plan` | POST /api/harvest-candidates/promote-to-plan — RETIRED (architect ruling on to-do e68449f2): the backing nebula.candidates_to_plan() procedure was dropped in a migration and must NOT be resurrected — spawn_requirement_from_candidate is the canonical promotion path (MCP-surfaced, sets requirements.ca |
 | GET | `/api/harvests` | HARVESTS — database-first harvest pipeline output GET /api/harvests — list all harvests with sort/filter support + pagination sort options: candidate_count, code_blocks, turns, block_density, collaboration, created_at |
 | POST | `/api/harvests` | POST /api/harvests — create a new harvest record AND unpack candidates into harvest_candidates (dual-write: JSONB preserved for Rover + relational for linking) |
 | DELETE | `/api/harvests/:id` | DELETE /api/harvests/:id |
@@ -109,13 +110,13 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | PUT | `/api/inbox-pointer/:role` | PUT /api/inbox-pointer/:role — set the inbox pointer for a role |
 | GET | `/api/inbox-pointers` | GET /api/inbox-pointers — list all inbox pointers (debugging) |
 | GET | `/api/inventory` | GET /api/inventory — rollup counts for the full hierarchy tree Returns per-node counts (systems/subsystems/features) for tree badges plus global totals. Single query, no per-node N+1. |
-| GET | `/api/knowledge/cross-references` | GET /api/knowledge/cross-references — list cross-references for graph overlay with pagination. Also includes harvest_candidate spawn-plan cross-references from nebula.cross_references. |
+| GET | `/api/knowledge/cross-references` | GET /api/knowledge/cross-references — list cross-references for graph overlay with pagination. Also includes harvest_candidate spawn-requirement cross-references from nebula.cross_references. |
 | GET | `/api/knowledge/edges` | GET /api/knowledge/edges — list graph edges with optional filters and pagination |
 | GET | `/api/knowledge/entities` | KNOWLEDGE GRAPH — read-only queries for graph visualization GET /api/knowledge/entities — list knowledge graph entities with optional filters and pagination |
 | GET | `/api/knowledge/entities/:section/:entityId` | GET /api/knowledge/entities/:section/:entityId — get single entity |
 | GET | `/api/knowledge/entities/:section/:entityId/relations` | GET /api/knowledge/entities/:section/:entityId/relations — inbound + outbound with pagination |
 | GET | `/api/knowledge/summary` | GET /api/knowledge/summary — entity counts by section (with embedded), edge counts by relation type |
-| GET | `/api/knowledge/view` | GET /api/knowledge/view — combined data payload for graph visualization Returns all entities (including linked harvest_candidates) + all edges in one call, with optional limit. Harvest_candidates are unioned so spawn-plan cross-references render as dashed edges in graph-view X-Refs mode. |
+| GET | `/api/knowledge/view` | GET /api/knowledge/view — combined data payload for graph visualization Returns all entities (including linked harvest_candidates) + all edges in one call, with optional limit. Harvest_candidates are unioned so spawn-requirement cross-references render as dashed edges in graph-view X-Refs mode. |
 | GET | `/api/observations` | OBSERVATIONS GET /api/observations — list with pagination |
 | GET | `/api/observations/:id` | GET /api/observations/:id — single observation |
 | GET | `/api/op-registry` | GET /api/op-registry — list registry entries with optional filters and pagination |
@@ -242,6 +243,7 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
 
 
 
