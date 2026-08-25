@@ -22,6 +22,7 @@ import { plansRouter } from './plans.js';
 import { searchRouter } from './search.js';
 import { bridgesRouter } from './bridges.js';
 import { dualityRouter } from './duality.js';
+import { decisionsRouter } from './decisions.js';
 
 export const routes = Router();
 
@@ -48,3 +49,4 @@ routes.use('/users', usersRouter);
 routes.use('/plans', plansRouter);
 routes.use('/bridges', bridgesRouter);
 routes.use('/duality', dualityRouter);
+routes.use('/decisions', decisionsRouter);
