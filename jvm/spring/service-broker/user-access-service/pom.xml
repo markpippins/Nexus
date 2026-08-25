@@ -89,7 +89,7 @@
                 <id>default</id>
                 <phase>prepare-package</phase>
                 <goals>
-                    <goal>copy</goal>
+                    <goal>copy-dependencies</goal>
                 </goals>
                 <configuration>
                     <outputDirectory>${project.build.directory}/libs</outputDirectory>

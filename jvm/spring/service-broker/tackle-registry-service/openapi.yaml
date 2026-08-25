@@ -1,0 +1,546 @@
+openapi: 3.0.0
+info:
+  title: Tackle Registry Service
+  version: 0.0.0
+tags: []
+paths:
+  /ai/hello:
+    get:
+      operationId: hello
+      description: Spring AI hello-world one-shot; degrades gracefully without configured providers.
+      parameters:
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+          explode: false
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/HelloResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
+  /ai/invoke:
+    post:
+      operationId: invoke
+      description: Run a prompt through the resolved bundle (role mode) or an explicit provider (direct mode). CLI-harness provider types are refused with 415.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/InvokeResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvokeRequest'
+  /ai/invoke/capabilities:
+    get:
+      operationId: capabilities
+      description: Which provider types this service can serve over HTTP.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilitiesResponse'
+  /ai/models:
+    get:
+      operationId: aiModels
+      description: Introspect ChatModel beans auto-configured by Spring AI.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelsResponse'
+  /ai/ping:
+    get:
+      operationId: ping
+      description: Liveness probe; never touches a model.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PingResponse'
+  /config/ai/bundles:
+    get:
+      operationId: listBundlesAlias
+      description: Alias of /config/bundles (tackle-srv mount parity).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConfigBundle'
+  /config/ai/bundles/{role}:
+    get:
+      operationId: listBundlesForRoleAlias
+      description: Alias of /config/bundles/{role} (tackle-srv mount parity).
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConfigBundle'
+  /config/ai/harnesses:
+    get:
+      operationId: listHarnessesAlias
+      description: Alias of /config/harnesses (tackle-srv mount parity).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Harness'
+  /config/ai/models:
+    get:
+      operationId: listModelsAlias
+      description: Alias of /config/models (tackle-srv mount parity).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ModelRow'
+  /config/ai/providers:
+    get:
+      operationId: listProvidersAlias
+      description: Alias of /config/providers (tackle-srv mount parity).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Provider'
+  /config/ai/resolve/{role}:
+    get:
+      operationId: resolveRoleAlias
+      description: Alias of /config/resolve/{role} (tackle-srv mount parity).
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/ResolvedRoleConfig'
+                  - $ref: '#/components/schemas/ErrorResponse'
+  /config/ai/roles:
+    get:
+      operationId: listRolesAlias
+      description: Alias of /config/roles (tackle-srv mount parity).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RoleRow'
+  /config/bundles:
+    get:
+      operationId: listBundles
+      description: List all config bundles ordered by role and priority.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConfigBundle'
+  /config/bundles/{role}:
+    get:
+      operationId: listBundlesForRole
+      description: List config bundles for one role.
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConfigBundle'
+  /config/harnesses:
+    get:
+      operationId: listHarnesses
+      description: List invocation harnesses.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Harness'
+  /config/models:
+    get:
+      operationId: listModels
+      description: List models.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ModelRow'
+  /config/providers:
+    get:
+      operationId: listProviders
+      description: List AI providers from the tackle schema.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Provider'
+  /config/resolve/{role}:
+    get:
+      operationId: resolveRole
+      description: Resolve the winning active bundle for a role (mirrors tackle-srv getResolvedRoleConfig).
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/ResolvedRoleConfig'
+                  - $ref: '#/components/schemas/ErrorResponse'
+  /config/roles:
+    get:
+      operationId: listRoles
+      description: List governance roles.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RoleRow'
+components:
+  schemas:
+    CapabilitiesResponse:
+      type: object
+      required:
+        - httpInvocable
+        - note
+      properties:
+        httpInvocable:
+          type: array
+          items:
+            type: string
+        note:
+          type: string
+    ConfigBundle:
+      type: object
+      required:
+        - id
+        - name
+        - role
+        - modelId
+        - priority
+        - invocationMode
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        modelId:
+          type: string
+        providerId:
+          type: string
+        harnessId:
+          type: string
+        priority:
+          type: integer
+          format: int32
+        invocationMode:
+          type: string
+        command:
+          type: string
+        endpointUrl:
+          type: string
+        timeoutMs:
+          type: integer
+          format: int32
+        isActive:
+          type: boolean
+      description: A priority-ordered configuration bundle binding a role to a model.
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+    Harness:
+      type: object
+      required:
+        - id
+        - name
+        - invocationSemantics
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        invocationSemantics:
+          type: object
+          additionalProperties: {}
+      description: An invocation harness (CLI/HTTP wrapper description).
+    HelloResponse:
+      type: object
+      required:
+        - reply
+      properties:
+        reply:
+          type: string
+        model:
+          type: string
+    InvokeRequest:
+      type: object
+      required:
+        - prompt
+      properties:
+        role:
+          type: string
+          description: 'Role-resolved mode: resolve active bundle via /config/resolve/{role}.'
+        providerType:
+          type: string
+          description: Direct mode fields.
+        endpointUrl:
+          type: string
+        apiKey:
+          type: string
+        modelIdentifier:
+          type: string
+        prompt:
+          type: string
+      description: Request body for POST /ai/invoke. Field names accept snake_case on the wire.
+    InvokeResponse:
+      type: object
+      required:
+        - reply
+      properties:
+        reply:
+          type: string
+    ModelRow:
+      type: object
+      required:
+        - id
+        - name
+        - harnessId
+        - modelIdentifier
+        - verified
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        harnessId:
+          type: string
+        providerId:
+          type: string
+        modelIdentifier:
+          type: string
+        verified:
+          type: boolean
+      description: A model row joined to its harness/provider.
+    ModelsResponse:
+      type: object
+      required:
+        - count
+        - models
+      properties:
+        count:
+          type: integer
+          format: int32
+        models:
+          type: array
+          items:
+            type: string
+    PingResponse:
+      type: object
+      required:
+        - service
+        - status
+        - modelsAvailable
+      properties:
+        service:
+          type: string
+        status:
+          type: string
+        modelsAvailable:
+          type: integer
+          format: int32
+    Provider:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - configJson
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          description: Controlled vocabulary incl. openai|anthropic|google|ollama|opencode|codex|spring_ai|lm_server|custom
+        endpointUrl:
+          type: string
+        apiKey:
+          type: string
+        configJson:
+          type: object
+          additionalProperties: {}
+      description: An AI provider registered in the tackle schema.
+    ResolvedFallback:
+      type: object
+      required:
+        - priority
+        - modelIdentifier
+        - providerType
+        - providerName
+      properties:
+        priority:
+          type: integer
+          format: int32
+        modelIdentifier:
+          type: string
+        providerType:
+          type: string
+        providerName:
+          type: string
+      description: Winning bundle resolution — mirrors tackle-srv getResolvedRoleConfig.
+    ResolvedRoleConfig:
+      type: object
+      required:
+        - role
+        - modelIdentifier
+        - providerId
+        - providerName
+        - providerType
+        - harnessName
+        - fallbacks
+      properties:
+        role:
+          type: string
+        modelIdentifier:
+          type: string
+        providerId:
+          type: string
+        providerName:
+          type: string
+        providerType:
+          type: string
+        apiKey:
+          type: string
+        endpointUrl:
+          type: string
+        harnessName:
+          type: string
+        fallbacks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResolvedFallback'
+    RoleRow:
+      type: object
+      required:
+        - id
+        - name
+        - description
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+      description: A governance role entry.
+servers:
+  - url: http://localhost:8765
+    description: Tackle Registry Service
+    variables: {}

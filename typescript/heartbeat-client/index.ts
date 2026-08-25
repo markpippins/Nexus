@@ -48,7 +48,10 @@ export interface HeartbeatStats {
 
 // ─── Defaults ───────────────────────────────────────────────────────────────
 
-const DEFAULT_REGISTRY_URL = "http://localhost:8085";
+const DEFAULT_REGISTRY_URL =
+  process.env.HEARTBEAT_REGISTRY_URL ||
+  process.env.REGISTRY_URL ||
+  "http://localhost:8085";
 const DEFAULT_INTERVAL = 20; // seconds (well under 60s TTL / 90s stale)
 const DEFAULT_TIMEOUT_MS = 5000;
 

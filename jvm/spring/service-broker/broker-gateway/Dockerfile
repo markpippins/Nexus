@@ -14,27 +14,18 @@ WORKDIR /build
 # Parent POM com.aibizarchitect.nexus:nexus lives at jvm/spring/pom.xml.
 COPY spring/pom.xml spring-parent.pom.xml
 RUN --mount=type=cache,target=/root/.m2 mvn -B -q -f spring-parent.pom.xml -N install
-# Shared API modules the gateway (and its reactor deps) compile against but
-# which live outside the service-broker aggregator — install first so the
-# container build is self-contained (normally provided by host ~/.m2).
-# NOTE: both are standalone POMs (no <parent> block), same as registry used.
-COPY shared/broker-service-api/pom.xml shared/broker-service-api/
-COPY shared/broker-service-api/src shared/broker-service-api/src
-RUN --mount=type=cache,target=/root/.m2 mvn -B -q -f shared/broker-service-api/pom.xml install
-COPY shared/user-api/pom.xml shared/user-api/
-COPY shared/user-api/src shared/user-api/src
-RUN --mount=type=cache,target=/root/.m2 mvn -B -q -f shared/user-api/pom.xml install
-# The full service-broker reactor (aggregator POM requires every module
-# dir to exist), then build gateway + its intra-reactor deps (-am).
-# The ../atlas module lives outside this tree — stripped for image builds.
+# Full shared/ reactor: gateway's dependency chain reaches several of its
+# modules transitively (core, apis, adapters) via the service-broker siblings.
+COPY shared/ shared/
+RUN --mount=type=cache,target=/root/.m2 mvn -B -q -f shared/pom.xml install -DskipTests
+# Broker reactor: build gateway plus its internal dependencies (-am), exactly
+# like the documented host build. Produces the boot-executable -exec.jar.
+# The service-broker aggregator also declares module ../atlas (i.e. spring/atlas).
+COPY spring/atlas/ spring/atlas/
 COPY spring/service-broker/ spring/service-broker/
-RUN sed -i '\|<module>\.\./atlas</module>|d' spring/service-broker/pom.xml
 WORKDIR /build/spring/service-broker
-# -Dmdep.skip: user-access-service has a dependency:copy execution without
-# artifactItems (host-launch layout helper); its target/libs output is not
-# consumed by any downstream Maven build, so skip it in-image.
-RUN --mount=type=cache,target=/root/.m2 mvn -B clean package -DskipTests -q -pl broker-gateway -am -Dmdep.skip=true \
- && JAR=$(ls broker-gateway/target/*.jar | grep -v original | head -1) \
+RUN --mount=type=cache,target=/root/.m2 mvn -B clean package -DskipTests -pl broker-gateway -am \
+ && JAR=$(ls broker-gateway/target/*-exec.jar | head -1) \
  && ln -s "$(basename "$JAR")" broker-gateway/target/app.jar
 
 FROM eclipse-temurin:21-jre
