@@ -36,7 +36,7 @@ export class SidebarComponent implements OnDestroy {
   getProvider = input.required<(path: string[]) => FileSystemProvider>();
   isTreeVisible = input(true);
   isNotesVisible = input(true);
-  viewMode = input<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui'>('file-explorer');
+  viewMode = input<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'barbie' | 'kanban' | 'cascade-ui'>('file-explorer');
   meshViewMode = input<'console' | 'graph'>('console'); // Sub-mode when in service-mesh
   graphSubView = input<'canvas' | 'creator'>('canvas'); // Sub-view when in graph mode
 
@@ -70,7 +70,7 @@ export class SidebarComponent implements OnDestroy {
   dependencies = computed(() => this.serviceMeshService.dependencies());
   deployments = computed(() => this.serviceMeshService.deployments());
   selectedService = this.serviceMeshService.selectedService;
-  isIframeMode = computed(() => this.viewMode() === 'conduit-ui' || this.viewMode() === 'duality' || this.viewMode() === 'plurality' || this.viewMode() === 'assembly' || this.viewMode() === 'nebula-rms' || this.viewMode() === 'peb-ui' || this.viewMode() === 'kernel-ui' || this.viewMode() === 'tackle-ui' || this.viewMode() === 'cascade-ui');
+  isIframeMode = computed(() => this.viewMode() === 'conduit-ui' || this.viewMode() === 'duality' || this.viewMode() === 'plurality' || this.viewMode() === 'assembly' || this.viewMode() === 'nebula-rms' || this.viewMode() === 'peb-ui' || this.viewMode() === 'kernel-ui' || this.viewMode() === 'tackle-ui' || this.viewMode() === 'barbie' || this.viewMode() === 'cascade-ui');
 
 
   width = signal(this.uiPreferencesService.sidebarWidth() ?? 288);
