@@ -122,3 +122,7 @@ cir1_ref_index.txt
 docker/candidate-stack/.env
 state/promotion-flow/
 nexus/etc/fleet-internal.env
+
+# runtime state dirs (never commit)
+typescript/file-system-server/root
+typescript/file-system-server/root.sandbox-bak-*/
