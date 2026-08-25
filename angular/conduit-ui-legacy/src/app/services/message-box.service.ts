@@ -23,6 +23,17 @@ const VALID_ROLES = ["planner", "builder", "reviewer", "critic"] as const;
 type AgentRole = typeof VALID_ROLES[number];
 const DEFAULT_ROLE: AgentRole = "planner";
 
+/** Display label for message box role. "planner" → "Operator" per 9d3f0fa7. */
+export const AGENT_ROLE_DISPLAY: Record<string, string> = {
+  planner: "Operator",
+  builder: "Builder",
+  reviewer: "Reviewer",
+  critic: "Critic",
+};
+export function agentRoleLabel(role: string | null): string {
+  return role ? (AGENT_ROLE_DISPLAY[role] || role) : "Assistant";
+}
+
 export interface MessageBoxInstance {
   id: string;
   title: string;
