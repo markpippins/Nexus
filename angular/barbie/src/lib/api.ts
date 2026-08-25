@@ -27,6 +27,8 @@ import {
   JenkinsJob,
   JenkinsBuild,
   SonarProject,
+  SonarRating,
+  QualityGateStatus,
   SonarMetricPoint,
   BallerinaPackage,
   BallerinaService
@@ -247,6 +249,23 @@ function mapAggregate(raw: any): PlatformAggregateState {
     nodes: Array.isArray(raw.nodes) ? raw.nodes : [],
     edges: Array.isArray(raw.edges) ? raw.edges : [],
   };
+}
+
+// ── CI-gateway (ballerina :9095 via /gateway passthrough) ──────────
+async function gatewayJson<T>(path: string): Promise<T> {
+  const env = await fetchJson<{ data: T }>(`/gateway${path}`);
+  return env.data;
+}
+
+function jenkinsColorToStatus(color: string | undefined): JenkinsJobStatus {
+  const c = (color ?? '').toLowerCase();
+  if (c.includes('anime')) return 'building';
+  if (c.startsWith('blue')) return 'success';
+  if (c.startsWith('red')) return 'failure';
+  if (c.startsWith('yellow')) return 'unstable';
+  if (c.startsWith('aborted') || c.startsWith('disabled')) return 'aborted';
+  if (c.startsWith('notbuilt') || c === '') return 'not_built';
+  return 'not_built';
 }
 
 export const registryApi = {
@@ -906,7 +925,10 @@ export const registryApi = {
     return fetchJson(`${currentBaseUrl}/metrics/${entityType}/${encodeURIComponent(entityId)}`);
   },
 
-  // --- JENKINS CI/CD ---
+  
+
+
+// --- JENKINS CI/CD ---
   getJenkinsJobs: async (params?: {
     search?: string;
     status?: string;
@@ -925,14 +947,37 @@ export const registryApi = {
     const query = new URLSearchParams();
     if (params?.search) query.append('search', params.search);
     if (params?.status) query.append('status', params.status);
-    return fetchJson<JenkinsJob[]>(`${flatBaseUrl()}/jenkins/jobs?${query.toString()}`);
+    // Live path rides the ballerina ci-gateway (registry has no CI data).
+    type GhJob = { name?: string; color?: string; url?: string };
+    const raw = await gatewayJson<GhJob[]>('/jenkins/jobs');
+    let jobs: JenkinsJob[] = (raw ?? []).map((j, i) => ({
+      id: encodeURIComponent(j.name ?? String(i)),
+      name: j.name ?? `job-${i}`,
+      url: j.url ?? '',
+      status: jenkinsColorToStatus(j.color),
+      lastBuildNumber: 0,
+      lastBuildTimestamp: '',
+      lastBuildDuration: 0,
+      scmBranch: '',
+      triggeredBy: 'ci',
+    }));
+    if (params?.search) {
+      const q = params.search.toLowerCase();
+      jobs = jobs.filter((j) => j.name.toLowerCase().includes(q));
+    }
+    if (params?.status && params.status !== 'all') {
+      jobs = jobs.filter((j) => j.status === params.status);
+    }
+    return jobs;
   },
 
   getJenkinsBuilds: async (jobId: string): Promise<JenkinsBuild[]> => {
     if (currentMode === 'mock') {
       return mockJenkinsBuilds[jobId] || [];
     }
-    return fetchJson<JenkinsBuild[]>(`${flatBaseUrl()}/jenkins/jobs/${encodeURIComponent(jobId)}/builds`);
+    // Build history needs per-job depth the read-only gateway doesn't
+    // expose yet — return empty rather than erroring the table.
+    return [];
   },
 
   // --- SONARQUBE CODE QUALITY ---
@@ -954,7 +999,30 @@ export const registryApi = {
     const query = new URLSearchParams();
     if (params?.search) query.append('search', params.search);
     if (params?.gate) query.append('gate', params.gate);
-    return fetchJson<SonarProject[]>(`${flatBaseUrl()}/sonar/projects?${query.toString()}`);
+    // Live path rides the ballerina ci-gateway.
+    type SonarComp = { key?: string; name?: string; qualifier?: string };
+    const raw = await gatewayJson<{ paging?: unknown; components?: SonarComp[] }>('/sonar/projects');
+    let projects: SonarProject[] = (raw.components ?? [])
+      .filter((c) => (c.qualifier ?? 'TRK') === 'TRK')
+      .map((c, i) => ({
+        id: c.key ?? String(i),
+        key: c.key ?? String(i),
+        name: c.name ?? c.key ?? `project-${i}`,
+        gate: 'none' as QualityGateStatus,
+        reliabilityRating: 'A' as SonarRating,
+        securityRating: 'A' as SonarRating,
+        maintainabilityRating: 'A' as SonarRating,
+        coveragePercent: 0,
+        duplicationsPercent: 0,
+      }));
+    if (params?.search) {
+      const q = params.search.toLowerCase();
+      projects = projects.filter((p) => p.name.toLowerCase().includes(q) || p.key.toLowerCase().includes(q));
+    }
+    if (params?.gate && params.gate !== 'all') {
+      projects = projects.filter((p) => p.gate === params.gate);
+    }
+    return projects;
   },
 
   getSonarMetrics: async (projectId: string): Promise<SonarMetricPoint[]> => {
