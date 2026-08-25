@@ -20,6 +20,11 @@ NEBULA   = os.environ.get("NEBULA_SRV",   "http://localhost:3101")
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SERVICES_SCRIPT = os.path.join(_SCRIPT_DIR, "start-nexus-services.sh")
 
+# Units retired from the fleet (systemd files may linger). The status
+# script still lists them, so sweep results are filtered here.
+# angular-assembly: RETIRED 2026-08-24, replaced by assembly-ui :4214.
+RETIRED_UNITS = ("angular-assembly.service",)
+
 _ENGINEER_UUID = "af069ff6-760c-44cb-a0d4-11517164169b"
 
 
@@ -46,7 +51,7 @@ def service_status() -> list[str]:
     try:
         result = subprocess.run(
             ["bash", SERVICES_SCRIPT, "status"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, timeout=60,
         )
         output = result.stdout + result.stderr
     except Exception as e:
@@ -55,6 +60,11 @@ def service_status() -> list[str]:
     issues: list[str] = []
     for line in output.splitlines():
         stripped = line.strip()
+        # Skip units retired from the fleet that still have systemd files —
+        # they report DOWN every cycle otherwise (incident b382b591,
+        # sysadmin proposal approved 2026-08-25).
+        if any(retired in stripped for retired in RETIRED_UNITS):
+            continue
         # Look for non-OK health statuses
         if "inactive" in stripped.lower() or "failed" in stripped.lower():
             issues.append(stripped)
