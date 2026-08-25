@@ -2998,7 +2998,7 @@ BEGIN
         '- **Harness agent file** — \`config/harnesses/opencode/agents/<role>.md\` (frontmatter: assumes_role, permissions; pattern: \`sysadmin.md\`).\n'
         '- **Procedure cards** — add the role to the role lists of the relevant \`tackle.memory\` cards (tackle.role_memory assignments); then regenerate the seed: \`python3 bin/regenerate_memory_seed.py --verify\`.\n'
         '- **Assembly alias** — \`assembly.users\` row with alias = role name (pattern: builder seed in \`assembly-migration.sql\`).\n'
-        '- **nebula role CHECK** — new \`typescript/nebula-srv/migrations/0NN-allow-<role>.sql\` mirroring \`052-allow-sysadmin-dba-role.sql\`; apply + replicate to Strontium.\n'
+        '- **nebula role CHECK** — new \`typescript/nebula-srv/migrations/0NN-allow-<role>.sql\` mirroring \`052-allow-sysadmin-dba-role.sql\`; apply + replicate to barium.\n'
         '- **Governance** — add to \`harness-srv/src/governance.ts\` KNOWN_EXECUTORS only if the role issues receipts.\n'
         '\n'
         '### 3. Verify\n'

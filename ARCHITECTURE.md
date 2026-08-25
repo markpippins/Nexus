@@ -123,9 +123,14 @@ three-layer mesh and is retained as historical reference.
 
 ## 3. Database Schemas (`nexus` DB)
 
-PostgreSQL is canonical. Both primary (`pgvector_db`, localhost:5432) and the
-**Strontium backup server** (172.16.30.2:5432) host the `nexus` database at
-parity — schema/seed migrations are applied to both (see §7).
+PostgreSQL is canonical. The primary (`pgvector_db`, localhost:5432) hosts the
+live `nexus` database; **barium** (192.168.1.212 — Raspberry Pi,
+`pgvector/pgvector:pg17` Docker) is the canonical off-machine backup target and
+is kept at parity (nightly verified backups via `bin/pg-backup-to-barium.sh`;
+schema/seed migrations applied to both — see §7). The former backup server
+**Strontium** (172.16.30.2) has been down for repair since 2026-08-22 and is
+decommissioned from the backup role; it may return, but barium remains the
+replication target for the forceable future (2026-08-25 decision).
 
 | Schema | Tables | Views | Purpose |
 |--------|-------:|------:|---------|
@@ -229,7 +234,9 @@ durable state, per `AGENTS.md` (the governing doctrine):
 
 - Migrations live in `nexus/sql/` as `V0NN__description.sql`; **no runner** —
   engineers apply them manually, in order, to **both** the primary and
-  Strontium, and confirm parity (R9: always ask before replicating).
+  barium (the canonical backup target — Strontium was decommissioned from
+  this role 2026-08-25), and confirm parity
+  (R9: always ask before replicating).
 - Applied chain (semantics): `semantics.sql` → V055 → V056 → V057 → V058 →
   V059. V055/V056 were superseded/reverted by V057 and kept as honest history.
 - Idempotency is expected (V057 guards on empty; V059 uses

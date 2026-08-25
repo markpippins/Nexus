@@ -116,7 +116,7 @@
     "cpuCores": 4,
     "memoryMb": 8192,
     "diskGb": 100,
-    "status": "ACTIVE",
-    "description": "VM Node"
+    "status": "INACTIVE",
+    "description": "VM Node \u2014 former PG backup target; down for repair since 2026-08-22; replaced by barium (2026-08-25)"
   }
 ]
