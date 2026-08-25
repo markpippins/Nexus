@@ -3,53 +3,50 @@ CIR-SDM enforcement caller (T23 Step 7) — per-family enforcement gate.
 
 This is the *enforcement* side of the shadow-mode doctrine: a thin caller
 around :func:`nexus_core.wrp.cir_sdm.evaluate` that decides which rule
-families are blocking-eligible based on the ``CIR_SDM_ENFORCE`` env flag. The
-pure ``evaluate()`` is unchanged — this module only supplies the
-``enforced_rules`` set and renders the startup audit state.
+families are blocking-eligible. The pure ``evaluate()`` is unchanged — this
+module supplies the ``enforced_rules`` set and renders the startup audit
+state.
 
-Binding contract (architect ruling 4a57c089, 2026-08-16):
+Binding contracts:
 
-1. **Initial enforced set** = ``{"cir-sdm.one-way-gate"}`` — the only family
-   with a *measured* zero-FP-blocking window (77-event stream: 2 warnings /
-   0 blocking; FN self-check caught; R-A-011). Every other family stays
-   shadow until it demonstrates its own zero-FP window and receives explicit
-   per-family approval.
-2. **``CIR_SDM_ENFORCE`` env flag** (read by the enforcement caller, NEVER
-   inside the pure ``evaluate()``):
-
-   * ``"0"``  → ``frozenset()`` — full rollback to shadow (nothing blocks).
-   * unset or ``"1"`` (any non-``"0"`` value) → enforced set active.
-
-3. **Warnings never block.** ``blocking=True`` applies only to
-   blocking-severity violations in the enforced set (pure-function semantics).
-   Cold-start warnings surface for review at dispatch (post + notify), never
-   auto-block (R-A-011 fold).
-4. **Per-family additions** only via explicit architect decision after a
-   measured zero-FP window — this module exposes no mutating API, so there is
-   no silent-addition path.
-5. **Reject/override** of an enforcement outcome goes through a
-   ``type:decision`` thread (owning-role decision, I1/I2) — never a silent
-   bypass.
+* **architect ruling 4a57c089 (2026-08-16)** — initial enforced set
+  (``cir-sdm.one-way-gate``), warnings never block, per-family additions ONLY
+  via explicit architect decision after a measured zero-FP window, no
+  silent-addition path, reject/override only via ``type:decision``.
+* **RULING R-D (record 2487aef3, 2026-08-25)** — the enforcement posture is
+  CURRENT STATE and persists as a resolution-schema row
+  (``resolution.enforcement_posture``, governance_threshold-style: one row
+  per family ``{family, mode, authorized_by, effective_from}``). The
+  ``CIR_SDM_ENFORCE`` env demotes to bootstrap default ONLY while zero rows
+  exist (first boot); once rows exist the database wins. Env-vs-row
+  divergence emits a warning. Composition (posture-row resolution, admission
+  recording, audit logging) lives HERE in the boundary wrapper —
+  ``cir_sdm.py`` stays zero-dependency.
 
 Design (mirrors the zero-dependency rule of ``cir_sdm.py``):
 
-* ``resolve_enforced_rules`` / ``enforce`` are pure functions — the only
-  environment input is the ``CIR_SDM_ENFORCE`` value, passed in explicitly by
-  the dispatch caller. The module never touches ``os.environ``, keeping it
+* ``resolve_enforced_rules`` / ``enforce`` stay pure — the environment input
+  (``CIR_SDM_ENFORCE`` value) and the posture rows are passed in explicitly
+  by the dispatch caller. The module never touches ``os.environ``, keeping it
   cross-kernel-safe and trivially testable.
+* ``load_posture_rows`` is the ONLY I/O surface — a thin psql read of
+  ``resolution.enforcement_posture`` (active = latest ``effective_from``
+  ``<= now()`` per family). It returns ``[]`` on any failure so the caller
+  falls back to the bootstrap default rather than erroring (R-D R2).
 * ``render_enforcement_state`` produces the startup audit line the dispatch
-  service logs once at boot (shadow vs enforced + the active rule set).
+  service logs once at boot (shadow vs enforced + source + active rule set).
 
 Usage (dispatch path)::
 
-    import os
     from nexus_core.wrp.enforcement import (
-        ENFORCED_RULES_KEY, enforce, render_enforcement_state,
+        ENFORCED_RULES_KEY, enforce, load_posture_rows,
+        render_enforcement_state, resolve_enforced_rules,
     )
 
     env_value = os.environ.get(ENFORCED_RULES_KEY)
-    log.info(render_enforcement_state(env_value))   # startup audit line
-    violations = enforce(events, env_value=env_value)
+    posture = load_posture_rows()                     # DB wins once seeded
+    log.info(render_enforcement_state(env_value, posture))   # startup audit line
+    violations = enforce(events, env_value=env_value, posture_rows=posture)
 """
 
 from __future__ import annotations
@@ -70,25 +67,110 @@ __all__ = [
     "render_enforcement_state",
     "governed_decisions",
     "violation_to_row",
+    "load_posture_rows",
+    "posture_enforced_rules",
 ]
 
 # Env flag the enforcement caller reads (never inside the pure evaluate()).
 ENFORCED_RULES_KEY = "CIR_SDM_ENFORCE"
 
-# Initial enforced set (architect ruling 4a57c089): one-way-gate is the only
-# family with a measured zero-FP-blocking window. Every other family stays
-# shadow until its own window + explicit per-family approval.
+# Bootstrap enforced set (architect ruling 4a57c089): one-way-gate is the
+# only family with a measured zero-FP-blocking window. Every other family
+# stays shadow until its own window + explicit per-family approval. Used ONLY
+# while resolution.enforcement_posture has zero rows (R-D R2: env demoted to
+# bootstrap default; once rows exist the database wins).
 DEFAULT_ENFORCED_RULES: FrozenSet[str] = frozenset({RULE_ONE_WAY_GATE})
 
+# Same host-side psql pathway the promotion gate / peb_admission use to reach
+# the nexus DB (docker exec into the pgvector_db container). Module-level so
+# tests can swap it.
+_PSQL: List[str] = [
+    "docker", "exec", "-i", "pgvector_db",
+    "psql", "-U", "pguser", "-d", "nexus", "-t", "-A", "-q",
+]
 
-def resolve_enforced_rules(env_value: Optional[str]) -> FrozenSet[str]:
-    """Map the ``CIR_SDM_ENFORCE`` value to the enforced-rule set.
 
-    ``"0"`` → ``frozenset()`` (full rollback to shadow); unset/``None``/
-    ``"1"``/any other value → :data:`DEFAULT_ENFORCED_RULES` (enforced
-    active). The dispatch caller reads the env and passes the value in; this
+def load_posture_rows(
+    psql: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
+    """Load the active enforcement posture rows from the DB.
+
+    Active = latest ``effective_from <= now()`` per family (immutable-temporal
+    semantics, governance_threshold-style). Returns a list of
+    ``{"family", "mode", "authorized_by", "effective_from"}`` dicts, or
+    ``[]`` on any failure (DB unreachable / table missing) so the caller
+    degrades to the bootstrap default rather than erroring (R-D R2). This is
+    the ONLY I/O surface in the enforcement layer.
+    """
+    import subprocess
+    cmd = psql if psql is not None else _PSQL
+    sql = (
+        "SELECT DISTINCT ON (family) family, mode, authorized_by, effective_from "
+        "FROM resolution.enforcement_posture "
+        "WHERE effective_from <= now() "
+        "ORDER BY family, effective_from DESC;"
+    )
+    try:
+        proc = subprocess.run(
+            cmd + ["-c", sql], capture_output=True, text=True, timeout=10,
+            stdin=subprocess.DEVNULL,   # never eat the caller's stdin pipe
+        )
+        if proc.returncode != 0:
+            return []
+    except Exception:
+        return []
+    rows: List[Dict[str, Any]] = []
+    for line in proc.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) < 3 or not parts[0]:
+            continue
+        rows.append({
+            "family": parts[0],
+            "mode": parts[1],
+            "authorized_by": parts[2] or None,
+            "effective_from": parts[3] if len(parts) > 3 else None,
+        })
+    return rows
+
+
+def posture_enforced_rules(
+    posture_rows: Iterable[Dict[str, Any]],
+) -> FrozenSet[str]:
+    """The enforced families from a set of posture rows (DB wins semantics).
+
+    A family is enforced when its active posture row has ``mode='enforced'``
+    AND an ``authorized_by`` decision is cited (no silent addition — a row
+    without authorization never enforces). Pure.
+    """
+    return frozenset(
+        r["family"] for r in posture_rows
+        if r.get("mode") == "enforced" and r.get("authorized_by")
+    )
+
+
+def resolve_enforced_rules(
+    env_value: Optional[str],
+    posture_rows: Optional[Iterable[Dict[str, Any]]] = None,
+) -> FrozenSet[str]:
+    """Map env + optional posture rows to the enforced-rule set.
+
+    R-D R2 precedence:
+
+    1. **DB wins** — when ``posture_rows`` is non-empty, the enforced set is
+       the enforced families from the posture (``authorized_by`` cited).
+    2. **Bootstrap** — when zero posture rows exist (first boot), fall back
+       to the env/bootstrap default: ``"0"`` → empty (full shadow),
+       unset/``"1"``/other → :data:`DEFAULT_ENFORCED_RULES`.
+
+    The dispatch caller reads the env and passes both values in; this
     function stays pure.
     """
+    rows = list(posture_rows) if posture_rows else []
+    if rows:
+        return posture_enforced_rules(rows)
     if env_value is not None and env_value.strip() == "0":
         return frozenset()
     return DEFAULT_ENFORCED_RULES
@@ -98,33 +180,68 @@ def enforce(
     events: Iterable[Any],
     *,
     env_value: Optional[str] = None,
+    posture_rows: Optional[Iterable[Dict[str, Any]]] = None,
 ) -> List[CIRViolation]:
     """Evaluate the stream under the resolved per-family enforcement set.
 
-    Thin caller over the pure ``evaluate()``: resolves ``enforced_rules`` from
-    the supplied env value and delegates. Warnings never block (``evaluate``
-    applies ``blocking=True`` only to blocking-severity violations whose rule
-    is in the enforced set), so cold-start and IR-payload warnings surface
-    non-blocking even in enforced mode.
+    Thin caller over the pure ``evaluate()``: resolves ``enforced_rules``
+    from the supplied env value + posture rows and delegates. Warnings never
+    block (``evaluate`` applies ``blocking=True`` only to blocking-severity
+    violations whose rule is in the enforced set), so cold-start and
+    IR-payload warnings surface non-blocking even in enforced mode.
     """
-    return evaluate(events, enforced_rules=resolve_enforced_rules(env_value))
+    return evaluate(
+        events,
+        enforced_rules=resolve_enforced_rules(env_value, posture_rows),
+    )
 
 
-def render_enforcement_state(env_value: Optional[str]) -> str:
-    """Startup audit line — logs shadow vs enforced plus the active rule set.
+def render_enforcement_state(
+    env_value: Optional[str],
+    posture_rows: Optional[Iterable[Dict[str, Any]]] = None,
+) -> str:
+    """Startup audit line — logs shadow vs enforced, the source, and rules.
 
     The dispatch service logs this once at boot so the enforcement posture is
-    auditable (architect caveat 4a57c089). Pure — no I/O, no wall clock.
+    auditable (4a57c089 / R-D R2). Reports ``database`` when posture rows
+    exist, ``bootstrap`` otherwise, and emits a WARNING when ``CIR_SDM_ENFORCE``
+    is set and diverges from the database posture (R-D R2: DB wins; divergence
+    is surfaced, never silently resolved). Pure — no I/O, no wall clock.
     """
-    rules = resolve_enforced_rules(env_value)
+    rules = resolve_enforced_rules(env_value, posture_rows)
+    rows = list(posture_rows) if posture_rows else []
+
+    if rows:
+        divergence = ""
+        if env_value is not None:
+            env_rules = (
+                frozenset() if env_value.strip() == "0"
+                else DEFAULT_ENFORCED_RULES
+            )
+            if env_rules != rules:
+                divergence = (
+                    f"; WARNING: CIR_SDM_ENFORCE={env_value!r} diverges from "
+                    "posture rows — database wins"
+                )
+        if not rules:
+            return (
+                "CIR-SDM enforcement: shadow "
+                f"(database: resolution.enforcement_posture — nothing blocks){divergence}"
+            )
+        return (
+            "CIR-SDM enforcement: enforced "
+            f"(database: resolution.enforcement_posture; "
+            f"rules: {', '.join(sorted(rules))}){divergence}"
+        )
+
     if not rules:
         return (
             "CIR-SDM enforcement: shadow "
-            "(CIR_SDM_ENFORCE=0 — nothing blocks)"
+            "(bootstrap; CIR_SDM_ENFORCE=0 — nothing blocks)"
         )
     return (
         "CIR-SDM enforcement: enforced "
-        f"(rules: {', '.join(sorted(rules))})"
+        f"(bootstrap; rules: {', '.join(sorted(rules))})"
     )
 
 
