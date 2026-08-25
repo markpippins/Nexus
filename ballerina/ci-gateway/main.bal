@@ -17,6 +17,9 @@ import ballerina/http;
 import ballerina/io;
 
 configurable int port = 9095;
+// G4 edge-monopoly convention: gateway binds loopback by default; LAN
+// exposure must come from the control-edge (:8082), not this listener.
+configurable string bindHost = "127.0.0.1";
 configurable string jenkinsBase = ?;
 configurable string jenkinsUser = ?;
 configurable string jenkinsToken = ?;
@@ -48,7 +51,7 @@ function sonarGet(http:Client upstream, string path) returns json|http:ClientErr
     return upstream->get(path, { "Authorization": "Basic " + sonarAuthBasic });
 }
 
-service /gateway on new http:Listener(port) {
+service /gateway on new http:Listener(port, { host: bindHost }) {
 
     private final http:Client jenkins;
     private final http:Client sonar;

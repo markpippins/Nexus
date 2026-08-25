@@ -1,0 +1,14 @@
+[Unit]
+Description=Ballerina CI Gateway — Jenkins/Sonar reads + contract drift sentinel (:9095, loopback)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/codex/dev/nexus/ballerina/ci-gateway
+Environment=BAL_CONFIG_FILE=/home/codex/dev/nexus/ballerina/ci-gateway/Config.toml
+ExecStart=/usr/bin/bal run
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
