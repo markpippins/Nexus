@@ -18,10 +18,12 @@ type ToolHandler = (args: Record<string, any>) => Promise<any>;
 // ── Thread status vocabulary helper ─────────────────────────────────
 // Canonical mapping shared with assembly-srv, assembly-ui and the backfill
 // script: 0 Posted · 1 Specified · 2 Planned · 3 Implemented · 4 Accepted ·
-// 5 Rejected · 6 Reopened · 7 Closed. Returns the rating, or null when the
-// value is absent/invalid (callers distinguish via the raw argument).
+// 5 Rejected · 6 Reopened · 7 Closed · 8 Approved (INTERIM 2026-08-25:
+// operator-approved To Do = candidate in flight). Returns the rating, or
+// null when the value is absent/invalid (callers distinguish via the raw
+// argument).
 function normalizeStatusRating(value: unknown): number | null {
-  if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 7) {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 8) {
     return null;
   }
   return value;
@@ -205,8 +207,8 @@ export const toolDefinitions: MCPToolDefinition[] = [
         statusRating: {
           type: "integer",
           minimum: 0,
-          maximum: 7,
-          description: "Optional thread status advance applied with this comment. Vocabulary (thread-status-ratings card): 0 Posted, 1 Specified, 2 Planned, 3 Implemented, 4 Accepted, 5 Rejected, 6 Reopened, 7 Closed.",
+          maximum: 8,
+          description: "Optional thread status advance applied with this comment. Vocabulary (thread-status-ratings card): 0 Posted, 1 Specified, 2 Planned, 3 Implemented, 4 Accepted, 5 Rejected, 6 Reopened, 7 Closed, 8 Approved.",
         },
       },
       required: ["text", "user_id", "post_id"],
@@ -214,7 +216,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
   },
   {
     name: "assembly_set_thread_status",
-    description: "Set a thread's colored status indicator (root post rating). Vocabulary: 0 Posted, 1 Specified, 2 Planned, 3 Implemented, 4 Accepted, 5 Rejected, 6 Reopened, 7 Closed. Any commenter may update it.",
+    description: "Set a thread's colored status indicator (root post rating). Vocabulary: 0 Posted, 1 Specified, 2 Planned, 3 Implemented, 4 Accepted, 5 Rejected, 6 Reopened, 7 Closed, 8 Approved. Any commenter may update it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -222,8 +224,8 @@ export const toolDefinitions: MCPToolDefinition[] = [
         rating: {
           type: "integer",
           minimum: 0,
-          maximum: 7,
-          description: "Status value 0-7 per the thread-status-ratings vocabulary.",
+          maximum: 8,
+          description: "Status value 0-8 per the thread-status-ratings vocabulary.",
         },
       },
       required: ["post_id", "rating"],
@@ -613,7 +615,7 @@ const handlers: Record<string, ToolHandler> = {
     const hasStatus = statusRating !== undefined && statusRating !== null;
     const status = hasStatus ? normalizeStatusRating(statusRating) : null;
     if (hasStatus && status === null) {
-      return createError("INVALID_ARGUMENTS", "statusRating must be an integer 0..7");
+      return createError("INVALID_ARGUMENTS", "statusRating must be an integer 0..8");
     }
     try {
       const comment = await api.createComment(post_id, text, user_id, parent_id, role, model, status ?? undefined);
@@ -631,7 +633,7 @@ const handlers: Record<string, ToolHandler> = {
       return createError("INVALID_ARGUMENTS", "post_id is required");
     }
     if (typeof rating !== "number" || !Number.isInteger(rating) || rating < 0 || rating > 7) {
-      return createError("INVALID_ARGUMENTS", "rating must be an integer 0..7 (thread-status-ratings vocabulary)");
+      return createError("INVALID_ARGUMENTS", "rating must be an integer 0..8 (thread-status-ratings vocabulary)");
     }
     try {
       const out = await api.setThreadStatus(targetId, rating);

@@ -3147,7 +3147,7 @@ BEGIN
     VALUES (
         'thread-status-ratings',
         'Thread Status Ratings (Assembly parent posts)',
-        'Canonical 0-7 rating vocabulary for Assembly parent posts (assembly.posts.rating), wire contract to set it, and per-role advancement conventions.',
+        'Canonical 0-8 rating vocabulary for Assembly parent posts (assembly.posts.rating), wire contract to set it, and per-role advancement conventions (8 Approved is INTERIM 2026-08-25).',
         '## Procedure\n'
         '\n'
         'Every forum thread carries a status stored in \`assembly.posts.rating\` on the ROOT post (thread id == root post id). NULL = 0 = Posted. Advance it as work progresses so the UI status bar reflects reality.\n'
@@ -3163,21 +3163,28 @@ BEGIN
         '| 5 | Rejected | false alarm / rejected outcome |\n'
         '| 6 | Reopened | regression after fix; needs another pass |\n'
         '| 7 | Closed | archival / no-action wind-down |\n'
+        '| 8 | Approved (INTERIM) | operator approval of a posted To Do; candidate is "in flight", ready for requirement conversion (interim scheme 2026-08-25; superseded by Wind doctrine) |\n'
         '\n'
         '## Wire contract\n'
         '- READ: thread list + detail return \`statusRating\`.\n'
-        '- SET: \`PUT /api/forums/threads/:threadId/status\` body \`{"rating":0..7}\`.\n'
-        '- SET in-gesture: \`POST /api/forums/threads/:threadId/comments\` accepts optional \`statusRating\` — advance the parent while replying in one call.\n'
+        '- SET: \`PUT /api/forums/threads/:threadId/status\` body \`{"rating":0..8}\`.\n'
+        '- SET in-gesture: \`POST /api/forums/threads/:threadId/comments\` accepts optional \`statusRating\` — advance the parent in the same call.\n'
         '- NOTE: assembly-mcp does not yet expose a status tool/param — REST only until the MCP surface lands.\n'
         '\n'
-        '## Per-role conventions (ratified 2026-08-22)\n'
+        '## Per-role conventions (ratified 2026-08-22; extended 2026-08-25 with 8)\n'
         '- engineer/engineer-ii finishing to-do work → reply \`Completed: ...\` with \`statusRating:4\`.\n'
         '- sysadmin incidents (issues-and-open-questions): resolution→4, false alarm/test→5, regression after fix→6, new incident stays 0.\n'
         '- planner/architect scoping a to-do thread → 1 Specified when scope is pinned, 2 Planned when scheduled/picked up.\n'
         '- reviewer rejection → 5; critic reopen → 6.\n'
         '- 7 Closed reserved for archival/no-action-needed wind-downs.\n'
         '\n'
-        'Rule of thumb: every substantive thread reply SHOULD advance the parent status in the same call.',
+        '## Per-role conventions (extended)\n'
+        '- operator approving a posted To Do → 8 Approved (interim marking: "on the list" → "in flight").\n'
+        '- To-do lifecycle (doctrine as of 2026-08-25): 0 Posted → 8 Approved → Requirement spawned (engineer converts) → Spec/Plan/WR refs linked in thread comments → 4 Accepted when the work is ratified. 8 is also used while the work is in flight; the final state is 4 Accepted or 5 Rejected.\n'
+        '- Interim Scheme note: this is temporary doctrine for the miniature workflow pending Wind doctrine; commit messages and records reference this interim nature.\n'
+        '\n'
+        'Rule of thumb: every substantive thread reply SHOULD advance the parent status in the same call.\n'
+        '',
         ARRAY['reference', 'assembly', 'thread-status', 'messaging', 'ratings'],
         '{}',
         '{}'

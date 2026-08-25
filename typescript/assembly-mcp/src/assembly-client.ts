@@ -160,14 +160,14 @@ export async function createComment(
     parentId: parentId || undefined,
     role: role || null,
     model: model || null,
-    // Optional thread-status advance (assembly.posts.rating 0..7); the
+    // Optional thread-status advance (assembly.posts.rating 0..8); the
     // server applies it to the root post in the same call when present.
     statusRating: statusRating ?? undefined,
   });
 }
 
 // PUT /api/forums/threads/:threadId/status — set the colored status
-// indicator on a thread's root post (assembly.posts.rating, 0..7).
+// indicator on a thread's root post (assembly.posts.rating, 0..8).
 export async function setThreadStatus(threadId: string, rating: number) {
   return put(`forums/threads/${threadId}/status`, { rating });
 }

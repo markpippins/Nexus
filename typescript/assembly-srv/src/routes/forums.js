@@ -16,8 +16,11 @@ export const forumsRouter = Router();
 //   5 rejected    red
 //   6 reopened    purple
 //   7 closed      grey
+//   8 approved   teal  (INTERIM scheme 2026-08-25: operator approval of a
+//                    posted To Do -> candidate "in flight" ready for
+//                    requirement conversion; superseded by Wind doctrine)
 const STATUS_MIN = 0;
-const STATUS_MAX = 7;
+const STATUS_MAX = 8;
 
 function normalizeStatusRating(value) {
   if (value === undefined || value === null) return 0;
