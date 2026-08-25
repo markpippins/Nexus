@@ -51,6 +51,48 @@ namespace org.nexus.tackleregistry {
   @doc("Resolve the winning active bundle for a role (mirrors tackle-srv getResolvedRoleConfig).")
   op resolveRole(@path role: string): ResolvedRoleConfig | ErrorResponse;
 
+  // ── Consumer-compat aliases (D-C step 2, analysis thread 6d97277a) ──
+  // tackle-srv mounts its ai-config router at /config/ai/*. Each read op above
+  // is ALSO served under /config/ai/* so existing consumers (tackle-ui,
+  // tackle-mcp) can repoint at this service without rewriting URL prefixes.
+  // Serialization parity (snake_case) is a separate opt-in mode documented in
+  // the service README / application.properties.
+
+  @route("/config/ai/providers")
+  @get
+  @doc("Alias of /config/providers (tackle-srv mount parity).")
+  op listProvidersAlias(): Provider[];
+
+  @route("/config/ai/harnesses")
+  @get
+  @doc("Alias of /config/harnesses (tackle-srv mount parity).")
+  op listHarnessesAlias(): Harness[];
+
+  @route("/config/ai/models")
+  @get
+  @doc("Alias of /config/models (tackle-srv mount parity).")
+  op listModelsAlias(): ModelRow[];
+
+  @route("/config/ai/roles")
+  @get
+  @doc("Alias of /config/roles (tackle-srv mount parity).")
+  op listRolesAlias(): RoleRow[];
+
+  @route("/config/ai/bundles")
+  @get
+  @doc("Alias of /config/bundles (tackle-srv mount parity).")
+  op listBundlesAlias(): ConfigBundle[];
+
+  @route("/config/ai/bundles/{role}")
+  @get
+  @doc("Alias of /config/bundles/{role} (tackle-srv mount parity).")
+  op listBundlesForRoleAlias(@path role: string): ConfigBundle[];
+
+  @route("/config/ai/resolve/{role}")
+  @get
+  @doc("Alias of /config/resolve/{role} (tackle-srv mount parity).")
+  op resolveRoleAlias(@path role: string): ResolvedRoleConfig | ErrorResponse;
+
   // ── Inference ─────────────────────────────────────────────────────
 
   @route("/ai/invoke")

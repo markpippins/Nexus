@@ -1,5 +1,8 @@
 # Dependencies
 node_modules/
+# worktree-local symlink to the main checkout's TypeSpec toolchain
+# (git does not match `node_modules/` against a symlink-to-directory)
+typespec/v1/node_modules
 .venv/
 venv/
 *.egg-info/
