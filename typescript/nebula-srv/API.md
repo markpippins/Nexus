@@ -5,19 +5,20 @@
 
 Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge graph, and cross-references.
 
-**225 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**226 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/agendas` | AGENDAS (scoped by hierarchy via agenda_items → requirements) GET /api/agendas — list ALL agendas (unscoped, when no hierarchy selected) |
+| GET | `/api/agendas` | GET /api/agendas — list ALL agendas (unscoped, when no hierarchy selected) |
+| POST | `/api/agendas` | AGENDAS (scoped by hierarchy via agenda_items → requirements) POST /api/agendas — create a new agenda. INTERIM scheme 2026-08-25: the engineering loop's spec-row path is agenda → items → finalize (agenda_to_specification); superseded by Wind doctrine. |
 | GET | `/api/agendas/:id` | GET /api/agendas/:id — single agenda with items |
 | POST | `/api/agendas/:id/finalize` | POST /api/agendas/:id/finalize — create a specification from an agenda |
 | DELETE | `/api/agendas/:id/items` | DELETE /api/agendas/:id/items — remove an agenda item by source_id Query: ?sourceId=<uuid> — finds and deletes the item matching that source |
 | POST | `/api/agendas/:id/items` | POST /api/agendas/:id/items — add a single item to an existing agenda |
-| GET | `/api/agent-records` | AGENT RECORDS — database-first audit trail GET /api/agent-records — list records with optional filters and pagination |
+| GET | `/api/agent-records` |  |
 | POST | `/api/agent-records` | POST /api/agent-records — create a new agent record (canonical write path) |
 | DELETE | `/api/agent-records/:id` | DELETE /api/agent-records/:id |
-| GET | `/api/agent-records/:id` | GET /api/agent-records/:id — full record with content |
+| GET | `/api/agent-records/:id` | GET /api/agent-records — list records with optional filters and pagination GET /api/agent-records/:id — full single record INCLUDING content. Fixes finding 6d731551: REST had no content-bearing read (list omits content; ?id= was fuzzy search), so REST-only consumers misread persisted records as empt |
 | PATCH | `/api/agent-records/:id` | PATCH /api/agent-records/:id — update record fields |
 | POST | `/api/agent-records/search` | POST /api/agent-records/search — multi-tag AND/OR agent record search |
 | GET | `/api/architect-specs` | ARCHITECT SPECS GET /api/architect-specs — list with pagination |
@@ -243,6 +244,7 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
 
 
 

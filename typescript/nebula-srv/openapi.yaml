@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: nebula-srv — Nebula Knowledge-Graph API
-  version: 1.0.79b7ed9a
+  version: 1.0.f0673a1a
   description: 'Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge
     graph, and cross-references.
 
@@ -91,8 +91,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: AGENDAS (scoped by hierarchy via agenda_items → requirements) GET /api/agendas — list ALL agendas (unscoped,
-        when no hierarchy selected)
+      summary: GET /api/agendas — list ALL agendas (unscoped, when no hierarchy selected)
+    post:
+      tags:
+      - agendas
+      operationId: post_agendas
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'AGENDAS (scoped by hierarchy via agenda_items → requirements) POST /api/agendas — create a new agenda. INTERIM
+        scheme 2026-08-25: the engine'
   /api/agendas/{id}:
     get:
       tags:
@@ -271,8 +301,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: AGENT RECORDS — database-first audit trail GET /api/agent-records — list records with optional filters and
-        pagination
     post:
       tags:
       - agent-records
@@ -369,7 +397,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: GET /api/agent-records/:id — full record with content
+      summary: GET /api/agent-records — list records with optional filters and pagination GET /api/agent-records/:id — full
+        single record INCLUDING content
       parameters:
       - name: id
         in: path
