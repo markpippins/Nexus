@@ -62,7 +62,8 @@ from cascade.conversation_coordinator import (
     OUTCOME_CONTINUE,
     OUTCOME_DELEGATE,
 )
-from cascade.sol_gate import evaluate_lease_dispatch  # SOL-framed gate (v36)
+from cascade.sol_gate import evaluate_lease_dispatch  # SOL-framed lease gate (v36)
+from cascade.watch_gate import evaluate_watch_admission  # SOL-framed watch admission gate (Kiro #2)
 
 # ── Configuration ───────────────────────────────────────────────────
 DATABASE_URL = os.getenv(
@@ -1174,6 +1175,24 @@ async def handle_comment_created(
         # Skip if the comment was posted BY the watch's own role
         # (don't reply to yourself)
         if comment_role and comment_role == watch_role:
+            continue
+
+        # ── Watch admission gate (Kiro #2 — SOL-framed watch admission) ──
+        # Every watch is evaluated against the SOL proposition "watch may
+        # consume event", framed on its own execution_backend. The outcome
+        # is recorded into peb.transactions (record-then-act, PEB-forward
+        # Phase 1) before dispatch. Turn-count/idle pre-flights are NOT
+        # enforced here (enforce_preflights=False): those are the
+        # coordinator's R2/R4 guarded-closure paths, which close the watch
+        # after a response. A refused watch (ungoverned backend / non-active
+        # status that slipped past the SQL filter) is a fail-closed skip —
+        # it must not dispatch.
+        watch_admitted, watch_reason = evaluate_watch_admission(
+            watch, now_ms=int(time.time() * 1000), enforce_preflights=False,
+        )
+        if not watch_admitted:
+            _log("Watch %s: admission refused (%s) — skipping dispatch",
+                 watch_id[:8], watch_reason)
             continue
 
         _log("Watch %s: role=%s turn=%s/%s",

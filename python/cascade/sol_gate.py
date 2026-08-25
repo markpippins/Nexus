@@ -236,6 +236,22 @@ def evaluate_lease_dispatch(lease: dict[str, Any] | None) -> tuple[bool, str]:
     Returns ``(admitted, reason)`` — drop-in for ``_lease_valid`` /
     ``_lease_failure_reason``.
 
+    Advisory record-then-act: the outcome is recorded into
+    ``peb.transactions`` via ``resolution.admit_and_record`` before the
+    caller acts (PEB-forward Phase 1).  Recording is best-effort and can
+    never flip the outcome.
+    """
+    outcome = _evaluate_lease_dispatch(lease)
+    _record_admission(lease, outcome)
+    return outcome
+
+
+def _evaluate_lease_dispatch(lease: dict[str, Any] | None) -> tuple[bool, str]:
+    """Internal evaluation core (wrapped by evaluate_lease_dispatch).
+
+    Returns ``(admitted, reason)`` — drop-in for ``_lease_valid`` /
+    ``_lease_failure_reason``.
+
     The SOL proposition is framed on ``channel = interactive``, so
     leases from other channels (opencode, ollama) are refused with
     ``context_mismatch``.  Within the interactive channel, the
@@ -302,3 +318,27 @@ def gate_check(lease: dict[str, Any] | None) -> bool:
     """
     admitted, _ = evaluate_lease_dispatch(lease)
     return admitted
+
+
+def _record_admission(lease: dict[str, Any] | None, outcome: tuple[bool, str]) -> None:
+    """Advisory record-then-act (PEB-forward Phase 1).
+
+    Best-effort: a recording failure never flips the gate outcome and
+    never raises (see cascade.peb_admission.record_gate_outcome)."""
+    if lease is None:
+        return
+    admitted, reason = outcome
+    try:
+        from cascade.peb_admission import record_gate_outcome
+    except Exception:  # noqa: BLE001 — advisory path
+        return
+    try:
+        record_gate_outcome(
+            gate="sol_gate.evaluate_lease_dispatch",
+            entity_id=str(lease.get("id", "")),
+            admitted=admitted,
+            reason=reason,
+            payload={"lease": lease, "reason": reason},
+        )
+    except Exception:  # noqa: BLE001 — advisory path must never raise
+        pass
