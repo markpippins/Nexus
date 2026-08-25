@@ -21,7 +21,7 @@
         <lombok.version>1.18.38</lombok.version>
         <testcontainers.version>1.21.0</testcontainers.version>
         <testcontainers.redis.version>2.2.4</testcontainers.redis.version>
-        <postgresql.version>42.7.3</postgresql.version>
+        <postgresql.version>42.7.11</postgresql.version>
     </properties>
 
     <dependencyManagement>
