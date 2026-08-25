@@ -126,3 +126,6 @@ nexus/etc/fleet-internal.env
 # runtime state dirs (never commit)
 typescript/file-system-server/root
 typescript/file-system-server/root.sandbox-bak-*/
+
+# fleet secrets (Security Pass Alpha, 22fe12bc) — never commit
+etc/
