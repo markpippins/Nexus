@@ -1014,6 +1014,9 @@ export const registryApi = {
         maintainabilityRating: 'A' as SonarRating,
         coveragePercent: 0,
         duplicationsPercent: 0,
+        linesOfCode: 0,
+        lastAnalysis: '',
+        url: '',
       }));
     if (params?.search) {
       const q = params.search.toLowerCase();
@@ -1029,7 +1032,8 @@ export const registryApi = {
     if (currentMode === 'mock') {
       return mockSonarMetrics[projectId] || [];
     }
-    return fetchJson<SonarMetricPoint[]>(`${flatBaseUrl()}/sonar/projects/${encodeURIComponent(projectId)}/metrics`);
+    // No metrics endpoint on the read-only gateway yet.
+    return [];
   },
 
   // --- BALLERINA INTEGRATION PLATFORM ---
