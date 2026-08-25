@@ -28,6 +28,12 @@ configurable string sonarBase = ?;
 // Ballerina's auth config rejects empty passwords, so the pre-encoded
 // header value (base64("<token>:")) is configured directly instead.
 configurable string sonarAuthBasic = ?;
+// ── GitHub bridge (increment #3, proposal 13890307) ─────────────────
+// Read-only phase: status / repos / open PR search. Webhook listener +
+// outbound write actions are a later, separately-ruled increment.
+configurable string githubBase = "https://api.github.com";
+configurable string githubToken = ?;
+configurable string githubOwner = "markpippins";
 
 // Upstream failure → HTTP 502 with a normalized envelope (bad gateway is
 // more honest than 500: this service answered, the upstream didn't).
@@ -49,6 +55,22 @@ function upstreamFail(string upstreamName, string endpointName,
 // overload of get() carries the credential instead).
 function sonarGet(http:Client upstream, string path) returns json|http:ClientError {
     return upstream->get(path, { "Authorization": "Basic " + sonarAuthBasic });
+}
+
+final http:Client githubClient = check new (githubBase);
+
+// GitHub GET with bearer token; normalized envelope like the others.
+function githubGet(string path) returns json|http:Response {
+    json|http:ClientError out =
+        githubClient->get(path, {
+            "Authorization": "Bearer " + githubToken,
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "nexus-ci-gateway"
+        });
+    if out is http:ClientError {
+        return upstreamFail("github", path, out);
+    }
+    return {upstream: "github", endpoint: path, data: out};
 }
 
 service /gateway on new http:Listener(port, { host: bindHost }) {
@@ -131,6 +153,23 @@ service /gateway on new http:Listener(port, { host: bindHost }) {
     // ---- Drift sentinel (helpers in drift.bal) ----
 
     // Probe all configured targets now and return the full report.
+    // ── GitHub bridge (read-only) ────────────────────────────────
+    resource function get github/status() returns json|http:Response {
+        return githubGet("/user");
+    }
+
+    resource function get github/repos() returns json|http:Response {
+        return githubGet(string `/users/${githubOwner}/repos?per_page=100&sort=pushed`);
+    }
+
+    // All open PRs across the owner's repos in ONE call (search API).
+    resource function get github/pulls() returns json|http:Response {
+        // GitHub search 'q': owner names are [A-Za-z0-9-], no encoding needed;
+        // spaces/colons in the fixed query parts are pre-encoded.
+        string q = githubOwner;
+        return githubGet(string `/search/issues?q=is%3Apr%20is%3Aopen%20user%3A${q}&per_page=100`);
+    }
+
     resource function get driftCheck() returns json {
         return reportToJson(runDriftCheck());
     }
