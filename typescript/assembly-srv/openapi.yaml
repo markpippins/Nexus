@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: assembly-srv — Assembly Forum REST API
-  version: 1.0.729bee08
+  version: 1.0.c101b6b3
   description: 'Assembly forum service: forums, threads, comments, users, harvests, work requests, agent records, agendas,
     plans, specifications, assessments, observations, search, counts, and stats refresh.
 
@@ -18,6 +18,7 @@ tags:
 - name: candidates
 - name: conversations
 - name: counts
+- name: decisions
 - name: duality
 - name: feed
 - name: forums
@@ -802,6 +803,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/decisions:
+    get:
+      tags:
+      - decisions
+      operationId: get_decisions
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: GET /api/decisions?threadId=… — decisions persisted in a thread
+    post:
+      tags:
+      - decisions
+      operationId: post_decisions
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: POST /api/decisions — persist one submitted decision card
   /api/duality/sessions/{threadId}/events:
     get:
       tags:
