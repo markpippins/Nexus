@@ -423,3 +423,201 @@ def _get_evidence_type_id(cur, type_name: str) -> Optional[str]:
     )
     row = cur.fetchone()
     return row["id"] if row else None
+
+
+# ── Write: resolution.proposition + frame + evidence link (T24) ────
+
+# Default execution_backend frame_dimension_value UUIDs (seeded via
+# de641f38 shared vocabulary migration).
+_EXECUTION_BACKEND_VALUE_IDS: dict[str, str] = {
+    "freebuff": "6d03abed-cd17-4623-b723-9d96e900f5f2",
+    "ollama": "940ff000-8293-4d92-97fd-a61d048477f4",
+    "opencode": "7dc2dab2-49cb-4f88-934f-e0f77704c9e3",
+}
+_EXECUTION_BACKEND_DIM_ID = None  # resolved lazily
+
+
+def _get_execution_backend_dim_id(cur) -> Optional[str]:
+    """Resolve the execution_backend frame_dimension UUID."""
+    global _EXECUTION_BACKEND_DIM_ID
+    if _EXECUTION_BACKEND_DIM_ID is None:
+        cur.execute(
+            """
+            SELECT id FROM resolution.frame_dimension
+            WHERE name = 'execution_backend'
+            """,
+        )
+        row = cur.fetchone()
+        _EXECUTION_BACKEND_DIM_ID = row["id"] if row else None
+    return _EXECUTION_BACKEND_DIM_ID
+
+
+def mint_proposition(
+    title: str,
+    description: str,
+    value: bool = True,
+    semantic_type: Optional[str] = None,
+    *,
+    cur=None,
+    conn=None,
+) -> dict:
+    """Create a resolution.proposition row.
+
+    Returns dict with id + title. Caller owns framing + evidence linking.
+    If cur/conn are provided (from an outer transaction), uses them;
+    otherwise opens its own connection + commits.
+    """
+    own_conn = conn is None
+    if own_conn:
+        conn = _connect()
+    try:
+        if cur is None:
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            """
+            INSERT INTO resolution.proposition
+                (title, description, value, semantic_type_id)
+            VALUES (%s, %s, %s,
+                    (SELECT id FROM resolution.semantic_type
+                     WHERE LOWER(name) = LOWER(%s) LIMIT 1))
+            RETURNING id, title, description, value
+            """,
+            (title, description, value, semantic_type),
+        )
+        row = cur.fetchone()
+        if own_conn:
+            conn.commit()
+        return dict(row) if row else {}
+    finally:
+        if own_conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def frame_proposition(
+    proposition_id: str,
+    dimension_id: str,
+    *,
+    reference_value_id: Optional[str] = None,
+    scalar_value: Optional[str] = None,
+    cur=None,
+    conn=None,
+) -> dict:
+    """Link a proposition to a frame_dimension via proposition_frame_value.
+
+    Exactly one of reference_value_id or scalar_value must be provided.
+    """
+    own_conn = conn is None
+    if own_conn:
+        conn = _connect()
+    try:
+        if cur is None:
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            """
+            INSERT INTO resolution.proposition_frame_value
+                (proposition_id, dimension_id, reference_value_id, scalar_value)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (proposition_id, dimension_id) DO NOTHING
+            RETURNING id
+            """,
+            (proposition_id, dimension_id, reference_value_id, scalar_value),
+        )
+        row = cur.fetchone()
+        if own_conn:
+            conn.commit()
+        return dict(row) if row else {"deduped": True}
+    finally:
+        if own_conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def frame_proposition_for_backend(
+    proposition_id: str,
+    backend: str = "freebuff",
+    *,
+    cur=None,
+    conn=None,
+) -> dict:
+    """Frame a proposition against execution_backend=backend.
+
+    Uses the seeded frame_dimension_values from de641f38.
+    Falls back to freebuff if backend unknown.
+    """
+    ref_id = _EXECUTION_BACKEND_VALUE_IDS.get(
+        backend, _EXECUTION_BACKEND_VALUE_IDS["freebuff"]
+    )
+    dim_id = _get_execution_backend_dim_id(cur) if cur else None
+    if dim_id is None:
+        with _connect() as c:
+            with c.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as c2:
+                dim_id = _get_execution_backend_dim_id(c2)
+    return frame_proposition(
+        proposition_id=proposition_id,
+        dimension_id=dim_id,
+        reference_value_id=ref_id,
+        cur=cur,
+        conn=conn,
+    )
+
+
+def link_evidence_to_proposition(
+    evidence_item_id: str,
+    proposition_id: str,
+    role: str = "epistemologist",
+    strength: Optional[float] = None,
+    comment: Optional[str] = None,
+    cur=None,
+    conn=None,
+) -> dict:
+    """Link evidence_item → resolution.proposition via statement_evidence.
+
+    Uses statement_type='resolution_proposition' — the V120 trigger
+    (trg_statement_evidence_check_statement) validates the proposition exists.
+    """
+    own_conn = conn is None
+    if own_conn:
+        conn = _connect()
+    try:
+        if cur is None:
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            """
+            INSERT INTO semantics.statement_evidence
+                (evidence_item_id, statement_type, statement_id, role, strength, comment)
+            VALUES (%s, 'resolution_proposition', %s, %s, %s, %s)
+            ON CONFLICT (evidence_item_id, statement_type, statement_id, role)
+            WHERE expired_at IS NULL
+            DO NOTHING
+            RETURNING id
+            """,
+            (evidence_item_id, proposition_id, role, strength, comment),
+        )
+        row = cur.fetchone()
+        if own_conn:
+            conn.commit()
+        return dict(row) if row else {"deduped": True}
+    finally:
+        if own_conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def get_frame_dimension_id_by_name(cur, name: str) -> Optional[str]:
+    """Resolve a frame_dimension UUID by name within an existing cursor."""
+    cur.execute(
+        """
+        SELECT id FROM resolution.frame_dimension
+        WHERE name = %s
+        """,
+        (name,),
+    )
+    row = cur.fetchone()
+    return row["id"] if row else None

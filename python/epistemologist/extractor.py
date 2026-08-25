@@ -147,7 +147,7 @@ def _persist_extraction(
     evidence_type_id: Optional[str],
 ) -> dict:
     """Write extracted concepts, relationships, and evidence to the DB."""
-    stats = {"concepts": 0, "relationships": 0, "evidence": 0}
+    stats = {"concepts": 0, "relationships": 0, "evidence": 0, "propositions": 0}
     concept_map: dict[str, str] = {}  # name → id
 
     # Index seeded concepts by lowercase name
@@ -238,6 +238,38 @@ def _persist_extraction(
                 comment=evidence_excerpt[:200],
             )
 
+            # ── T24: Mint proposition + link same evidence ────────
+            # Each concept_relationship assertion becomes a
+            # resolution.proposition so the V120 trigger guard
+            # (statement_evidence ← resolution_proposition) can bind.
+            prop_title = (
+                f"Relationship: {from_name} --[{rel_type['name']}]--> {to_name}"
+            )
+            prop_desc = (
+                f"Epistemologist-extracted edge from observation {observation_id}. "
+                f"source={from_name} target={to_name} type={rel_type['name']} "
+                f"confidence={confidence}"
+            )
+            prop = db.mint_proposition(
+                title=prop_title,
+                description=prop_desc,
+                value=True,
+                semantic_type="assertion",
+            )
+            if prop and prop.get("id") and evidence_type_id:
+                db.frame_proposition_for_backend(
+                    proposition_id=prop["id"],
+                    backend="freebuff",
+                )
+                db.link_evidence_to_proposition(
+                    evidence_item_id=ev["id"],
+                    proposition_id=prop["id"],
+                    role="epistemologist",
+                    strength=confidence,
+                    comment=evidence_excerpt[:200],
+                )
+                stats["propositions"] = stats.get("propositions", 0) + 1
+
     # ── 3. Standalone evidence items ──────────────────────────────
     for e in extracted.get("evidence_items", []):
         excerpt = (e.get("excerpt") or "")[:2000]
@@ -274,7 +306,8 @@ def process_observations(
     _log.info("Found %d unprocessed source_observations", len(observations))
 
     total = {"observations": len(observations), "concepts": 0,
-             "relationships": 0, "evidence": 0, "errors": 0, "skipped": 0}
+             "relationships": 0, "evidence": 0, "propositions": 0,
+             "errors": 0, "skipped": 0}
 
     for i, obs in enumerate(observations):
         obs_id = obs["id"]
@@ -292,6 +325,7 @@ def process_observations(
             total["evidence"] += result.get("evidence", 0)
             if result.get("error"):
                 total["errors"] += 1
+            total["propositions"] += result.get("propositions", 0)
             if result.get("skipped") or result.get("dry_run"):
                 total["skipped"] += 1
             else:

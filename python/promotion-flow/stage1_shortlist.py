@@ -40,7 +40,9 @@ def attach_discovery_proposals(candidates):
     operator can confirm with one MAP command. Never writes hierarchy ids."""
     from promotion_common import ollama_available, post
 
-    unmapped = [c for c in candidates if not c.get("system_name") or c["system_name"] == "(none)"]
+    # Gap C: identity frame (id-authoritative)
+    unmapped = [c for c in candidates
+                if not (c.get("system_id") or c.get("systemId"))]
     if not unmapped:
         return
     if not ollama_available():
@@ -86,7 +88,7 @@ def suggest_destination(c, oq_count):
         return "requirements (?)"
     if oq_count > 0:
         return f"requirements ({oq_count} open question(s) block sandbox)"
-    if c.get("system_name") and c["system_name"] != "(none)":
+    if c.get("system_id") or c.get("systemId"):
         return "requirements"
     return "sandbox"
 
@@ -105,7 +107,7 @@ def render_decision_cards(candidates):
         short = cid[:8]
         oq = open_question_count(cid)
         dest = suggest_destination(c, oq)
-        mapped = c.get("system_name") and c["system_name"] != "(none)"
+        mapped = bool(c.get("system_id") or c.get("systemId"))
         mapping = f"{c.get('system_name')} :: {c.get('subsystem_name')}" if mapped else "(unmapped)"
         suggested = ""
         if not mapped and c.get("proposed_target"):
@@ -164,7 +166,7 @@ def main():
                 "readiness": c["compilation_readiness"],
                 "system_name": c.get("system_name"),
                 "subsystem_name": c.get("subsystem_name"),
-                "mapped_confirmed": bool(c.get("system_name") and c["system_name"] != "(none)"),
+                "mapped_confirmed": bool(c.get("system_id") or c.get("systemId")),
                 "struck": False,
                 "promoted": False,
             }
