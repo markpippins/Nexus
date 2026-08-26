@@ -254,6 +254,7 @@ services:
     restart: unless-stopped
     environment:
       PORT: ${NEBULA_SRV_PORT:-3101}
+      BIND_HOST: 0.0.0.0
       # nebula-srv reads PG_HOST style (src/index.ts)
       PG_HOST: ${PG_HOST}
       PG_PORT: ${PG_PORT}
@@ -275,6 +276,7 @@ services:
     restart: unless-stopped
     environment:
       NEBULA_MCP_PORT: 3102
+      BIND_HOST: 0.0.0.0
       NEBULA_SRV_URL: http://nebula:3101
     ports:
     - ${NEBULA_MCP_HOST_PORT:-3102}:3102
@@ -292,7 +294,8 @@ services:
     - ${SEMANTICS_HOST_PORT:-3160}:3160
   terrain-ts:
     build:
-      context: ../../typescript/terrain-srv
+      context: ../../typescript
+      dockerfile: terrain-srv/Dockerfile
     container_name: vd-terrain-ts
     restart: unless-stopped
     environment:
