@@ -132,3 +132,4 @@ typescript/file-system-server/root.sandbox-bak-*/
 
 # fleet secrets (Security Pass Alpha, 22fe12bc) — never commit
 etc/
+

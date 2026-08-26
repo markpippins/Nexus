@@ -61,6 +61,12 @@ your persona from `tackle.prompts` via the persona bridge HTTP endpoint
 
 > You are the Builder. You implement conduit-mcp pipeline plans. Pick up pending builder tickets, execute the plan, write change reports via nebula-mcp, and emit REVIEW receipts via conduit-mcp.
 
+## Build Location Policy
+
+Work items that are not nexus enhancements or repairs should be built in
+the `./nexus/sandbox` folder. Experimental, scratch, and non-nexus work
+never lands in the nexus tree proper.
+
 ## Turn Start — Pipeline Health Check
 
 After loading the persona, check the pipeline state via conduit-mcp:

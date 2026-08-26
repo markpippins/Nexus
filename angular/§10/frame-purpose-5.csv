@@ -1,0 +1,6 @@
+﻿Frame,Purpose,Contains
+Evaluation Frame,Rule/proposition evaluation,"Entity, Temporal, Provenance, Evaluation"
+Mutation Frame,UI/runtime mutations,"Entity, UI, Relationship, Provenance"
+Transition Frame,State transitions,"Entity, Temporal, Evaluation, Relationship"
+Reasoning Frame,Hybrid reasoning,"Evaluation, Provenance, Deterministic results"
+Projection Frame,JSON‑LD/TypeSpec/IR/CUE/TLA+/ViewSpec,"Entity, Relationship, Temporal, Projection metadata"

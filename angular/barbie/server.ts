@@ -103,26 +103,32 @@ if (FEDERATED.length > 0) {
 
     // Multi-page variant for entity-list merges.
     async function fetchAllRows(base: string) {
-      const q = new URLSearchParams(req.query as Record<string, string>);
-      let perPageCap = 1000;
-      const rows: any[] = [];
-      let total = Infinity;
-      for (let page = 0; page < 50; page++) {
-        q.set("page", String(page));
-        q.set("per_page", String(perPageCap));
-        const r = await fetchWithTimeout(`${base}${pathOnly}?${q.toString()}`);
-        if (!r.ok) return { ok: false as const, status: r.status };
-        const body = await r.json();
-        const arr: any[] = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
-        rows.push(...arr);
-        if (!Array.isArray(body)) {
-          const meta = body?.meta ?? {};
-          if (Number(meta.total) > 0) total = Number(meta.total);
-          if (Number(meta.per_page) > 0) perPageCap = Math.min(perPageCap, Number(meta.per_page));
+      try {
+        const q = new URLSearchParams(req.query as Record<string, string>);
+        let perPageCap = 1000;
+        const rows: any[] = [];
+        let total = Infinity;
+        for (let page = 0; page < 50; page++) {
+          q.set("page", String(page));
+          q.set("per_page", String(perPageCap));
+          const r = await fetchWithTimeout(`${base}${pathOnly}?${q.toString()}`);
+          if (!r.ok) return { ok: false as const, status: r.status };
+          const body = await r.json();
+          const arr: any[] = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
+          rows.push(...arr);
+          if (!Array.isArray(body)) {
+            const meta = body?.meta ?? {};
+            if (Number(meta.total) > 0) total = Number(meta.total);
+            if (Number(meta.per_page) > 0) perPageCap = Math.min(perPageCap, Number(meta.per_page));
+          }
+          if (arr.length === 0 || rows.length >= total) break;
         }
-        if (arr.length === 0 || rows.length >= total) break;
+        return { ok: true as const, rows };
+      } catch (err: any) {
+        // A source being unreachable must degrade honestly, not kill the
+        // process via unhandled rejection (Express 4 cannot catch these).
+        return { ok: false as const, status: 0, error: String(err?.message || err) };
       }
-      return { ok: true as const, rows };
     }
 
     const results = await Promise.all([
