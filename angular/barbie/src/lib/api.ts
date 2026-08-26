@@ -363,6 +363,20 @@ export const registryApi = {
     return { data: items.map(mapService), operation };
   },
 
+  getServiceSubModules: async (id: string): Promise<Array<Record<string, unknown>>> => {
+    // Parity with console manage-services node: browse declared sub-modules
+    // of a service (backend route GET /api/v1/services/{id}/sub-modules).
+    if (currentMode === 'mock') {
+      const svc = mockServices.find(s => s.id === id);
+      return [
+        { name: `${svc?.name ?? 'mock'}-core`, version: svc?.version ?? '1.0.0', status: 'active' },
+        { name: `${svc?.name ?? 'mock'}-admin`, version: svc?.version ?? '1.0.0', status: 'active' }
+      ];
+    }
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/services/${id}/sub-modules`);
+    return Array.isArray(raw) ? raw : (Array.isArray(raw.data) ? raw.data : []);
+  },
+
   createService: async (data: Partial<Service>): Promise<Service> => {
     if (currentMode === 'mock') {
       const newSvc: Service = {
