@@ -89,6 +89,52 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 
 // ── Live-mode normalization layer ───────────────────────────────────
 
+// ── Terrain platform health (barbie-parity #16) ─────────────────────
+// Base URL: server-injected bootstrap → localStorage override → console
+// default (Spring Boot terrain on :8084).
+const TERRAIN_URL: string = SERVER_CONFIG?.terrainUrl
+  || localStorage.getItem('platform_terrain_url')
+  || 'http://localhost:8084';
+
+export interface TerrainHealthSummary {
+  terrainUp: boolean;
+  terrainError?: string;
+  loadedAt: string;
+  mcp: { total: number; online: number; offline: number };
+  services: { total: number; online: number; offline: number };
+  servers: { total: number; online: number; offline: number };
+}
+
+function _countBlock(block: any): { total: number; online: number; offline: number } {
+  return {
+    total: Number(block?.total ?? 0),
+    online: Number(block?.online ?? 0),
+    offline: Number(block?.offline ?? block?.degraded ?? 0)
+  };
+}
+
+async function _terrainHealth(): Promise<TerrainHealthSummary> {
+  try {
+    const raw = await fetchJson<any>(`${TERRAIN_URL}/api/v1/platform/health`);
+    return {
+      terrainUp: Boolean(raw.terrainUp),
+      loadedAt: new Date().toISOString(),
+      mcp: _countBlock(raw.mcpServers),
+      services: _countBlock(raw.runnableServices),
+      servers: _countBlock(raw.hostServers)
+    };
+  } catch (e: any) {
+    return {
+      terrainUp: false,
+      terrainError: `Unable to reach terrain at ${TERRAIN_URL}: ${e?.message ?? e}`,
+      loadedAt: new Date().toISOString(),
+      mcp: { total: 0, online: 0, offline: 0 },
+      services: { total: 0, online: 0, offline: 0 },
+      servers: { total: 0, online: 0, offline: 0 }
+    };
+  }
+}
+
 // currentBaseUrl defaults to /api/v1/registry. Flat entity endpoints live
 // directly under /api/v1 (no /registry segment), so derive that base.
 function flatBaseUrl(): string {
@@ -891,6 +937,19 @@ export const registryApi = {
   },
 
   // --- AGGREGATE PLATFORM STATE ---
+  getTerrainHealth: async (): Promise<TerrainHealthSummary> => {
+    if (currentMode === 'mock') {
+      return {
+        terrainUp: true,
+        loadedAt: new Date().toISOString(),
+        mcp: { total: 6, online: 6, offline: 0 },
+        services: { total: 40, online: 38, offline: 2 },
+        servers: { total: 3, online: 3, offline: 0 }
+      };
+    }
+    return _terrainHealth();
+  },
+
   getPlatformAggregate: async (): Promise<PlatformAggregateState> => {
     if (currentMode === 'mock') {
       return {

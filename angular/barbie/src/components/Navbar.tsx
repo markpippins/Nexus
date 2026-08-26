@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTheme } from './ThemeContext';
-import { registryApi } from '../lib/api';
+import { registryApi, TerrainHealthSummary } from '../lib/api';
 import {
   Search,
   Moon,
@@ -19,6 +19,7 @@ import {
 import { ThemeMode, System } from '../types';
 
 interface NavbarProps {
+
   searchQuery: string;
   onSearchChange: (query: string) => void;
   selectedSystemFilter: string;
@@ -31,6 +32,7 @@ interface NavbarProps {
   onToggleMobileMenu: () => void;
   isRefreshing: boolean;
   onManualRefresh: () => void;
+  onTerrainRecheck?: () => Promise<TerrainHealthSummary | null>;
   activeView: string;
   apiMode?: 'live' | 'mock';
   onApiModeChange?: (mode: 'live' | 'mock') => void;
@@ -49,11 +51,28 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleMobileMenu,
   isRefreshing,
   onManualRefresh,
+  onTerrainRecheck,
   activeView,
   apiMode = registryApi.getApiMode(),
   onApiModeChange
 }) => {
   const { theme, setTheme } = useTheme();
+
+  // Terrain platform-health re-check (barbie-parity #16)
+  const [terrainOpen, setTerrainOpen] = useState(false);
+  const [terrainChecking, setTerrainChecking] = useState(false);
+  const [terrainHealth, setTerrainHealth] = useState<TerrainHealthSummary | null>(null);
+
+  const handleTerrainRecheck = async () => {
+    if (!onTerrainRecheck) return;
+    setTerrainOpen(true);
+    setTerrainChecking(true);
+    try {
+      setTerrainHealth(await onTerrainRecheck());
+    } finally {
+      setTerrainChecking(false);
+    }
+  };
 
   return (
     <header className="sticky top-0 z-30 border-b border-[var(--border-color)] bg-[var(--bg-card)]/95 backdrop-blur shadow-sm">
@@ -191,6 +210,53 @@ export const Navbar: React.FC<NavbarProps> = ({
               <option value={30000}>30s Poll</option>
               <option value={0}>Paused</option>
             </select>
+
+            {onTerrainRecheck && (
+              <div className="relative">
+                <button
+                  onClick={handleTerrainRecheck}
+                  disabled={terrainChecking}
+                  className={`flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] px-2.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] ${
+                    terrainChecking ? 'opacity-60' : ''
+                  }`}
+                  title="System Health — live re-check via terrain"
+                >
+                  <Activity className={`h-3.5 w-3.5 text-emerald-400 ${terrainChecking ? 'animate-pulse' : ''}`} />
+                  <span>Health</span>
+                </button>
+
+                {terrainOpen && (
+                  <div className="absolute right-0 top-9 z-50 w-64 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 text-xs shadow-xl">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="font-bold text-[var(--text-primary)]">Platform Health</span>
+                      <span
+                        className={`rounded px-1.5 py-0.5 ${
+                          terrainChecking
+                            ? 'bg-slate-500/10 text-slate-400'
+                            : terrainHealth?.terrainUp
+                              ? 'bg-emerald-500/10 text-emerald-400'
+                              : 'bg-rose-500/10 text-rose-400'
+                        }`}
+                      >
+                        {terrainChecking ? 'checking…' : terrainHealth?.terrainUp ? 'UP' : 'DOWN'}
+                      </span>
+                    </div>
+                    {!terrainChecking && terrainHealth && (
+                      <>
+                        <div className="space-y-1 font-mono text-[11px] text-[var(--text-secondary)]">
+                          <div className="flex justify-between"><span>MCP servers</span><span>{terrainHealth.mcp.online}/{terrainHealth.mcp.total} online</span></div>
+                          <div className="flex justify-between"><span>Services</span><span>{terrainHealth.services.online}/{terrainHealth.services.total} online</span></div>
+                          <div className="flex justify-between"><span>Hosts</span><span>{terrainHealth.servers.online}/{terrainHealth.servers.total} online</span></div>
+                        </div>
+                        <div className="mt-2 text-[10px] text-[var(--text-secondary)] opacity-70">
+                          {terrainHealth.terrainError ? terrainHealth.terrainError : `checked ${new Date(terrainHealth.loadedAt).toLocaleTimeString()}`}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Service Register Button */}

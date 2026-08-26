@@ -1370,7 +1370,11 @@ app.get("/api/v1/registry/metrics/:entityType/:entityId", (req, res) => {
 // runs live regardless of stale localStorage on the browser side.
 function injectConfig(html: string): string {
   if (!BACKEND_URL) return html;
-  const cfg = `<script>window.__BARBIE_CONFIG__=${JSON.stringify({ apiMode: "live" })};</script>`;
+  const cfg = `<script>window.__BARBIE_CONFIG__=${JSON.stringify({
+    apiMode: "live",
+    // Terrain base for platform-health re-checks (barbie-parity #16).
+    terrainUrl: process.env.TERRAIN_BASE_URL || "http://localhost:8084",
+  })};</script>`;
   return html.includes("<head>")
     ? html.replace("<head>", `<head>\n    ${cfg}`)
     : cfg + html;
