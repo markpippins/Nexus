@@ -9,7 +9,12 @@ import {
   Plus,
   Edit2,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Play,
+  Square,
+  RotateCw,
+  ScrollText,
+  Settings2
 } from 'lucide-react';
 
 interface DeploymentsTableProps {
@@ -233,6 +238,27 @@ export const DeploymentsTable: React.FC<DeploymentsTableProps> = ({
 
                   <td className="p-3 text-right">
                     <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                      {/* Lifecycle/log/config ops: backend routes do not exist
+                          (D-BP-1, ref 6938f85a) — rendered DISABLED with reason;
+                          no network calls, no mock success paths. They activate
+                          when the deferred backend plan lands. */}
+                      {[
+                        { icon: Play, title: 'Start — deferred: no POST /deployments/{id}/start route (D-BP-1)' },
+                        { icon: Square, title: 'Stop — deferred: no POST /deployments/{id}/stop route (D-BP-1)' },
+                        { icon: RotateCw, title: 'Restart — deferred: needs start+stop routes (D-BP-1)' },
+                        { icon: ScrollText, title: 'View logs — deferred: no logs route; console placeholder only (D-BP-1)' },
+                        { icon: Settings2, title: 'View config — deferred: no /configurations/deployment/{id} route (D-BP-1)' }
+                      ].map(({ icon: Icon, title }) => (
+                        <button
+                          key={title}
+                          disabled
+                          title={title}
+                          className="cursor-not-allowed rounded p-1 text-slate-500 opacity-40"
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                        </button>
+                      ))}
+
                       <button
                         onClick={() => onOpenEditModal(dep)}
                         className="rounded p-1 text-sky-400 hover:bg-sky-500/10"

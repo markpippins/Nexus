@@ -129,10 +129,30 @@ export const ServicesTable: React.FC<ServicesTableProps> = ({
     try {
       await registryApi.sendHeartbeat(serviceName);
       setServices(prev =>
-        prev.map(s => (s.name === serviceName ? { ...s, status: 'healthy', lastHeartbeat: new Date().toISOString() } : s))
+        prev.map(s => (s.name === serviceName ? { ...s, status: 'healthy', lastHeartbeat: new Date().toISOString() } as Service : s))
       );
     } catch (err: any) {
       alert(`Heartbeat error: ${err.message}`);
+    }
+  };
+
+  // Live health re-check via ServiceStatusController (barbie-parity #8,
+  // unblocked portion per D-BP-1: GET /api/v1/status/{serviceName}).
+  const [healthChecking, setHealthChecking] = useState<string | null>(null);
+  const handleCheckHealth = async (e: React.MouseEvent, service: Service) => {
+    e.stopPropagation();
+    setHealthChecking(service.name);
+    try {
+      const st = await registryApi.getServiceStatus(service.name);
+      const status = String((st as any).status ?? 'unknown');
+      setServices(prev =>
+        prev.map(s => (s.name === service.name ? { ...s, status } as Service : s))
+      );
+      alert(`${service.name}: ${status}`);
+    } catch (err: any) {
+      alert(`Health check failed: ${err.message}`);
+    } finally {
+      setHealthChecking(null);
     }
   };
 
@@ -332,6 +352,15 @@ export const ServicesTable: React.FC<ServicesTableProps> = ({
                         title="Edit Service"
                       >
                         <Edit2 className="h-3.5 w-3.5" />
+                      </button>
+
+                      <button
+                        onClick={(e) => handleCheckHealth(e, service)}
+                        disabled={healthChecking === service.name}
+                        className="rounded p-1 text-teal-400 hover:bg-teal-500/10 disabled:opacity-40"
+                        title="Check health via /api/v1/status"
+                      >
+                        <Heart className={`h-3.5 w-3.5 ${healthChecking === service.name ? 'animate-pulse' : ''}`} />
                       </button>
 
                       <button

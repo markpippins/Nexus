@@ -950,6 +950,15 @@ export const registryApi = {
     return _terrainHealth();
   },
 
+  getServiceStatus: async (serviceName: string): Promise<Record<string, unknown>> => {
+    // Real backend route (D-BP-1 verified): ServiceStatusController
+    // GET /api/v1/status/{serviceName} — flat under /api/v1.
+    if (currentMode === 'mock') {
+      return { serviceName, status: 'healthy', lastHeartbeat: new Date().toISOString(), uptimeSeconds: 86400 };
+    }
+    return fetchJson<Record<string, unknown>>(`${flatBaseUrl()}/status/${encodeURIComponent(serviceName)}`);
+  },
+
   getPlatformAggregate: async (): Promise<PlatformAggregateState> => {
     if (currentMode === 'mock') {
       return {
