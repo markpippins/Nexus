@@ -1403,11 +1403,19 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    const indexHtml = injectConfig(require("fs").readFileSync(path.join(distPath, "index.html"), "utf8"));
+    // Read index.html PER REQUEST, not cached at startup — otherwise every
+    // rebuild rotates hashed assets out from under the running process and
+    // browsers get a ghost bundle -> blank screen ("not-quite-death",
+    // 2026-08-26). injectConfig still applies server-authoritative config.
     app.use(express.static(distPath, { index: false })); // hashed assets only; / handled below with config injection
     app.get("*", (req, res) => {
       if (req.path.startsWith("/api")) return res.status(404).json({ error: "Not found" });
-      res.type("html").send(indexHtml);
+      try {
+        const html = injectConfig(require("fs").readFileSync(path.join(distPath, "index.html"), "utf8"));
+        return res.type("html").send(html);
+      } catch {
+        return res.status(503).type("html").send("<h1>barbie: dist/ not built</h1><p>Run <code>npm run build</code>.</p>");
+      }
     });
   }
 
