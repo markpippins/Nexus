@@ -102,3 +102,20 @@ tier_endpoints:
   - { name: broker,          port: 8081, path: /actuator/health }
   - { name: peb-kernel,      port: 8098, path: /actuator/health }
   - { name: terrain-ts,      port: 8084, path: /health, tolerate_amber: true }
+
+# ── Candidate stack (adonisjs/moleculer failover group) ────────────────
+# Deployed by deploy-candidate.yml; probed by health-candidate.yml.
+# Source of truth for the manifest: docker/candidate-stack/compose.yaml
+# plus the compose.vanadium.yaml override (env retarget to authority host).
+candidate_compose_dir: "{{ nexus_root }}/docker/candidate-stack"
+candidate_compose_files:
+  - compose.yaml
+  - compose.vanadium.yaml
+# Node sources build clean on arm64 (unlike prebuilt terrain-ts, W2 backlog).
+candidate_build_services:
+  - broker
+  - control-edge
+# cand-redis has no published host port (compose-internal only) — nothing to probe.
+candidate_endpoints:
+  - { name: cand-broker,       port: 14080, path: /api/health }
+  - { name: cand-control-edge, port: 18082, path: /health }

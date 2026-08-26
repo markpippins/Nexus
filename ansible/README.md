@@ -15,6 +15,8 @@ group_vars/vanadium.yml     paths, ports, endpoint map
 playbooks/deploy-tier.yml   git sync → render .env → compose up (+W2 override) → prune
 playbooks/health-check.yml  probe every tier endpoint, fail on non-200
 playbooks/reboot-drill.yml  reboot → wait → verify auto-recovery → health-check
+playbooks/deploy-candidate.yml   candidate stack (adonisjs/moleculer) — same rules, own compose dir
+playbooks/health-candidate.yml   probe candidate endpoints (14080/api/health, 18082/health)
 ```
 
 ## Usage

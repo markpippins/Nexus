@@ -1,0 +1,125 @@
+# deploy-candidate.yml — sync code, render candidate .env, bring the
+# candidate failover group up on vanadium.
+#
+# Companion to deploy-tier.yml (legacy tier) using the SAME ground rules:
+#   - Idempotent: re-running converges.
+#   - Mongo credentials come ONLY from the controller's untracked
+#     nexus/.env — never committed to the repo. Fails loudly if absent.
+#   - NO --remove-orphans: this host runs other compose projects (legacy
+#     vd-* front doors, CI stack) — remove-orphans would stop them.
+#     Learned 2026-08-24.
+#   - reset --hard is intentional: vanadium is a managed deploy target.
+#
+# Run against the [vanadium] inventory group only.
+---
+- name: Deploy candidate stack on vanadium
+  hosts: vanadium
+  gather_facts: false
+  vars:
+    ansible_become: false
+
+  tasks:
+    - name: Wait for SSH to settle (Pi can stall during container-start storms)
+      ansible.builtin.wait_for_connection:
+        timeout: 180
+
+    # Mongo credential lives ONLY in the controller's untracked nexus/.env —
+    # never committed to the repo. Fail loudly if absent.
+    - name: Load Mongo URI from controller-local .env
+      ansible.builtin.set_fact:
+        mongo_uri: "{{ ((lookup('file', nexus_controller_env).splitlines()
+                        | select('match', '^SPRING_DATA_MONGODB_URI=')
+                        | first) | regex_replace('^SPRING_DATA_MONGODB_URI=', ''))
+                        | regex_replace('@localhost:', '@' ~ authority_host ~ ':') }}"
+      delegate_to: localhost
+      run_once: true
+
+    # Candidate broker projects into the sol_ir DB with admin authSource
+    # (learned 2026-08-26: driver defaults SCRAM to the path DB and fails
+    # code 18 against the root user). Strip any path/query from the Spring
+    # URI, keep scheme+credentials+host, re-append our own.
+    - name: Derive candidate MONGO_URL (sol_ir projection, admin authSource)
+      ansible.builtin.set_fact:
+        cand_mongo_url: "{{ (mongo_uri | regex_replace('^(mongodb(\\+srv)?://[^/]+).*$', '\\1')) }}/sol_ir?authSource=admin"
+      delegate_to: localhost
+      run_once: true
+
+    - name: Fetch latest {{ nexus_branch }}
+      ansible.builtin.command:
+        cmd: git fetch origin {{ nexus_branch }}
+        chdir: "{{ nexus_root }}"
+      changed_when: false
+
+    - name: Read local and remote HEADs
+      ansible.builtin.command:
+        cmd: "git rev-parse HEAD origin/{{ nexus_branch }}"
+        chdir: "{{ nexus_root }}"
+      changed_when: false
+      register: heads
+
+    - name: Fast-forward to origin/{{ nexus_branch }}
+      ansible.builtin.command:
+        cmd: git reset --hard origin/{{ nexus_branch }}
+        chdir: "{{ nexus_root }}"
+      when: heads.stdout_lines[0] != heads.stdout_lines[1]
+      register: git_sync
+
+    - name: Report repo state
+      ansible.builtin.debug:
+        msg: "repo at {{ git_sync.after | default('unchanged') }}"
+      when: git_sync is not skipped
+
+    # Superset of the keys both containers read via env_file (.env):
+    # control-edge needs APP_*/PG_*, broker needs MONGO_URL. Same dev-tier
+    # credential posture as the legacy tier (documented LAN dev creds).
+    - name: Render candidate .env
+      ansible.builtin.copy:
+        dest: "{{ candidate_compose_dir }}/.env"
+        mode: "0600"
+        content: |
+          # Managed by ansible (nexus/ansible/playbooks/deploy-candidate.yml).
+          # Manual edits will be overwritten on next deploy.
+          LOG_LEVEL=info
+          APP_NAME=nexus-control-edge
+          APP_KEY=dev-key-nexus-control-edge-000000
+          PG_USER=pguser
+          PG_PASSWORD=pgpass
+          PG_DB_NAME=nexus
+          PG_PORT=5432
+          MONGO_URL={{ cand_mongo_url }}
+      register: env_render
+      no_log: true
+
+    - name: Build candidate images ({{ candidate_build_services | join(', ') }})
+      # Node sources build clean on arm64 — unlike prebuilt terrain-ts (W2).
+      ansible.builtin.command:
+        cmd: >-
+          docker compose
+          {% for f in candidate_compose_files %}-f {{ f }} {% endfor %}
+          build {{ candidate_build_services | join(' ') }}
+        chdir: "{{ candidate_compose_dir }}"
+      environment:
+        DOCKER_BUILDKIT: "1"
+      register: compose_build
+
+    # Deliberately NOT --remove-orphans (see header). --no-build is safe:
+    # the build task above just produced the images.
+    - name: Bring up the candidate group
+      ansible.builtin.command:
+        cmd: >-
+          docker compose
+          {% for f in candidate_compose_files %}-f {{ f }} {% endfor %}
+          up -d --no-build
+        chdir: "{{ candidate_compose_dir }}"
+      register: compose_up
+      changed_when: compose_up.stdout != ''
+
+    - name: Prune dangling images from rebuilds
+      ansible.builtin.command:
+        cmd: docker image prune -f
+      changed_when: false
+
+    - name: Wait for containers to reach running/healthy
+      ansible.builtin.pause:
+        seconds: 45
+      when: compose_up is changed
