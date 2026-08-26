@@ -103,6 +103,11 @@ export interface TerrainHealthSummary {
   mcp: { total: number; online: number; offline: number };
   services: { total: number; online: number; offline: number };
   servers: { total: number; online: number; offline: number };
+  // Raw items for the terrain-backed topology view (#11). Loose-typed on
+  // purpose — terrain owns these shapes (console terrain.service.ts models).
+  mcpItems: Array<Record<string, unknown>>;
+  serviceItems: Array<Record<string, unknown>>;
+  serverItems: Array<Record<string, unknown>>;
 }
 
 function _countBlock(block: any): { total: number; online: number; offline: number } {
@@ -121,7 +126,10 @@ async function _terrainHealth(): Promise<TerrainHealthSummary> {
       loadedAt: new Date().toISOString(),
       mcp: _countBlock(raw.mcpServers),
       services: _countBlock(raw.runnableServices),
-      servers: _countBlock(raw.hostServers)
+      servers: _countBlock(raw.hostServers),
+      mcpItems: Array.isArray(raw.mcpServers?.items) ? raw.mcpServers.items : [],
+      serviceItems: Array.isArray(raw.runnableServices?.items) ? raw.runnableServices.items : [],
+      serverItems: Array.isArray(raw.hostServers?.items) ? raw.hostServers.items : []
     };
   } catch (e: any) {
     return {
@@ -130,7 +138,10 @@ async function _terrainHealth(): Promise<TerrainHealthSummary> {
       loadedAt: new Date().toISOString(),
       mcp: { total: 0, online: 0, offline: 0 },
       services: { total: 0, online: 0, offline: 0 },
-      servers: { total: 0, online: 0, offline: 0 }
+      servers: { total: 0, online: 0, offline: 0 },
+      mcpItems: [],
+      serviceItems: [],
+      serverItems: []
     };
   }
 }
@@ -994,7 +1005,22 @@ export const registryApi = {
         loadedAt: new Date().toISOString(),
         mcp: { total: 6, online: 6, offline: 0 },
         services: { total: 40, online: 38, offline: 2 },
-        servers: { total: 3, online: 3, offline: 0 }
+        servers: { total: 3, online: 3, offline: 0 },
+        mcpItems: [
+          { id: 'm1', name: 'conduit-mcp', port: 3100, status: 'ON' },
+          { id: 'm2', name: 'nebula-mcp', port: 3102, status: 'ON' },
+          { id: 'm3', name: 'terrain-mcp', port: 3130, status: 'ON' }
+        ],
+        serviceItems: [
+          { id: 's1', name: 'assembly-srv', port: 3107, status: 'ON' },
+          { id: 's2', name: 'nebula-srv', port: 3101, status: 'ON' },
+          { id: 's3', name: 'cascade-srv', port: 3106, status: 'DEGRADED' },
+          { id: 's4', name: 'wind-srv', port: 3300, status: 'ON' }
+        ],
+        serverItems: [
+          { id: 'h1', hostname: 'titanium', ipAddress: '127.0.0.1', os: 'linux', status: 'ONLINE' },
+          { id: 'h2', hostname: 'vanadium', ipAddress: '192.168.1.209', os: 'linux', status: 'ONLINE' }
+        ]
       };
     }
     return _terrainHealth();
