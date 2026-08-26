@@ -250,6 +250,10 @@ services:
       PG_USER: ${PG_USER}
       PG_PASSWORD: ${PG_PASS}
       PG_DB_NAME: ${PG_DB_NAME}
+      # Block-segmentation/inbox-pointer Redis. Defaults to localhost inside
+      # the container without this, which ECONNREFUSEDs (2026-08-26). Same
+      # instance as tackle-mcp persona cache per .env MEMORY_REDIS_URL.
+      REDIS_URL: ${MEMORY_REDIS_URL:-redis://redis:6379}
     ports:
     - ${NEBULA_HOST_PORT:-3101}:3101
 
