@@ -14,7 +14,8 @@ import {
   Radio,
   Server,
   Layers,
-  Cpu
+  Cpu,
+  Settings
 } from 'lucide-react';
 import { ThemeMode, System } from '../types';
 
@@ -33,6 +34,7 @@ interface NavbarProps {
   isRefreshing: boolean;
   onManualRefresh: () => void;
   onTerrainRecheck?: () => Promise<TerrainHealthSummary | null>;
+  onOpenProfiles?: () => void;
   activeView: string;
   apiMode?: 'live' | 'mock';
   onApiModeChange?: (mode: 'live' | 'mock') => void;
@@ -52,6 +54,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   isRefreshing,
   onManualRefresh,
   onTerrainRecheck,
+  onOpenProfiles,
   activeView,
   apiMode = registryApi.getApiMode(),
   onApiModeChange
@@ -211,9 +214,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               <option value={0}>Paused</option>
             </select>
 
+            {onOpenProfiles && (
+              <button
+                onClick={onOpenProfiles}
+                className="flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] px-2.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
+                title="Connection Profiles (registry / broker-gateway)"
+              >
+                <Settings className="h-3.5 w-3.5 text-violet-400" />
+                <span>Profiles</span>
+              </button>
+            )}
+
             {onTerrainRecheck && (
-              <div className="relative">
-                <button
+              <div className="relative">                <button
                   onClick={handleTerrainRecheck}
                   disabled={terrainChecking}
                   className={`flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] px-2.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] ${

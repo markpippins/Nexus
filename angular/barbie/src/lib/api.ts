@@ -314,6 +314,56 @@ function jenkinsColorToStatus(color: string | undefined): JenkinsJobStatus {
   return 'not_built';
 }
 
+// ── Registry / Broker-Gateway profiles (barbie-parity #13/#14) ──────
+// Barbie-local address book persisted in localStorage. A 'registry'
+// profile can be set ACTIVE — that repoints every DataView via the
+// existing platform_api_base_url storage key.
+export interface BarbieProfile {
+  id: string;
+  name: string;
+  baseUrl: string;
+  kind: 'registry' | 'broker';
+}
+
+const PROFILES_KEY = 'platform_profiles';
+
+export function getProfiles(): BarbieProfile[] {
+  try {
+    const raw = localStorage.getItem(PROFILES_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveProfiles(list: BarbieProfile[]): void {
+  localStorage.setItem(PROFILES_KEY, JSON.stringify(list));
+}
+
+export async function testProfileConnection(
+  profile: Pick<BarbieProfile, 'kind' | 'baseUrl'>
+): Promise<{ ok: boolean; detail: string }> {
+  const path = profile.kind === 'broker' ? '/actuator/health' : '/health';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  const started = Date.now();
+  try {
+    const res = await fetch(`${profile.baseUrl.replace(/\/$/, '')}${path}`, {
+      signal: controller.signal
+    });
+    const ms = Date.now() - started;
+    if (res.ok) return { ok: true, detail: `reachable (${ms}ms, HTTP ${res.status})` };
+    return { ok: false, detail: `HTTP ${res.status} in ${ms}ms` };
+  } catch (e: any) {
+    const ms = Date.now() - started;
+    if (e?.name === 'AbortError') return { ok: false, detail: `timeout after ${Date.now() - started}ms` };
+    return { ok: false, detail: `${e?.message ?? e} (${ms}ms)` };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export const registryApi = {
   // Mode & Configuration Controls
   getApiMode: (): 'live' | 'mock' => currentMode,
