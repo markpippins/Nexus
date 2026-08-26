@@ -41,7 +41,7 @@ check_count() {
 }
 
 echo "═══════════════════════════════════════════════════════════════"
-echo "  NEBULA-SRV E2E TESTS (strontium:5432 PostgreSQL)"
+echo "  NEBULA-SRV E2E TESTS (localhost:5432 PostgreSQL)"
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
 

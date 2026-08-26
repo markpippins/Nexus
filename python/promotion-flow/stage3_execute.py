@@ -127,8 +127,13 @@ def _architect_decisions(limit=30):
 def active_promotion_halt():
     """Return the newest active halt/deferral ruling affecting promotion
     batches, or None. A halt counts as lifted ONLY by a later architect
-    decision explicitly resuming (RESUME/LIFTED/CLEARED)."""
+    decision explicitly resuming (RESUME/LIFTED/CLEARED).
+
+    A record that matches the halt pattern BUT carries its own lift marker
+    (e.g. 'HALT LIFTED') is a lift event, not a halt — skip it and keep
+    scanning older records for the actual governing halt."""
     decisions = _architect_decisions()
+    lift_marker = re.compile(r"LIFTED|RESUME|CLEARED|GUARD\s*ACTIVE", re.I)
     for rec in decisions:
         title = rec.get("title") or ""
         tags = " ".join(rec.get("tags") or [])
@@ -136,8 +141,9 @@ def active_promotion_halt():
         if re.search(r"HALT|DEFERRED", blob, re.I) and re.search(
             r"promotion|stage-3|batch|gate", blob, re.I
         ):
-            return rec  # newest first → first hit is governing unless superseded below
-    # look for a later explicit lift of any halt we just found
+            if lift_marker.search(blob):
+                continue  # this IS the lift record — not a halt
+            return rec  # newest first → first non-lift hit governs
     return None
 
 

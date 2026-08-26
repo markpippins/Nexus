@@ -1,0 +1,24 @@
+# Vanadium (Pi 5, 192.168.1.209) override for the candidate stack.
+#
+# Applied as:
+#   docker compose -f compose.yaml -f compose.vanadium.yaml up -d
+#
+# WHY THIS EXISTS: the base manifest targets the titanium-local topology —
+# host.docker.internal reaches titanium's own PG/Mongo/Conduit. On the
+# standby those services live on the AUTHORITY HOST over LAN, so the env
+# must be retargeted (compose `environment` overrides both base values and
+# env_file per key). MONGO_URL itself is NOT set here: it carries
+# credentials and is injected by deploy-candidate.yml into the rendered
+# .env (never committed).
+
+services:
+  broker:
+    environment:
+      # Workers reach shared infrastructure on the authority host.
+      PG_HOST: "192.168.1.120"
+      CONDUIT_MCP_URL: "http://192.168.1.120:3100"
+      # REDIS_HOST stays "redis" — in-compose DNS, unchanged.
+
+  control-edge:
+    environment:
+      PG_HOST: "192.168.1.120"

@@ -59,6 +59,22 @@ function fetchWithTimeout(url: string, ms = 12000): Promise<Response> {
     .finally(() => clearTimeout(timer));
 }
 
+// CI gateway passthrough (to-do d9ac7608 follow-on; proposal 13890307):
+// browser -> :3010 /gateway/* -> loopback ballerina ci-gateway :9095.
+// Read-only; upstream binds loopback so this is the only exposure.
+app.use("/gateway", async (req, res) => {
+  try {
+    // Accept header omitted — fetchWithTimeout pins JSON content-type;
+    // gateway always answers JSON anyway.
+    const r = await fetchWithTimeout(`http://127.0.0.1:9095${req.originalUrl}`, 10000);
+    const text = await r.text();
+    res.status(r.status).set("Content-Type", r.headers.get("content-type") ?? "application/json");
+    res.send(text);
+  } catch (err: any) {
+    res.status(502).json({ error: "ci-gateway unreachable", detail: String(err?.message || err) });
+  }
+});
+
 if (FEDERATED.length > 0) {
   console.log(`[barbie] Federation enabled: ${FEDERATED.map((f) => `${f.label}@${f.url}`).join(", ")} (read-only)`);
 
@@ -1354,7 +1370,11 @@ app.get("/api/v1/registry/metrics/:entityType/:entityId", (req, res) => {
 // runs live regardless of stale localStorage on the browser side.
 function injectConfig(html: string): string {
   if (!BACKEND_URL) return html;
-  const cfg = `<script>window.__BARBIE_CONFIG__=${JSON.stringify({ apiMode: "live" })};</script>`;
+  const cfg = `<script>window.__BARBIE_CONFIG__=${JSON.stringify({
+    apiMode: "live",
+    // Terrain base for platform-health re-checks (barbie-parity #16).
+    terrainUrl: process.env.TERRAIN_BASE_URL || "http://localhost:8084",
+  })};</script>`;
   return html.includes("<head>")
     ? html.replace("<head>", `<head>\n    ${cfg}`)
     : cfg + html;
@@ -1383,11 +1403,19 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    const indexHtml = injectConfig(require("fs").readFileSync(path.join(distPath, "index.html"), "utf8"));
+    // Read index.html PER REQUEST, not cached at startup — otherwise every
+    // rebuild rotates hashed assets out from under the running process and
+    // browsers get a ghost bundle -> blank screen ("not-quite-death",
+    // 2026-08-26). injectConfig still applies server-authoritative config.
     app.use(express.static(distPath, { index: false })); // hashed assets only; / handled below with config injection
     app.get("*", (req, res) => {
       if (req.path.startsWith("/api")) return res.status(404).json({ error: "Not found" });
-      res.type("html").send(indexHtml);
+      try {
+        const html = injectConfig(require("fs").readFileSync(path.join(distPath, "index.html"), "utf8"));
+        return res.type("html").send(html);
+      } catch {
+        return res.status(503).type("html").send("<h1>barbie: dist/ not built</h1><p>Run <code>npm run build</code>.</p>");
+      }
     });
   }
 

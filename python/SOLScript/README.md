@@ -301,6 +301,15 @@ It correlates to the schema tables but does not depend on them at runtime:
 | `resolution.representation` | `Representation` |
 | `resolution.execution_claim` | *(evaluated via InferenceEngine)* |
 
+**Shrapnel (standalone facts store).**  The `shrapnel` schema is an EAV
+object store (fields/objects/values) that lives outside `resolution`.  It is
+a "facts" database — resolution reasons *about* those facts without owning
+them.  `DatabaseLoader.load_shrapnel_facts()` materializes every shrapnel
+object as an `Entity` under the `ShrapnelFact` concept (attributes keyed by
+`field.property_name`), so the interpreter can query and evaluate shrapnel
+data like any other entity.  The load is best-effort: if the shrapnel schema
+is absent, the loader simply skips it.
+
 The interpreter can be populated from the database via `DatabaseLoader` or
 built entirely in memory.  Dropping the semantics or resolution schemas does
 not affect SOLScript's internal state.

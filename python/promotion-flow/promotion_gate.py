@@ -416,6 +416,24 @@ def evaluate_candidate_ready(
 
     Returns ``(admitted, reason)``.
 
+    Advisory record-then-act: the outcome is recorded into
+    ``peb.transactions`` via ``resolution.admit_and_record`` before the
+    caller acts (PEB-forward Phase 1).  Recording is best-effort and can
+    never flip the outcome.
+    """
+    outcome = _evaluate_candidate_ready(candidate, thread_id)
+    _record_admission(candidate, outcome)
+    return outcome
+
+
+def _evaluate_candidate_ready(
+    candidate: dict[str, Any],
+    thread_id: str | None = None,
+) -> tuple[bool, str]:
+    """Internal evaluation core (wrapped by evaluate_candidate_ready).
+
+    Returns ``(admitted, reason)``.
+
     The SOL proposition is framed on ``system_mapped = true``, so
     candidates without a resolvable system mapping are refused with
     ``context_mismatch``.  Within the frame, three assertions are
@@ -481,3 +499,23 @@ def evaluate_candidate_ready(
     if planner_q:
         return (False, "planner has questions — explicit approval required")
     return (False, "candidate is not promotion-ready")
+
+
+def _record_admission(candidate: dict[str, Any], outcome: tuple[bool, str]) -> None:
+    """Advisory record-then-act (PEB-forward Phase 1).
+
+    Best-effort: a recording failure never flips the gate outcome and
+    never raises (see cascade.peb_admission.record_gate_outcome).
+    """
+    admitted, reason = outcome
+    try:
+        from cascade.peb_admission import record_gate_outcome
+        record_gate_outcome(
+            gate="promotion_gate.evaluate_candidate_ready",
+            entity_id=str(candidate.get("id", "")),
+            admitted=admitted,
+            reason=reason,
+            payload={"candidate": candidate, "reason": reason},
+        )
+    except Exception:  # noqa: BLE001 — advisory path must never raise
+        pass

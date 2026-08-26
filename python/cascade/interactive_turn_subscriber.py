@@ -59,10 +59,12 @@ if _PARENT not in sys.path:
 from cascade.conversation_coordinator import (
     resolve_conversation_outcome,
     is_terminal,
+    close_code_for_outcome,
     OUTCOME_CONTINUE,
     OUTCOME_DELEGATE,
 )
-from cascade.sol_gate import evaluate_lease_dispatch  # SOL-framed gate (v36)
+from cascade.sol_gate import evaluate_lease_dispatch  # SOL-framed lease gate (v36)
+from cascade.watch_gate import evaluate_watch_admission  # SOL-framed watch admission gate (Kiro #2)
 
 # ── Configuration ───────────────────────────────────────────────────
 DATABASE_URL = os.getenv(
@@ -195,7 +197,7 @@ def _query_lease(
         cur.execute(
             f"""SELECT id, role, channel, model,
                       budget_units, consumed_units,
-                      status, window_end, expires_at
+                      status, window_end, expires_at, release_reason
                FROM tackle.role_leases
                WHERE {' AND '.join(predicates)}""",
             params,
@@ -248,20 +250,36 @@ def _touch_watch_activity(pg_conn: Any, watch_id: str) -> None:
     pg_conn.commit()
 
 
-def _close_watch(pg_conn: Any, watch_id: str, reason: str) -> None:
-    """Mark a watch as closed."""
+def _close_watch(
+    pg_conn: Any,
+    watch_id: str,
+    reason: str,
+    close_code: str = "natural",
+) -> None:
+    """Mark a watch as closed with a structured close code (#8).
+
+    The terminal outcome is mapped to a controlled close code (V130
+    CHECK: lease_revoked / lease_exhausted / lease_expired / turns / agent /
+    idle / natural) persisted on the row and carried in the watch.status
+    envelope, so closure is queryable without parsing free text. A
+    lease-expired closure flips the row status to ``expired`` (in the V096
+    status CHECK); everything else closes as ``closed``. The free-text
+    ``reason`` remains for human detail only.
+    """
+    status = "expired" if close_code == "lease_expired" else "closed"
     with pg_conn.cursor() as cur:
         cur.execute(
             """UPDATE duality.session_watches
-               SET status = 'closed',
+               SET status = %s,
+                   closed_reason = %s,
                    updated_at = now()
                WHERE id = %s::uuid
                RETURNING thread_id""",
-            (watch_id,),
+            (status, close_code, watch_id),
         )
         row = cur.fetchone()
     pg_conn.commit()
-    _log("Watch %s closed: %s", watch_id[:8], reason)
+    _log("Watch %s closed (%s): %s", watch_id[:8], close_code, reason)
     # Emit a durable watch.status envelope so SSE subscribers see the
     # session close (P1 item 4). Idempotent via event_key.
     if row:
@@ -271,7 +289,8 @@ def _close_watch(pg_conn: Any, watch_id: str, reason: str) -> None:
             watch_id=watch_id,
             event_type="watch.status",
             event_key=f"watch.closed:{watch_id}",
-            payload={"status": "closed", "reason": reason[:500]},
+            payload={"status": status, "closeCode": close_code,
+                     "reason": reason[:500]},
         )
 
 
@@ -1176,6 +1195,24 @@ async def handle_comment_created(
         if comment_role and comment_role == watch_role:
             continue
 
+        # ── Watch admission gate (Kiro #2 — SOL-framed watch admission) ──
+        # Every watch is evaluated against the SOL proposition "watch may
+        # consume event", framed on its own execution_backend. The outcome
+        # is recorded into peb.transactions (record-then-act, PEB-forward
+        # Phase 1) before dispatch. Turn-count/idle pre-flights are NOT
+        # enforced here (enforce_preflights=False): those are the
+        # coordinator's R2/R4 guarded-closure paths, which close the watch
+        # after a response. A refused watch (ungoverned backend / non-active
+        # status that slipped past the SQL filter) is a fail-closed skip —
+        # it must not dispatch.
+        watch_admitted, watch_reason = evaluate_watch_admission(
+            watch, now_ms=int(time.time() * 1000), enforce_preflights=False,
+        )
+        if not watch_admitted:
+            _log("Watch %s: admission refused (%s) — skipping dispatch",
+                 watch_id[:8], watch_reason)
+            continue
+
         _log("Watch %s: role=%s turn=%s/%s",
              watch_id[:8], watch_role,
              watch.get("turn_count", 0), watch.get("max_turns", "?"))
@@ -1363,7 +1400,12 @@ async def handle_comment_created(
              watch_role, post_resolution.outcome, post_resolution.reason)
 
         if is_terminal(post_resolution.outcome):
-            _close_watch(pg_conn, watch_id, post_resolution.reason)
+            _close_watch(
+                pg_conn,
+                watch_id,
+                post_resolution.reason,
+                close_code=close_code_for_outcome(post_resolution.outcome),
+            )
         else:
             _bump_turn_count(pg_conn, watch_id)
 

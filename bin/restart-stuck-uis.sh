@@ -37,7 +37,6 @@ UI_SERVICES=(
     "tackle-ui"
     "nebula-ui"
     "duality-ui"
-    "angular-assembly"
     "cascade-ui"
     "plurality-ui"
     "execution-ui"

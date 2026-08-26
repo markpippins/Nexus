@@ -123,9 +123,9 @@ rebuilds, and refuses to run if any row exists. Later migrations are additive.
 cat nexus/sql/V061__semantics_operational_relationships.sql \
   | docker exec -i pgvector_db psql -U pguser -d nexus -v ON_ERROR_STOP=1
 
-# Backup (Strontium, 172.16.30.2 — keep at parity):
+# Backup (barium, 192.168.1.212 — keep at parity):
 export PGPASSWORD=pgpass
-psql -h strontium -p 5432 -U pguser -d nexus -v ON_ERROR_STOP=1 \
+psql -h barium -p 5432 -U pguser -d nexus -v ON_ERROR_STOP=1 \
   -f nexus/sql/V061__semantics_operational_relationships.sql
 ```
 
@@ -148,4 +148,4 @@ Every migration is idempotent (V057 via its empty-check guard; V059 via
   `cascade.lineage_edges` (proposed, not yet built).
 - **Asset parentage is deliberately unbuilt** until canonical Asset identity lands.
 - Concept/edge seed data is curated — extend via new migrations, and keep
-  Strontium at parity whenever the schema or seed changes.
+  barium at parity whenever the schema or seed changes.

@@ -3219,6 +3219,28 @@ export function createRoutes(pool: Pool): Router {
   // ════════════════════════════════════════════════════════════════
 
 
+  // POST /api/agendas — create a new agenda. INTERIM scheme 2026-08-25:
+  // the engineering loop's spec-row path is agenda → items → finalize
+  // (agenda_to_specification); superseded by Wind doctrine.
+  router.post('/agendas', async (req: Request, res: Response) => {
+    try {
+      const { title, scope = null, status = 'draft', metadata = {} } = req.body;
+      if (!title) return res.status(400).json({ error: 'title is required' });
+      const VALID = ['draft', 'ready_for_review', 'in_review', 'specified', 'archived'];
+      if (!VALID.includes(status)) {
+        return res.status(400).json({ error: `status must be one of: ${VALID.join(', ')}` });
+      }
+      const { rows: [row] } = await pool.query(
+        `INSERT INTO nebula.agendas (title, scope, status, metadata)
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [title, scope || null, status, JSON.stringify(metadata || {})]
+      );
+      res.status(201).json({ ok: true, agenda: row });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // GET /api/agendas — list ALL agendas (unscoped, when no hierarchy selected)
   router.get('/agendas', async (req: Request, res: Response) => {
     try {

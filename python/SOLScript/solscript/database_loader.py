@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .models import (
     AttributeBinding,
@@ -55,6 +55,113 @@ class DatabaseLoader:
         await self.load_propositions()
         await self.load_frame_dimension_meanings()
         await self.load_entities()
+        await self.load_shrapnel_facts()
+
+    # ── Shrapnel facts (EAV object store) ───────────────────────
+
+    # Physical column names of the typed value extension tables.  The EAV
+    # store keeps the type in shrapnel.value.value_type_code and the actual
+    # payload in the matching shrapnel.value_<type> row (1:1 by id).
+    _SHRAPNEL_TYPE_COLUMNS: Dict[int, str] = {
+        1: "value_long",         # bigint
+        2: "value_string",       # varchar(255)
+        3: "value_double",       # double precision
+        4: "value_boolean",      # boolean
+        5: "value_timestamp",    # timestamptz
+        6: "value_jsonb",        # jsonb
+        7: "value_uuid",         # uuid
+    }
+
+    async def load_shrapnel_facts(
+        self, concept_name: str = "ShrapnelFact"
+    ) -> None:
+        """Materialize shrapnel EAV objects as interpreter entities.
+
+        Shrapnel is the standalone "facts" datastore (fields/objects/values
+        in an EAV layout).  Resolution reasons *about* those facts, so each
+        shrapnel object becomes an Entity whose attributes are the object's
+        field values (keyed by property_name).  Objects are attached to a
+        concept named `concept_name` so query_builder/inference can reference
+        them like any other resolution entity.
+
+        The load is best-effort: if the shrapnel schema is absent or any
+        object is malformed, that part is skipped without failing the whole
+        load (mirrors the external-projection tolerance in load_entities).
+        """
+        async with self.pool.acquire() as conn:
+            try:
+                field_rows = await conn.fetch(
+                    "SELECT id, name, property_name, field_type_code "
+                    "FROM shrapnel.field"
+                )
+            except Exception:
+                # shrapnel schema not present (or not migrated) — fine
+                return
+
+            fields: Dict[int, Dict[str, Any]] = {}
+            for fr in field_rows:
+                fields[fr["id"]] = {
+                    "name": fr["name"],
+                    "property_name": fr["property_name"],
+                    "field_type_code": fr["field_type_code"],
+                }
+            if not fields:
+                return
+
+            # All objects and their attribute bindings in one shot.
+            object_rows = await conn.fetch(
+                "SELECT o.id AS object_id, oav.field_id, oav.value_id, "
+                "v.value_type_code "
+                "FROM shrapnel.object_instance o "
+                "JOIN shrapnel.object_attribute_value oav ON oav.object_id = o.id "
+                "JOIN shrapnel.value v ON v.id = oav.value_id"
+            )
+
+            # Pull typed values per extension table (best-effort per table).
+            typed: Dict[Tuple[int, str], Any] = {}
+            for table in self._SHRAPNEL_TYPE_COLUMNS.values():
+                try:
+                    rows = await conn.fetch(f"SELECT id, value FROM shrapnel.{table}")
+                except Exception:
+                    continue
+                for row in rows:
+                    typed[(row["id"], table)] = row["value"]
+
+            # Assemble per-object attribute dicts.
+            objects: Dict[int, Dict[str, Any]] = {}
+            for orow in object_rows:
+                oid = orow["object_id"]
+                field = fields.get(orow["field_id"])
+                if not field:
+                    continue
+                value = None
+                table = self._SHRAPNEL_TYPE_COLUMNS.get(orow["value_type_code"])
+                if table is not None:
+                    value = typed.get((orow["value_id"], table))
+                attr_key = field["property_name"] or field["name"]
+                objects.setdefault(oid, {})[attr_key] = value
+
+            if not objects:
+                return
+
+            # Register entities under the given concept (create if absent).
+            concept = self.interpreter.get_concept_by_name(concept_name)
+            if not concept:
+                concept = Concept(
+                    id="f0000000-0000-4000-8000-0000000000f1",
+                    name=concept_name,
+                    description="Shrapnel EAV fact objects (standalone facts store)",
+                )
+                self.interpreter.add_concept(concept)
+
+            for oid, attrs in objects.items():
+                entity = Entity(
+                    id=f"shrapnel:{oid}",
+                    concept_id=concept.id,
+                    attributes=attrs,
+                    external_id=str(oid),
+                )
+                self.interpreter.entities[entity.id] = entity
 
     # ── Concepts ─────────────────────────────────────────────────
 

@@ -116,7 +116,6 @@ ALL_SERVICES=(
     "conduit-ui.service"        # port 4201 — Conduit UI
     "tackle-ui.service"         # port 4202 — Tackle UI
     "cascade-ui.service"        # port 4203 — Cascade UI
-    "angular-assembly.service"  # port 4204 — Assembly UI
     "execution-ui.service"      # port 4205 — Execution UI
     "peb-ui.service"            # port 4206 — PEB UI
     "semantic-kernel-ui.service" # port 4207 — Semantic Kernel UI
@@ -191,7 +190,6 @@ SERVICE_PORTS=(
     ["conduit-ui.service"]="4201"
     ["tackle-ui.service"]="4202"
     ["cascade-ui.service"]="4203"
-    ["angular-assembly.service"]="4204"
     ["execution-ui.service"]="4205"
     ["peb-ui.service"]="4206"
     ["semantic-kernel-ui.service"]="4207"
@@ -209,7 +207,6 @@ SERVICE_HEALTH_PATHS=(
     ["conduit-ui.service"]="/"
     ["tackle-ui.service"]="/"
     ["cascade-ui.service"]="/"
-    ["angular-assembly.service"]="/"
     ["execution-ui.service"]="/"
     ["peb-ui.service"]="/"
     ["semantic-kernel-ui.service"]="/"
@@ -352,68 +349,87 @@ cmd_start_all() {
     echo "=== Done ==="
 }
 
+# Status check for ONE service — emits one aligned table row. Extracted
+# from cmd_status_all so all checks can run in parallel.
+_status_one() {
+    local svc="$1"
+    local active
+    if _is_active "$svc"; then
+        active="active"
+    else
+        active="inactive"
+    fi
+
+    local sub
+    sub=$(_substate "$svc")
+
+    # Determine health based on actual service type
+    local health="—"
+
+    # On-demand services: "exited" is normal (RemainAfterExit=yes tracking units)
+    if _in_array "$svc" "${ON_DEMAND_SERVICES[@]}"; then
+        if [[ "$sub" == "exited" ]]; then
+            sub="tracking"  # Normal state for on-demand stdio MCP servers
+            health="OK (on-demand)"
+        fi
+    # Docker services: container liveness is the source of truth.
+    # NOTE: do NOT short-circuit on `[[ "$sub" == "running" ]]` — systemd's
+    # SubState lags actual container liveness during teardown, which caused
+    # a false "OK (docker)" report while the container was already gone.
+    # See audit record ef2ef768 (2026-08-03).
+    elif _in_array "$svc" "${DOCKER_SERVICES[@]}"; then
+        local container
+        container=$(_docker_container_for "$svc")
+        if _docker_container_running "$container"; then
+            health="OK (docker)"
+        elif [[ "$active" == "active" ]]; then
+            # systemd says active but the container is missing — surface
+            # the divergence instead of hiding it as "OK".
+            health="⚠ systemd active, container missing"
+        else
+            health="DOWN"
+        fi
+    # Services with HTTP ports: probe /health
+    elif [[ -n "${SERVICE_PORTS[$svc]:-}" ]]; then
+        local port="${SERVICE_PORTS[$svc]}"
+        if _port_listening "$port"; then
+            health="OK (port $port)"
+        elif [[ "$active" == "active" ]]; then
+            health="⚠ port $port not listening"
+        else
+            health="DOWN"
+        fi
+    # Services without known ports
+    else
+        if [[ "$active" == "active" ]]; then
+            health="OK"
+        else
+            health="DOWN"
+        fi
+    fi
+
+    printf "%-35s %-10s %-12s %s\n" "$svc" "$active" "$sub" "$health"
+}
+
 cmd_status_all() {
     echo "=== Nexus Service Status ==="
     printf "%-35s %-10s %-12s %s\n" "SERVICE" "ACTIVE" "SUB" "HEALTH"
     printf "%-35s %-10s %-12s %s\n" "-------" "------" "---" "------"
+    # Fan out one background job per service. Each check spawns several
+    # subprocesses (systemctl/ss/curl/docker); serially that's ~150 forks,
+    # which blew hourly_maintenance's 30s timeout under host load spikes
+    # (incident b382b591, 2026-08-25). Wall time now ≈ slowest single check.
+    local statusdir
+    statusdir=$(mktemp -d /tmp/nexus-status.XXXXXX)
     for svc in "${ALL_SERVICES[@]}"; do
-        local active
-        if _is_active "$svc"; then
-            active="active"
-        else
-            active="inactive"
-        fi
-
-        local sub
-        sub=$(_substate "$svc")
-
-        # Determine health based on actual service type
-        local health="—"
-
-        # On-demand services: "exited" is normal (RemainAfterExit=yes tracking units)
-        if _in_array "$svc" "${ON_DEMAND_SERVICES[@]}"; then
-            if [[ "$sub" == "exited" ]]; then
-                sub="tracking"  # Normal state for on-demand stdio MCP servers
-                health="OK (on-demand)"
-            fi
-        # Docker services: container liveness is the source of truth.
-        # NOTE: do NOT short-circuit on `[[ "$sub" == "running" ]]` — systemd's
-        # SubState lags actual container liveness during teardown, which caused
-        # a false "OK (docker)" report while the container was already gone.
-        # See audit record ef2ef768 (2026-08-03).
-        elif _in_array "$svc" "${DOCKER_SERVICES[@]}"; then
-            local container
-            container=$(_docker_container_for "$svc")
-            if _docker_container_running "$container"; then
-                health="OK (docker)"
-            elif [[ "$active" == "active" ]]; then
-                # systemd says active but the container is missing — surface
-                # the divergence instead of hiding it as "OK".
-                health="⚠ systemd active, container missing"
-            else
-                health="DOWN"
-            fi
-        # Services with HTTP ports: probe /health
-        elif [[ -n "${SERVICE_PORTS[$svc]:-}" ]]; then
-            local port="${SERVICE_PORTS[$svc]}"
-            if _port_listening "$port"; then
-                health="OK (port $port)"
-            elif [[ "$active" == "active" ]]; then
-                health="⚠ port $port not listening"
-            else
-                health="DOWN"
-            fi
-        # Services without known ports
-        else
-            if [[ "$active" == "active" ]]; then
-                health="OK"
-            else
-                health="DOWN"
-            fi
-        fi
-
-        printf "%-35s %-10s %-12s %s\n" "$svc" "$active" "$sub" "$health"
+        _status_one "$svc" >"$statusdir/$svc.out" 2>&1 &
     done
+    wait
+    # Reassemble rows in canonical ALL_SERVICES order.
+    for svc in "${ALL_SERVICES[@]}"; do
+        cat "$statusdir/$svc.out"
+    done
+    rm -rf "$statusdir"
 }
 
 cmd_health() {

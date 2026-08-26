@@ -127,17 +127,38 @@ class TestAC5SerializationAndStateLine(unittest.TestCase):
         )
 
     def test_state_only_prints_enforcement_line(self):
-        with mock.patch.dict(os.environ, {"CIR_SDM_ENFORCE": "0"}, clear=False):
-            with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
-                self.assertEqual(main(["--state-only"]), 0)
-                self.assertIn("shadow", out.getvalue())
+        # Bootstrap path (no posture rows): CIR_SDM_ENFORCE=0 → shadow.
+        with mock.patch("nexus_core.wrp.enforce_cli.load_posture_rows",
+                        return_value=[]):
+            with mock.patch.dict(os.environ, {"CIR_SDM_ENFORCE": "0"},
+                                 clear=False):
+                with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+                    self.assertEqual(main(["--state-only"]), 0)
+                    self.assertIn("shadow", out.getvalue())
 
     def test_state_only_defaults_to_enforced(self):
-        with mock.patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("CIR_SDM_ENFORCE", None)
-            with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
-                self.assertEqual(main(["--state-only"]), 0)
-                self.assertIn("enforced", out.getvalue())
+        # Bootstrap path (no posture rows): default enforced set.
+        with mock.patch("nexus_core.wrp.enforce_cli.load_posture_rows",
+                        return_value=[]):
+            with mock.patch.dict(os.environ, {}, clear=False):
+                os.environ.pop("CIR_SDM_ENFORCE", None)
+                with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+                    self.assertEqual(main(["--state-only"]), 0)
+                    self.assertIn("enforced", out.getvalue())
+
+    def test_state_only_database_wins_over_env(self):
+        # R-D: once posture rows exist, the database wins even when the env
+        # disables CIR_SDM_ENFORCE — the audit line reports the DB source.
+        rows = [{"family": RULE_ONE_WAY_GATE, "mode": "enforced",
+                 "authorized_by": "4a57c089", "effective_from": None}]
+        with mock.patch("nexus_core.wrp.enforce_cli.load_posture_rows",
+                        return_value=rows):
+            with mock.patch.dict(os.environ, {"CIR_SDM_ENFORCE": "0"},
+                                 clear=False):
+                with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+                    self.assertEqual(main(["--state-only"]), 0)
+                    self.assertIn("database", out.getvalue())
+                    self.assertIn("enforced", out.getvalue())
 
 
 if __name__ == "__main__":

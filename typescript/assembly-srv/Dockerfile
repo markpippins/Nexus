@@ -16,10 +16,12 @@ RUN npm install --omit=dev --no-package-lock \
 
 COPY assembly-srv/src ./src
 
-ENV PORT=3107
+# assembly-srv reads ASSEMBLY_SRV_PORT (src/index.js), defaulting to 3107.
+ENV ASSEMBLY_SRV_PORT=3107
 EXPOSE 3107
 
+# bookworm-slim ships no wget/curl — probe with node's global fetch instead.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/health || exit 1
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.ASSEMBLY_SRV_PORT||3107)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "src/index.js"]

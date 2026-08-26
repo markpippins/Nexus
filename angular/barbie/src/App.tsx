@@ -14,6 +14,7 @@ import { SonarQubeTable } from './components/DataViews/SonarQubeTable';
 import { BallerinaTable } from './components/DataViews/BallerinaTable';
 import { DetailContextPanel } from './components/DetailContextPanel';
 import { EntityModal } from './components/Modals/EntityModal';
+import { ProfilesModal } from './components/Modals/ProfilesModal';
 import {
   PlatformAggregateState,
   EntitySelection,
@@ -29,6 +30,8 @@ export default function App() {
 
   // API Mode State
   const [apiMode, setApiModeState] = useState<'live' | 'mock'>(registryApi.getApiMode());
+  // Connection profiles manager (barbie-parity #13/#14)
+  const [isProfilesOpen, setIsProfilesOpen] = useState(false);
 
   const handleApiModeChange = (mode: 'live' | 'mock') => {
     registryApi.setApiMode(mode);
@@ -95,9 +98,22 @@ export default function App() {
     if (autoRefreshInterval <= 0) return;
     const interval = setInterval(() => {
       fetchAllData();
+      // Bump the table-level trigger too — otherwise DataViews only
+      // refresh manually and the poll updates aggregate telemetry only
+      // (barbie-parity #17: live refresh / watch-changes).
+      setRefreshTrigger(t => t + 1);
     }, autoRefreshInterval);
     return () => clearInterval(interval);
   }, [autoRefreshInterval, fetchAllData]);
+
+  // Terrain platform-health re-check (barbie-parity #16)
+  const handleTerrainRecheck = useCallback(async () => {
+    try {
+      return await registryApi.getTerrainHealth();
+    } catch {
+      return null;
+    }
+  }, []);
 
   // Handle entity selection from graph, table, or list
   const handleSelectEntity = (entity: EntitySelection) => {
@@ -145,6 +161,8 @@ export default function App() {
             fetchAllData();
             setRefreshTrigger(t => t + 1);
           }}
+          onTerrainRecheck={handleTerrainRecheck}
+          onOpenProfiles={() => setIsProfilesOpen(true)}
           activeView={activeTab}
           apiMode={apiMode}
           onApiModeChange={handleApiModeChange}
@@ -309,6 +327,16 @@ export default function App() {
           servicesList={servicesList}
           serversList={serversList}
           onSuccess={() => {
+            fetchAllData();
+            setRefreshTrigger(t => t + 1);
+          }}
+        />
+
+        {/* Connection Profiles Manager (barbie-parity #13/#14) */}
+        <ProfilesModal
+          open={isProfilesOpen}
+          onClose={() => setIsProfilesOpen(false)}
+          onActiveChanged={() => {
             fetchAllData();
             setRefreshTrigger(t => t + 1);
           }}

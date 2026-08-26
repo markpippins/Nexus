@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   ChevronRight
 } from 'lucide-react';
+import { TerrainTopologyView } from './TerrainTopologyView';
 
 interface VisualizerProps {
   aggregateState: PlatformAggregateState | null;
@@ -47,7 +48,7 @@ export const AggregatePlatformVisualizer: React.FC<VisualizerProps> = ({
   onSelectEntity,
   searchFilter
 }) => {
-  const [viewMode, setViewMode] = useState<'topology' | 'heatmap' | 'incidents'>('topology');
+  const [viewMode, setViewMode] = useState<'topology' | 'heatmap' | 'incidents' | 'terrain'>('topology');
 
   if (!aggregateState) {
     return (
@@ -262,8 +263,24 @@ export const AggregatePlatformVisualizer: React.FC<VisualizerProps> = ({
               <AlertTriangle className="h-3.5 w-3.5" />
               <span>Health Incidents ({aggregateState.activeIncidentsCount})</span>
             </button>
+
+            <button
+              onClick={() => setViewMode('terrain')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-all ${
+                viewMode === 'terrain'
+                  ? 'bg-sky-500 text-white shadow-sm ring-1 ring-sky-400'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+              title="Terrain-backed infrastructure topology (hosts / services / MCP)"
+            >
+              <ServerIcon className="h-3.5 w-3.5" />
+              <span>Terrain</span>
+            </button>
           </div>
         </div>
+
+        {/* VIEW MODE 4: TERRAIN-BACKED INFRASTRUCTURE TOPOLOGY (#11) */}
+        {viewMode === 'terrain' && <TerrainTopologyView />}
 
         {/* VIEW MODE 1: INTERACTIVE TOPOLOGY MAP */}
         {viewMode === 'topology' && (

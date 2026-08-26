@@ -6,7 +6,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NgFor, NgIf } from '@angular/common';
-import { MessageBoxInstance, MessageBoxService, SlashCommand, SLASH_COMMANDS } from '../../services/message-box.service';
+import { MessageBoxInstance, MessageBoxService, SlashCommand, SLASH_COMMANDS, agentRoleLabel } from '../../services/message-box.service';
 
 type ResizeEdge = 'n' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 
@@ -68,11 +68,11 @@ type ResizeEdge = 'n' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
             [class.user]="msg.role === 'user'"
             [class.assistant]="msg.role === 'assistant'"
           >
-            <span class="mbox-role">{{ msg.role === 'user' ? 'You' : (box.agentRole || 'Assistant') }}</span>
+            <span class="mbox-role">{{ msg.role === 'user' ? 'You' : agentRoleLabel(box.agentRole) }}</span>
             <div class="mbox-content">{{ msg.content }}</div>
           </div>
           <div class="mbox-msg assistant" *ngIf="box.submitting">
-            <span class="mbox-role">{{ box.agentRole || 'Assistant' }}</span>
+            <span class="mbox-role">{{ agentRoleLabel(box.agentRole) }}</span>
             <div class="mbox-content mbox-thinking">Thinking…</div>
           </div>
         </div>

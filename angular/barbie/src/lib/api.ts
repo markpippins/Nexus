@@ -27,6 +27,8 @@ import {
   JenkinsJob,
   JenkinsBuild,
   SonarProject,
+  SonarRating,
+  QualityGateStatus,
   SonarMetricPoint,
   BallerinaPackage,
   BallerinaService
@@ -87,10 +89,75 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 
 // ── Live-mode normalization layer ───────────────────────────────────
 
+// ── Terrain platform health (barbie-parity #16) ─────────────────────
+// Base URL: server-injected bootstrap → localStorage override → console
+// default (Spring Boot terrain on :8084).
+const TERRAIN_URL: string = SERVER_CONFIG?.terrainUrl
+  || localStorage.getItem('platform_terrain_url')
+  || 'http://localhost:8084';
+
+export interface TerrainHealthSummary {
+  terrainUp: boolean;
+  terrainError?: string;
+  loadedAt: string;
+  mcp: { total: number; online: number; offline: number };
+  services: { total: number; online: number; offline: number };
+  servers: { total: number; online: number; offline: number };
+  // Raw items for the terrain-backed topology view (#11). Loose-typed on
+  // purpose — terrain owns these shapes (console terrain.service.ts models).
+  mcpItems: Array<Record<string, unknown>>;
+  serviceItems: Array<Record<string, unknown>>;
+  serverItems: Array<Record<string, unknown>>;
+}
+
+function _countBlock(block: any): { total: number; online: number; offline: number } {
+  return {
+    total: Number(block?.total ?? 0),
+    online: Number(block?.online ?? 0),
+    offline: Number(block?.offline ?? block?.degraded ?? 0)
+  };
+}
+
+async function _terrainHealth(): Promise<TerrainHealthSummary> {
+  try {
+    const raw = await fetchJson<any>(`${TERRAIN_URL}/api/v1/platform/health`);
+    return {
+      terrainUp: Boolean(raw.terrainUp),
+      loadedAt: new Date().toISOString(),
+      mcp: _countBlock(raw.mcpServers),
+      services: _countBlock(raw.runnableServices),
+      servers: _countBlock(raw.hostServers),
+      mcpItems: Array.isArray(raw.mcpServers?.items) ? raw.mcpServers.items : [],
+      serviceItems: Array.isArray(raw.runnableServices?.items) ? raw.runnableServices.items : [],
+      serverItems: Array.isArray(raw.hostServers?.items) ? raw.hostServers.items : []
+    };
+  } catch (e: any) {
+    return {
+      terrainUp: false,
+      terrainError: `Unable to reach terrain at ${TERRAIN_URL}: ${e?.message ?? e}`,
+      loadedAt: new Date().toISOString(),
+      mcp: { total: 0, online: 0, offline: 0 },
+      services: { total: 0, online: 0, offline: 0 },
+      servers: { total: 0, online: 0, offline: 0 },
+      mcpItems: [],
+      serviceItems: [],
+      serverItems: []
+    };
+  }
+}
+
 // currentBaseUrl defaults to /api/v1/registry. Flat entity endpoints live
 // directly under /api/v1 (no /registry segment), so derive that base.
+// External profiles (http://host:8085) also need /api/v1 appended since
+// the service-registry's entity routes live under that prefix.
 function flatBaseUrl(): string {
-  return currentBaseUrl.replace(/\/registry\/?$/, '');
+  const stripped = currentBaseUrl.replace(/\/registry\/?$/, '');
+  // External registry profile URLs (http(s)://...) that lack /api/v1
+  // need the prefix appended — entity endpoints live there.
+  if (/^https?:\/\//.test(stripped) && !stripped.includes('/api/v1')) {
+    return stripped.replace(/\/$/, '') + '/api/v1';
+  }
+  return stripped;
 }
 
 // Map backend uppercase enums → barbie lowercase HealthStatus.
@@ -249,6 +316,78 @@ function mapAggregate(raw: any): PlatformAggregateState {
   };
 }
 
+// ── CI-gateway (ballerina :9095 via /gateway passthrough) ──────────
+async function gatewayJson<T>(path: string): Promise<T> {
+  const env = await fetchJson<{ data: T }>(`/gateway${path}`);
+  return env.data;
+}
+
+function jenkinsColorToStatus(color: string | undefined): JenkinsJobStatus {
+  const c = (color ?? '').toLowerCase();
+  if (c.includes('anime')) return 'building';
+  if (c.startsWith('blue')) return 'success';
+  if (c.startsWith('red')) return 'failure';
+  if (c.startsWith('yellow')) return 'unstable';
+  if (c.startsWith('aborted') || c.startsWith('disabled')) return 'aborted';
+  if (c.startsWith('notbuilt') || c === '') return 'not_built';
+  return 'not_built';
+}
+
+// ── Registry / Broker-Gateway profiles (barbie-parity #13/#14) ──────
+// Barbie-local address book persisted in localStorage. A 'registry'
+// profile can be set ACTIVE — that repoints every DataView via the
+// existing platform_api_base_url storage key.
+export interface BarbieProfile {
+  id: string;
+  name: string;
+  baseUrl: string;
+  kind: 'registry' | 'broker';
+}
+
+const PROFILES_KEY = 'platform_profiles';
+
+export function getProfiles(): BarbieProfile[] {
+  try {
+    const raw = localStorage.getItem(PROFILES_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveProfiles(list: BarbieProfile[]): void {
+  localStorage.setItem(PROFILES_KEY, JSON.stringify(list));
+}
+
+export async function testProfileConnection(
+  profile: Pick<BarbieProfile, 'kind' | 'baseUrl'>
+): Promise<{ ok: boolean; detail: string }> {
+  const base = profile.baseUrl.replace(/\/$/, '');
+  // Try primary path first; fall back to Spring Boot actuator for registries.
+  const paths = profile.kind === 'broker'
+    ? ['/actuator/health']
+    : ['/health', '/actuator/health'];
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  const started = Date.now();
+  try {
+    for (const path of paths) {
+      const res = await fetch(`${base}${path}`, { signal: controller.signal });
+      const ms = Date.now() - started;
+      if (res.ok) return { ok: true, detail: `reachable (${ms}ms, HTTP ${res.status} via ${path})` };
+    }
+    const ms = Date.now() - started;
+    return { ok: false, detail: `unreachable (tried ${paths.join(', ')}, ${ms}ms)` };
+  } catch (e: any) {
+    const ms = Date.now() - started;
+    if (e?.name === 'AbortError') return { ok: false, detail: `timeout after ${Date.now() - started}ms` };
+    return { ok: false, detail: `${e?.message ?? e} (${ms}ms)` };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export const registryApi = {
   // Mode & Configuration Controls
   getApiMode: (): 'live' | 'mock' => currentMode,
@@ -342,6 +481,20 @@ export const registryApi = {
     const raw = await fetchJson<any>(`${flatBaseUrl()}/services/by-operation/${encodeURIComponent(operation)}`);
     const items = Array.isArray(raw) ? raw : (Array.isArray(raw.data) ? raw.data : []);
     return { data: items.map(mapService), operation };
+  },
+
+  getServiceSubModules: async (id: string): Promise<Array<Record<string, unknown>>> => {
+    // Parity with console manage-services node: browse declared sub-modules
+    // of a service (backend route GET /api/v1/services/{id}/sub-modules).
+    if (currentMode === 'mock') {
+      const svc = mockServices.find(s => s.id === id);
+      return [
+        { name: `${svc?.name ?? 'mock'}-core`, version: svc?.version ?? '1.0.0', status: 'active' },
+        { name: `${svc?.name ?? 'mock'}-admin`, version: svc?.version ?? '1.0.0', status: 'active' }
+      ];
+    }
+    const raw = await fetchJson<any>(`${flatBaseUrl()}/services/${id}/sub-modules`);
+    return Array.isArray(raw) ? raw : (Array.isArray(raw.data) ? raw.data : []);
   },
 
   createService: async (data: Partial<Service>): Promise<Service> => {
@@ -858,6 +1011,43 @@ export const registryApi = {
   },
 
   // --- AGGREGATE PLATFORM STATE ---
+  getTerrainHealth: async (): Promise<TerrainHealthSummary> => {
+    if (currentMode === 'mock') {
+      return {
+        terrainUp: true,
+        loadedAt: new Date().toISOString(),
+        mcp: { total: 6, online: 6, offline: 0 },
+        services: { total: 40, online: 38, offline: 2 },
+        servers: { total: 3, online: 3, offline: 0 },
+        mcpItems: [
+          { id: 'm1', name: 'conduit-mcp', port: 3100, status: 'ON' },
+          { id: 'm2', name: 'nebula-mcp', port: 3102, status: 'ON' },
+          { id: 'm3', name: 'terrain-mcp', port: 3130, status: 'ON' }
+        ],
+        serviceItems: [
+          { id: 's1', name: 'assembly-srv', port: 3107, status: 'ON' },
+          { id: 's2', name: 'nebula-srv', port: 3101, status: 'ON' },
+          { id: 's3', name: 'cascade-srv', port: 3106, status: 'DEGRADED' },
+          { id: 's4', name: 'wind-srv', port: 3300, status: 'ON' }
+        ],
+        serverItems: [
+          { id: 'h1', hostname: 'titanium', ipAddress: '127.0.0.1', os: 'linux', status: 'ONLINE' },
+          { id: 'h2', hostname: 'vanadium', ipAddress: '192.168.1.209', os: 'linux', status: 'ONLINE' }
+        ]
+      };
+    }
+    return _terrainHealth();
+  },
+
+  getServiceStatus: async (serviceName: string): Promise<Record<string, unknown>> => {
+    // Real backend route (D-BP-1 verified): ServiceStatusController
+    // GET /api/v1/status/{serviceName} — flat under /api/v1.
+    if (currentMode === 'mock') {
+      return { serviceName, status: 'healthy', lastHeartbeat: new Date().toISOString(), uptimeSeconds: 86400 };
+    }
+    return fetchJson<Record<string, unknown>>(`${flatBaseUrl()}/status/${encodeURIComponent(serviceName)}`);
+  },
+
   getPlatformAggregate: async (): Promise<PlatformAggregateState> => {
     if (currentMode === 'mock') {
       return {
@@ -906,7 +1096,10 @@ export const registryApi = {
     return fetchJson(`${currentBaseUrl}/metrics/${entityType}/${encodeURIComponent(entityId)}`);
   },
 
-  // --- JENKINS CI/CD ---
+  
+
+
+// --- JENKINS CI/CD ---
   getJenkinsJobs: async (params?: {
     search?: string;
     status?: string;
@@ -925,14 +1118,37 @@ export const registryApi = {
     const query = new URLSearchParams();
     if (params?.search) query.append('search', params.search);
     if (params?.status) query.append('status', params.status);
-    return fetchJson<JenkinsJob[]>(`${flatBaseUrl()}/jenkins/jobs?${query.toString()}`);
+    // Live path rides the ballerina ci-gateway (registry has no CI data).
+    type GhJob = { name?: string; color?: string; url?: string };
+    const raw = await gatewayJson<GhJob[]>('/jenkins/jobs');
+    let jobs: JenkinsJob[] = (raw ?? []).map((j, i) => ({
+      id: encodeURIComponent(j.name ?? String(i)),
+      name: j.name ?? `job-${i}`,
+      url: j.url ?? '',
+      status: jenkinsColorToStatus(j.color),
+      lastBuildNumber: 0,
+      lastBuildTimestamp: '',
+      lastBuildDuration: 0,
+      scmBranch: '',
+      triggeredBy: 'ci',
+    }));
+    if (params?.search) {
+      const q = params.search.toLowerCase();
+      jobs = jobs.filter((j) => j.name.toLowerCase().includes(q));
+    }
+    if (params?.status && params.status !== 'all') {
+      jobs = jobs.filter((j) => j.status === params.status);
+    }
+    return jobs;
   },
 
   getJenkinsBuilds: async (jobId: string): Promise<JenkinsBuild[]> => {
     if (currentMode === 'mock') {
       return mockJenkinsBuilds[jobId] || [];
     }
-    return fetchJson<JenkinsBuild[]>(`${flatBaseUrl()}/jenkins/jobs/${encodeURIComponent(jobId)}/builds`);
+    // Build history needs per-job depth the read-only gateway doesn't
+    // expose yet — return empty rather than erroring the table.
+    return [];
   },
 
   // --- SONARQUBE CODE QUALITY ---
@@ -954,14 +1170,41 @@ export const registryApi = {
     const query = new URLSearchParams();
     if (params?.search) query.append('search', params.search);
     if (params?.gate) query.append('gate', params.gate);
-    return fetchJson<SonarProject[]>(`${flatBaseUrl()}/sonar/projects?${query.toString()}`);
+    // Live path rides the ballerina ci-gateway.
+    type SonarComp = { key?: string; name?: string; qualifier?: string };
+    const raw = await gatewayJson<{ paging?: unknown; components?: SonarComp[] }>('/sonar/projects');
+    let projects: SonarProject[] = (raw.components ?? [])
+      .filter((c) => (c.qualifier ?? 'TRK') === 'TRK')
+      .map((c, i) => ({
+        id: c.key ?? String(i),
+        key: c.key ?? String(i),
+        name: c.name ?? c.key ?? `project-${i}`,
+        gate: 'none' as QualityGateStatus,
+        reliabilityRating: 'A' as SonarRating,
+        securityRating: 'A' as SonarRating,
+        maintainabilityRating: 'A' as SonarRating,
+        coveragePercent: 0,
+        duplicationsPercent: 0,
+        linesOfCode: 0,
+        lastAnalysis: '',
+        url: '',
+      }));
+    if (params?.search) {
+      const q = params.search.toLowerCase();
+      projects = projects.filter((p) => p.name.toLowerCase().includes(q) || p.key.toLowerCase().includes(q));
+    }
+    if (params?.gate && params.gate !== 'all') {
+      projects = projects.filter((p) => p.gate === params.gate);
+    }
+    return projects;
   },
 
   getSonarMetrics: async (projectId: string): Promise<SonarMetricPoint[]> => {
     if (currentMode === 'mock') {
       return mockSonarMetrics[projectId] || [];
     }
-    return fetchJson<SonarMetricPoint[]>(`${flatBaseUrl()}/sonar/projects/${encodeURIComponent(projectId)}/metrics`);
+    // No metrics endpoint on the read-only gateway yet.
+    return [];
   },
 
   // --- BALLERINA INTEGRATION PLATFORM ---

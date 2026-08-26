@@ -48,6 +48,25 @@ export const ServicesTable: React.FC<ServicesTableProps> = ({
   const [sortBy, setSortBy] = useState<string>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
+  // Sub-modules browser (barbie-parity item #9)
+  const [subModulesFor, setSubModulesFor] = useState<Service | null>(null);
+  const [subModules, setSubModules] = useState<Array<Record<string, unknown>>>([]);
+  const [subLoading, setSubLoading] = useState(false);
+
+  const handleViewSubModules = async (e: React.MouseEvent, service: Service) => {
+    e.stopPropagation();
+    setSubModulesFor(service);
+    setSubModules([]);
+    setSubLoading(true);
+    try {
+      setSubModules(await registryApi.getServiceSubModules(service.id));
+    } catch {
+      setSubModules([]);
+    } finally {
+      setSubLoading(false);
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
@@ -110,10 +129,30 @@ export const ServicesTable: React.FC<ServicesTableProps> = ({
     try {
       await registryApi.sendHeartbeat(serviceName);
       setServices(prev =>
-        prev.map(s => (s.name === serviceName ? { ...s, status: 'healthy', lastHeartbeat: new Date().toISOString() } : s))
+        prev.map(s => (s.name === serviceName ? { ...s, status: 'healthy', lastHeartbeat: new Date().toISOString() } as Service : s))
       );
     } catch (err: any) {
       alert(`Heartbeat error: ${err.message}`);
+    }
+  };
+
+  // Live health re-check via ServiceStatusController (barbie-parity #8,
+  // unblocked portion per D-BP-1: GET /api/v1/status/{serviceName}).
+  const [healthChecking, setHealthChecking] = useState<string | null>(null);
+  const handleCheckHealth = async (e: React.MouseEvent, service: Service) => {
+    e.stopPropagation();
+    setHealthChecking(service.name);
+    try {
+      const st = await registryApi.getServiceStatus(service.name);
+      const status = String((st as any).status ?? 'unknown');
+      setServices(prev =>
+        prev.map(s => (s.name === service.name ? { ...s, status } as Service : s))
+      );
+      alert(`${service.name}: ${status}`);
+    } catch (err: any) {
+      alert(`Health check failed: ${err.message}`);
+    } finally {
+      setHealthChecking(null);
     }
   };
 
@@ -316,6 +355,23 @@ export const ServicesTable: React.FC<ServicesTableProps> = ({
                       </button>
 
                       <button
+                        onClick={(e) => handleCheckHealth(e, service)}
+                        disabled={healthChecking === service.name}
+                        className="rounded p-1 text-teal-400 hover:bg-teal-500/10 disabled:opacity-40"
+                        title="Check health via /api/v1/status"
+                      >
+                        <Heart className={`h-3.5 w-3.5 ${healthChecking === service.name ? 'animate-pulse' : ''}`} />
+                      </button>
+
+                      <button
+                        onClick={(e) => handleViewSubModules(e, service)}
+                        className="rounded p-1 text-violet-400 hover:bg-violet-500/10"
+                        title="Browse Sub-modules"
+                      >
+                        <Layers className="h-3.5 w-3.5" />
+                      </button>
+
+                      <button
                         onClick={(e) => handleDeleteService(e, service.id, service.name)}
                         className="rounded p-1 text-rose-400 hover:bg-rose-500/10"
                         title="Delete Service"
@@ -370,6 +426,72 @@ export const ServicesTable: React.FC<ServicesTableProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Sub-modules modal (barbie-parity #9) */}
+      {subModulesFor && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setSubModulesFor(null)}
+        >
+          <div
+            className="w-[480px] max-w-[92vw] rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                Sub-modules — <span className="font-mono text-sky-400">{subModulesFor.name}</span>
+              </h3>
+              <button
+                onClick={() => setSubModulesFor(null)}
+                className="rounded p-1 text-[var(--text-secondary)] hover:bg-white/5"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+            {subLoading ? (
+              <p className="p-6 text-center text-xs text-[var(--text-secondary)]">Loading sub-modules…</p>
+            ) : subModules.length === 0 ? (
+              <p className="p-6 text-center text-xs text-[var(--text-secondary)]">
+                No sub-modules registered for this service.
+              </p>
+            ) : (
+              <ul className="max-h-72 space-y-1 overflow-auto">
+                {subModules.map((m, i) => {
+                  const name = String(m.name ?? m.moduleName ?? m.id ?? `module-${i}`);
+                  const version = m.version ? String(m.version) : null;
+                  const status = m.status ? String(m.status) : null;
+                  const up = !!status && ['active', 'healthy', 'running'].includes(status.toLowerCase());
+                  return (
+                    <li
+                      key={name}
+                      className="flex items-center justify-between rounded-lg border border-[var(--border-color)] px-3 py-2"
+                    >
+                      <span className="font-mono text-xs text-[var(--text-primary)]">{name}</span>
+                      <span className="flex items-center gap-2">
+                        {version && (
+                          <span className="rounded bg-slate-800/80 px-1.5 py-0.5 font-mono text-[10px] text-slate-300">
+                            v{version}
+                          </span>
+                        )}
+                        {status && (
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] ${
+                              up ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-500/10 text-slate-400'
+                            }`}
+                          >
+                            {status}
+                          </span>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

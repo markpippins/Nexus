@@ -7,6 +7,8 @@ should continue, delegate to another role, or close.
 Doctrine rules:
     R1 — Lease governance (hard stop):
          lease.remaining_units <= 0 OR lease.expired → CLOSED
+         (granular since #7: CLOSED_LEASE_REVOKED / _EXHAUSTED / _EXPIRED
+         from the persisted release_reason; close codes in #8)
     R2 — Turn limit (prevent infinite loops):
          turn_count >= max_turns → CLOSED
     R3 — Agent-declared completion (explicit close signal):
@@ -34,16 +36,33 @@ logger = logging.getLogger(__name__)
 OUTCOME_CONTINUE        = "CONTINUE"
 OUTCOME_DELEGATE        = "DELEGATE"
 OUTCOME_CLOSED          = "CLOSED"
-OUTCOME_CLOSED_LEASE    = "CLOSED_LEASE"
+OUTCOME_CLOSED_LEASE    = "CLOSED_LEASE"          # legacy aggregate (no release_reason)
+OUTCOME_CLOSED_LEASE_REVOKED    = "CLOSED_LEASE_REVOKED"
+OUTCOME_CLOSED_LEASE_EXHAUSTED  = "CLOSED_LEASE_EXHAUSTED"
+OUTCOME_CLOSED_LEASE_EXPIRED    = "CLOSED_LEASE_EXPIRED"
 OUTCOME_CLOSED_TURNS    = "CLOSED_TURNS"
 OUTCOME_CLOSED_AGENT    = "CLOSED_BY_AGENT"
 OUTCOME_CLOSED_IDLE     = "CLOSED_IDLE"
 OUTCOME_CLOSED_NATURAL  = "CLOSED_NATURAL"
 
 TERMINAL_OUTCOMES = frozenset([
-    OUTCOME_CLOSED, OUTCOME_CLOSED_LEASE, OUTCOME_CLOSED_TURNS,
-    OUTCOME_CLOSED_AGENT, OUTCOME_CLOSED_IDLE, OUTCOME_CLOSED_NATURAL,
+    OUTCOME_CLOSED, OUTCOME_CLOSED_LEASE,
+    OUTCOME_CLOSED_LEASE_REVOKED, OUTCOME_CLOSED_LEASE_EXHAUSTED,
+    OUTCOME_CLOSED_LEASE_EXPIRED,
+    OUTCOME_CLOSED_TURNS, OUTCOME_CLOSED_AGENT, OUTCOME_CLOSED_IDLE,
+    OUTCOME_CLOSED_NATURAL,
 ])
+
+# Structured close codes (f0706646 #8) — controlled vocabulary persisted on
+# duality.session_watches.closed_reason (V130) and carried in the
+# watch.status envelope so closure is queryable without parsing free text.
+CLOSE_CODE_LEASE_REVOKED   = "lease_revoked"
+CLOSE_CODE_LEASE_EXHAUSTED = "lease_exhausted"
+CLOSE_CODE_LEASE_EXPIRED   = "lease_expired"
+CLOSE_CODE_TURNS           = "turns"
+CLOSE_CODE_AGENT           = "agent"
+CLOSE_CODE_IDLE            = "idle"
+CLOSE_CODE_NATURAL         = "natural"
 
 # Pattern: DELEGATE <role>: <instruction>
 _DELEGATE_RE = re.compile(r'DELEGATE\s+(\w[\w-]*)\s*:\s*(.+)', re.IGNORECASE)
@@ -117,6 +136,28 @@ def resolve_conversation_outcome(
 
     lease_status = lease.get("status", "")
     if lease_status in ("EXPIRED", "RELEASED"):
+        # f0706646 #7 — separate the release paths: the API layer already
+        # persists release_reason ∈ {revoked, exhausted, expired} on the
+        # lease row; surface it as distinct structured outcomes instead of a
+        # single aggregate. Missing release_reason (e.g. an old row or a
+        # synthetic lease) falls back to the legacy aggregated outcome.
+        release_reason = lease.get("release_reason") or ""
+        r = release_reason.lower()
+        if lease_status == "RELEASED" and r == "revoked":
+            return ConversationResolution(
+                outcome=OUTCOME_CLOSED_LEASE_REVOKED,
+                reason="Role lease revoked",
+            )
+        if r == "exhausted":
+            return ConversationResolution(
+                outcome=OUTCOME_CLOSED_LEASE_EXHAUSTED,
+                reason="Role lease exhausted (released)",
+            )
+        if r == "expired" or lease_status == "EXPIRED":
+            return ConversationResolution(
+                outcome=OUTCOME_CLOSED_LEASE_EXPIRED,
+                reason=f"Role lease expired (status={lease_status})",
+            )
         return ConversationResolution(
             outcome=OUTCOME_CLOSED_LEASE,
             reason=f"Role lease status={lease_status}",
@@ -127,7 +168,7 @@ def resolve_conversation_outcome(
     remaining = max(0, budget - consumed)
     if budget > 0 and remaining <= 0:
         return ConversationResolution(
-            outcome=OUTCOME_CLOSED_LEASE,
+            outcome=OUTCOME_CLOSED_LEASE_EXHAUSTED,
             reason=f"Role lease exhausted ({consumed}/{budget} units consumed)",
         )
 
@@ -139,7 +180,7 @@ def resolve_conversation_outcome(
             )
         if expires_at.timestamp() * 1000 < now_ms:
             return ConversationResolution(
-                outcome=OUTCOME_CLOSED_LEASE,
+                outcome=OUTCOME_CLOSED_LEASE_EXPIRED,
                 reason=f"Role lease expired at {expires_at.isoformat()}",
             )
 
@@ -209,3 +250,30 @@ def should_continue(resolution: ConversationResolution) -> bool:
 def should_delegate(resolution: ConversationResolution) -> bool:
     """True when the conversation hands off to another role."""
     return resolution.outcome == OUTCOME_DELEGATE
+
+
+# ── Structured close codes (f0706646 #8) ─────────────────────────────
+
+_CLOSE_CODE_BY_OUTCOME = {
+    OUTCOME_CLOSED_LEASE_REVOKED:   CLOSE_CODE_LEASE_REVOKED,
+    OUTCOME_CLOSED_LEASE_EXHAUSTED: CLOSE_CODE_LEASE_EXHAUSTED,
+    OUTCOME_CLOSED_LEASE_EXPIRED:   CLOSE_CODE_LEASE_EXPIRED,
+    OUTCOME_CLOSED_TURNS:           CLOSE_CODE_TURNS,
+    OUTCOME_CLOSED_AGENT:           CLOSE_CODE_AGENT,
+    OUTCOME_CLOSED_IDLE:            CLOSE_CODE_IDLE,
+    OUTCOME_CLOSED_NATURAL:         CLOSE_CODE_NATURAL,
+    # Legacy aggregates (pre-#7, no granularity) — conservative fallbacks.
+    OUTCOME_CLOSED:                 CLOSE_CODE_NATURAL,
+    OUTCOME_CLOSED_LEASE:           CLOSE_CODE_LEASE_EXPIRED,
+}
+
+
+def close_code_for_outcome(outcome: str) -> str:
+    """Map a terminal outcome to its structured close code.
+
+    Vocab (V130 CHECK): lease_revoked, lease_exhausted, lease_expired,
+    turns, agent, idle, natural. Unknown outcomes fall back to ``natural``.
+    The legacy aggregates (OUTCOME_CLOSED / OUTCOME_CLOSED_LEASE) carry no
+    granularity and map conservatively.
+    """
+    return _CLOSE_CODE_BY_OUTCOME.get(outcome, CLOSE_CODE_NATURAL)

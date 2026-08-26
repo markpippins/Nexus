@@ -1,3 +1,8 @@
-# Keep build context lean — target/ dirs are rebuilt inside the images.
+# Build-context guard for jvm/ Docker builds (registry, broker-gateway).
+# Keeps target/ artifacts and VCS noise out of `docker build` context uploads.
 **/target/
+**/.git/
+**/.idea/
+**/*.iml
+**/.DS_Store
 *.log

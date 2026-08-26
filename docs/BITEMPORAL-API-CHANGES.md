@@ -208,3 +208,8 @@ curl -s -X POST http://localhost:3101/api/cross-references \
 ## Replication Status
 
 All schema changes have been replicated to the Strontium server (`192.168.1.76`). Both servers are now at parity with 38 `_history` tables and matching VIEWs.
+
+> **Update 2026-08-25:** Strontium has been replaced as the canonical backup
+> target by **barium** (`192.168.1.212`). Strontium is down for repair and may
+> return, but new schema changes replicate to barium (R9). The parity statement
+> above is historical, true as of its original writing.

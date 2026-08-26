@@ -14,9 +14,6 @@
 	path = angular/plurality-ui
 	url = https://www.github.com/markpippins/nexus-plurality.git
 
-[submodule "angular/prompt-architect"]
-	path = angular/prompt-architect
-	url = https://www.github.com/markpippins/prompt-architect.git
 
 [submodule "python/vision/losm-kernel"]
 	path = python/vision/losm-kernel
@@ -44,3 +41,21 @@
 [submodule "angular/wind-ui"]
 	path = angular/wind-ui
 	url = https://github.com/markpippins/nexus-wind-ui.git
+[submodule "angular/view-architect"]
+	path = angular/view-architect
+	url = https://github.com/markpippins/prompt-architect.git
+[submodule "angular/data-explorer-ui"]
+	path = angular/data-explorer-ui
+	url = https://github.com/markpippins/Nexus-Data-Explorer.git
+[submodule "angular/monaco-judge"]
+	path = angular/monaco-judge
+	url = https://github.com/markpippins/monaco-judge.git
+[submodule "angular/nebula-control-plane"]
+	path = angular/nebula-control-plane
+	url = https://github.com/markpippins/nebula-control-plane.git
+[submodule "angular/throttler-ui"]
+	path = angular/throttler-ui
+	url = https://github.com/markpippins/nexus-explorer.git
+[submodule "angular/wind-ui-v2"]
+	path = angular/wind-ui-v2
+	url = https://github.com/markpippins/nexus-wind-v2.git

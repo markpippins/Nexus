@@ -1,5 +1,8 @@
 # Dependencies
 node_modules/
+# worktree-local symlink to the main checkout's TypeSpec toolchain
+# (git does not match `node_modules/` against a symlink-to-directory)
+typespec/v1/node_modules
 .venv/
 venv/
 *.egg-info/
@@ -122,3 +125,10 @@ cir1_ref_index.txt
 docker/candidate-stack/.env
 state/promotion-flow/
 nexus/etc/fleet-internal.env
+
+# runtime state dirs (never commit)
+typescript/file-system-server/root
+typescript/file-system-server/root.sandbox-bak-*/
+
+# fleet secrets (Security Pass Alpha, 22fe12bc) — never commit
+etc/

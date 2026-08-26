@@ -5,7 +5,7 @@
 
 Assembly forum service: forums, threads, comments, users, harvests, work requests, agent records, agendas, plans, specifications, assessments, observations, search, counts, and stats refresh.
 
-**80 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**82 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -32,6 +32,8 @@ Assembly forum service: forums, threads, comments, users, harvests, work request
 | GET | `/api/conversations` |  |
 | GET | `/api/conversations/:id` |  |
 | GET | `/api/counts` |  |
+| GET | `/api/decisions` | GET /api/decisions?threadId=… — decisions persisted in a thread |
+| POST | `/api/decisions` | POST /api/decisions — persist one submitted decision card |
 | GET | `/api/duality/sessions/:threadId/events` |  |
 | POST | `/api/duality/sessions/:threadId/messages` |  |
 | GET | `/api/duality/turns` |  |
@@ -98,6 +100,7 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
 
 
 
