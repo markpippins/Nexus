@@ -187,7 +187,7 @@ export const ProfilesModal: React.FC<ProfilesModalProps> = ({ open, onClose, onA
             <input
               value={draft.baseUrl}
               onChange={(e) => setDraft({ ...draft, baseUrl: e.target.value })}
-              placeholder={draft.kind === 'broker' ? 'http://host:8081' : 'http://host:8085 or /api/v1/registry'}
+              placeholder={draft.kind === 'broker' ? 'http://host:8081' : 'http://host:8085 or /api/v1/registry (prefix auto-resolved)'}
               className="h-8 w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-main)] px-2 font-mono text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-highlight)]"
             />
             <div className="flex items-center justify-end gap-2">

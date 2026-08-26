@@ -148,8 +148,16 @@ async function _terrainHealth(): Promise<TerrainHealthSummary> {
 
 // currentBaseUrl defaults to /api/v1/registry. Flat entity endpoints live
 // directly under /api/v1 (no /registry segment), so derive that base.
+// External profiles (http://host:8085) also need /api/v1 appended since
+// the service-registry's entity routes live under that prefix.
 function flatBaseUrl(): string {
-  return currentBaseUrl.replace(/\/registry\/?$/, '');
+  const stripped = currentBaseUrl.replace(/\/registry\/?$/, '');
+  // External registry profile URLs (http(s)://...) that lack /api/v1
+  // need the prefix appended — entity endpoints live there.
+  if (/^https?:\/\//.test(stripped) && !stripped.includes('/api/v1')) {
+    return stripped.replace(/\/$/, '') + '/api/v1';
+  }
+  return stripped;
 }
 
 // Map backend uppercase enums → barbie lowercase HealthStatus.
@@ -355,17 +363,22 @@ export function saveProfiles(list: BarbieProfile[]): void {
 export async function testProfileConnection(
   profile: Pick<BarbieProfile, 'kind' | 'baseUrl'>
 ): Promise<{ ok: boolean; detail: string }> {
-  const path = profile.kind === 'broker' ? '/actuator/health' : '/health';
+  const base = profile.baseUrl.replace(/\/$/, '');
+  // Try primary path first; fall back to Spring Boot actuator for registries.
+  const paths = profile.kind === 'broker'
+    ? ['/actuator/health']
+    : ['/health', '/actuator/health'];
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 4000);
   const started = Date.now();
   try {
-    const res = await fetch(`${profile.baseUrl.replace(/\/$/, '')}${path}`, {
-      signal: controller.signal
-    });
+    for (const path of paths) {
+      const res = await fetch(`${base}${path}`, { signal: controller.signal });
+      const ms = Date.now() - started;
+      if (res.ok) return { ok: true, detail: `reachable (${ms}ms, HTTP ${res.status} via ${path})` };
+    }
     const ms = Date.now() - started;
-    if (res.ok) return { ok: true, detail: `reachable (${ms}ms, HTTP ${res.status})` };
-    return { ok: false, detail: `HTTP ${res.status} in ${ms}ms` };
+    return { ok: false, detail: `unreachable (tried ${paths.join(', ')}, ${ms}ms)` };
   } catch (e: any) {
     const ms = Date.now() - started;
     if (e?.name === 'AbortError') return { ok: false, detail: `timeout after ${Date.now() - started}ms` };
