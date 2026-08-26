@@ -30,7 +30,6 @@ UI_NAMES=(
     "conduit-ui"         # 4201 (live; mock was :3000, unbound in live mode)
     "tackle-ui"          # 4202
     "cascade-ui"         # 4203
-    "angular-assembly"   # 4204
     "execution-ui"       # 4205
     "peb-ui"             # 4206
     "semantic-kernel-ui" # 4207
@@ -54,7 +53,6 @@ UI_PORTS[nexus-console]=4200
 UI_PORTS[conduit-ui]=4201  # live mode (mock was :3000, intentionally unbound in live mode)
 UI_PORTS[tackle-ui]=4202
 UI_PORTS[cascade-ui]=4203
-UI_PORTS[angular-assembly]=4204
 UI_PORTS[execution-ui]=4205
 UI_PORTS[peb-ui]=4206
 UI_PORTS[semantic-kernel-ui]=4207

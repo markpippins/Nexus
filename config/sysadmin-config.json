@@ -518,20 +518,6 @@
       "notes": "Angular/Vite dev server"
     },
     {
-      "id": "angular-assembly",
-      "displayName": "Angular Assembly",
-      "category": "ui",
-      "host": "localhost",
-      "port": 4204,
-      "checkMethod": "http",
-      "healthEndpoint": "/",
-      "expectedStatus": 200,
-      "systemdUnit": "angular-assembly.service",
-      "timeout": 5,
-      "dependencies": [],
-      "notes": "Angular/Vite dev server"
-    },
-    {
       "id": "nebula-ui",
       "displayName": "Nebula UI",
       "category": "ui",

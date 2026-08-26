@@ -116,7 +116,6 @@ ALL_SERVICES=(
     "conduit-ui.service"        # port 4201 — Conduit UI
     "tackle-ui.service"         # port 4202 — Tackle UI
     "cascade-ui.service"        # port 4203 — Cascade UI
-    "angular-assembly.service"  # port 4204 — Assembly UI
     "execution-ui.service"      # port 4205 — Execution UI
     "peb-ui.service"            # port 4206 — PEB UI
     "semantic-kernel-ui.service" # port 4207 — Semantic Kernel UI
@@ -191,7 +190,6 @@ SERVICE_PORTS=(
     ["conduit-ui.service"]="4201"
     ["tackle-ui.service"]="4202"
     ["cascade-ui.service"]="4203"
-    ["angular-assembly.service"]="4204"
     ["execution-ui.service"]="4205"
     ["peb-ui.service"]="4206"
     ["semantic-kernel-ui.service"]="4207"
@@ -209,7 +207,6 @@ SERVICE_HEALTH_PATHS=(
     ["conduit-ui.service"]="/"
     ["tackle-ui.service"]="/"
     ["cascade-ui.service"]="/"
-    ["angular-assembly.service"]="/"
     ["execution-ui.service"]="/"
     ["peb-ui.service"]="/"
     ["semantic-kernel-ui.service"]="/"

@@ -41,7 +41,6 @@ HEALTH_URLS = {
     # ── Angular dev servers (bind [::1] only — need IPv6 URL) ──
     "nexus-console":            "http://[::1]:4200/health",
     "cascade-ui":               "http://[::1]:4203/health",
-    "angular-assembly":         "http://[::1]:4204/health",
     "nebula-ui":                "http://[::1]:4210/health",
 }
 

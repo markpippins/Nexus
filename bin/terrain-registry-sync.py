@@ -33,7 +33,7 @@ ALIASES = {"shrapnel-srv", "topology-server"}
 
 # Framework name per migratable service (mirrors the item-4 staged SQL mapping).
 FRAMEWORK_BY_NAME = {
-    "angular-assembly": "Express", "assembly-ui": "Express", "barbie-ui": "Express",
+    "assembly-ui": "Express", "barbie-ui": "Express",
     "data-explorer-ui": "Express", "duality-ui": "Express", "execution-ui": "Express",
     "monaco-judge": "Express", "nebula-control-plane": "Express", "peb-ui": "Express",
     "plurality-ui": "Express", "semantic-kernel-ui": "Express", "semantics-ui": "Express",

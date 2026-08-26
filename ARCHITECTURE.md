@@ -109,7 +109,7 @@ Ports below are the authoritative `SERVICE_PORTS` map from that script.
 
 `nebula-ui` 4210 · `duality-ui` 3002 · `view-architect` 3003 ·
 `plurality-ui` 3004 · `nexus-console` 4200 · `conduit-ui` 4201 ·
-`tackle-ui` 4202 · `cascade-ui` 4203 · `angular-assembly` 4204 ·
+`tackle-ui` 4202 · `cascade-ui` 4203 ·
 `execution-ui` 4205 · `peb-ui` 4206 · `semantic-kernel-ui` 4207
 
 ### 2.5 Legacy broker mesh (historical)
