@@ -294,7 +294,8 @@ services:
     - ${SEMANTICS_HOST_PORT:-3160}:3160
   terrain-ts:
     build:
-      context: ../../typescript/terrain-srv
+      context: ../../typescript
+      dockerfile: terrain-srv/Dockerfile
     container_name: vd-terrain-ts
     restart: unless-stopped
     environment:
