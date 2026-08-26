@@ -1,0 +1,55 @@
+# SonarQube on titanium (rehome from vanadium, 2026-08-26).
+# Operator goal: Sonar running tonight so Barbie gets live feedback via
+# ci-gateway (:9095 /sonar passthrough -> http://sonarqube:9000 here).
+#
+# Postgres-backed (not embedded H2) so quality-gate history survives
+# upgrades. Sizing: sonar heap capped at 2g; box had 14Gi available at
+# staging. Port 9000 was free.
+name: nexus-sonar
+services:
+  sonar-db:
+    image: postgres:16-alpine
+    container_name: vd-rehome-sonar-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD:?set SONAR_DB_PASSWORD in .env}
+      POSTGRES_DB: sonar
+    volumes:
+      - sonar-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 512m
+
+  sonarqube:
+    image: sonarqube:9.9-community
+    container_name: vd-rehome-sonar
+    restart: unless-stopped
+    depends_on:
+      sonar-db:
+        condition: service_healthy
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonar
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD}
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    ports:
+      - "${SONAR_HOST_PORT:-9000}:9000"
+    volumes:
+      - sonar-data:/opt/sonarqube/data
+      - sonar-extensions:/opt/sonarqube/extensions
+      - sonar-logs:/opt/sonarqube/logs
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    mem_limit: 3g
+
+volumes:
+  sonar-db-data:
+  sonar-data:
+  sonar-extensions:
+  sonar-logs:
