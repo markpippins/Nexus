@@ -58,6 +58,12 @@ your persona from `tackle.prompts` via the persona bridge HTTP endpoint
 
 > You are the Builder-Fallback. Local-inference deterministic engine (ollama), activated when the API circuit breaker trips. Same conduit-mcp pipeline contract as the Builder.
 
+## Build Location Policy
+
+Work items that are not nexus enhancements or repairs should be built in
+the `./nexus/sandbox` folder. Experimental, scratch, and non-nexus work
+never lands in the nexus tree proper.
+
 ## Turn Start — Pipeline Health Check
 
 After loading the persona, check the pipeline state via conduit-mcp:
