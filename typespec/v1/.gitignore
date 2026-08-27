@@ -7,3 +7,7 @@ tsp-output/
 # files here.
 staging/*
 !staging/.gitkeep
+
+# W1.07 CUE bundle runner outputs (regenerable per-run evidence; pins in
+# cue/conformance/ ARE tracked, run manifests are not).
+governance-envelope/cue/out/
