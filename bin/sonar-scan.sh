@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SONAR_HOST="${SONAR_HOST_URL:-http://vanadium:9000}"
-SONAR_LOGIN="${SONAR_LOGIN:-squ_39ef4acd7cdb446713642e203ea581875aca04c8}"
+SONAR_LOGIN="${SONAR_LOGIN:?SONAR_LOGIN must be set}"
 FSS_ROOT="$PROJECT_DIR/typescript/file-system-server/root"
 FSS_STASH="/tmp/.fss-root-stash-$$"
 GATE_WAIT="${1:-false}"
