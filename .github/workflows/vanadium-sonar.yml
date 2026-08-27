@@ -1,0 +1,47 @@
+name: vanadium-sonar
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  sonar:
+    runs-on: self-hosted
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install sonar-scanner
+        run: |
+          if [ ! -x "$HOME/bin/sonar-scanner" ]; then
+            curl -sL https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-8.1.0.6389-linux-x64.zip -o /tmp/sonar.zip
+            unzip -qo /tmp/sonar.zip -d "$HOME/sonar-scanner"
+            mkdir -p "$HOME/bin"
+            ln -sf "$HOME/sonar-scanner/sonar-scanner-8.1.0.6389-linux-x64/bin/sonar-scanner" "$HOME/bin/sonar-scanner"
+          fi
+          "$HOME/bin/sonar-scanner" --version
+
+      - name: SonarQube scan (vanadium CI)
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          ARGS=(
+            -Dsonar.host.url="${{ secrets.SONAR_HOST_URL }}"
+            -Dsonar.login="$SONAR_TOKEN"
+            -Dsonar.projectKey=nexus
+            -Dsonar.projectBaseDir="$GITHUB_WORKSPACE"
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=600
+          )
+          if [ -n "${{ github.event.pull_request.number }}" ]; then
+            ARGS+=(
+              -Dsonar.pullrequest.key="${{ github.event.pull_request.number }}"
+              -Dsonar.pullrequest.branch="${{ github.head_ref }}"
+              -Dsonar.pullrequest.base=main
+            )
+          fi
+          "$HOME/bin/sonar-scanner" "${ARGS[@]}"
