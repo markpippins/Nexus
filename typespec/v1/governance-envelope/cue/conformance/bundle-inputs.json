@@ -1,0 +1,9 @@
+{
+  "files": {
+    "schema.cue": "1b43eb79264c88c8c3f97773d2d7fbc39f0ffcef65fc2c5ef7654b6bd334e466",
+    "bundle.cue": "eb2db4c1473e99bb1c8e9b43806da76468237964114860e81ac5ef4a4d7354b1",
+    "checks.cue": "80e8cff1f263f0e9e07ff56225267ecc3a7a85de646e21acb1a081cd26b9338c"
+  },
+  "combined": "73bd51114f2e02b1f6de1b825b92d9213c7d751f8a02641d75faf9649b7d5609",
+  "generated_at_utc": "2026-08-27T08:28:26.486467+00:00"
+}

@@ -35,3 +35,6 @@ import "./terrain/spring/main.tsp";
 
 // PEB Kernel — governance engine, decision ledger, capability enforcement
 import "./peb-kernel/spring/main.tsp";
+
+// Governance Admission Envelope — canonical wire boundary (W1.05)
+import "./governance-envelope/spring/main.tsp";

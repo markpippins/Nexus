@@ -1,0 +1,488 @@
+openapi: 3.1.0
+info:
+  title: Nexus Governance Admission
+  version: 0.0.0
+tags:
+  - name: Governance Admission
+paths:
+  /api/v1/governance/admission/admit:
+    post:
+      operationId: GovernanceAdmissionEndpoint_admit
+      description: |-
+        Admit an evaluated envelope — PEB appends the authority receipt.
+
+        The request MUST carry the envelope with its immutable evaluation and
+        fingerprint. The response includes the receipt with the PEB transaction
+        and sanctioned-transition identities. This is the only surface where
+        authority is granted; the payload can never replace PEB/SOL authority
+        (AC4).
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdmissionResult'
+      tags:
+        - Governance Admission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdmissionRequest'
+  /api/v1/governance/admission/evaluate:
+    post:
+      operationId: GovernanceAdmissionEndpoint_evaluate
+      description: |-
+        Evaluate an envelope and return the assessment.
+
+        The response is assessment-only: disposition, refusal code, and the
+        evaluation fingerprint. It carries NO authority — no PEB transaction,
+        no sanctioned transition. Callers must not treat an assessment as a
+        grant (W1.01/W1.03).
+
+        Fail-closed behavior (W1.01): missing identity/digest/law/input/
+        fingerprint, stale doctrine, contract digest mismatch, unknown
+        contract, expired lease, mismatched attempt, or evaluator uncertainty
+        returns disposition `refuse`/`unknown` with a refusal_code.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdmissionResult'
+      tags:
+        - Governance Admission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdmissionRequest'
+components:
+  schemas:
+    AdmissionAuthorityResult:
+      type: string
+      enum:
+        - granted
+        - refused
+        - routed
+      description: Authority outcome appended only by PEB after admission.
+    AdmissionReceipt:
+      type: object
+      required:
+        - peb_transaction_id
+        - admission_receipt_id
+        - authority_result
+      properties:
+        peb_transaction_id:
+          type: string
+          format: uuid
+        admission_receipt_id:
+          type: string
+          format: uuid
+        sanctioned_transition_id:
+          anyOf:
+            - type: string
+            - type: 'null'
+          format: uuid
+        authority_result:
+          $ref: '#/components/schemas/AdmissionAuthorityResult'
+      description: |-
+        Authority-bearing receipt. Read-only in this contract: PEB appends these
+        fields after admission; no caller may populate them in a request.
+    AdmissionRequest:
+      type: object
+      required:
+        - envelope
+      properties:
+        envelope:
+          $ref: '#/components/schemas/GovernanceEnvelope'
+      description: Admission request — the envelope to be evaluated.
+    AdmissionResult:
+      type: object
+      required:
+        - envelope_id
+        - disposition
+        - evaluation_fingerprint
+      properties:
+        envelope_id:
+          type: string
+          format: uuid
+        disposition:
+          $ref: '#/components/schemas/EnvelopeDisposition'
+        refusal_code:
+          anyOf:
+            - $ref: '#/components/schemas/RefusalCode'
+            - type: 'null'
+        evaluation_fingerprint:
+          type: string
+          description: '`sha256:<64 hex>` — must match the envelope fingerprint (W1.04)'
+        receipt:
+          anyOf:
+            - $ref: '#/components/schemas/AdmissionReceipt'
+            - type: 'null'
+          description: PEB-appended authority receipt, when admission completed
+      description: |-
+        Admission result — the assessment + fingerprint. `receipt` is populated
+        only after PEB admission; until then it is absent.
+    AssertionResult:
+      type: object
+      required:
+        - proposition_id
+        - result
+      properties:
+        proposition_id:
+          type: string
+          format: uuid
+        result:
+          type: boolean
+        detail:
+          anyOf:
+            - type: string
+            - type: 'null'
+          description: Optional evaluator detail line
+      description: Per-proposition evaluation result.
+    EnvelopeDisposition:
+      type: string
+      enum:
+        - allow
+        - reject
+        - refuse
+        - unknown
+      description: |-
+        Exact disposition vocabulary for a governed admission.
+        - allow  — admitted
+        - reject — deterministically denied (doctrine/contract violation)
+        - refuse — fail-closed refusal (missing/stale/unknown authority inputs)
+        - unknown — evaluator uncertainty; routed for clarification
+    EvaluationFingerprint:
+      type: object
+      required:
+        - evaluation_fingerprint
+        - fingerprint_algorithm
+        - fingerprint_version
+      properties:
+        evaluation_fingerprint:
+          type: string
+          description: '`sha256:<64 hex>` over the canonical envelope (W1.04 §3)'
+        fingerprint_algorithm:
+          type: string
+          description: Algorithm — `sha256` (v1)
+        fingerprint_version:
+          type: integer
+          format: int32
+          description: Fingerprint algorithm version (1)
+      description: Evaluation fingerprint — required and immutable (W1.04).
+    EvidenceBundle:
+      type: object
+      required:
+        - evidence_ids
+      properties:
+        evidence_ids:
+          type: array
+          items:
+            type: string
+          description: UUID identities
+        evidence_fingerprint:
+          anyOf:
+            - type: string
+            - type: 'null'
+          description: '`sha256:<hex>` over the referenced evidence set'
+      description: Evidence verification set — identities + fingerprint, never payloads.
+    ExecutionAuthority:
+      type: object
+      properties:
+        lease_id:
+          anyOf:
+            - type: string
+            - type: 'null'
+          format: uuid
+        grant_id:
+          anyOf:
+            - type: string
+            - type: 'null'
+          format: uuid
+        attempt_id:
+          anyOf:
+            - type: string
+            - type: 'null'
+          format: uuid
+      description: One authorized attempt. Nullable only pre-execution.
+    FrameValue:
+      type: object
+      required:
+        - frame
+        - value
+      properties:
+        frame:
+          type: string
+        value:
+          description: Scalar frame value (string, number, or boolean)
+      description: A resolved frame value (e.g. execution_backend=interactive).
+    GovernanceContract:
+      type: object
+      required:
+        - contract_id
+        - contract_version
+        - contract_digest
+        - operation
+      properties:
+        contract_id:
+          type: string
+          format: uuid
+          description: Contract identity (UUID)
+        contract_version:
+          type: integer
+          format: int32
+          description: Contract version — independent of envelope_version (AC2)
+        contract_digest:
+          type: string
+          description: SHA-256 digest of the contract artifact (`sha256:<64 hex>`)
+        projection_id:
+          anyOf:
+            - type: string
+            - type: 'null'
+          format: uuid
+          description: Projection identity, when the evaluation runs against a projection
+        projection_version:
+          anyOf:
+            - type: integer
+              format: int32
+            - type: 'null'
+          description: Projection version
+        projection_digest:
+          anyOf:
+            - type: string
+            - type: 'null'
+          description: Projection digest (`sha256:<64 hex>`)
+        operation:
+          type: string
+          description: Governed operation (e.g. `admit_execution`)
+        transition:
+          anyOf:
+            - type: string
+            - type: 'null'
+          description: Requested transition (e.g. `REQUESTED->EXECUTING`)
+      description: |-
+        Contract identity + projection digest. Identity references only — never
+        a payload constraint that could replace PEB/SOL authority (AC4).
+    GovernanceEnvelope:
+      type: object
+      required:
+        - envelope_version
+        - envelope_id
+        - created_at
+        - contract
+        - semantic
+        - workflow
+        - law
+        - inputs
+        - evaluation
+        - fingerprint
+      properties:
+        envelope_version:
+          type: integer
+          format: int32
+          description: Envelope schema version — independent of contract_version (AC2)
+        envelope_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        contract:
+          $ref: '#/components/schemas/GovernanceContract'
+        semantic:
+          $ref: '#/components/schemas/SemanticIdentity'
+        workflow:
+          $ref: '#/components/schemas/WorkflowContext'
+        law:
+          $ref: '#/components/schemas/LawSnapshot'
+        execution:
+          anyOf:
+            - $ref: '#/components/schemas/ExecutionAuthority'
+            - type: 'null'
+          description: Nullable only pre-execution
+        inputs:
+          $ref: '#/components/schemas/InputSnapshot'
+        evaluation:
+          $ref: '#/components/schemas/GovernanceEvaluation'
+        evidence:
+          anyOf:
+            - $ref: '#/components/schemas/EvidenceBundle'
+            - type: 'null'
+          description: Required when claims rely on evidence
+        fingerprint:
+          $ref: '#/components/schemas/EvaluationFingerprint'
+        authority:
+          anyOf:
+            - $ref: '#/components/schemas/AdmissionReceipt'
+            - type: 'null'
+          description: Appended only by PEB after admission
+      description: |-
+        Canonical governance admission envelope. Immutable, versioned admission/
+        evaluation record and replay authority — not merely correlation metadata.
+
+        `authority` is appended only by PEB after admission; corrections create a
+        new linked envelope, never a mutation.
+    GovernanceEvaluation:
+      type: object
+      required:
+        - assertion_results
+        - disposition
+        - unknowns
+        - evaluated_at
+      properties:
+        assertion_results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssertionResult'
+        disposition:
+          $ref: '#/components/schemas/EnvelopeDisposition'
+        unknowns:
+          type: array
+          items:
+            type: string
+          description: Unknown/uncertainty markers (e.g. `context:unknown-vocabulary`)
+        refusal_code:
+          anyOf:
+            - $ref: '#/components/schemas/RefusalCode'
+            - type: 'null'
+          description: Canonical form may carry explicit null when not applicable (W1.04 §2.1)
+        diagnostics:
+          anyOf:
+            - type: array
+              items:
+                type: string
+            - type: 'null'
+          description: Ordered diagnostics — evaluation order is part of the explanation
+        evaluated_at:
+          type: string
+          format: date-time
+          description: Captured evaluation time — replay never substitutes wall-clock now()
+      description: |-
+        SOL assessment output. Assessment fields are NOT authority-bearing — only
+        the PEB-appended AdmissionReceipt can grant authority (W1.01/W1.03).
+    InputSnapshot:
+      type: object
+      required:
+        - input_snapshot_id
+        - input_captured_at
+        - input_fingerprint
+      properties:
+        input_snapshot_id:
+          type: string
+          format: uuid
+        input_captured_at:
+          type: string
+          format: date-time
+        input_fingerprint:
+          type: string
+          description: '`sha256:<64 hex>` of the captured input snapshot'
+      description: Input snapshot identity — the exact facts evaluated by SOL.
+    LawSnapshot:
+      type: object
+      required:
+        - proposition_ids
+        - frame_values
+        - doctrine_ids
+      properties:
+        proposition_ids:
+          type: array
+          items:
+            type: string
+          description: UUID identities
+        frame_values:
+          type: array
+          items:
+            $ref: '#/components/schemas/FrameValue'
+        doctrine_ids:
+          type: array
+          items:
+            type: string
+          description: UUID identities
+        posture_ids:
+          anyOf:
+            - type: array
+              items:
+                type: string
+            - type: 'null'
+          description: UUID identities
+        effective_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          description: Captured effective-at time (never wall-clock `now()` on replay)
+      description: Resolved law + context snapshot evaluated by SOL.
+    RefusalCode:
+      type: string
+      enum:
+        - missing_identity
+        - missing_digest
+        - missing_law
+        - missing_input
+        - missing_fingerprint
+        - stale_doctrine
+        - contract_digest_mismatch
+        - unknown_context
+        - expired_lease
+        - attempt_mismatch
+        - evaluator_uncertainty
+        - duplicate_reuse
+      description: |-
+        Exact fail-closed refusal codes (W1.01: missing identity/digest/law/
+        input/fingerprint, stale doctrine, contract digest mismatch, unknown
+        contract, expired lease, mismatched attempt, evaluator uncertainty).
+    SemanticIdentity:
+      type: object
+      required:
+        - '@context'
+        - subject_id
+        - subject_type
+      properties:
+        '@context':
+          type: string
+          description: JSON-LD context IRI (absolute; relative fails closed)
+        subject_id:
+          type: string
+          description: Subject identifier
+        subject_type:
+          type: string
+          description: Subject type (e.g. `work_request`)
+        subject_ref:
+          anyOf:
+            - type: string
+            - type: 'null'
+          description: Subject reference IRI
+      description: JSON-LD semantic identity of the governed subject.
+    WorkflowContext:
+      type: object
+      required:
+        - workflow_id
+        - workflow_version
+        - node_id
+      properties:
+        workflow_id:
+          type: string
+        workflow_version:
+          type: integer
+          format: int32
+        node_id:
+          type: string
+        work_request_id:
+          anyOf:
+            - type: string
+            - type: 'null'
+          description: Work-request identity when the decision is work-request-governed
+        work_request_version:
+          anyOf:
+            - type: integer
+              format: int32
+            - type: 'null'
+      description: Exact process position of the governed decision.

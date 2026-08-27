@@ -1,0 +1,27 @@
+{
+  "description": "Violation class: envelope environment frame contradicts the advertised endpoint deployment mode.",
+  "expectation": "fail",
+  "expected_code": "ENV-CONTRADICTION",
+  "expected_stage": "endpoint_environment_consistency",
+  "mutations": [],
+  "environment": {
+    "contract_logical_name": "nexus-governance-surface",
+    "contract_version_recorded_in_manifest": 3,
+    "jsonld_context_base_iri": "https://nexus.local/context/governance/",
+    "type_spec_sources_root": "nexus/typespec/v1",
+    "wind_projection_registry_file": "audit/wind/WIND_PROJECTION_REGISTRY.md",
+    "doctrine_corpus_file": "audit/resolution/DOCTRINE_CORPUS_INDEX.md",
+    "endpoints_manifest_file": "audit/endpoints/endpoints-manifest.json",
+    "version_cap": {"nexus-governance-surface": 3},
+    "doctrine_proposition_ids": [
+      "11111111-2222-4333-8444-555555555555",
+      "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+    ],
+    "posture_ids": ["pppppppp-2222-4333-8444-555555555555"],
+    "endpoints": {
+      "nexus-governance-surface": {"url": "https://nexus.local/api/nexus-governance-surface", "mode": "staging"},
+      "resolution-kernel": {"url": "https://nexus.local/api/resolution-kernel", "mode": "production"},
+      "peb-kernel": {"url": "https://nexus.local/api/peb-kernel", "mode": "production"}
+    }
+  }
+}
