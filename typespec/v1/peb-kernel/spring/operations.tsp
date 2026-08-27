@@ -30,7 +30,7 @@ namespace org.nexus.peb {
     """)
     @post
     @route("/transaction")
-    submit(@body request: PebTransactionRequest): AdmissionResponse;
+    submit(@body request: PebTransactionRequest): PebAdmissionResult;
   }
 
   /**

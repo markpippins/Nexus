@@ -204,10 +204,13 @@ implicit in W1.08 acceptance.
    (suggested, matches "current state in resolution") vs a nebula-backed
    table. Default: resolution.
 3. **Whether `peb.transactions` gains an `envelope_id` column now or the
-   citation lives in `input.envelope_id` (no-DDL option).** Default
-   designed: no-DDL (`input` JSONB carries `envelope_id`; the idempotency-key
-   vocabulary makes it queryable). Column is a clean later migration if
-   query volume justifies it.
+   citation lives in `input.envelope_id` (no-DDL option).** Resolved
+   (2026-08-27, W1.12): the TypeSpec `PebTransaction` contract now carries
+   `envelope_id` as an optional field, and the Python `PebTransaction`
+   domain model + API carry it through. The physical DDL column is still a
+   clean later migration (D1/D4 in section 7); until then, `input` JSONB
+   carries `envelope_id` (the no-DDL option, queryable via the idempotency-key
+   vocabulary).
 
 ---
 

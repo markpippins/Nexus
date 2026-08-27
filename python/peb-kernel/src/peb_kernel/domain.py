@@ -218,6 +218,10 @@ class PebTransaction:
     committed_at: datetime | None = None
     kernel_event_id: UUID | None = None
     kernel_event_type: str | None = None
+    # W1.12: governance envelope reference fields (W1.05 contract)
+    envelope_id: UUID | None = None
+    evaluation_fingerprint: str | None = None
+    contract_digest: str | None = None
 
     def on_create(self) -> None:
         if self.id is None:
@@ -238,11 +242,17 @@ class PebTransaction:
             tool_name=get("toolName", "tool_name"),
             input=payload.get("input"),
             id=_uuid(payload.get("id")),
+            envelope_id=_uuid(payload.get("envelope_id")),
+            evaluation_fingerprint=payload.get("evaluation_fingerprint"),
+            contract_digest=payload.get("contract_digest"),
         )
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": str(self.id) if self.id else None,
+            "envelope_id": str(self.envelope_id) if self.envelope_id else None,
+            "evaluation_fingerprint": self.evaluation_fingerprint,
+            "contract_digest": self.contract_digest,
             "idempotencyKey": self.idempotency_key,
             "entityId": self.entity_id,
             "toolName": self.tool_name,
@@ -336,6 +346,13 @@ class PebCapability:
 
 @dataclass(frozen=True)
 class AdmissionResponse:
+    """Legacy admission response.
+
+    Deprecated (W1.12): replaced by `PebAdmissionResult` which carries the
+    governance envelope identity + evaluation fingerprint. Retained for
+    backward compatibility until all callers migrate.
+    """
+
     message: str
     admitted: bool
 
@@ -349,3 +366,54 @@ class AdmissionResponse:
 
     def to_dict(self) -> dict[str, Any]:
         return {"message": self.message, "admitted": self.admitted}
+
+
+@dataclass(frozen=True)
+class PebAdmissionResult:
+    """Envelope-aware admission result (W1.12).
+
+    Carries the PEB transaction identity alongside the governance envelope
+    identity + evaluation fingerprint, aligning with the W1.05 contract.
+    The envelope fields are identity references — authority remains with PEB
+    (W1.03).
+    """
+
+    transaction_id: UUID
+    admission_result: AdmissionResult
+    message: str
+    admitted: bool
+    envelope_id: UUID | None = None
+    evaluation_fingerprint: str | None = None
+
+    @classmethod
+    def from_transaction(
+        cls,
+        transaction: "PebTransaction",
+        message: str,
+        admitted: bool,
+    ) -> "PebAdmissionResult":
+        """Build a result from a processed PebTransaction, carrying envelope refs.
+
+        ``admitted`` is the endpoint-level outcome (did the PEB accept and
+        persist this transaction?), NOT the governance result. A REPORT_VIOLATION
+        transaction has ``admission_result=REJECTED`` but ``admitted=True``
+        because the violation was successfully recorded.
+        """
+        return cls(
+            transaction_id=transaction.id,  # type: ignore[arg-type]
+            admission_result=transaction.admission_result or AdmissionResult.ROUTED,
+            message=message,
+            admitted=admitted,
+            envelope_id=transaction.envelope_id,
+            evaluation_fingerprint=transaction.evaluation_fingerprint,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "transaction_id": str(self.transaction_id),
+            "envelope_id": str(self.envelope_id) if self.envelope_id else None,
+            "evaluation_fingerprint": self.evaluation_fingerprint,
+            "admission_result": self.admission_result.value,
+            "message": self.message,
+            "admitted": self.admitted,
+        }
