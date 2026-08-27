@@ -19,9 +19,17 @@ jobs:
           fetch-depth: 0
 
       - name: Install sonar-scanner
+        env:
+          # Pinned digest for sonar-scanner-cli-8.1.0.6389-linux-x64.zip
+          # (published by SonarSource at the .sha256 sibling URL; verified by
+          # architect on 2026-08-27). If SonarSource republishes the artifact
+          # this fails loudly instead of executing unknown code on the
+          # self-hosted runner.
+          SONAR_SCANNER_ZIP_SHA256: bb8f709f9cb73352f8d1260a3b3c506c0f41146754bc630762c126d795499d0b
         run: |
           if [ ! -x "$HOME/bin/sonar-scanner" ]; then
             curl -sL https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-8.1.0.6389-linux-x64.zip -o /tmp/sonar.zip
+            echo "$SONAR_SCANNER_ZIP_SHA256  /tmp/sonar.zip" | sha256sum -c -
             unzip -qo /tmp/sonar.zip -d "$HOME/sonar-scanner"
             mkdir -p "$HOME/bin"
             ln -sf "$HOME/sonar-scanner/sonar-scanner-8.1.0.6389-linux-x64/bin/sonar-scanner" "$HOME/bin/sonar-scanner"
