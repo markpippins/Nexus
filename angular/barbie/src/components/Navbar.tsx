@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTheme } from './ThemeContext';
-import { registryApi, TerrainHealthSummary } from '../lib/api';
+import { TerrainHealthSummary } from '../lib/api';
 import {
   Search,
   Moon,
@@ -11,10 +11,8 @@ import {
   RefreshCw,
   Menu,
   X,
-  Radio,
   Server,
   Layers,
-  Cpu,
   Settings
 } from 'lucide-react';
 import { ThemeMode, System } from '../types';
@@ -36,8 +34,6 @@ interface NavbarProps {
   onTerrainRecheck?: () => Promise<TerrainHealthSummary | null>;
   onOpenProfiles?: () => void;
   activeView: string;
-  apiMode?: 'live' | 'mock';
-  onApiModeChange?: (mode: 'live' | 'mock') => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -56,8 +52,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onTerrainRecheck,
   onOpenProfiles,
   activeView,
-  apiMode = registryApi.getApiMode(),
-  onApiModeChange
 }) => {
   const { theme, setTheme } = useTheme();
 
@@ -134,56 +128,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Right Controls: Auto-refresh, Mode Switcher, System Status, Register Button */}
+        {/* Right Controls: Auto-refresh, System Status, Register Button */}
         <div className="flex items-center gap-3">
           
-          {/* Data Mode Toggle (LIVE REST API vs MOCK) */}
-          <div className="hidden md:flex items-center gap-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] p-1">
-            <button
-              onClick={() => {
-                registryApi.setApiMode('live');
-                onApiModeChange ? onApiModeChange('live') : onManualRefresh();
-              }}
-              className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold transition-all ${
-                apiMode === 'live'
-                  ? 'bg-emerald-500 text-white shadow-sm ring-1 ring-emerald-400'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-              title="Connect to Live Express REST Backend Server (/api/v1/registry)"
-            >
-              <Radio className="h-3 w-3" />
-              <span>LIVE API</span>
-            </button>
-
-            <button
-              onClick={() => {
-                registryApi.setApiMode('mock');
-                onApiModeChange ? onApiModeChange('mock') : onManualRefresh();
-              }}
-              className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold transition-all ${
-                apiMode === 'mock'
-                  ? 'bg-amber-500 text-white shadow-sm ring-1 ring-amber-400'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-              title="Switch to Client-side Offline Mock Data Generator"
-            >
-              <Cpu className="h-3 w-3" />
-              <span>MOCK</span>
-            </button>
-          </div>
-
-          {/* System Status Display from Professional Polish theme */}
+          {/* Live Status Display from Professional Polish theme */}
           <div className="hidden lg:flex flex-col items-end pr-2 border-r border-[var(--border-color)]">
             <span className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">
-              {apiMode === 'live' ? 'Live Backend' : 'Mock Client'}
+              Live Backend
             </span>
-            <span className={`text-sm font-bold flex items-center gap-1.5 ${
-              apiMode === 'live' ? 'text-emerald-400' : 'text-amber-400'
-            }`}>
-              <span className={`w-2 h-2 rounded-full ${
-                apiMode === 'live' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-amber-500'
-              }`}></span>
-              {apiMode === 'live' ? 'REST ONLINE' : 'MOCK ACTIVE'}
+            <span className="text-sm font-bold flex items-center gap-1.5 text-emerald-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse"></span>
+              REST ONLINE
             </span>
           </div>
           
