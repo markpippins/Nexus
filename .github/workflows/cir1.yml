@@ -101,6 +101,7 @@ jobs:
           go-version: "1.22"
       - name: Initialize submodule
         run: git submodule update --init go/wrp/ccnf-ref
+        working-directory: ${{ github.workspace }}
       - name: Set base ref
         id: refs
         run: |

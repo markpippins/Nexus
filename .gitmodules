@@ -59,3 +59,7 @@
 [submodule "angular/wind-ui-v2"]
 	path = angular/wind-ui-v2
 	url = https://github.com/markpippins/nexus-wind-v2.git
+
+[submodule "docs/attractor"]
+	path = docs/attractor
+	url = https://github.com/strongdm/attractor.git
