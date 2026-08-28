@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { JenkinsJob, JenkinsBuild } from '../../types';
-import { registryApi } from '../../lib/api';
+import { registryApi, GatewayUpstreamError } from '../../lib/api';
 import {
   Rocket,
   ChevronLeft,
@@ -9,7 +9,8 @@ import {
   ExternalLink,
   Clock,
   GitBranch,
-  User
+  User,
+  WifiOff
 } from 'lucide-react';
 
 interface JenkinsTableProps {
@@ -26,6 +27,7 @@ export const JenkinsTable: React.FC<JenkinsTableProps> = ({
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [unavailable, setUnavailable] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -39,17 +41,33 @@ export const JenkinsTable: React.FC<JenkinsTableProps> = ({
         });
 
         if (isMounted) {
+          setUnavailable(null);
           setJobs(data);
           // Pre-fetch builds for each job
           const buildMap: Record<string, JenkinsBuild[]> = {};
           for (const job of data) {
-            const b = await registryApi.getJenkinsBuilds(job.id);
-            buildMap[job.id] = b;
+            try {
+              const b = await registryApi.getJenkinsBuilds(job.id);
+              buildMap[job.id] = b;
+            } catch {
+              buildMap[job.id] = []; // per-job build history unavailable; keep job row
+            }
           }
           setBuilds(buildMap);
         }
       } catch (err) {
         console.error('Failed fetching Jenkins jobs:', err);
+        if (isMounted) {
+          setJobs([]);
+          setBuilds({});
+          if (err instanceof GatewayUpstreamError) {
+            setUnavailable(err.upstream
+              ? `Jenkins is unreachable (upstream: ${err.upstream}). The vanadium host may be offline.`
+              : `Jenkins is unreachable. The CI gateway could not be reached.`);
+          } else {
+            setUnavailable('Failed to load Jenkins data.');
+          }
+        }
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -159,7 +177,20 @@ export const JenkinsTable: React.FC<JenkinsTableProps> = ({
           </thead>
 
           <tbody className="divide-y divide-[var(--border-color)]">
-            {isLoading ? (
+            {unavailable ? (
+              <tr>
+                <td colSpan={8} className="p-8">
+                  <div className="flex items-center gap-3 text-[var(--text-secondary)]">
+                    <WifiOff className="h-6 w-6 text-amber-400 flex-shrink-0" />
+                    <div>
+                      <div className="font-semibold text-amber-400">Jenkins unavailable</div>
+                      <div className="text-xs">{unavailable}</div>
+                      <div className="text-[11px] mt-1 opacity-70">Auto-refresh will retry. Runs fine on the laptop without vanadium.</div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            ) : isLoading ? (
               <tr>
                 <td colSpan={8} className="p-8 text-center text-[var(--text-secondary)]">
                   Loading CI pipeline jobs...

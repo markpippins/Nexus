@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { SonarProject, SonarMetricPoint, SonarRating } from '../../types';
-import { registryApi } from '../../lib/api';
+import { registryApi, GatewayUpstreamError } from '../../lib/api';
 import {
   Gauge,
   Filter,
   ExternalLink,
   ShieldCheck,
   LineChart,
-  Clock
+  Clock,
+  WifiOff
 } from 'lucide-react';
 
 interface SonarQubeTableProps {
@@ -32,6 +33,7 @@ export const SonarQubeTable: React.FC<SonarQubeTableProps> = ({
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [gateFilter, setGateFilter] = useState<string>('all');
+  const [unavailable, setUnavailable] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -45,17 +47,33 @@ export const SonarQubeTable: React.FC<SonarQubeTableProps> = ({
         });
 
         if (isMounted) {
+          setUnavailable(null);
           setProjects(data);
           // Pre-fetch metric history for each project
           const metricMap: Record<string, SonarMetricPoint[]> = {};
           for (const proj of data) {
-            const m = await registryApi.getSonarMetrics(proj.id);
-            metricMap[proj.id] = m;
+            try {
+              const m = await registryApi.getSonarMetrics(proj.id);
+              metricMap[proj.id] = m;
+            } catch {
+              metricMap[proj.id] = []; // per-project measures unavailable; keep project row
+            }
           }
           setMetrics(metricMap);
         }
       } catch (err) {
         console.error('Failed fetching SonarQube projects:', err);
+        if (isMounted) {
+          setProjects([]);
+          setMetrics({});
+          if (err instanceof GatewayUpstreamError) {
+            setUnavailable(err.upstream
+              ? `SonarQube is unreachable (upstream: ${err.upstream}). The vanadium host may be offline.`
+              : `SonarQube is unreachable. The CI gateway could not be reached.`);
+          } else {
+            setUnavailable('Failed to load SonarQube data.');
+          }
+        }
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -154,7 +172,20 @@ export const SonarQubeTable: React.FC<SonarQubeTableProps> = ({
           </thead>
 
           <tbody className="divide-y divide-[var(--border-color)]">
-            {isLoading ? (
+            {unavailable ? (
+              <tr>
+                <td colSpan={10} className="p-8">
+                  <div className="flex items-center gap-3 text-[var(--text-secondary)]">
+                    <WifiOff className="h-6 w-6 text-amber-400 flex-shrink-0" />
+                    <div>
+                      <div className="font-semibold text-amber-400">SonarQube unavailable</div>
+                      <div className="text-xs">{unavailable}</div>
+                      <div className="text-[11px] mt-1 opacity-70">Auto-refresh will retry. Runs fine on the laptop without vanadium.</div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            ) : isLoading ? (
               <tr>
                 <td colSpan={10} className="p-8 text-center text-[var(--text-secondary)]">
                   Loading code quality metrics...
