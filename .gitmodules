@@ -63,3 +63,7 @@
 [submodule "docs/attractor"]
 	path = docs/attractor
 	url = https://github.com/strongdm/attractor.git
+
+[submodule "docs/system prompts"]
+	path = docs/system prompts
+	url = https://github.com/asgeirtj/system_prompts_leaks.git

@@ -72,18 +72,18 @@ class LoginServiceE2ETest {
         // Mock Broker — validateUser via ServiceRequest
         when(broker.submit(any())).thenAnswer(invocation -> {
             ServiceRequest req = invocation.getArgument(0);
-            String alias = (String) req.getParams().get("alias");
+            String email = (String) req.getParams().get("email");
             String password = (String) req.getParams().get("identifier");
 
             @SuppressWarnings("rawtypes")
             ServiceResponse rawResp = new ServiceResponse();
             rawResp.setOk(true);
-            if (alias != null && !alias.isEmpty() && password != null && !password.isEmpty()) {
+            if (email != null && !email.isEmpty() && password != null && !password.isEmpty()) {
                 UserRegistrationDTO user = new UserRegistrationDTO();
                 user.setId("1");
-                if ("user2".equals(alias)) user.setId("2");
-                if ("user3".equals(alias)) user.setId("3");
-                user.setAlias(alias);
+                if ("user2".equals(email)) user.setId("2");
+                if ("user3".equals(email)) user.setId("3");
+                user.setAlias(email);
                 user.setAdmin(false);
                 rawResp.setData(user);
             } else {
