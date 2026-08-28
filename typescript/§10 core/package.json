@@ -7,7 +7,10 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "example:compile": "tsx example/usage.ts",
-    "example:adapter": "tsx example/adapter-example.ts"
+    "example:adapter": "tsx example/adapter-example.ts",
+    "test:replay": "tsx scripts/run-replay-conformance.ts",
+    "test:witnessed-run": "tsx scripts/run-witnessed-run-conformance.ts",
+    "test:doctrine-lookup": "tsx scripts/run-doctrine-lookup-conformance.ts"
   },
   "devDependencies": {
     "typescript": "^5.5.0",
