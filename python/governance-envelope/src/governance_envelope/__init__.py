@@ -9,6 +9,7 @@ The serialization rules mirror the ratified CCNF canonical serialization
 contract (`nexus/go/wrp/ccnf-ref/SERIALIZATION_CONTRACT.md`).
 """
 
+from .admission import AdmissionAssessment, AdmissionError, assess_candidate, envelope_from_candidate
 from .canonical import (
     canonical_json,
     canonicalize,
@@ -25,6 +26,10 @@ __all__ = [
     "FingerprintError",
     "ALLOWED_TOP_KEYS",
     "EXCLUDED_TOP_KEYS",
+    "AdmissionAssessment",
+    "AdmissionError",
+    "assess_candidate",
+    "envelope_from_candidate",
     "__version__",
 ]
 
