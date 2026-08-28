@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { System, Service } from '../../types';
 import { registryApi } from '../../lib/api';
 import {
@@ -32,9 +32,25 @@ export const SystemsTable: React.FC<SystemsTableProps> = ({
   const [systems, setSystems] = useState<System[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Update-in-place on refresh: a pure refresh (auto-refresh health check /
+  // manual refresh bumping refreshTrigger with NO change to the search query)
+  // keeps the existing rows visible and swaps in the fresh data when it
+  // arrives, so the table doesn't blank out on every poll. A search change and
+  // the initial mount still show the loading row because the data context
+  // genuinely changed.
+  const prevContext = useRef<string | null>(null);
+
   useEffect(() => {
     let isMounted = true;
-    setIsLoading(true);
+
+    // Distinguish a pure refresh (context unchanged — only refreshTrigger
+    // bumped) from a data-context change (initial mount / search change). On a
+    // pure refresh we update in place (no loading row, no table blank-out); on
+    // a context change we show the loading row.
+    const context = JSON.stringify([searchQuery]);
+    const isPureRefresh = prevContext.current === context;
+    prevContext.current = context;
+    if (!isPureRefresh) setIsLoading(true);
 
     const loadData = async () => {
       try {
