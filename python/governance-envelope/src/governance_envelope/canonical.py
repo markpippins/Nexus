@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import unicodedata
 from datetime import datetime, timezone
@@ -73,7 +74,7 @@ UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$"
 )
 
-DECIMAL_RE = re.compile(r"^-?(0|[1-9][0-9]*)(\.[0-9]+)?$")
+DECIMAL_RE = re.compile(r"^-?(0|[1-9]\d*)(\.\d+)?$")
 
 
 def norm_uuid(value: str) -> str:
@@ -162,7 +163,7 @@ def norm_number(value: Any) -> Any:
     if isinstance(value, int):
         return value
     if isinstance(value, float):
-        if value != value or value in (float("inf"), float("-inf")):
+        if math.isnan(value) or value in (float("inf"), float("-inf")):
             raise FingerprintError(f"NaN/Infinity not allowed: {value!r}")
         if value.is_integer():
             return int(value)
