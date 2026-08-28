@@ -1,12 +1,16 @@
 /**
  * Centralized REST API Client for Platform Operations Registry API
- * Targets /api/v1/registry/* endpoints with support for switching between
- * Live REST Backend mode and Client Mock mode.
  *
- * Live mode normalizes the real Nexus service-registry backend shapes into
+ * Live-only. All reads/writes target the real Nexus backend (proxied by the
+ * barbie express server via BACKEND_URL) and the Ballerina CI-gateway moat
+ * (Jenkins / SonarQube / Ballerina Central via /gateway). There is no mock
+ * fallback: a feature either returns real data or surfaces the backend error.
+ *
+ * Live normalization maps the real service-registry backend shapes into
  * barbie's front-end contracts (see DRIFT_REPORT.md). The backend serves:
  *   - systems / registration / aggregate / logs / metrics under /api/v1/registry/*
  *   - services / frameworks / deployments / servers / libraries / lookups flat under /api/v1/*
+ *   - Jenkins / SonarQube / Ballerina through the CI-gateway (/gateway/*)
  */
 
 import {
@@ -34,40 +38,14 @@ import {
   BallerinaService
 } from '../types';
 
-import {
-  mockServices,
-  mockServers,
-  mockDeployments,
-  mockSystems,
-  mockFrameworks,
-  mockLibraries,
-  mockLookups,
-  mockAggregateState,
-  mockJenkinsJobs,
-  mockJenkinsBuilds,
-  mockSonarProjects,
-  mockSonarMetrics,
-  mockBallerinaPackages,
-  mockBallerinaServices
-} from './mockData';
-
 // Storage keys
-const STORAGE_MODE_KEY = 'platform_api_mode';
 const STORAGE_URL_KEY = 'platform_api_base_url';
 
-// Server-injected bootstrap config (see injectConfig in server.ts).
-// When present it is AUTHORITATIVE: the express proxy knows a real
-// backend is in front of us, so stale localStorage cannot flip the UI
-// back into mock mode.
+// Server-injected bootstrap config (see injectConfig in server.ts). Present
+// only when a real backend is proxied. Live-only: apiMode is always 'live'.
 const SERVER_CONFIG = (typeof window !== 'undefined' && (window as any).__BARBIE_CONFIG__) ||
-  (undefined as { apiMode?: 'live' | 'mock' } | undefined);
+  (undefined as { terrainUrl?: string } | undefined);
 
-function storedMode(): 'live' | 'mock' | null {
-  const v = localStorage.getItem(STORAGE_MODE_KEY);
-  return v === 'live' || v === 'mock' ? v : null;
-}
-
-let currentMode: 'live' | 'mock' = SERVER_CONFIG?.apiMode ?? storedMode() ?? 'live';
 let currentBaseUrl: string = localStorage.getItem(STORAGE_URL_KEY) || '/api/v1/registry';
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
@@ -322,7 +300,7 @@ async function gatewayJson<T>(path: string): Promise<T> {
   return env.data;
 }
 
-function jenkinsColorToStatus(color: string | undefined): JenkinsJobStatus {
+function jenkinsColorToStatus(color: string | undefined): JenkinsJob['status'] {
   const c = (color ?? '').toLowerCase();
   if (c.includes('anime')) return 'building';
   if (c.startsWith('blue')) return 'success';
@@ -331,6 +309,15 @@ function jenkinsColorToStatus(color: string | undefined): JenkinsJobStatus {
   if (c.startsWith('aborted') || c.startsWith('disabled')) return 'aborted';
   if (c.startsWith('notbuilt') || c === '') return 'not_built';
   return 'not_built';
+}
+
+function jenkinsResultToStatus(result: string | undefined): JenkinsBuild['status'] {
+  const r = (result ?? '').toUpperCase();
+  if (r === 'SUCCESS') return 'success';
+  if (r === 'FAILURE' || r === 'ABORTED') return 'failure';
+  if (r === 'UNSTABLE') return 'unstable';
+  if (r === 'NOT_BUILT') return 'not_built';
+  return 'success';
 }
 
 // ── Registry / Broker-Gateway profiles (barbie-parity #13/#14) ──────
@@ -389,13 +376,7 @@ export async function testProfileConnection(
 }
 
 export const registryApi = {
-  // Mode & Configuration Controls
-  getApiMode: (): 'live' | 'mock' => currentMode,
-  setApiMode: (mode: 'live' | 'mock') => {
-    if (SERVER_CONFIG?.apiMode) return; // server-authoritative — ignore toggle
-    currentMode = mode;
-    localStorage.setItem(STORAGE_MODE_KEY, mode);
-  },
+  // Base URL config (live-only; no mock mode exists any longer)
   getApiBaseUrl: (): string => currentBaseUrl,
   setApiBaseUrl: (url: string) => {
     currentBaseUrl = url || '/api/v1/registry';
@@ -413,18 +394,6 @@ export const registryApi = {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
   }): Promise<PaginatedResponse<Service>> => {
-    if (currentMode === 'mock') {
-      let items = [...mockServices];
-      if (params?.search) {
-        const s = params.search.toLowerCase();
-        items = items.filter(x => x.name.toLowerCase().includes(s) || x.type.toLowerCase().includes(s));
-      }
-      return {
-        data: items,
-        meta: { page: 1, size: items.length, totalItems: items.length, totalPages: 1 }
-      };
-    }
-
     const query = new URLSearchParams();
     if (params?.page) query.append('page', String(params.page - 1)); // backend 0-indexed
     if (params?.size) query.append('per_page', String(params.size));
@@ -440,32 +409,16 @@ export const registryApi = {
   },
 
   getServicesWithHosted: async (size = 1000): Promise<PaginatedResponse<Service>> => {
-    if (currentMode === 'mock') {
-      return {
-        data: mockServices,
-        meta: { page: 1, size: mockServices.length, totalItems: mockServices.length, totalPages: 1 }
-      };
-    }
     const raw = await fetchJson<any>(`${currentBaseUrl}/services/with-hosted?size=${size}`);
     return normalizePaged(raw, mapService);
   },
 
   getServiceById: async (id: string): Promise<Service> => {
-    if (currentMode === 'mock') {
-      const found = mockServices.find(s => s.id === id) || mockServices[0];
-      return found;
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/services/${id}`);
     return mapService(raw);
   },
 
   getServiceDetails: async (serviceName: string): Promise<{ service: Service; deployments: Deployment[]; server?: Server }> => {
-    if (currentMode === 'mock') {
-      const svc = mockServices.find(s => s.name === serviceName) || mockServices[0];
-      const deps = mockDeployments.filter(d => d.serviceName === serviceName);
-      const srv = mockServers.find(s => s.id === svc.serverId);
-      return { service: svc, deployments: deps, server: srv };
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/services/${encodeURIComponent(serviceName)}/details`);
     return {
       service: raw.service ? mapService(raw.service) : mapService(raw),
@@ -475,9 +428,6 @@ export const registryApi = {
   },
 
   getServicesByOperation: async (operation: string): Promise<{ data: Service[]; operation: string }> => {
-    if (currentMode === 'mock') {
-      return { data: mockServices, operation };
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/services/by-operation/${encodeURIComponent(operation)}`);
     const items = Array.isArray(raw) ? raw : (Array.isArray(raw.data) ? raw.data : []);
     return { data: items.map(mapService), operation };
@@ -486,45 +436,11 @@ export const registryApi = {
   getServiceSubModules: async (id: string): Promise<Array<Record<string, unknown>>> => {
     // Parity with console manage-services node: browse declared sub-modules
     // of a service (backend route GET /api/v1/services/{id}/sub-modules).
-    if (currentMode === 'mock') {
-      const svc = mockServices.find(s => s.id === id);
-      return [
-        { name: `${svc?.name ?? 'mock'}-core`, version: svc?.version ?? '1.0.0', status: 'active' },
-        { name: `${svc?.name ?? 'mock'}-admin`, version: svc?.version ?? '1.0.0', status: 'active' }
-      ];
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/services/${id}/sub-modules`);
     return Array.isArray(raw) ? raw : (Array.isArray(raw.data) ? raw.data : []);
   },
 
   createService: async (data: Partial<Service>): Promise<Service> => {
-    if (currentMode === 'mock') {
-      const newSvc: Service = {
-        id: `svc-mock-${Date.now()}`,
-        name: data.name || 'new-mock-svc',
-        type: data.type || 'Microservice',
-        version: data.version || '1.0.0',
-        status: (data.status as HealthStatus) || 'healthy',
-        systemId: data.systemId || 'sys-mock-01',
-        systemName: data.systemName || 'Payments & Financial Core (Mock)',
-        endpoint: data.endpoint || 'https://mock.internal/v1',
-        environment: (data.environment as Environment) || 'production',
-        hostedServicesCount: 0,
-        hostedServices: [],
-        frameworkId: 'fw-01',
-        frameworkName: 'Node.js Express',
-        serverId: 'srv-mock-01',
-        serverHostname: 'mock-node-01',
-        lastHeartbeat: new Date().toISOString(),
-        uptimePercent: 100,
-        rps: 10,
-        errorRate: 0,
-        latencyMs: 12,
-        description: data.description || 'Mock created service'
-      };
-      mockServices.push(newSvc);
-      return newSvc;
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/services`, {
       method: 'POST',
       body: JSON.stringify(data)
@@ -533,14 +449,6 @@ export const registryApi = {
   },
 
   updateService: async (id: string, data: Partial<Service>): Promise<Service> => {
-    if (currentMode === 'mock') {
-      const index = mockServices.findIndex(s => s.id === id);
-      if (index !== -1) {
-        mockServices[index] = { ...mockServices[index], ...data };
-        return mockServices[index];
-      }
-      return mockServices[0];
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/services/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
@@ -549,11 +457,6 @@ export const registryApi = {
   },
 
   deleteService: async (id: string): Promise<{ message: string; service: Service }> => {
-    if (currentMode === 'mock') {
-      const idx = mockServices.findIndex(s => s.id === id);
-      const removed = idx !== -1 ? mockServices.splice(idx, 1)[0] : mockServices[0];
-      return { message: 'Mock deleted', service: removed };
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/services/${id}`, {
       method: 'DELETE'
     });
@@ -568,12 +471,6 @@ export const registryApi = {
     status?: string;
     environment?: string;
   }): Promise<PaginatedResponse<Server>> => {
-    if (currentMode === 'mock') {
-      return {
-        data: mockServers,
-        meta: { page: 1, size: mockServers.length, totalItems: mockServers.length, totalPages: 1 }
-      };
-    }
     const query = new URLSearchParams();
     if (params?.page) query.append('page', String(params.page - 1)); // backend 0-indexed
     if (params?.size) query.append('per_page', String(params.size));
@@ -586,26 +483,6 @@ export const registryApi = {
   },
 
   createServer: async (data: Partial<Server>): Promise<Server> => {
-    if (currentMode === 'mock') {
-      const srv: Server = {
-        id: `srv-mock-${Date.now()}`,
-        name: data.name || 'mock-server',
-        hostname: data.hostname || 'mock-node.internal',
-        ipAddress: data.ipAddress || '10.0.0.1',
-        serverType: data.serverType || 'c6i.2xlarge',
-        operatingSystem: 'Ubuntu 22.04 LTS',
-        datacenterRegion: 'us-east-1',
-        status: 'healthy',
-        cpuUsage: 20,
-        memoryUsage: 30,
-        diskUsage: 15,
-        activePodsCount: 5,
-        lastPing: new Date().toISOString(),
-        environment: 'production'
-      };
-      mockServers.push(srv);
-      return srv;
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/servers`, {
       method: 'POST',
       body: JSON.stringify(data)
@@ -614,11 +491,6 @@ export const registryApi = {
   },
 
   updateServer: async (id: string, data: Partial<Server>): Promise<Server> => {
-    if (currentMode === 'mock') {
-      const idx = mockServers.findIndex(s => s.id === id);
-      if (idx !== -1) mockServers[idx] = { ...mockServers[idx], ...data };
-      return mockServers[0];
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/servers/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
@@ -627,11 +499,6 @@ export const registryApi = {
   },
 
   deleteServer: async (id: string): Promise<{ message: string; server: Server }> => {
-    if (currentMode === 'mock') {
-      const idx = mockServers.findIndex(s => s.id === id);
-      const removed = idx !== -1 ? mockServers.splice(idx, 1)[0] : mockServers[0];
-      return { message: 'Mock server deleted', server: removed };
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/servers/${id}`, {
       method: 'DELETE'
     });
@@ -646,12 +513,6 @@ export const registryApi = {
     status?: string;
     environment?: string;
   }): Promise<PaginatedResponse<Deployment>> => {
-    if (currentMode === 'mock') {
-      return {
-        data: mockDeployments,
-        meta: { page: 1, size: mockDeployments.length, totalItems: mockDeployments.length, totalPages: 1 }
-      };
-    }
     const query = new URLSearchParams();
     if (params?.page) query.append('page', String(params.page - 1)); // backend 0-indexed
     if (params?.size) query.append('per_page', String(params.size));
@@ -664,24 +525,6 @@ export const registryApi = {
   },
 
   createDeployment: async (data: Partial<Deployment>): Promise<Deployment> => {
-    if (currentMode === 'mock') {
-      const dep: Deployment = {
-        id: `dep-mock-${Date.now()}`,
-        serviceId: data.serviceId || 'svc-mock-01',
-        serviceName: data.serviceName || 'mock-service',
-        version: data.version || '1.0.0',
-        clusterName: 'mock-k8s',
-        replicasReady: 3,
-        replicasTarget: 3,
-        commitHash: 'm0ck999',
-        deployedBy: 'Operator (Mock)',
-        deployedAt: new Date().toISOString(),
-        environment: 'production',
-        status: 'healthy'
-      };
-      mockDeployments.push(dep);
-      return dep;
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/deployments`, {
       method: 'POST',
       body: JSON.stringify(data)
@@ -690,11 +533,6 @@ export const registryApi = {
   },
 
   updateDeployment: async (id: string, data: Partial<Deployment>): Promise<Deployment> => {
-    if (currentMode === 'mock') {
-      const idx = mockDeployments.findIndex(d => d.id === id);
-      if (idx !== -1) mockDeployments[idx] = { ...mockDeployments[idx], ...data };
-      return mockDeployments[0];
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/deployments/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
@@ -703,11 +541,6 @@ export const registryApi = {
   },
 
   deleteDeployment: async (id: string): Promise<{ message: string; deployment: Deployment }> => {
-    if (currentMode === 'mock') {
-      const idx = mockDeployments.findIndex(d => d.id === id);
-      const removed = idx !== -1 ? mockDeployments.splice(idx, 1)[0] : mockDeployments[0];
-      return { message: 'Mock deployment deleted', deployment: removed };
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/deployments/${id}`, {
       method: 'DELETE'
     });
@@ -716,12 +549,6 @@ export const registryApi = {
 
   // --- FRAMEWORKS ---
   getFrameworks: async (params?: { page?: number; size?: number; search?: string }): Promise<PaginatedResponse<Framework>> => {
-    if (currentMode === 'mock') {
-      return {
-        data: mockFrameworks,
-        meta: { page: 1, size: mockFrameworks.length, totalItems: mockFrameworks.length, totalPages: 1 }
-      };
-    }
     const query = new URLSearchParams();
     if (params?.page) query.append('page', String(params.page - 1)); // backend 0-indexed
     if (params?.size) query.append('per_page', String(params.size));
@@ -732,18 +559,6 @@ export const registryApi = {
   },
 
   createFramework: async (data: Partial<Framework>): Promise<Framework> => {
-    if (currentMode === 'mock') {
-      const fw: Framework = {
-        id: `fw-m-${Date.now()}`,
-        name: data.name || 'Mock Framework',
-        category: data.category || 'Backend',
-        language: data.language || 'TypeScript',
-        version: data.version || '1.0.0',
-        servicesCount: 0
-      };
-      mockFrameworks.push(fw);
-      return fw;
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/frameworks`, {
       method: 'POST',
       body: JSON.stringify(data)
@@ -752,7 +567,6 @@ export const registryApi = {
   },
 
   updateFramework: async (id: string, data: Partial<Framework>): Promise<Framework> => {
-    if (currentMode === 'mock') return mockFrameworks[0];
     const raw = await fetchJson<any>(`${flatBaseUrl()}/frameworks/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
@@ -761,11 +575,6 @@ export const registryApi = {
   },
 
   deleteFramework: async (id: string): Promise<{ message: string; framework: Framework }> => {
-    if (currentMode === 'mock') {
-      const idx = mockFrameworks.findIndex(f => f.id === id);
-      const removed = idx !== -1 ? mockFrameworks.splice(idx, 1)[0] : mockFrameworks[0];
-      return { message: 'Mock framework deleted', framework: removed };
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/frameworks/${id}`, {
       method: 'DELETE'
     });
@@ -774,12 +583,6 @@ export const registryApi = {
 
   // --- LIBRARIES ---
   getLibraries: async (params?: { page?: number; size?: number; search?: string }): Promise<PaginatedResponse<Library>> => {
-    if (currentMode === 'mock') {
-      return {
-        data: mockLibraries,
-        meta: { page: 1, size: mockLibraries.length, totalItems: mockLibraries.length, totalPages: 1 }
-      };
-    }
     const query = new URLSearchParams();
     if (params?.page) query.append('page', String(params.page - 1)); // backend 0-indexed
     if (params?.size) query.append('per_page', String(params.size));
@@ -790,18 +593,6 @@ export const registryApi = {
   },
 
   createLibrary: async (data: Partial<Library>): Promise<Library> => {
-    if (currentMode === 'mock') {
-      const lib: Library = {
-        id: `lib-m-${Date.now()}`,
-        name: data.name || 'Mock Library',
-        category: data.category || 'Utility',
-        language: data.language || 'TypeScript',
-        version: data.version || '1.0.0',
-        vulnerabilitiesCount: 0
-      };
-      mockLibraries.push(lib);
-      return lib;
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/libraries`, {
       method: 'POST',
       body: JSON.stringify(data)
@@ -810,7 +601,6 @@ export const registryApi = {
   },
 
   updateLibrary: async (id: string, data: Partial<Library>): Promise<Library> => {
-    if (currentMode === 'mock') return mockLibraries[0];
     const raw = await fetchJson<any>(`${flatBaseUrl()}/libraries/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
@@ -819,11 +609,6 @@ export const registryApi = {
   },
 
   deleteLibrary: async (id: string): Promise<{ message: string; library: Library }> => {
-    if (currentMode === 'mock') {
-      const idx = mockLibraries.findIndex(l => l.id === id);
-      const removed = idx !== -1 ? mockLibraries.splice(idx, 1)[0] : mockLibraries[0];
-      return { message: 'Mock library deleted', library: removed };
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/libraries/${id}`, {
       method: 'DELETE'
     });
@@ -832,12 +617,6 @@ export const registryApi = {
 
   // --- SYSTEMS ---
   getSystems: async (params?: { page?: number; size?: number; search?: string }): Promise<PaginatedResponse<System>> => {
-    if (currentMode === 'mock') {
-      return {
-        data: mockSystems,
-        meta: { page: 1, size: mockSystems.length, totalItems: mockSystems.length, totalPages: 1 }
-      };
-    }
     const query = new URLSearchParams();
     if (params?.page) query.append('page', String(params.page - 1)); // backend 0-indexed
     if (params?.size) query.append('per_page', String(params.size));
@@ -849,21 +628,6 @@ export const registryApi = {
   },
 
   createSystem: async (data: Partial<System>): Promise<System> => {
-    if (currentMode === 'mock') {
-      const sys: System = {
-        id: `sys-mock-${Date.now()}`,
-        name: data.name || 'Mock System Domain',
-        description: data.description || 'Mock architecture domain',
-        owner: data.owner || 'DevOps',
-        tier: 'Tier 2 - Important',
-        environment: 'production',
-        status: 'healthy',
-        servicesCount: 0,
-        services: []
-      };
-      mockSystems.push(sys);
-      return sys;
-    }
     const raw = await fetchJson<any>(`${currentBaseUrl}/systems`, {
       method: 'POST',
       body: JSON.stringify(data)
@@ -872,7 +636,6 @@ export const registryApi = {
   },
 
   updateSystem: async (id: string, data: Partial<System>): Promise<System> => {
-    if (currentMode === 'mock') return mockSystems[0];
     const raw = await fetchJson<any>(`${currentBaseUrl}/systems/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
@@ -881,11 +644,6 @@ export const registryApi = {
   },
 
   deleteSystem: async (id: string): Promise<{ message: string; system: System }> => {
-    if (currentMode === 'mock') {
-      const idx = mockSystems.findIndex(s => s.id === id);
-      const removed = idx !== -1 ? mockSystems.splice(idx, 1)[0] : mockSystems[0];
-      return { message: 'Mock system deleted', system: removed };
-    }
     const raw = await fetchJson<any>(`${currentBaseUrl}/systems/${id}`, {
       method: 'DELETE'
     });
@@ -893,11 +651,6 @@ export const registryApi = {
   },
 
   linkServiceToSystem: async (systemName: string, serviceName: string): Promise<any> => {
-    if (currentMode === 'mock') {
-      const sys = mockSystems.find(s => s.name === systemName);
-      if (sys && !sys.services.includes(serviceName)) sys.services.push(serviceName);
-      return { message: 'Mock service linked to system' };
-    }
     return fetchJson(`${currentBaseUrl}/systems/${encodeURIComponent(systemName)}/services/${encodeURIComponent(serviceName)}`, {
       method: 'POST'
     });
@@ -905,13 +658,6 @@ export const registryApi = {
 
   // --- LOOKUP TABLES ---
   getLookupEntries: async (type: LookupType, params?: { page?: number; size?: number }): Promise<PaginatedResponse<LookupEntry>> => {
-    if (currentMode === 'mock') {
-      const list = mockLookups[type] || [];
-      return {
-        data: list,
-        meta: { page: 1, size: list.length, totalItems: list.length, totalPages: 1 }
-      };
-    }
     const query = new URLSearchParams();
     if (params?.page) query.append('page', String(params.page - 1)); // backend 0-indexed
     if (params?.size) query.append('per_page', String(params.size));
@@ -921,12 +667,6 @@ export const registryApi = {
   },
 
   createLookupEntry: async (type: LookupType, data: { key: string; name: string }): Promise<LookupEntry> => {
-    if (currentMode === 'mock') {
-      const entry: LookupEntry = { id: `lk-${Date.now()}`, lookupType: type, key: data.key, name: data.name };
-      if (!mockLookups[type]) mockLookups[type] = [];
-      mockLookups[type].push(entry);
-      return entry;
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/${type}`, {
       method: 'POST',
       body: JSON.stringify(data)
@@ -935,12 +675,6 @@ export const registryApi = {
   },
 
   deleteLookupEntry: async (type: LookupType, id: string): Promise<{ message: string }> => {
-    if (currentMode === 'mock') {
-      if (mockLookups[type]) {
-        mockLookups[type] = mockLookups[type].filter(x => x.id !== id);
-      }
-      return { message: 'Mock lookup deleted' };
-    }
     const raw = await fetchJson<any>(`${flatBaseUrl()}/${type}/${id}`, {
       method: 'DELETE'
     });
@@ -955,33 +689,6 @@ export const registryApi = {
     systemName?: string;
     environment?: string;
   }): Promise<{ message: string; service: Service }> => {
-    if (currentMode === 'mock') {
-      const svc: Service = {
-        id: `svc-reg-${Date.now()}`,
-        name: data.name,
-        type: 'Registered Microservice',
-        version: data.version || '1.0.0',
-        status: 'healthy',
-        systemId: 'sys-mock-01',
-        systemName: data.systemName || 'Payments & Financial Core (Mock)',
-        endpoint: data.endpoint || 'https://api.internal/v1',
-        environment: (data.environment as Environment) || 'production',
-        hostedServicesCount: 0,
-        hostedServices: [],
-        frameworkId: 'fw-01',
-        frameworkName: 'Node.js Express',
-        serverId: 'srv-mock-01',
-        serverHostname: 'mock-k8s-node-01',
-        lastHeartbeat: new Date().toISOString(),
-        uptimePercent: 100,
-        rps: 0,
-        errorRate: 0,
-        latencyMs: 10,
-        description: 'Mock registered service'
-      };
-      mockServices.push(svc);
-      return { message: 'Mock registered', service: svc };
-    }
     const raw = await fetchJson<any>(`${currentBaseUrl}/register`, {
       method: 'POST',
       body: JSON.stringify(data)
@@ -990,20 +697,12 @@ export const registryApi = {
   },
 
   sendHeartbeat: async (serviceName: string): Promise<{ message: string; timestamp: string; status: string }> => {
-    if (currentMode === 'mock') {
-      return { message: 'Mock heartbeat acknowledged', timestamp: new Date().toISOString(), status: 'healthy' };
-    }
     return fetchJson(`${currentBaseUrl}/heartbeat/${encodeURIComponent(serviceName)}`, {
       method: 'POST'
     });
   },
 
   deregisterServiceGraceful: async (serviceName: string): Promise<{ message: string; service: Service }> => {
-    if (currentMode === 'mock') {
-      const idx = mockServices.findIndex(s => s.name === serviceName);
-      const removed = idx !== -1 ? mockServices.splice(idx, 1)[0] : mockServices[0];
-      return { message: 'Mock deregistered', service: removed };
-    }
     const raw = await fetchJson<any>(`${currentBaseUrl}/deregister/${encodeURIComponent(serviceName)}/graceful`, {
       method: 'POST'
     });
@@ -1012,109 +711,34 @@ export const registryApi = {
 
   // --- AGGREGATE PLATFORM STATE ---
   getTerrainHealth: async (): Promise<TerrainHealthSummary> => {
-    if (currentMode === 'mock') {
-      return {
-        terrainUp: true,
-        loadedAt: new Date().toISOString(),
-        mcp: { total: 6, online: 6, offline: 0 },
-        services: { total: 40, online: 38, offline: 2 },
-        servers: { total: 3, online: 3, offline: 0 },
-        mcpItems: [
-          { id: 'm1', name: 'conduit-mcp', port: 3100, status: 'ON' },
-          { id: 'm2', name: 'nebula-mcp', port: 3102, status: 'ON' },
-          { id: 'm3', name: 'terrain-mcp', port: 3130, status: 'ON' }
-        ],
-        serviceItems: [
-          { id: 's1', name: 'assembly-srv', port: 3107, status: 'ON' },
-          { id: 's2', name: 'nebula-srv', port: 3101, status: 'ON' },
-          { id: 's3', name: 'cascade-srv', port: 3106, status: 'DEGRADED' },
-          { id: 's4', name: 'wind-srv', port: 3300, status: 'ON' }
-        ],
-        serverItems: [
-          { id: 'h1', hostname: 'titanium', ipAddress: '127.0.0.1', os: 'linux', status: 'ONLINE' },
-          { id: 'h2', hostname: 'vanadium', ipAddress: '192.168.1.209', os: 'linux', status: 'ONLINE' }
-        ]
-      };
-    }
     return _terrainHealth();
   },
 
   getServiceStatus: async (serviceName: string): Promise<Record<string, unknown>> => {
     // Real backend route (D-BP-1 verified): ServiceStatusController
     // GET /api/v1/status/{serviceName} — flat under /api/v1.
-    if (currentMode === 'mock') {
-      return { serviceName, status: 'healthy', lastHeartbeat: new Date().toISOString(), uptimeSeconds: 86400 };
-    }
     return fetchJson<Record<string, unknown>>(`${flatBaseUrl()}/status/${encodeURIComponent(serviceName)}`);
   },
 
   getPlatformAggregate: async (): Promise<PlatformAggregateState> => {
-    if (currentMode === 'mock') {
-      return {
-        ...mockAggregateState,
-        totalServices: mockServices.length,
-        totalServers: mockServers.length,
-        totalDeployments: mockDeployments.length
-      };
-    }
     const raw = await fetchJson<any>(`${currentBaseUrl}/aggregate`);
     return mapAggregate(raw);
   },
 
   // --- LOGS & METRICS ---
   getLogs: async (entityType: string, entityId: string): Promise<{ logs: LogEntry[] }> => {
-    if (currentMode === 'mock') {
-      return {
-        logs: [
-          { id: 'l1', timestamp: new Date().toISOString(), level: 'info', message: `[MOCK LOG] Service ${entityId} initialized cleanly.` },
-          { id: 'l2', timestamp: new Date(Date.now() - 5000).toISOString(), level: 'info', message: `[MOCK LOG] Database connection pool established.` },
-          { id: 'l3', timestamp: new Date(Date.now() - 15000).toISOString(), level: 'debug', message: `[MOCK LOG] Handling inbound heartbeat ACK.` }
-        ]
-      };
-    }
     return fetchJson(`${currentBaseUrl}/logs/${entityType}/${encodeURIComponent(entityId)}`);
   },
 
   getMetrics: async (entityType: string, entityId: string): Promise<{ metrics: MetricPoint[] }> => {
-    if (currentMode === 'mock') {
-      const now = Date.now();
-      return {
-        metrics: Array.from({ length: 10 }, (_, i) => {
-          const time = new Date(now - (9 - i) * 10000);
-          return {
-            timestamp: time.toISOString(),
-            timeLabel: time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-            cpu: Math.floor(Math.random() * 30 + 20),
-            memory: Math.floor(Math.random() * 20 + 50),
-            rps: Math.floor(Math.random() * 200 + 400),
-            latency: Math.floor(Math.random() * 10 + 15),
-            errorRate: 0.1
-          };
-        })
-      };
-    }
     return fetchJson(`${currentBaseUrl}/metrics/${entityType}/${encodeURIComponent(entityId)}`);
   },
-
-  
-
 
 // --- JENKINS CI/CD ---
   getJenkinsJobs: async (params?: {
     search?: string;
     status?: string;
   }): Promise<JenkinsJob[]> => {
-    if (currentMode === 'mock') {
-      let items = [...mockJenkinsJobs];
-      if (params?.search) {
-        const s = params.search.toLowerCase();
-        items = items.filter(j => j.name.toLowerCase().includes(s));
-      }
-      if (params?.status && params.status !== 'all') {
-        items = items.filter(j => j.status === params.status);
-      }
-      return items;
-    }
     const query = new URLSearchParams();
     if (params?.search) query.append('search', params.search);
     if (params?.status) query.append('status', params.status);
@@ -1143,12 +767,30 @@ export const registryApi = {
   },
 
   getJenkinsBuilds: async (jobId: string): Promise<JenkinsBuild[]> => {
-    if (currentMode === 'mock') {
-      return mockJenkinsBuilds[jobId] || [];
-    }
-    // Build history needs per-job depth the read-only gateway doesn't
-    // expose yet — return empty rather than erroring the table.
-    return [];
+    // Live build history from the ci-gateway moat (per-job Jenkins API).
+    const raw = await gatewayJson<{
+      builds?: Array<{
+        number?: number;
+        result?: string;
+        timestamp?: number;
+        duration?: number;
+        url?: string;
+        changeSet?: { items?: Array<{ commitId?: string }> };
+      }>;
+    }>(`/jenkins/jobs/${jobId}/builds`);
+    return (raw?.builds ?? []).map((b, i) => ({
+      id: `${jobId}-${b.number ?? i}`,
+      jobId,
+      jobName: decodeURIComponent(jobId),
+      buildNumber: b.number ?? 0,
+      status: jenkinsResultToStatus(b.result),
+      timestamp: b.timestamp ? new Date(b.timestamp).toISOString() : '',
+      duration: Math.round((b.duration ?? 0) / 1000), // ms → seconds
+      scmBranch: '',
+      commitHash: b.changeSet?.items?.[0]?.commitId ?? '',
+      triggeredBy: 'ci',
+      consoleUrl: b.url ? `${b.url}console` : '',
+    }));
   },
 
   // --- SONARQUBE CODE QUALITY ---
@@ -1156,17 +798,6 @@ export const registryApi = {
     search?: string;
     gate?: string;
   }): Promise<SonarProject[]> => {
-    if (currentMode === 'mock') {
-      let items = [...mockSonarProjects];
-      if (params?.search) {
-        const s = params.search.toLowerCase();
-        items = items.filter(p => p.name.toLowerCase().includes(s) || p.key.toLowerCase().includes(s));
-      }
-      if (params?.gate && params.gate !== 'all') {
-        items = items.filter(p => p.gate === params.gate);
-      }
-      return items;
-    }
     const query = new URLSearchParams();
     if (params?.search) query.append('search', params.search);
     if (params?.gate) query.append('gate', params.gate);
@@ -1200,52 +831,67 @@ export const registryApi = {
   },
 
   getSonarMetrics: async (projectId: string): Promise<SonarMetricPoint[]> => {
-    if (currentMode === 'mock') {
-      return mockSonarMetrics[projectId] || [];
-    }
-    // No metrics endpoint on the read-only gateway yet.
-    return [];
+    // Live coverage/quality measures per project via the ci-gateway moat.
+    const raw = await gatewayJson<{
+      measures?: Array<{ metric?: string; value?: string }>;
+    }>(`/sonar/measures?component=${encodeURIComponent(projectId)}`);
+
+    const get = (k: string): number => {
+      const m = (raw.measures ?? []).find((x) => x.metric === k);
+      return Number(m?.value ?? 0);
+    };
+    const rating = (k: string): SonarRating => {
+      const v = get(k);
+      const map: Record<number, SonarRating> = { 1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E' };
+      return map[Math.round(v)] ?? 'A';
+    };
+
+    return [{
+      id: `${projectId}-live`,
+      projectId,
+      projectKey: projectId,
+      timestamp: new Date().toISOString(),
+      coveragePercent: get('coverage'),
+      duplicationsPercent: get('duplicated_lines_density'),
+      reliabilityRating: rating('reliability_rating'),
+      securityRating: rating('security_rating'),
+      maintainabilityRating: rating('sqale_rating'),
+    }];
   },
 
   // --- BALLERINA INTEGRATION PLATFORM ---
   getBallerinaPackages: async (params?: {
     search?: string;
   }): Promise<BallerinaPackage[]> => {
-    if (currentMode === 'mock') {
-      let items = [...mockBallerinaPackages];
-      if (params?.search) {
-        const s = params.search.toLowerCase();
-        items = items.filter(p =>
-          p.name.toLowerCase().includes(s) ||
-          p.org.toLowerCase().includes(s) ||
-          `${p.org}/${p.name}`.toLowerCase().includes(s)
-        );
-      }
-      return items;
-    }
     const query = new URLSearchParams();
     if (params?.search) query.append('search', params.search);
-    return fetchJson<BallerinaPackage[]>(`${flatBaseUrl()}/ballerina/packages?${query.toString()}`);
+    // Live Ballerina Central search via the ci-gateway moat. The gateway
+    // returns the raw registry envelope { packages: [...] } under data.
+    const raw = await gatewayJson<{ packages?: any[] }>(`/ballerina/packages?${query.toString()}`);
+    // Map Central's registry shape → barbie's BallerinaPackage contract.
+    return (raw?.packages ?? []).map((p) => ({
+      id: String(p.id ?? `${p.organization}/${p.name}`),
+      org: p.organization ?? p.org ?? '',
+      name: p.name ?? '',
+      version: p.version ?? '',
+      platform: p.platform ?? p.ballerinaVersion ?? '',
+      license: Array.isArray(p.licenses) ? (p.licenses[0] ?? '') : (p.license ?? ''),
+      description: p.summary ?? p.description ?? '',
+      dependencies: Array.isArray(p.dependencies)
+        ? p.dependencies.map((d: any) => ({ org: d.organization ?? d.org, name: d.name, version: d.version }))
+        : [],
+      lastUpdated: p.createdDate ? new Date(p.createdDate).toISOString() : '',
+    }));
   },
 
   getBallerinaServices: async (params?: {
     search?: string;
     status?: string;
   }): Promise<BallerinaService[]> => {
-    if (currentMode === 'mock') {
-      let items = [...mockBallerinaServices];
-      if (params?.search) {
-        const s = params.search.toLowerCase();
-        items = items.filter(svc => svc.name.toLowerCase().includes(s) || svc.endpoint.toLowerCase().includes(s));
-      }
-      if (params?.status && params.status !== 'all') {
-        items = items.filter(svc => svc.status === params.status);
-      }
-      return items;
-    }
     const query = new URLSearchParams();
     if (params?.search) query.append('search', params.search);
     if (params?.status) query.append('status', params.status);
-    return fetchJson<BallerinaService[]>(`${flatBaseUrl()}/ballerina/services?${query.toString()}`);
+    // Live Ballerina runtime services via the ci-gateway moat.
+    return gatewayJson<BallerinaService[]>(`/ballerina/services?${query.toString()}`);
   }
 };

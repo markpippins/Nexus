@@ -13,14 +13,11 @@ import {
   X,
   Filter,
   ShieldCheck,
-  Cpu,
-  Radio,
   Rocket,
   Gauge,
   Workflow
 } from 'lucide-react';
 import { System } from '../types';
-import { registryApi } from '../lib/api';
 
 export type ActiveTab =
   | 'aggregate'
@@ -47,8 +44,6 @@ interface SidebarNavProps {
   onOpenRegisterModal: () => void;
   isMobileOpen: boolean;
   onCloseMobile: () => void;
-  apiMode?: 'live' | 'mock';
-  onApiModeChange?: (mode: 'live' | 'mock') => void;
 }
 
 export const SidebarNav: React.FC<SidebarNavProps> = ({
@@ -64,8 +59,6 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
   onOpenRegisterModal,
   isMobileOpen,
   onCloseMobile,
-  apiMode = registryApi.getApiMode(),
-  onApiModeChange
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -281,15 +274,9 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
           <div className="rounded-lg bg-[var(--bg-main)] p-2.5 border border-[var(--border-color)] text-[11px] space-y-1.5">
             <div className="flex items-center justify-between font-mono">
               <span className="text-[10px] uppercase font-bold text-[var(--text-secondary)]">Mode</span>
-              <button
-                onClick={() => onApiModeChange && onApiModeChange(apiMode === 'live' ? 'mock' : 'live')}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer hover:opacity-80 transition-opacity ${
-                  apiMode === 'live' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                }`}
-                title="Click to toggle REST Backend Mode"
-              >
-                {apiMode === 'live' ? 'LIVE API' : 'CLIENT MOCK'}
-              </button>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold text-emerald-400 bg-emerald-500/20 border border-emerald-500/30">
+                LIVE API
+              </span>
             </div>
             <div className="flex items-center justify-between text-[10px] text-[var(--text-secondary)] font-mono">
               <span>Services Online</span>
