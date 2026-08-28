@@ -165,8 +165,18 @@ const server = http.createServer(async (req, res) => {
                     const entryStats = await fs.lstat(entryPath);
                     const relPath = path.relative(FS_ROOT_DIR, entryPath);
                     let type: 'directory' | 'file' | 'symlink' = 'file';
-                    if (entryStats.isSymbolicLink()) type = 'symlink';
-                    else if (entryStats.isDirectory()) type = 'directory';
+                    if (entryStats.isSymbolicLink()) {
+                        // Resolve symlink: if it points to a directory, treat as directory
+                        // so FileTree can expand it. Dangling symlinks stay 'symlink'.
+                        try {
+                            const target = await fs.stat(entryPath);
+                            type = target.isDirectory() ? 'directory' : 'file';
+                        } catch {
+                            type = 'symlink'; // dangling symlink
+                        }
+                    } else if (entryStats.isDirectory()) {
+                        type = 'directory';
+                    }
                     entries.push({
                         name: entry,
                         path: relPath || entry,
@@ -288,8 +298,16 @@ const server = http.createServer(async (req, res) => {
                             // lstat (not stat) so dangling symlinks don't throw ENOENT.
                             const itemStats = await fs.lstat(itemPath);
                             let type: 'directory' | 'file' | 'symlink' = 'file';
-                            if (itemStats.isSymbolicLink()) type = 'symlink';
-                            else if (itemStats.isDirectory()) type = 'directory';
+                            if (itemStats.isSymbolicLink()) {
+                                try {
+                                    const target = await fs.stat(itemPath);
+                                    type = target.isDirectory() ? 'directory' : 'file';
+                                } catch {
+                                    type = 'symlink';
+                                }
+                            } else if (itemStats.isDirectory()) {
+                                type = 'directory';
+                            }
                             items.push({
                                 name: itemName,
                                 type,
