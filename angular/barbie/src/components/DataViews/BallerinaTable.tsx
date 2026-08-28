@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { BallerinaPackage, BallerinaService, HealthStatus } from '../../types';
-import { registryApi } from '../../lib/api';
+import { registryApi, GatewayUpstreamError } from '../../lib/api';
 import {
   Workflow,
   GitFork,
   Package,
   Server as ServerIcon,
-  ExternalLink
+  ExternalLink,
+  WifiOff
 } from 'lucide-react';
 
 interface BallerinaTableProps {
@@ -29,6 +30,7 @@ export const BallerinaTable: React.FC<BallerinaTableProps> = ({
   const [services, setServices] = useState<BallerinaService[]>([]);
   const [expandedPkg, setExpandedPkg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [unavailable, setUnavailable] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -36,16 +38,46 @@ export const BallerinaTable: React.FC<BallerinaTableProps> = ({
 
     const loadData = async () => {
       try {
-        const [pkgs, svcs] = await Promise.all([
+        // Packages come from Ballerina Central (internet) via the gateway moat;
+        // services come from the local runtime. Fetch independently so one being
+        // unreachable doesn't blank the other.
+        const [pkgsRes, svcsRes] = await Promise.allSettled([
           registryApi.getBallerinaPackages({ search: searchQuery }),
           registryApi.getBallerinaServices({ search: searchQuery })
         ]);
+
         if (isMounted) {
-          setPackages(pkgs);
-          setServices(svcs);
+          let unavailableMsg: string | null = null;
+
+          if (pkgsRes.status === 'fulfilled') {
+            setPackages(pkgsRes.value);
+          } else {
+            setPackages([]);
+            const e = pkgsRes.reason;
+            unavailableMsg = e instanceof GatewayUpstreamError
+              ? (e.upstream
+                  ? `Ballerina Central packages unreachable (upstream: ${e.upstream}). Internet or vanadium may be offline.`
+                  : 'Ballerina Central packages unreachable.')
+              : 'Failed to load Ballerina packages.';
+          }
+
+          if (svcsRes.status === 'fulfilled') {
+            setServices(svcsRes.value);
+          } else {
+            setServices([]);
+            const e = svcsRes.reason;
+            unavailableMsg = e instanceof GatewayUpstreamError
+              ? (e.upstream
+                  ? `Ballerina runtime services unreachable (upstream: ${e.upstream}).`
+                  : 'Ballerina runtime services unreachable.')
+              : 'Failed to load Ballerina services.';
+          }
+
+          setUnavailable(unavailableMsg);
         }
       } catch (err) {
         console.error('Failed fetching Ballerina registry:', err);
+        if (isMounted) setUnavailable('Failed to load Ballerina data.');
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -71,6 +103,18 @@ export const BallerinaTable: React.FC<BallerinaTableProps> = ({
           </span>
         </div>
       </div>
+
+      {/* Upstream-unavailable banner (laptop without vanadium / internet) */}
+      {!isLoading && unavailable && (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-[var(--text-secondary)]">
+          <WifiOff className="h-6 w-6 text-amber-400 flex-shrink-0" />
+          <div>
+            <div className="font-semibold text-amber-400">Ballerina data partially unavailable</div>
+            <div className="text-xs">{unavailable}</div>
+            <div className="text-[11px] mt-1 opacity-70">Auto-refresh will retry.</div>
+          </div>
+        </div>
+      )}
 
       {/* Deployed Services Section */}
       <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
