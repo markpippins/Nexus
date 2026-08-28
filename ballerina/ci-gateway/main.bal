@@ -228,8 +228,8 @@ service /gateway on new http:Listener(port, { host: bindHost }) {
                 id: "bal-svc-ci-gateway",
                 packageRef: "codex/ci_gateway",
                 name: "ci-gateway",
-                endpoint: "http://127.0.0.1:9095/gateway",
-                listenerPort: "9095",
+                endpoint: string `http://${bindHost}:${port}/gateway`,
+                listenerPort: port.toString(),
                 status: "healthy",
                 description: "Nexus CI moat — Jenkins/Sonar/GitHub/Ballerina-Central reads + drift sentinel"
             },
