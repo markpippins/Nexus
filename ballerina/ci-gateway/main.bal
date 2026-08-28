@@ -219,6 +219,9 @@ service /gateway on new http:Listener(port, { host: bindHost }) {
         };
     }
 
+    // The responding gateway is the only Ballerina HTTP service that can be
+    // established as live here. parity-runner is a one-shot CLI program, so
+    // listing it as a healthy service would report stale, fabricated state.
     // Ballerina runtime services — the moat layer itself is the live source.
     // Reports the actual Ballerina services running in the nexus integration
     // platform (ci-gateway + parity-runner) rather than fabricated rows.
