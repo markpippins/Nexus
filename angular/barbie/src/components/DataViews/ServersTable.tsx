@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Server, HealthStatus } from '../../types';
 import { registryApi } from '../../lib/api';
 import {
@@ -35,12 +35,28 @@ export const ServersTable: React.FC<ServersTableProps> = ({
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Update-in-place on refresh: a pure refresh (auto-refresh health check /
+  // manual refresh bumping refreshTrigger with NO change to page/size/filter/
+  // sort/search) keeps the existing rows visible and swaps in the fresh data
+  // when it arrives, so the table doesn't blank out on every poll. Context
+  // changes (page/size/filter/search) and the initial mount still show the
+  // loading row because the data context genuinely changed.
+  const prevContext = useRef<string | null>(null);
+
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [envFilter, setEnvFilter] = useState<string>('all');
 
   useEffect(() => {
     let isMounted = true;
-    setIsLoading(true);
+
+    // Distinguish a pure refresh (context unchanged — only refreshTrigger
+    // bumped) from a data-context change (initial mount / page/size/filter/
+    // search). On a pure refresh we update in place (no loading row, no table
+    // blank-out); on a context change we show the loading row.
+    const context = JSON.stringify([page, size, searchQuery, statusFilter, envFilter]);
+    const isPureRefresh = prevContext.current === context;
+    prevContext.current = context;
+    if (!isPureRefresh) setIsLoading(true);
 
     const loadData = async () => {
       try {
