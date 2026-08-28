@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from .domain import AdmissionPath, PebCapability, PebTransaction, PebStateHash, MalformedAdmissionRequest
+from .domain import AdmissionPath, PebAdmissionResult, PebCapability, PebTransaction, PebStateHash, MalformedAdmissionRequest
 from .engine import PebGovernanceEngine
 from .ports import PebStore
 
@@ -40,9 +40,20 @@ class AdmissionController:
         try:
             response = self.governance_engine.process_for_path(transaction, path)
         except MalformedAdmissionRequest as exc:
-            return ApiResult(422, {"message": f"Malformed admission request: {exc}"})
+            # Build a fail-closed result carrying envelope refs if present
+            result = PebAdmissionResult.from_transaction(
+                transaction, f"Malformed admission request: {exc}", admitted=False
+            )
+            return ApiResult(422, result.to_dict())
 
-        return ApiResult(200 if response.admitted else 422, response.to_dict())
+        # Build the envelope-aware result (W1.12: PebAdmissionResult).
+        # `admitted` is the endpoint-level outcome from the engine response,
+        # NOT the governance result — a REPORT_VIOLATION transaction has
+        # admission_result=REJECTED but admitted=True (violation recorded).
+        result = PebAdmissionResult.from_transaction(
+            transaction, response.message, admitted=response.admitted
+        )
+        return ApiResult(200 if result.admitted else 422, result.to_dict())
 
     def register_capability(self, payload: Mapping[str, Any] | None) -> ApiResult:
         """Register (grant) a capability in the PEB registry."""

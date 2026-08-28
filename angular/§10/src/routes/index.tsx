@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Search, RotateCcw, Plus, Filter, Sparkles } from "lucide-react";
+import { GovernanceDemo } from "@/components/runtime/GovernanceWorkbench";
 import { WidgetCard } from "@/components/WidgetCard";
 import { RelicTypesGrid } from "@/components/RelicTypesGrid";
 import { useCatalog } from "@/lib/storage";
@@ -132,6 +133,8 @@ function CatalogPage() {
           </dl>
         </div>
       </section>
+
+      <GovernanceDemo />
 
       {/* Relic Types / Archetypes Grid with shadow-glow hover effects */}
       <RelicTypesGrid

@@ -39,9 +39,43 @@ class ExpressionCompiler:
 
     # ── Node compiler ────────────────────────────────────────────
 
+    @staticmethod
+    def _coerce_literal(value: Any, return_type: Optional[str]) -> Any:
+        """Coerce a literal to its declared return type.
+
+        The schema stores literals as text (e.g. `'0'` with
+        `return_type='integer'`), so comparisons against typed attribute
+        values would otherwise fail with a TypeError. Coerce once at
+        compile time; unknown types pass through unchanged.
+        """
+        if value is None:
+            return None
+        rt = (return_type or "").lower()
+        if rt in ("integer", "int", "bigint", "smallint"):
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return value
+        if rt in ("numeric", "decimal", "double", "double precision", "float", "real"):
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return value
+        if rt == "boolean":
+            if isinstance(value, bool):
+                return value
+            if value in ("true", "True", "t", "1"):
+                return True
+            if value in ("false", "False", "f", "0"):
+                return False
+            return value
+        if rt in ("timestamp", "timestamptz", "date", "text", "varchar", "uuid", "jsonb"):
+            return value
+        return value
+
     def _compile_node(self, expr: Expression) -> Callable[..., Any]:
         if expr.kind == ExpressionKind.LITERAL:
-            val = expr.literal_value
+            val = self._coerce_literal(expr.literal_value, expr.return_type)
             return lambda _ctx: val
 
         if expr.kind == ExpressionKind.ATTRIBUTE_REF:

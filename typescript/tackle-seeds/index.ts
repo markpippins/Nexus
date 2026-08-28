@@ -2996,7 +2996,7 @@ BEGIN
         '- **tackle.roles row** — via the seed arrays (\`tackle-mcp/src/db.ts\` DEFAULT_ROLES, \`conduit-mcp/src/db.ts\` migration defaultRoles) or a migration; the live DB is canonical.\n'
         '- **Persona prompt** — \`tackle.prompts\` row (role, slug \`opencode-persona\`, version 1) in \`schemas/migrations/tackle/\` (pattern: \`sysadmin_persona_v1.sql\`); apply to the live DB.\n'
         '- **Harness agent file** — \`config/harnesses/opencode/agents/<role>.md\` (frontmatter: assumes_role, permissions; pattern: \`sysadmin.md\`).\n'
-        '- **Procedure cards** — add the role to the role lists of the relevant \`tackle.memory\` cards (tackle.role_memory assignments); then regenerate the seed: \`python3 bin/regenerate_memory_seed.py --verify\`.\n'
+        '- **Procedure cards** — add the role to the role lists of the relevant \`the canonical procedure-card table\` cards (the role assignment join table assignments); then regenerate the seed: \`python3 bin/regenerate_memory_seed.py --verify\`.\n'
         '- **Assembly alias** — \`assembly.users\` row with alias = role name (pattern: builder seed in \`assembly-migration.sql\`).\n'
         '- **nebula role CHECK** — new \`typescript/nebula-srv/migrations/0NN-allow-<role>.sql\` mirroring \`052-allow-sysadmin-dba-role.sql\`; apply + replicate to barium.\n'
         '- **Governance** — add to \`harness-srv/src/governance.ts\` KNOWN_EXECUTORS only if the role issues receipts.\n'
@@ -3192,7 +3192,7 @@ BEGIN
     ON CONFLICT (slug) DO NOTHING
     RETURNING id INTO v_memory_id;
     IF v_memory_id IS NOT NULL THEN
-        v_roles := ARRAY[]::TEXT[];
+        v_roles := ARRAY['analyst', 'architect', 'engineer', 'operator', 'reviewer'];
         FOREACH v_role IN ARRAY v_roles LOOP
             INSERT INTO ${SQL}.role_memory (memory_id, role, as_of_dt, expiration_dt)
             VALUES (v_memory_id, v_role, NOW(), NULL);

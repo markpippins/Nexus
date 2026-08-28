@@ -81,10 +81,48 @@ namespace org.nexus.peb {
   // DTOs
   // ========================================================================
 
-  /** Response from the admission controller */
+  /**
+   * Response from the admission controller.
+   *
+   * @deprecated Replaced by `PebAdmissionResult` (W1.12). Retained for
+   *   compatibility until all callers migrate to the envelope-aware
+   *   response. New code MUST use `PebAdmissionResult`.
+   */
+  #deprecated "Replaced by PebAdmissionResult (W1.12 — reconcile with governance envelope contract)"
   model AdmissionResponse {
     /** Human-readable outcome message */
     message: string;
+    /** Whether the request was admitted (true) or denied (false) */
+    admitted: boolean;
+  }
+
+  /**
+   * Envelope-aware admission result (W1.12).
+   *
+   * Carries the envelope identity + evaluation fingerprint alongside the
+   * PEB admission result, aligning with the W1.05 governance envelope
+   * contract. The `envelope_id` and `evaluation_fingerprint` reference the
+   * governance envelope that was evaluated — they are identity references,
+   * not authority (authority remains with PEB per W1.03).
+   */
+  model PebAdmissionResult {
+    /** PEB transaction UUID (same as PebTransaction.id) */
+    @format("uuid")
+    transaction_id: string;
+
+    /** Governance envelope identity (W1.05 contract reference) */
+    @format("uuid")
+    envelope_id?: string;
+
+    /** Evaluation fingerprint from the governance envelope (sha256:<hex>) */
+    evaluation_fingerprint?: string;
+
+    /** PEB admission result — ALLOWED / REJECTED / ROUTED */
+    admission_result: AdmissionResult;
+
+    /** Human-readable outcome message */
+    message: string;
+
     /** Whether the request was admitted (true) or denied (false) */
     admitted: boolean;
   }
@@ -98,6 +136,18 @@ namespace org.nexus.peb {
     /** Auto-generated UUID primary key */
     @format("uuid")
     id: string;
+
+    /** Governance envelope identity (W1.05 contract reference) */
+    @format("uuid")
+    envelope_id?: string;
+
+    /** Evaluation fingerprint from the governance envelope (sha256:<hex>) */
+    @maxLength(80)
+    evaluation_fingerprint?: string;
+
+    /** Contract digest from the governance envelope (sha256:<hex>) */
+    @maxLength(80)
+    contract_digest?: string;
 
     /** Caller-provided idempotency key for safe retry */
     @maxLength(128)
@@ -358,11 +408,27 @@ namespace org.nexus.peb {
   // Request Models (client-provided, subset of full entity)
   // ========================================================================
 
-  /** Request payload for the PEB MCP facade endpoint */
+  /**
+   * Request payload for the PEB MCP facade endpoint.
+   *
+   * W1.12: optionally carries governance envelope identity + evaluation
+   * fingerprint, referencing the W1.05 governance envelope that authorized
+   * this transaction. When present, PEB records the envelope reference on
+   * the persisted PebTransaction. When absent, the transaction proceeds
+   * without envelope linkage (backward-compatible).
+   */
   model PebTransactionRequest {
     /** Optional caller-supplied UUID; the Python domain assigns one when omitted */
     @format("uuid")
     id?: string;
+
+    /** Governance envelope identity (W1.05 contract reference) */
+    @format("uuid")
+    envelope_id?: string;
+
+    /** Evaluation fingerprint from the governance envelope (sha256:<hex>) */
+    @maxLength(80)
+    evaluation_fingerprint?: string;
 
     /** Caller-provided idempotency key for safe retry */
     @maxLength(128)

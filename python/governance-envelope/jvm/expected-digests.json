@@ -1,0 +1,91 @@
+{
+  "algorithm": {
+    "canonical_payload": "sha256 over canonical_json(full canonical envelope)",
+    "fingerprint": "sha256 over canonical_json(envelope minus fingerprint group)"
+  },
+  "purpose": "cross-runtime agreement targets: a JVM verifier must reproduce evaluation_fingerprint over its own canonical serialization of the envelope minus the fingerprint group, and canonical_payload_sha256 over the W1.04 canonical form (compact sorted-key JSON, no trailing newline). See docs/governance-envelope-serialization.md.",
+  "spec_item": "W1.09",
+  "vectors": [
+    {
+      "attempt_index": 0,
+      "canonical_payload_sha256": "sha256:a308f9c95e7857359b7aa996f06741818170f69d03eca4e036e90414ace245da",
+      "disposition": "allow",
+      "envelope_id": "3b7e8f2a-1c4d-4e5f-9a0b-c6d7e8f9a0b1",
+      "evaluation_fingerprint": "sha256:0ee3e8e9c5ec798205d86fd2a3ba4697ba96321cd9443d24d3ee254f45336ac0",
+      "fixture": "F01_allow_with_receipt",
+      "refusal_code": null
+    },
+    {
+      "attempt_index": 0,
+      "canonical_payload_sha256": "sha256:cada8b4f284cc62c32ef235fffd9ed7381c1dfcbbd9995614a5a17257b1d152b",
+      "disposition": "reject",
+      "envelope_id": "9a9a9a9a-0000-4000-8000-000000000002",
+      "evaluation_fingerprint": "sha256:1896a1489528b5af629a0e93e2ec5ed85795d46d81038f22f6dec84be3962624",
+      "fixture": "F02_reject_plain",
+      "refusal_code": null
+    },
+    {
+      "attempt_index": 0,
+      "canonical_payload_sha256": "sha256:582224e5bbb6c699ec6e7c72329c2ec192b6bdf620710a2f3baca6fb6c981e83",
+      "disposition": "refuse",
+      "envelope_id": "f2c3d4e5-6a7b-4c8d-9e0f-a1b2c3d4e5f6",
+      "evaluation_fingerprint": "sha256:836026933392f8bfc055e6e31f3d455010281a60351540317794e1ae8e551fd4",
+      "fixture": "F03_refuse_unknown_context",
+      "refusal_code": "unknown_context"
+    },
+    {
+      "attempt_index": 0,
+      "canonical_payload_sha256": "sha256:07e64e1289c8067adc518d2316e0f5cc574e35ee0c15fc4c9ea1de28be24212e",
+      "disposition": "refuse",
+      "envelope_id": "cccccccc-4444-4699-8ddd-000000000004",
+      "evaluation_fingerprint": "sha256:f8366f4d7de2f744c91c844d6dd057ddc828aedf3675faab15aa09f94938ebed",
+      "fixture": "F04_stale_doctrine",
+      "refusal_code": "stale_doctrine"
+    },
+    {
+      "attempt_index": 0,
+      "canonical_payload_sha256": "sha256:b7f665f5efdb1d7c408d2436a4990fa88c0455a975ca91ba6e52e465bf8de672",
+      "disposition": "allow",
+      "envelope_id": "cccccccc-4444-4699-8ddd-000000000005",
+      "evaluation_fingerprint": "sha256:6d85b1ed15aa4c34baf0fe542e52c1833ef79a507f80d43e1cf50eab4f6d13c0",
+      "fixture": "F05_contract_digest_drift",
+      "refusal_code": null
+    },
+    {
+      "attempt_index": 0,
+      "canonical_payload_sha256": "sha256:da6dc2daf468174204c20e2d45f03c91d9b286ca9cbf9a721a9aecac2d518722",
+      "disposition": "allow",
+      "envelope_id": "3b7e8f2a-1c4d-4e5f-9a0b-c6d7e8f9a0b1",
+      "evaluation_fingerprint": "sha256:9eaba4fab7739d0f93692d12e4819ad57f42dfb2b781a79676bf9efb07a58d55",
+      "fixture": "F06_duplicate_retry",
+      "refusal_code": null
+    },
+    {
+      "attempt_index": 1,
+      "canonical_payload_sha256": "sha256:da6dc2daf468174204c20e2d45f03c91d9b286ca9cbf9a721a9aecac2d518722",
+      "disposition": "allow",
+      "envelope_id": "3b7e8f2a-1c4d-4e5f-9a0b-c6d7e8f9a0b1",
+      "evaluation_fingerprint": "sha256:9eaba4fab7739d0f93692d12e4819ad57f42dfb2b781a79676bf9efb07a58d55",
+      "fixture": "F06_duplicate_retry",
+      "refusal_code": null
+    },
+    {
+      "attempt_index": 0,
+      "canonical_payload_sha256": "sha256:84d43ec54b75b0d5a8a42ef831d69b676a774278e320d572f586a6991930b0a3",
+      "disposition": "allow",
+      "envelope_id": "dddddddd-5555-4999-8ddd-000000000007",
+      "evaluation_fingerprint": "sha256:38a6ad17e09461470b711e306320cbd528c1f8153971484989f42d5e45523fe8",
+      "fixture": "F07_doctrine_change_mid_workflow",
+      "refusal_code": null
+    },
+    {
+      "attempt_index": 1,
+      "canonical_payload_sha256": "sha256:406f5dcac3e5d1770faeb5817b266685fc95a59c1fc7e299b2e1c52a78d920e7",
+      "disposition": "refuse",
+      "envelope_id": "dddddddd-5555-4999-8ddd-000000000008",
+      "evaluation_fingerprint": "sha256:bc3672c407a5f1a8cf2096f877351339453ab683aa85553011d77e734e0c6d94",
+      "fixture": "F07_doctrine_change_mid_workflow",
+      "refusal_code": "stale_doctrine"
+    }
+  ]
+}

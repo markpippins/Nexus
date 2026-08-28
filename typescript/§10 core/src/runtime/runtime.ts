@@ -1,4 +1,5 @@
-import { ViewSpec, ViewSpecAction } from "../types/viewSpec";
+import { ViewSpec, ViewSpecAction, validateViewSpec } from "../types/viewSpec";
+import { runtimeModeState } from "./modes";
 import { AdapterRuntime } from "../adapter/runtime";
 import { WidgetRegistry } from "./widgetRegistry";
 import { SimpleEventBus } from "./eventBus";
@@ -24,8 +25,9 @@ export class ViewSpecRuntime {
     this.widgetRegistry = new WidgetRegistry();
     this.adapterRuntime = new AdapterRuntime();
     this.options = {
-      useFixtures: true,
-      refreshInterval: 30000,
+      mode: options.mode ?? (options.useFixtures === false ? "live-read" : "fixture"),
+      useFixtures: options.useFixtures ?? true,
+      refreshInterval: options.refreshInterval ?? 30000,
       actionHandlers: options.actionHandlers,
       navigation: options.navigation,
     };
@@ -33,7 +35,11 @@ export class ViewSpecRuntime {
   }
 
   mount(spec: ViewSpec, container: HTMLElement): RuntimeView {
+    if (!validateViewSpec(spec)) {
+      throw new Error("Invalid or unversioned ViewSpec artifact");
+    }
     const view = this.initializeView(spec, container);
+    view.container.dataset.runtimeMode = runtimeModeState(view.mode ?? "fixture").label;
     this.buildLayout(view);
     this.instantiateWidgets(view);
     this.runAdapters(view);
@@ -50,6 +56,7 @@ export class ViewSpecRuntime {
 
     return {
       spec,
+      mode: this.options.mode,
       widgets: new Map(),
       adapters: new Map(),
       layout: {
@@ -263,8 +270,8 @@ export class ViewSpecRuntime {
           payload: customEvent.detail.payload || {},
           timestamp: Date.now(),
         };
-        // Emit would be wired up through the event bus
-        void runtimeEvent;
+        const runtimeView = Array.from(this.activeViews.values()).find((candidate) => candidate.widgets.get(widget.id) === widget);
+        runtimeView?.eventBus.emit(runtimeEvent);
       }
     };
 
@@ -284,6 +291,7 @@ export class ViewSpecRuntime {
   private async executeAction(action: ViewSpecAction, view: RuntimeView): Promise<void> {
     switch (action.type) {
       case "navigate":
+        if (!action.target) throw new Error("Navigation target is required");
         console.log(`Navigating to: ${action.target}`);
         view.eventBus.emit({
           type: "navigation",
@@ -296,6 +304,7 @@ export class ViewSpecRuntime {
         const widget = Array.from(view.widgets.values()).find(
           (w) => w.id === action.widgetId,
         );
+        if (!widget) throw new Error(`Widget not found: ${action.widgetId}`);
         if (widget) {
           widget.props.selected = true;
           this.updateWidget(widget, view);

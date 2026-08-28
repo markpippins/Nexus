@@ -39,7 +39,8 @@ class UserRegistrationServiceTest {
 
     @Test
     void testLoginSuccess() {
-        when(userRepository.findByAlias("testUser")).thenReturn(Optional.of(validUser));
+        // Service calls findByEmail() with the first arg, not findByAlias()
+        when(userRepository.findByEmail("testUser")).thenReturn(Optional.of(validUser));
 
         UserRegistrationDTO result = userAccessService.validateUser("testUser", "testpass");
 
@@ -50,7 +51,7 @@ class UserRegistrationServiceTest {
 
     @Test
     void testLoginFailureUserNotFound() {
-        when(userRepository.findByAlias("nonexistent")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("nonexistent")).thenReturn(Optional.empty());
 
         UserRegistrationDTO result = userAccessService.validateUser("nonexistent", "password123");
 

@@ -29,7 +29,13 @@ def payload(tool="peb_validate_transition", input_payload=None):
 def test_valid_transaction_returns_contract_response():
     result = controller().submit_transaction(payload())
     assert result.status_code == 200
-    assert result.body == {"message": "Validation processed", "admitted": True}
+    # W1.12: response is now PebAdmissionResult (envelope-aware)
+    assert result.body["message"] == "Validation processed"
+    assert result.body["admitted"] is True
+    assert result.body["admission_result"] == "ALLOWED"
+    assert "transaction_id" in result.body
+    assert "envelope_id" in result.body
+    assert "evaluation_fingerprint" in result.body
 
 
 def test_missing_persistence_fields_returns_400():
@@ -57,6 +63,29 @@ def test_malformed_violation_returns_422_and_no_partial_write():
     assert result.status_code == 422
     assert "violation_type" in result.body["message"]
     assert store.transactions == []
+
+
+def test_envelope_refs_are_carried_through_to_response():
+    """W1.12: when a request carries envelope_id + evaluation_fingerprint,
+    the PebAdmissionResult response must carry them through."""
+    env_id = "11111111-2222-4333-8444-555555555555"
+    fp = "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+    body = payload()
+    body["envelope_id"] = env_id
+    body["evaluation_fingerprint"] = fp
+    result = controller().submit_transaction(body)
+    assert result.status_code == 200
+    assert result.body["envelope_id"] == env_id
+    assert result.body["evaluation_fingerprint"] == fp
+    assert result.body["admitted"] is True
+
+
+def test_envelope_refs_absent_when_not_provided():
+    """W1.12: when no envelope refs are provided, the response carries null."""
+    result = controller().submit_transaction(payload())
+    assert result.status_code == 200
+    assert result.body["envelope_id"] is None
+    assert result.body["evaluation_fingerprint"] is None
 
 
 # ── GET /api/v1/peb/state/hash ──────────────────────────────────────────

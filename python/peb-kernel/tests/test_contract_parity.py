@@ -104,10 +104,14 @@ def test_typespec_admission_response_wire_shape_is_shared() -> None:
 
 
 def test_typespec_admission_response_json_body_has_both_fields() -> None:
-    """The TypeSpec AdmissionResponse model requires {message, admitted}.
+    """The TypeSpec PebAdmissionResult model requires {transaction_id,
+    envelope_id, evaluation_fingerprint, admission_result, message, admitted}.
     The JVM returns plain text (ResponseEntity<String>); Python returns
     JSON matching the contract. This test pins the Python side to the
     TypeSpec so a regression to plain-text is caught immediately.
+
+    W1.12: the response shape is now PebAdmissionResult (envelope-aware),
+    superseding the legacy AdmissionResponse {message, admitted}.
     """
     from peb_kernel.api import AdmissionController
 
@@ -116,14 +120,21 @@ def test_typespec_admission_response_json_body_has_both_fields() -> None:
         {"idempotencyKey": "json-test", "entityId": "e", "toolName": "peb_validate_transition", "input": {}}
     )
     assert result.status_code == 200
-    assert set(result.body.keys()) == {"message", "admitted"}
+    # W1.12: PebAdmissionResult shape (supersedes AdmissionResponse)
+    expected_keys = {
+        "transaction_id", "envelope_id", "evaluation_fingerprint",
+        "admission_result", "message", "admitted",
+    }
+    assert set(result.body.keys()) == expected_keys, f"unexpected keys: {set(result.body.keys())}"
     assert isinstance(result.body["message"], str)
     assert isinstance(result.body["admitted"], bool)
     assert result.body["admitted"] is True
+    assert result.body["admission_result"] == "ALLOWED"
 
 
 def test_typespec_admission_response_denied_body_has_both_fields() -> None:
-    """Denied responses must also be JSON with both fields, not plain text."""
+    """Denied responses must also be JSON with the PebAdmissionResult shape,
+    not plain text. W1.12: the response carries envelope refs + admission_result."""
     from peb_kernel.api import AdmissionController
 
     controller = AdmissionController(PebGovernanceEngine(InMemoryPebStore()))
@@ -131,8 +142,13 @@ def test_typespec_admission_response_denied_body_has_both_fields() -> None:
         {"idempotencyKey": "json-deny", "entityId": "e", "toolName": "unknown_tool", "input": {}}
     )
     assert result.status_code == 422
-    assert set(result.body.keys()) == {"message", "admitted"}
+    expected_keys = {
+        "transaction_id", "envelope_id", "evaluation_fingerprint",
+        "admission_result", "message", "admitted",
+    }
+    assert set(result.body.keys()) == expected_keys, f"unexpected keys: {set(result.body.keys())}"
     assert result.body["admitted"] is False
+    assert result.body["admission_result"] == "REJECTED"
 
 
 def test_typespec_health_response_matches_peb_health_response_model() -> None:
