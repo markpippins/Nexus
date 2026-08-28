@@ -1,0 +1,252 @@
+{
+  "fixture_id": "F07_doctrine_change_mid_workflow",
+  "spec_item": "W1.09",
+  "description": "Two decision points of wf-0007: attempt 1 (14:41Z) replays_ok under its own snapshot even though its cited posture was superseded later at 18:00Z; attempt 2 (next day 09:00Z) cites the dead doctrine and receives stale_doctrine. Proves envelopes are independent replay authorities and mid-workflow doctrine change is an intentional drift signal.",
+  "law_registry": {
+    "propositions": [
+      {
+        "entity_key": "11111111-2222-4333-8444-555555555555",
+        "effective_from": "2026-08-20T00:00:00.000000",
+        "version": 1
+      },
+      {
+        "entity_key": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        "effective_from": "2026-08-20T00:00:00.000000",
+        "version": 1
+      }
+    ],
+    "postures": [
+      {
+        "entity_key": "pppppppp-2222-4333-8444-555555555555",
+        "effective_from": "2026-08-20T00:00:00.000000",
+        "superseded_at": "2026-08-26T18:00:00.000000",
+        "note": "live for all V1-golden as-of times; stale after 18:00Z",
+        "version": 1
+      },
+      {
+        "entity_key": "qqqqqqqq-2222-4333-8444-555555555555",
+        "effective_from": "2026-08-26T12:00:00.000000",
+        "version": 2
+      }
+    ],
+    "doctrines": [
+      {
+        "entity_key": "dddddddd-1111-4222-8333-444444444444",
+        "effective_from": "2026-08-20T00:00:00.000000",
+        "version": 1
+      },
+      {
+        "entity_key": "99999999-0000-4aaa-bbbb-00000000dead",
+        "effective_from": "2026-08-20T00:00:00.000000",
+        "superseded_at": "2026-08-26T18:00:00.000000",
+        "version": 1,
+        "note": "expires before attempt 2's evaluated_at"
+      }
+    ]
+  },
+  "contract_registry": [
+    {
+      "contract_id": "b3a0c1d2-e4f5-4a6b-8c7d-9e0f1a2b3c4d",
+      "version": 3,
+      "digest": "sha256:abababababababababababababababababababababababababababababababab"
+    }
+  ],
+  "retry_after_admission": false,
+  "attempts": [
+    {
+      "envelope": {
+        "envelope_version": 1,
+        "envelope_id": "dddddddd-5555-4999-8ddd-000000000007",
+        "created_at": "2026-08-26T06:41:44.868Z",
+        "contract": {
+          "contract_id": "b3a0c1d2-e4f5-4a6b-8c7d-9e0f1a2b3c4d",
+          "contract_version": 3,
+          "contract_digest": "sha256:abababababababababababababababababababababababababababababababab",
+          "projection_id": "p-001",
+          "projection_version": 2,
+          "projection_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+          "operation": "admit_execution",
+          "transition": "REQUESTED->EXECUTING"
+        },
+        "semantic": {
+          "@context": "HTTPS://NEXUS.LOCAL/CONTEXT/GOVERNANCE/V1",
+          "subject_id": "subj-2026-08-26-0001",
+          "subject_type": "work_request",
+          "subject_ref": "https://nexus.local/wrp/work-requests/0007"
+        },
+        "workflow": {
+          "workflow_id": "wf-0007",
+          "workflow_version": 1,
+          "node_id": "node-admission",
+          "work_request_id": "wr-0007",
+          "work_request_version": 2
+        },
+        "law": {
+          "proposition_ids": [
+            "11111111-2222-4333-8444-555555555555",
+            "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+          ],
+          "frame_values": [
+            {
+              "frame": "execution_backend",
+              "value": "interactive"
+            },
+            {
+              "frame": "environment",
+              "value": "production"
+            }
+          ],
+          "doctrine_ids": [
+            "dddddddd-1111-4222-8333-444444444444"
+          ],
+          "posture_ids": [
+            "pppppppp-2222-4333-8444-555555555555"
+          ]
+        },
+        "execution": {
+          "lease_id": "llllllll-3333-4444-8555-666666666666",
+          "grant_id": "gggggggg-4444-4555-8666-777777777777",
+          "attempt_id": "aaaaaaaa-5555-4666-8777-888888888888"
+        },
+        "inputs": {
+          "input_snapshot_id": "11111111-2222-4333-8444-555555555555",
+          "input_captured_at": "2026-08-26T14:41:20.123456Z",
+          "input_fingerprint": "sha256:efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef"
+        },
+        "evaluation": {
+          "assertion_results": [
+            {
+              "proposition_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+              "result": true
+            },
+            {
+              "proposition_id": "11111111-2222-4333-8444-555555555555",
+              "result": true
+            }
+          ],
+          "disposition": "allow",
+          "unknowns": [],
+          "refusal_code": null,
+          "evaluated_at": "2026-08-26T14:41:25.000000Z"
+        },
+        "evidence": {
+          "evidence_ids": [
+            "eeeeeeee-6666-4777-8888-999999999999"
+          ],
+          "evidence_fingerprint": "sha256:0101010101010101010101010101010101010101010101010101010101010101"
+        },
+        "fingerprint": {
+          "evaluation_fingerprint": "sha256:38a6ad17e09461470b711e306320cbd528c1f8153971484989f42d5e45523fe8",
+          "fingerprint_algorithm": "sha256",
+          "fingerprint_version": 1
+        }
+      }
+    },
+    {
+      "envelope": {
+        "envelope_version": 1,
+        "envelope_id": "dddddddd-5555-4999-8ddd-000000000008",
+        "created_at": "2026-08-26T06:41:44.868Z",
+        "contract": {
+          "contract_id": "b3a0c1d2-e4f5-4a6b-8c7d-9e0f1a2b3c4d",
+          "contract_version": 3,
+          "contract_digest": "sha256:abababababababababababababababababababababababababababababababab",
+          "projection_id": "p-001",
+          "projection_version": 2,
+          "projection_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+          "operation": "admit_execution",
+          "transition": "REQUESTED->EXECUTING"
+        },
+        "semantic": {
+          "@context": "HTTPS://NEXUS.LOCAL/CONTEXT/GOVERNANCE/V1",
+          "subject_id": "subj-2026-08-26-0001",
+          "subject_type": "work_request",
+          "subject_ref": "https://nexus.local/wrp/work-requests/0007"
+        },
+        "workflow": {
+          "workflow_id": "wf-0007",
+          "workflow_version": 1,
+          "node_id": "node-execution",
+          "work_request_id": "wr-0007",
+          "work_request_version": 2
+        },
+        "law": {
+          "proposition_ids": [
+            "11111111-2222-4333-8444-555555555555",
+            "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+          ],
+          "frame_values": [
+            {
+              "frame": "execution_backend",
+              "value": "interactive"
+            },
+            {
+              "frame": "environment",
+              "value": "production"
+            }
+          ],
+          "doctrine_ids": [
+            "99999999-0000-4aaa-bbbb-00000000dead"
+          ],
+          "posture_ids": [
+            "pppppppp-2222-4333-8444-555555555555"
+          ]
+        },
+        "execution": {
+          "lease_id": "llllllll-3333-4444-8555-666666666666",
+          "grant_id": "gggggggg-4444-4555-8666-777777777777",
+          "attempt_id": "aaaaaaaa-5555-4666-8777-888888888888"
+        },
+        "inputs": {
+          "input_snapshot_id": "11111111-2222-4333-8444-555555555555",
+          "input_captured_at": "2026-08-26T14:41:20.123456Z",
+          "input_fingerprint": "sha256:efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef"
+        },
+        "evaluation": {
+          "assertion_results": [
+            {
+              "proposition_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+              "result": true
+            },
+            {
+              "proposition_id": "11111111-2222-4333-8444-555555555555",
+              "result": true
+            }
+          ],
+          "disposition": "refuse",
+          "unknowns": [],
+          "refusal_code": "stale_doctrine",
+          "evaluated_at": "2026-08-27T09:00:00.000000Z"
+        },
+        "evidence": {
+          "evidence_ids": [
+            "eeeeeeee-6666-4777-8888-999999999999"
+          ],
+          "evidence_fingerprint": "sha256:0101010101010101010101010101010101010101010101010101010101010101"
+        },
+        "fingerprint": {
+          "evaluation_fingerprint": "sha256:bc3672c407a5f1a8cf2096f877351339453ab683aa85553011d77e734e0c6d94",
+          "fingerprint_algorithm": "sha256",
+          "fingerprint_version": 1
+        }
+      }
+    }
+  ],
+  "expected_outcomes": [
+    {
+      "disposition": "allow",
+      "evaluation_fingerprint": "sha256:38a6ad17e09461470b711e306320cbd528c1f8153971484989f42d5e45523fe8",
+      "refusal_code": null,
+      "receipt": null,
+      "replay_verdict": "replay_ok"
+    },
+    {
+      "disposition": "refuse",
+      "evaluation_fingerprint": "sha256:bc3672c407a5f1a8cf2096f877351339453ab683aa85553011d77e734e0c6d94",
+      "refusal_code": "stale_doctrine",
+      "receipt": null,
+      "replay_verdict": "stale_doctrine",
+      "drift_category": "doctrine"
+    }
+  ]
+}

@@ -1,10 +1,15 @@
 import { PayloadSource } from "../types/viewSpec";
 import { Adapter, TransformStep } from "./types";
+import { FetchGovernedSourceClient, assertGovernedSource } from "./governed";
 
 export class AdapterRuntime {
   private registry = new Map<string, Adapter>();
+  private readonly governedSourceClient = new FetchGovernedSourceClient();
 
   register(adapter: Adapter): void {
+    if (!adapter.id || !adapter.source || !Array.isArray(adapter.steps)) {
+      throw new Error("Invalid adapter definition");
+    }
     this.registry.set(adapter.id, adapter);
   }
 
@@ -29,16 +34,26 @@ export class AdapterRuntime {
 
   private async fetchSource(source: PayloadSource, input?: any): Promise<any> {
     switch (source.type) {
+      case "server": {
+        assertGovernedSource(source);
+        const projection = await this.governedSourceClient.fetchProjection(source, undefined);
+        return projection.data;
+      }
       case "rest": {
-        const response = await fetch(source.url!);
+        if (!source.url) throw new Error("REST adapter source URL is required");
+        const response = await fetch(source.url);
+        if (!response.ok) throw new Error(`Adapter source failed: HTTP ${response.status}`);
         return response.json();
       }
       case "mock":
         return source.mock ?? input;
       case "sse":
         return input;
+      case "file":
+      case "agent":
+        throw new Error(`Unsupported live adapter source: ${source.type}`);
       default:
-        return input;
+        throw new Error(`Unsupported adapter source: ${source.type}`);
     }
   }
 

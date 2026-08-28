@@ -45,8 +45,8 @@ class UserAccessServiceTest {
 
     @Test
     void validateUser_WithValidCredentials_ShouldReturnUserDto() {
-        // Given
-        when(userRepository.findByAlias("testuser")).thenReturn(Optional.of(testUser));
+        // Given — service passes first arg directly to findByEmail()
+        when(userRepository.findByEmail("testuser")).thenReturn(Optional.of(testUser));
 
         // When
         UserRegistrationDTO result = userAccessService.validateUser("testuser", "testpass");
@@ -56,45 +56,45 @@ class UserAccessServiceTest {
         assertEquals("testuser", result.getAlias());
         assertEquals("test@example.com", result.getEmail());
         assertEquals("123e4567-e89b-12d3-a456-426614174000", result.getId()); // UUID converted to String in DTO
-        verify(userRepository, times(1)).findByAlias("testuser");
+        verify(userRepository, times(1)).findByEmail("testuser");
     }
 
     @Test
     void validateUser_WithNonExistentUser_ShouldReturnNull() {
         // Given
-        when(userRepository.findByAlias("nonexistent")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("nonexistent")).thenReturn(Optional.empty());
 
         // When
         UserRegistrationDTO result = userAccessService.validateUser("nonexistent", "anyPassword");
 
         // Then
         assertNull(result);
-        verify(userRepository, times(1)).findByAlias("nonexistent");
+        verify(userRepository, times(1)).findByEmail("nonexistent");
     }
 
     @Test
     void validateUser_WithNullAlias_ShouldReturnNull() {
         // Given
-        when(userRepository.findByAlias(null)).thenReturn(Optional.empty());
+        when(userRepository.findByEmail((String)null)).thenReturn(Optional.empty());
 
         // When
         UserRegistrationDTO result = userAccessService.validateUser(null, "password");
 
         // Then
         assertNull(result);
-        verify(userRepository, times(1)).findByAlias(null);
+        verify(userRepository, times(1)).findByEmail((String)null);
     }
 
     @Test
     void validateUser_WithWrongPassword_ShouldReturnNull() {
         // Given
-        when(userRepository.findByAlias("testuser")).thenReturn(Optional.of(testUser));
+        when(userRepository.findByEmail("testuser")).thenReturn(Optional.of(testUser));
 
         // When
         UserRegistrationDTO result = userAccessService.validateUser("testuser", "wrongpass");
 
         // Then
         assertNull(result);
-        verify(userRepository, times(1)).findByAlias("testuser");
+        verify(userRepository, times(1)).findByEmail("testuser");
     }
 }

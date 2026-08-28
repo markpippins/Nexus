@@ -1203,7 +1203,7 @@
       ]
     },
     {
-      "body_md": "## Procedure\nAdding a new role to the system is deterministic: edit the canonical expectations file, emit the artifacts, and verify with the end-to-end check. No undocumented parallel hand-edits.\n\n### 1. Canonical edit\nAdd the role to `nexus/config/roles/roles.json` under `roles` \u2014 the key must match the name inserted into `tackle.roles`. Inherit `roleDefaults` unless the role is special (test/alias roles override surfaces to false).\n\n### 2. Emit artifacts\nFor a full agent role, create/update:\n- **tackle.roles row** \u2014 via the seed arrays (`tackle-mcp/src/db.ts` DEFAULT_ROLES, `conduit-mcp/src/db.ts` migration defaultRoles) or a migration; the live DB is canonical.\n- **Persona prompt** \u2014 `tackle.prompts` row (role, slug `opencode-persona`, version 1) in `schemas/migrations/tackle/` (pattern: `sysadmin_persona_v1.sql`); apply to the live DB.\n- **Harness agent file** \u2014 `config/harnesses/opencode/agents/<role>.md` (frontmatter: assumes_role, permissions; pattern: `sysadmin.md`).\n- **Procedure cards** \u2014 add the role to the role lists of the relevant `tackle.memory` cards (tackle.role_memory assignments); then regenerate the seed: `python3 bin/regenerate_memory_seed.py --verify`.\n- **Assembly alias** \u2014 `assembly.users` row with alias = role name (pattern: builder seed in `assembly-migration.sql`).\n- **nebula role CHECK** \u2014 new `typescript/nebula-srv/migrations/0NN-allow-<role>.sql` mirroring `052-allow-sysadmin-dba-role.sql`; apply + replicate to barium.\n- **Governance** \u2014 add to `harness-srv/src/governance.ts` KNOWN_EXECUTORS only if the role issues receipts.\n\n### 3. Verify\nRun `python3 bin/verify-roles.py` \u2014 it checks every expected surface for every registered role (persona, procedure cards, assembly alias, harness file, nebula CHECK, governance). Exit 0 = all covered. Fix FAILs before closing.\n\n### 4. Close\nPost the walkthrough evidence on the role-creation thread and record an engineering log. Surface the new role to the architect for allowlist ratification if the case/naming deviates from convention.",
+      "body_md": "## Procedure\nAdding a new role to the system is deterministic: edit the canonical expectations file, emit the artifacts, and verify with the end-to-end check. No undocumented parallel hand-edits.\n\n### 1. Canonical edit\nAdd the role to `nexus/config/roles/roles.json` under `roles` \u2014 the key must match the name inserted into `tackle.roles`. Inherit `roleDefaults` unless the role is special (test/alias roles override surfaces to false).\n\n### 2. Emit artifacts\nFor a full agent role, create/update:\n- **tackle.roles row** \u2014 via the seed arrays (`tackle-mcp/src/db.ts` DEFAULT_ROLES, `conduit-mcp/src/db.ts` migration defaultRoles) or a migration; the live DB is canonical.\n- **Persona prompt** \u2014 `tackle.prompts` row (role, slug `opencode-persona`, version 1) in `schemas/migrations/tackle/` (pattern: `sysadmin_persona_v1.sql`); apply to the live DB.\n- **Harness agent file** \u2014 `config/harnesses/opencode/agents/<role>.md` (frontmatter: assumes_role, permissions; pattern: `sysadmin.md`).\n- **Procedure cards** \u2014 add the role to the role lists of the relevant `the canonical procedure-card table` cards (the role assignment join table assignments); then regenerate the seed: `python3 bin/regenerate_memory_seed.py --verify`.\n- **Assembly alias** \u2014 `assembly.users` row with alias = role name (pattern: builder seed in `assembly-migration.sql`).\n- **nebula role CHECK** \u2014 new `typescript/nebula-srv/migrations/0NN-allow-<role>.sql` mirroring `052-allow-sysadmin-dba-role.sql`; apply + replicate to barium.\n- **Governance** \u2014 add to `harness-srv/src/governance.ts` KNOWN_EXECUTORS only if the role issues receipts.\n\n### 3. Verify\nRun `python3 bin/verify-roles.py` \u2014 it checks every expected surface for every registered role (persona, procedure cards, assembly alias, harness file, nebula CHECK, governance). Exit 0 = all covered. Fix FAILs before closing.\n\n### 4. Close\nPost the walkthrough evidence on the role-creation thread and record an engineering log. Surface the new role to the architect for allowlist ratification if the case/naming deviates from convention.",
       "mcp_tools": [],
       "roles": [
         "architect",
@@ -1211,7 +1211,7 @@
         "engineer",
         "engineer-ii"
       ],
-      "sha256": "095d5de688eda5cc1bb4344874d13b801e620cb0ecc528b59455970a5bd8f35e",
+      "sha256": "d5583b3bd764f513cb3597d4ffd2c5e01e0c9536790eb6f2f477c13517834b91",
       "slug": "role-creation",
       "summary": "One source-of-truth edit (config/roles/roles.json) plus generated artifacts registers a role across every surface; bin/verify-roles.py proves end-to-end coverage.",
       "tags": [
@@ -1467,7 +1467,13 @@
     {
       "body_md": "## Procedure\n\nEvery forum thread carries a status stored in `assembly.posts.rating` on the ROOT post (thread id == root post id). NULL = 0 = Posted. Advance it as work progresses so the UI status bar reflects reality.\n\n## Vocabulary\n| rating | label | meaning |\n|---|---|---|\n| 0 | Posted | default; no role has picked it up |\n| 1 | Specified | requirements/scope pinned down |\n| 2 | Planned | scheduled or picked up by a role |\n| 3 | Implemented | work done, awaiting acceptance |\n| 4 | Accepted | completed and accepted (e.g. `Completed: ...` reply ratified) |\n| 5 | Rejected | false alarm / rejected outcome |\n| 6 | Reopened | regression after fix; needs another pass |\n| 7 | Closed | archival / no-action wind-down |\n| 8 | Approved (INTERIM) | operator approval of a posted To Do; candidate is \"in flight\", ready for requirement conversion (interim scheme 2026-08-25; superseded by Wind doctrine) |\n\n## Wire contract\n- READ: thread list + detail return `statusRating`.\n- SET: `PUT /api/forums/threads/:threadId/status` body `{\"rating\":0..8}`.\n- SET in-gesture: `POST /api/forums/threads/:threadId/comments` accepts optional `statusRating` \u2014 advance the parent in the same call.\n- NOTE: assembly-mcp does not yet expose a status tool/param \u2014 REST only until the MCP surface lands.\n\n## Per-role conventions (ratified 2026-08-22; extended 2026-08-25 with 8)\n- engineer/engineer-ii finishing to-do work \u2192 reply `Completed: ...` with `statusRating:4`.\n- sysadmin incidents (issues-and-open-questions): resolution\u21924, false alarm/test\u21925, regression after fix\u21926, new incident stays 0.\n- planner/architect scoping a to-do thread \u2192 1 Specified when scope is pinned, 2 Planned when scheduled/picked up.\n- reviewer rejection \u2192 5; critic reopen \u2192 6.\n- 7 Closed reserved for archival/no-action-needed wind-downs.\n\n## Per-role conventions (extended)\n- operator approving a posted To Do \u2192 8 Approved (interim marking: \"on the list\" \u2192 \"in flight\").\n- To-do lifecycle (doctrine as of 2026-08-25): 0 Posted \u2192 8 Approved \u2192 Requirement spawned (engineer converts) \u2192 Spec/Plan/WR refs linked in thread comments \u2192 4 Accepted when the work is ratified. 8 is also used while the work is in flight; the final state is 4 Accepted or 5 Rejected.\n- Interim Scheme note: this is temporary doctrine for the miniature workflow pending Wind doctrine; commit messages and records reference this interim nature.\n\nRule of thumb: every substantive thread reply SHOULD advance the parent status in the same call.\n",
       "mcp_tools": [],
-      "roles": [],
+      "roles": [
+        "analyst",
+        "architect",
+        "engineer",
+        "operator",
+        "reviewer"
+      ],
       "sha256": "2f8f3027f41b81e51c67c0dd5ce7207e99b141c29a0703e3af75626d531d6888",
       "slug": "thread-status-ratings",
       "summary": "Canonical 0-8 rating vocabulary for Assembly parent posts (assembly.posts.rating), wire contract to set it, and per-role advancement conventions (8 Approved is INTERIM 2026-08-25).",
@@ -1621,6 +1627,6 @@
       ]
     }
   ],
-  "role_count": 365,
+  "role_count": 370,
   "schema": "tackle"
 }

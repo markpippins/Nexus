@@ -18,8 +18,12 @@ W1.05 TypeSpec contract (`../spring/`), and W1.06 JSON-LD identity mappings.
 | `checks.cue` | The cross-artifact rules (all real, evaluable CUE) |
 | `run_bundle.py` | Deterministic scenario runner + projection-manifest emitter |
 | `tests/*.json` | Positive control + one fixture per violation class |
+| `publish_gate.py` | W2.05 fail-closed publication/admission gate (reuses the bundle) |
+| `gates/*.json` | Publication candidates: must pass with ZERO violations |
+| `controls/*.json` | Negative controls for the gate (must be blocked) |
 | `conformance/bundle-inputs.json` | Pin manifest: SHA-256 of the module sources |
 | `out/*.manifest.json` | Per-run normalized projection manifests (gitignored) |
+| `out/gates/*.publication-manifest.json` | W2.05 gate manifests (gitignored) |
 
 ## What it checks
 
@@ -71,6 +75,27 @@ expectation, and the exact expected violation code + stage.
 After intentional module-source changes the pin goes stale by design — that
 stale-pin signal IS the generated-artifact guard working; re-record with
 `--update-pins`.
+
+## W2.05 — publication/admission gate
+
+`publish_gate.py` runs the same CUE bundle as a fail-closed gate: a bundle
+candidate must produce ZERO violations and hold the AC4 non-authority
+policy assertion before it may be published or admitted. Exit 0 =
+admitted for publication; exit 2 = blocked.
+
+```bash
+python3 publish_gate.py gates/admission-surface-v3.json   # single candidate
+python3 publish_gate.py                                  # all gates/*.json
+python3 publish_gate.py controls/admission-surface-v3-tampered.json  # negative control → exit 2
+```
+
+Each run persists a timestamp-free, deterministic publication manifest
+(identical bytes across repeat runs) covering the W2.05-required surface:
+contract artifact/version/digest, operation + Wind node refs, JSON-LD
+context/version, proposition/doctrine/posture refs, and environment
+consistency. CUE remains structural validation — never SOL evaluation or
+PEB authority (AC4 asserted every run, and `policy_non_authority` is
+re-verified independently of the inputs).
 
 ## Runner notes
 

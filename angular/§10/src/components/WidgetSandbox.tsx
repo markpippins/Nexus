@@ -2,6 +2,12 @@ import * as React from "react";
 import { transform } from "@babel/standalone";
 import { generateMock } from "@/lib/schema";
 import type { Widget } from "@/lib/widget-types";
+import {
+  assertComponentName,
+  assertSandboxableCode,
+  capMockPayload,
+  clampIntervalMs,
+} from "@/lib/sandbox-guard";
 
 function normalize(url: string): string {
   let host = "";
@@ -28,9 +34,10 @@ function makeMockFetch(widget: Widget, tickRef: { current: number }, log: (line:
     if (!key) key = keys.find((k) => sig.endsWith(k) || k.endsWith(sig));
     if (!key) key = keys[0];
     const entry = key ? widget.mocks[key] : undefined;
-    const body = entry?.schema
-      ? generateMock(entry.schema, tickRef.current)
-      : (entry?.sample ?? {});
+    const body = capMockPayload(
+      entry?.schema ? generateMock(entry.schema, tickRef.current) : (entry?.sample ?? {}),
+      log,
+    );
     log(`${(init?.method ?? "GET").toUpperCase()} ${sig} → 200 mock`);
     await new Promise((r) => setTimeout(r, 60));
     return {
@@ -53,6 +60,11 @@ function compileWidget(
   componentName: string,
   mockFetch: typeof fetch,
 ): React.ComponentType<Record<string, unknown>> {
+  const codeGuard = assertSandboxableCode(code);
+  if (!codeGuard.ok) throw new Error(codeGuard.reason);
+  const nameGuard = assertComponentName(componentName);
+  if (!nameGuard.ok) throw new Error(nameGuard.reason);
+
   const stripped = code
     .replace(/^\s*import\s[\s\S]*?from\s*["'][^"']+["'];?\s*$/gm, "")
     .replace(/^\s*import\s+["'][^"']+["'];?\s*$/gm, "")
@@ -78,7 +90,13 @@ function compileWidget(
   );
 
   const call = async (url: string) => ({ data: await (await mockFetch(url)).json() });
-  const axios = { get: call, post: call, put: call, patch: call, delete: call };
+  const axios = Object.freeze({
+    get: call,
+    post: call,
+    put: call,
+    patch: call,
+    delete: call,
+  });
 
   const mod = factory(
     React,
@@ -143,7 +161,7 @@ export function WidgetSandbox({ widget, props = {}, intervalMs = 900, onLog, cla
   React.useEffect(() => {
     const id = setInterval(() => {
       tickRef.current += 1;
-    }, intervalMs);
+    }, clampIntervalMs(intervalMs));
     return () => clearInterval(id);
   }, [intervalMs]);
 

@@ -2,6 +2,7 @@ import { ViewSpec, LayoutSpec, AdapterBinding } from "../types/viewSpec";
 import { CapabilityContract } from "../types/capabilities";
 import { Adapter } from "../adapter/types";
 import type { ActionHandler } from "./actionInterpreter";
+import type { ViewRuntimeMode } from "./modes";
 
 export interface RuntimeWidget {
   id: string;
@@ -46,6 +47,7 @@ export interface RuntimeLayoutGraph {
 
 export interface RuntimeView {
   spec: ViewSpec;
+  mode?: ViewRuntimeMode;
   widgets: Map<string, RuntimeWidget>;
   adapters: Map<string, RuntimeAdapter>;
   layout: RuntimeLayoutGraph;
@@ -80,6 +82,7 @@ export interface WidgetImplementation {
 
 
 export interface RuntimeOptions {
+  mode?: ViewRuntimeMode;
   useFixtures?: boolean;
   refreshInterval?: number;
   actionHandlers?: Record<string, ActionHandler>;

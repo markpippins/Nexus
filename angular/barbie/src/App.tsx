@@ -28,15 +28,8 @@ import { registryApi } from './lib/api';
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('aggregate');
 
-  // API Mode State
-  const [apiMode, setApiModeState] = useState<'live' | 'mock'>(registryApi.getApiMode());
   // Connection profiles manager (barbie-parity #13/#14)
   const [isProfilesOpen, setIsProfilesOpen] = useState(false);
-
-  const handleApiModeChange = (mode: 'live' | 'mock') => {
-    registryApi.setApiMode(mode);
-    setApiModeState(mode);
-  };
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,7 +85,7 @@ export default function App() {
   // Initial load and periodic polling
   useEffect(() => {
     fetchAllData();
-  }, [fetchAllData, refreshTrigger, apiMode]);
+  }, [fetchAllData, refreshTrigger]);
 
   useEffect(() => {
     if (autoRefreshInterval <= 0) return;
@@ -164,8 +157,6 @@ export default function App() {
           onTerrainRecheck={handleTerrainRecheck}
           onOpenProfiles={() => setIsProfilesOpen(true)}
           activeView={activeTab}
-          apiMode={apiMode}
-          onApiModeChange={handleApiModeChange}
         />
 
         {/* Main Application Layout with Left Sidebar Navigation */}
@@ -185,8 +176,6 @@ export default function App() {
             onOpenRegisterModal={() => handleOpenCreateModal('register-service')}
             isMobileOpen={isMobileMenuOpen}
             onCloseMobile={() => setIsMobileMenuOpen(false)}
-            apiMode={apiMode}
-            onApiModeChange={handleApiModeChange}
           />
 
           {/* Center Stage Main Content Area */}
@@ -280,26 +269,22 @@ export default function App() {
           </main>
         </div>
 
-        {/* Footer Status Bar with Live/Mock Mode Indicator */}
+        {/* Footer Status Bar */}
         <footer className="mt-8 border-t border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-2.5 text-[11px] text-[var(--text-secondary)]">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-3 font-mono">
-              <span className={`flex items-center gap-1.5 font-semibold ${
-                registryApi.getApiMode() === 'live' ? 'text-emerald-400' : 'text-amber-400'
-              }`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${
-                  registryApi.getApiMode() === 'live' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-                }`}></span>
-                {registryApi.getApiMode() === 'live' ? 'Live REST API Online' : 'Client Mock Engine Active'}
+              <span className="flex items-center gap-1.5 font-semibold text-emerald-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Live REST API Online
               </span>
               <span>•</span>
-              <span>Build v1.8-stable</span>
+              <span>Build v1.9-live</span>
               <span>•</span>
               <span>Management Console</span>
             </div>
             <div className="flex items-center gap-4 text-[10px] font-mono">
               <span>ENDPOINT: {registryApi.getApiBaseUrl()}</span>
-              <span>MODE: {registryApi.getApiMode().toUpperCase()}</span>
+              <span>MODE: LIVE</span>
             </div>
           </div>
         </footer>

@@ -29,8 +29,7 @@ export class DefaultActionInterpreter implements ActionInterpreter {
   async execute(action: ViewSpecAction, runtime: RuntimeView): Promise<void> {
     const handler = this.customHandlers.get(action.type);
     if (!handler) {
-      console.warn(`No handler registered for action type: ${action.type}`);
-      return;
+      throw new Error(`Unsupported action type: ${action.type}`);
     }
 
     try {
@@ -59,9 +58,8 @@ export class DefaultActionInterpreter implements ActionInterpreter {
     if (!targetWidgetId) return;
 
     const widget = Array.from(runtime.widgets.values()).find((w) => w.id === targetWidgetId);
-    if (widget) {
-      widget.props.selected = true;
-    }
+    if (!widget) throw new Error(`Widget not found: ${targetWidgetId}`);
+    widget.props.selected = true;
   }
 
   private async handleDrilldown(action: ViewSpecAction, runtime: RuntimeView): Promise<void> {

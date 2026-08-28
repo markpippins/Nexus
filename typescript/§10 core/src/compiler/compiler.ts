@@ -323,16 +323,17 @@ export class DesignIRCompiler {
 
   private generateMockData(capability: CapabilityId): any {
     const timestamp = Date.now();
+    const seed = timestamp % 97;
 
     switch (capability) {
       case "MetricSeries":
         return {
           points: Array.from({ length: 20 }, (_, i) => ({
             x: timestamp - (19 - i) * 60000,
-            y: Math.random() * 100,
+            y: (i * 37 + seed) % 100,
           })),
           unit: "ms",
-          status: Math.random() > 0.8 ? "warn" : "ok",
+          status: seed % 5 === 0 ? "warn" : "ok",
         };
       case "EntityCollection":
         return {
@@ -340,7 +341,7 @@ export class DesignIRCompiler {
             id: `item_${i}`,
             name: `Item ${i}`,
             status: ["active", "pending", "completed"][i % 3],
-            value: Math.random() * 1000,
+            value: (i * 113 + seed) % 1000,
           })),
           columns: [
             { key: "id", label: "ID" },
@@ -375,10 +376,10 @@ export class DesignIRCompiler {
       case "KeyMetricMatrix":
         return {
           metrics: [
-            { id: "m1", label: "Requests", value: Math.floor(Math.random() * 1000), status: "ok" },
-            { id: "m2", label: "Errors", value: Math.floor(Math.random() * 50), status: Math.random() > 0.7 ? "warn" : "ok" },
-            { id: "m3", label: "Latency", value: Math.floor(Math.random() * 200), unit: "ms", status: "ok" },
-            { id: "m4", label: "Throughput", value: Math.floor(Math.random() * 5000), unit: "req/s", status: "ok" },
+            { id: "m1", label: "Requests", value: (1 * 137 + seed) % 1000, status: "ok" },
+            { id: "m2", label: "Errors", value: (2 * 47 + seed) % 50, status: seed % 7 === 0 ? "warn" : "ok" },
+            { id: "m3", label: "Latency", value: (3 * 61 + seed) % 200, unit: "ms", status: "ok" },
+            { id: "m4", label: "Throughput", value: (4 * 103 + seed) % 5000, unit: "req/s", status: "ok" },
           ],
         };
       default:
