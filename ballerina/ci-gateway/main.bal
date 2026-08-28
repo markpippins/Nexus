@@ -219,9 +219,9 @@ service /gateway on new http:Listener(port, { host: bindHost }) {
         };
     }
 
-    // Ballerina runtime services — the moat layer itself is the live source.
-    // Reports the actual Ballerina services running in the nexus integration
-    // platform (ci-gateway + parity-runner) rather than fabricated rows.
+    // The responding gateway is the only Ballerina HTTP service that can be
+    // established as live here. parity-runner is a one-shot CLI program, so
+    // listing it as a healthy service would report stale, fabricated state.
     resource function get ballerina/services(string? search) returns json {
         map<json>[] services = [
             {
@@ -232,15 +232,6 @@ service /gateway on new http:Listener(port, { host: bindHost }) {
                 listenerPort: port.toString(),
                 status: "healthy",
                 description: "Nexus CI moat — Jenkins/Sonar/GitHub/Ballerina-Central reads + drift sentinel"
-            },
-            {
-                id: "bal-svc-parity-runner",
-                packageRef: "codex/parity_runner",
-                name: "parity-runner",
-                endpoint: "http://127.0.0.1:3500",
-                listenerPort: "3500",
-                status: "healthy",
-                description: "Dual-target conformance runner for the cutover gate"
             }
         ];
         return { "upstream": "ballerina-local", "endpoint": "/gateway/ballerina/services", data: services };
