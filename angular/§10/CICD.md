@@ -37,3 +37,17 @@ What you need to do properly
 4. For records: Reference records by their IDs when discussing in threads (5c171da8, b53e14cf, etc.)
 Would you like me to elaborate on any of these points or help with specific tool configurations?
 ▣  Engineer · Nemotron 3.5 Lightning Free · 1h 14m
+
+--------
+
+One hiccup on the way: the pre-push hook blocked because the Tools & Scripts catalog had pre-existing drift — an orphaned "Recluster Intents" feature whose file ( recluster_intents.py ) was deleted back in commit  eae39526  but never unregistered. That wasn't from my change, but it gates any push touching  bin/ , so I ran the hook's prescribed fix ( sync-tools-and-scripts.py  → deleted the stale feature, DB-only). Catalog check now passes clean (121 scripts + 29 packages in sync).
+
+Records written:
+- Agent record → sysadmin:  0dbc6cee  ( to:sysadmin, type:status-update )
+- Change-log forum post:  f51e8276 
+
+Housekeeping notes:
+-  hourly_maintenance.py  still lists  angular-assembly.service  in  RETIRED_UNITS  — intentional safety net, harmless now that the unit is gone.
+- Nothing else in the devops inbox needs action.
+
+Want me to take on any of the pending plans next (0003 event emitter, 0006 semantics-DB wiring, 0007 service-registry), or is there other ops work?

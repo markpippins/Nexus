@@ -1,5 +1,10 @@
 import { PayloadSource } from "../types/viewSpec";
 import { Adapter, TransformStep } from "./types";
+import {
+  ALLOWED_LIVE_ORIGINS,
+  LIVE_FETCH_TIMEOUT_MS,
+  MAX_LIVE_RESPONSE_BYTES,
+} from "@/lib/sandbox-guard";
 
 export class AdapterRuntime {
   private registry = new Map<string, Adapter>();
@@ -30,8 +35,7 @@ export class AdapterRuntime {
   private async fetchSource(source: PayloadSource, input?: unknown): Promise<unknown> {
     switch (source.type) {
       case "rest": {
-        const response = await fetch(source.url!);
-        return response.json();
+        return this.fetchRestSource(source.url, input);
       }
       case "mock":
         return source.mock ?? input;
@@ -39,6 +43,85 @@ export class AdapterRuntime {
         return input;
       default:
         return input;
+    }
+  }
+
+  /**
+   * Live REST source fetch — fail-closed origin policy, auth boundary,
+   * response limits, and timeout/abort (devops hardening).
+   *
+   * - Origin policy: same-origin URLs only, plus the explicit
+   *   ALLOWED_LIVE_ORIGINS allowlist. Cross-origin URLs outside the
+   *   allowlist are rejected before any request is made.
+   * - Authentication boundary: credentials are never sent ("omit") and URLs
+   *   with embedded credentials (user:pass@) are rejected.
+   * - Response limits: the body is capped at MAX_LIVE_RESPONSE_BYTES.
+   * - Timeout/abort: requests abort after LIVE_FETCH_TIMEOUT_MS.
+   * - Schema validation: URL must parse as http(s).
+   */
+  private async fetchRestSource(url: string | undefined, input?: unknown): Promise<unknown> {
+    if (typeof url !== "string" || url.trim() === "") {
+      throw new Error(`Adapter rest source missing url (input: ${typeof input})`);
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(url, typeof window !== "undefined" ? window.location.href : undefined);
+    } catch {
+      throw new Error(`Adapter rest source url is not a valid URL: ${url}`);
+    }
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error(`Adapter rest source url must be http(s), got: ${parsed.protocol}//`);
+    }
+
+    // Authentication boundary: never embed credentials in the URL.
+    if (parsed.username || parsed.password) {
+      throw new Error(`Adapter rest source url must not embed credentials`);
+    }
+
+    // Origin policy: same-origin by default, plus explicit allowlist.
+    const callerOrigin = typeof window !== "undefined" ? window.location.origin : parsed.origin;
+    const allowed = parsed.origin === callerOrigin || ALLOWED_LIVE_ORIGINS.includes(parsed.origin);
+    if (!allowed) {
+      throw new Error(
+        `Adapter rest source origin not allowed: ${parsed.origin} (same-origin or ` +
+          `explicit ALLOWED_LIVE_ORIGINS entry required)`,
+      );
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LIVE_FETCH_TIMEOUT_MS);
+    try {
+      const response = await fetch(parsed.toString(), {
+        credentials: "omit",
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`Adapter rest source responded ${response.status} ${response.statusText}`);
+      }
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.includes("json") && !contentType.includes("text")) {
+        throw new Error(`Adapter rest source returned unexpected content-type: ${contentType}`);
+      }
+      const text = await response.text();
+      if (text.length > MAX_LIVE_RESPONSE_BYTES) {
+        throw new Error(
+          `Adapter rest source response exceeds ${MAX_LIVE_RESPONSE_BYTES} bytes ` +
+            `(${text.length} received)`,
+        );
+      }
+      return JSON.parse(text);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new Error(`Adapter rest source timed out after ${LIVE_FETCH_TIMEOUT_MS}ms`);
+      }
+      if (error instanceof SyntaxError) {
+        throw new Error(`Adapter rest source returned invalid JSON: ${error.message}`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
     }
   }
 
