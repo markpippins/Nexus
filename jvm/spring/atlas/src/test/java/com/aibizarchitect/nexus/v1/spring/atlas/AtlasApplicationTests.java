@@ -12,7 +12,13 @@ import org.springframework.test.context.TestPropertySource;
  */
 @SpringBootTest
 @TestPropertySource(properties = {
-        "spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1",
+        // Entities are mapped to the `registry` schema (shared with
+        // service-registry). H2 in-memory only has the default PUBLIC schema
+        // and Hibernate's namespace creation is disabled by default, so the
+        // create-drop DDL would fail with "Schema \"REGISTRY\" not found".
+        // The INIT clause creates the registry schema on first connection so
+        // both the drop and create phases of create-drop run cleanly.
+        "spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;INIT=CREATE SCHEMA IF NOT EXISTS registry",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
