@@ -5,6 +5,7 @@ export * from "./adapter/types";
 export * from "./adapter/runtime";
 export * from "./adapter/governed";
 export * from "./widget/catalog";
+export * from "./widget/contractCatalog";
 export * from "./compiler/compiler";
 export * from "./compiler/regionResolver";
 export { SimpleEventBus } from "./runtime/eventBus";
