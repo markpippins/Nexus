@@ -130,6 +130,10 @@ nexus/etc/fleet-internal.env
 typescript/file-system-server/root
 typescript/file-system-server/root.sandbox-bak-*/
 
+# TTS audio announced by agents (R6) — transient, purged by tts-audio-purge.timer
+# (never commit wav/mp3/pcm here)
+.tts-audio/
+
 # fleet secrets (Security Pass Alpha, 22fe12bc) — never commit
 etc/
 

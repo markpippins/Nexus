@@ -1,0 +1,22 @@
+[Unit]
+Description=TTS audio purge — delete agent-announcement wave files older than 15 minutes
+Documentation=https://github.com/markpippins/nexus/blob/main/AGENTS.md
+After=network.target
+
+[Service]
+Type=oneshot
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/.tts-audio
+
+# Remove any file (wav/mp3/pcm/etc.) not modified in the last 15 minutes.
+# .tts-audio is gitignored; this keeps the transient agent-announcement audio
+# from accumulating on disk (it was previously written via a symlink into the
+# now-unmounted /mnt/SiP1TB and silently consumed drive space).
+ExecStart=/usr/bin/find /home/codex/dev/nexus/.tts-audio -type f -mmin +15 -delete
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

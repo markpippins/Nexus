@@ -1,0 +1,13 @@
+[Unit]
+Description=TTS audio purge timer — cleans stale announcement wave files once daily
+Documentation=https://github.com/markpippins/nexus/blob/main/AGENTS.md
+After=network.target
+
+[Timer]
+OnCalendar=daily
+OnBootSec=10min
+Persistent=true
+RandomizedDelaySec=15min
+
+[Install]
+WantedBy=timers.target
