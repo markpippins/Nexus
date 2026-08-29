@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -37,6 +39,7 @@ import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Server;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.DeploymentRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.StatusEventRepository;
 
 @WebMvcTest(DeploymentController.class)
 @Import(TestJpaConfig.class)
@@ -53,6 +56,9 @@ class DeploymentControllerTest {
 
     @MockBean
     private ServiceRepository serviceRepository;
+
+    @MockBean
+    private StatusEventRepository statusEventRepository;
 
     private Deployment testDeployment;
     private Service testService;
@@ -258,5 +264,139 @@ class DeploymentControllerTest {
                 .andReturn().getResponse().getContentAsString();
 
         assertEquals("", body, "404 responses currently empty — regression lock");
+    }
+
+    // ================================================================
+    // LIFECYCLE OPS (D-BP-1) — start / stop / restart
+    // Idempotency + invalid-transition rejection + history recording
+    // ================================================================
+
+    @Test
+    void start_Success_transitionsToRunning_andRecordsEvent() throws Exception {
+        testDeployment.setStatus("STOPPED");
+        when(deploymentRepository.findById(1L)).thenReturn(Optional.of(testDeployment));
+        when(deploymentRepository.save(any(Deployment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc.perform(post("/api/v1/deployments/1/start"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RUNNING"))
+                .andExpect(jsonPath("$.changed").value(true));
+
+        verify(statusEventRepository).save(any());
+    }
+
+    @Test
+    void start_IdempotentWhenRunning_noStateChange() throws Exception {
+        testDeployment.setStatus("RUNNING");
+        when(deploymentRepository.findById(1L)).thenReturn(Optional.of(testDeployment));
+
+        mockMvc.perform(post("/api/v1/deployments/1/start"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.changed").value(false));
+
+        verify(deploymentRepository, never()).save(any());
+    }
+
+    @Test
+    void start_IdempotentWhenStarting() throws Exception {
+        testDeployment.setStatus("STARTING");
+        when(deploymentRepository.findById(1L)).thenReturn(Optional.of(testDeployment));
+
+        mockMvc.perform(post("/api/v1/deployments/1/start"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.changed").value(false));
+    }
+
+    @Test
+    void start_RejectsWhileStopping_409() throws Exception {
+        testDeployment.setStatus("STOPPING");
+        when(deploymentRepository.findById(1L)).thenReturn(Optional.of(testDeployment));
+
+        mockMvc.perform(post("/api/v1/deployments/1/start"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("invalid-transition"))
+                .andExpect(jsonPath("$.currentStatus").value("STOPPING"));
+
+        verify(deploymentRepository, never()).save(any());
+    }
+
+    @Test
+    void start_NotFound_404() throws Exception {
+        when(deploymentRepository.findById(1L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/api/v1/deployments/1/start"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void stop_Success_transitionsToStopped_andRecordsEvent() throws Exception {
+        testDeployment.setStatus("RUNNING");
+        when(deploymentRepository.findById(1L)).thenReturn(Optional.of(testDeployment));
+        when(deploymentRepository.save(any(Deployment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc.perform(post("/api/v1/deployments/1/stop"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("STOPPED"))
+                .andExpect(jsonPath("$.changed").value(true));
+
+        verify(statusEventRepository).save(any());
+    }
+
+    @Test
+    void stop_IdempotentWhenStopped() throws Exception {
+        testDeployment.setStatus("STOPPED");
+        when(deploymentRepository.findById(1L)).thenReturn(Optional.of(testDeployment));
+
+        mockMvc.perform(post("/api/v1/deployments/1/stop"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.changed").value(false));
+
+        verify(deploymentRepository, never()).save(any());
+    }
+
+    @Test
+    void stop_RejectsWhileStarting_409() throws Exception {
+        testDeployment.setStatus("STARTING");
+        when(deploymentRepository.findById(1L)).thenReturn(Optional.of(testDeployment));
+
+        mockMvc.perform(post("/api/v1/deployments/1/stop"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("invalid-transition"))
+                .andExpect(jsonPath("$.currentStatus").value("STARTING"));
+
+        verify(deploymentRepository, never()).save(any());
+    }
+
+    @Test
+    void stop_NotFound_404() throws Exception {
+        when(deploymentRepository.findById(1L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/api/v1/deployments/1/stop"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void restart_composesStopThenStart() throws Exception {
+        // Stopped deployment -> stop is a no-op (already stopped), start brings it to RUNNING
+        testDeployment.setStatus("STOPPED");
+        when(deploymentRepository.findById(1L)).thenReturn(Optional.of(testDeployment));
+        when(deploymentRepository.save(any(Deployment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc.perform(post("/api/v1/deployments/1/restart"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RUNNING"));
+    }
+
+    @Test
+    void restart_propagatesStopConflict() throws Exception {
+        // Starting deployment -> stop leg rejects 409; restart must not proceed
+        testDeployment.setStatus("STARTING");
+        when(deploymentRepository.findById(1L)).thenReturn(Optional.of(testDeployment));
+
+        mockMvc.perform(post("/api/v1/deployments/1/restart"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("invalid-transition"));
+
+        verify(deploymentRepository, never()).save(any());
     }
 }

@@ -103,6 +103,62 @@ export const DeploymentsTable: React.FC<DeploymentsTableProps> = ({
     }
   };
 
+  // Re-fetch the current page after a lifecycle op so the table reflects the
+  // backend's authoritative state (barbie's Deployment.status is a HealthStatus
+  // badge, distinct from the backend lifecycle DeploymentStatus).
+  const reload = async () => {
+    try {
+      const response = await registryApi.getDeployments({
+        page,
+        size,
+        search: searchQuery,
+        status: statusFilter,
+        environment: envFilter
+      });
+      setDeployments(response.data);
+      setTotalItems(response.meta.totalItems);
+      setTotalPages(response.meta.totalPages);
+    } catch (err) {
+      console.error('Failed reloading deployments:', err);
+    }
+  };
+
+  // D-BP-1 lifecycle ops: POST /deployments/{id}/start|stop|restart (idempotent;
+  // server returns 409 for invalid transitions, surfaced as an alert).
+  const handleLifecycle = async (e: React.MouseEvent, id: string, op: 'start' | 'stop' | 'restart') => {
+    e.stopPropagation();
+    try {
+      await registryApi.deploymentLifecycle(id, op);
+      await reload();
+    } catch (err: any) {
+      alert(`${op} error: ${err.message}`);
+    }
+  };
+
+  const handleViewLogs = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    try {
+      const data = await registryApi.viewDeploymentLogs(id);
+      alert(JSON.stringify(data));
+    } catch (err: any) {
+      alert(`Logs error: ${err.message}`);
+    }
+  };
+
+  const handleViewConfig = async (e: React.MouseEvent, dep: Deployment) => {
+    e.stopPropagation();
+    if (!dep.serviceId) {
+      alert('Deployment has no service id — cannot load config');
+      return;
+    }
+    try {
+      const data = await registryApi.viewDeploymentConfig(dep.serviceId);
+      alert(JSON.stringify(data));
+    } catch (err: any) {
+      alert(`Config error: ${err.message}`);
+    }
+  };
+
   const getStatusBadge = (status: HealthStatus) => {
     switch (status) {
       case 'healthy':
@@ -254,26 +310,41 @@ export const DeploymentsTable: React.FC<DeploymentsTableProps> = ({
 
                   <td className="p-3 text-right">
                     <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                      {/* Lifecycle/log/config ops: backend routes do not exist
-                          (D-BP-1, ref 6938f85a) — rendered DISABLED with reason;
-                          no network calls, no mock success paths. They activate
-                          when the deferred backend plan lands. */}
+                      {/* Lifecycle/log/config ops — wired to real routes (D-BP-1,
+                          ref 6938f85a): start/stop/restart via
+                          POST /api/v1/deployments/{id}/{op}; logs reuse
+                          GET /registry/logs/deployment/{id}; config composes
+                          GET /configurations/service/{serviceId}. */}
                       {[
-                        { icon: Play, title: 'Start — deferred: no POST /deployments/{id}/start route (D-BP-1)' },
-                        { icon: Square, title: 'Stop — deferred: no POST /deployments/{id}/stop route (D-BP-1)' },
-                        { icon: RotateCw, title: 'Restart — deferred: needs start+stop routes (D-BP-1)' },
-                        { icon: ScrollText, title: 'View logs — deferred: no logs route; console placeholder only (D-BP-1)' },
-                        { icon: Settings2, title: 'View config — deferred: no /configurations/deployment/{id} route (D-BP-1)' }
-                      ].map(({ icon: Icon, title }) => (
+                        { icon: Play, title: 'Start', op: 'start' as const },
+                        { icon: Square, title: 'Stop', op: 'stop' as const },
+                        { icon: RotateCw, title: 'Restart', op: 'restart' as const }
+                      ].map(({ icon: Icon, title, op }) => (
                         <button
-                          key={title}
-                          disabled
+                          key={op}
+                          onClick={(e) => handleLifecycle(e, dep.id, op)}
                           title={title}
-                          className="cursor-not-allowed rounded p-1 text-slate-500 opacity-40"
+                          className="rounded p-1 text-sky-400 hover:bg-sky-500/10"
                         >
                           <Icon className="h-3.5 w-3.5" />
                         </button>
                       ))}
+
+                      <button
+                        onClick={(e) => handleViewLogs(e, dep.id)}
+                        title="View logs"
+                        className="rounded p-1 text-sky-400 hover:bg-sky-500/10"
+                      >
+                        <ScrollText className="h-3.5 w-3.5" />
+                      </button>
+
+                      <button
+                        onClick={(e) => handleViewConfig(e, dep)}
+                        title="View config"
+                        className="rounded p-1 text-sky-400 hover:bg-sky-500/10"
+                      >
+                        <Settings2 className="h-3.5 w-3.5" />
+                      </button>
 
                       <button
                         onClick={() => onOpenEditModal(dep)}

@@ -1,5 +1,6 @@
 package com.aibizarchitect.nexus.v1.spring.serviceregistry.controller;
 
+import java.util.Map;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -16,9 +17,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Deployment;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.StatusEvent;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.DeploymentRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServerRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.StatusEventRepository;
 
 @RestController
 @RequestMapping("/api/v1/deployments")
@@ -29,13 +32,16 @@ public class DeploymentController {
     private final DeploymentRepository deploymentRepository;
     private final ServiceRepository serviceRepository;
     private final ServerRepository serverRepository;
+    private final StatusEventRepository statusEventRepository;
 
     public DeploymentController(DeploymentRepository deploymentRepository,
             ServiceRepository serviceRepository,
-            ServerRepository serverRepository) {
+            ServerRepository serverRepository,
+            StatusEventRepository statusEventRepository) {
         this.deploymentRepository = deploymentRepository;
         this.serviceRepository = serviceRepository;
         this.serverRepository = serverRepository;
+        this.statusEventRepository = statusEventRepository;
     }
 
     @GetMapping
@@ -57,6 +63,132 @@ public class DeploymentController {
         return deploymentRepository.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    // ================================================================
+    // Lifecycle operations (D-BP-1 ref 6938f85a): start / stop / restart
+    //   - Idempotent: repeating the operation while already in (or heading
+    //     toward) the target state is a 200 no-op, never an error.
+    //   - Invalid transitions are rejected with 409 CONFLICT (no state change).
+    //   - Transitions are recorded via the shared StatusEvent history model
+    //     (the same surface ServiceStatusController uses), NOT a parallel
+    //     state machine — history stays queryable via /api/v1/status/*.
+    // ================================================================
+
+    /**
+     * Start a deployment. Idempotent when already RUNNING/STARTING.
+     * Rejects 409 when the deployment is STOPPING (a stop is in flight).
+     */
+    @PostMapping("/{id}/start")
+    public ResponseEntity<?> startDeployment(@PathVariable Long id) {
+        Optional<Deployment> opt = deploymentRepository.findById(id);
+        if (opt.isEmpty()) {
+            log.warn("Deployment with ID {} not found for start", id);
+            return ResponseEntity.notFound().build();
+        }
+        Deployment dep = opt.get();
+        Deployment.DeploymentStatus current = dep.getStatusEnum();
+
+        if (current == Deployment.DeploymentStatus.STOPPING) {
+            return conflict("start", dep);
+        }
+        if (current == Deployment.DeploymentStatus.RUNNING
+                || current == Deployment.DeploymentStatus.STARTING) {
+            return ResponseEntity.ok(operationResult(dep, false, "already-running"));
+        }
+
+        String from = stateName(dep);
+        dep.setStatus(Deployment.DeploymentStatus.RUNNING.name());
+        dep.setStartedAt(java.time.LocalDateTime.now());
+        dep.setStoppedAt(null);
+        dep.setActiveFlag(true);
+        Deployment saved = deploymentRepository.save(dep);
+        recordTransition(dep, from, "deployment.start");
+        log.info("Started deployment with ID: {}", id);
+        return ResponseEntity.ok(operationResult(saved, true, "started"));
+    }
+
+    /**
+     * Stop a deployment. Idempotent when already STOPPED/STOPPING.
+     * Rejects 409 when the deployment is STARTING (a start is in flight).
+     */
+    @PostMapping("/{id}/stop")
+    public ResponseEntity<?> stopDeployment(@PathVariable Long id) {
+        Optional<Deployment> opt = deploymentRepository.findById(id);
+        if (opt.isEmpty()) {
+            log.warn("Deployment with ID {} not found for stop", id);
+            return ResponseEntity.notFound().build();
+        }
+        Deployment dep = opt.get();
+        Deployment.DeploymentStatus current = dep.getStatusEnum();
+
+        if (current == Deployment.DeploymentStatus.STARTING) {
+            return conflict("stop", dep);
+        }
+        if (current == Deployment.DeploymentStatus.STOPPED
+                || current == Deployment.DeploymentStatus.STOPPING) {
+            return ResponseEntity.ok(operationResult(dep, false, "already-stopped"));
+        }
+
+        String from = stateName(dep);
+        dep.setStatus(Deployment.DeploymentStatus.STOPPED.name());
+        dep.setStoppedAt(java.time.LocalDateTime.now());
+        dep.setStartedAt(null);
+        dep.setActiveFlag(false);
+        Deployment saved = deploymentRepository.save(dep);
+        recordTransition(dep, from, "deployment.stop");
+        log.info("Stopped deployment with ID: {}", id);
+        return ResponseEntity.ok(operationResult(saved, true, "stopped"));
+    }
+
+    /**
+     * Restart a deployment — expressed as a stop → start composition.
+     * If the stop leg rejects (409, e.g. start in flight), the conflict
+     * propagates and no restart occurs.
+     */
+    @PostMapping("/{id}/restart")
+    public ResponseEntity<?> restartDeployment(@PathVariable Long id) {
+        log.info("Restarting deployment with ID: {}", id);
+        ResponseEntity<?> stop = stopDeployment(id);
+        if (stop.getStatusCode().isError()) {
+            return stop;
+        }
+        return startDeployment(id);
+    }
+
+    private ResponseEntity<?> conflict(String operation, Deployment dep) {
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT)
+                .body(java.util.Map.of(
+                        "error", "invalid-transition",
+                        "operation", operation,
+                        "currentStatus", stateName(dep)));
+    }
+
+    private Map<String, Object> operationResult(Deployment dep, boolean changed, String message) {
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("deploymentId", dep.getId());
+        m.put("status", stateName(dep));
+        m.put("changed", changed);
+        m.put("message", message);
+        return m;
+    }
+
+    private String stateName(Deployment dep) {
+        Deployment.DeploymentStatus s = dep.getStatusEnum();
+        return s != null ? s.name() : "UNKNOWN";
+    }
+
+    private void recordTransition(Deployment dep, String from, String reason) {
+        try {
+            String serviceName = dep.getService() != null
+                    ? dep.getService().getName()
+                    : "deployment-" + dep.getId();
+            statusEventRepository.save(new StatusEvent(
+                    serviceName, from, stateName(dep), reason, null, null));
+        } catch (Exception e) {
+            log.warn("Failed to record status transition for deployment {}: {}",
+                    dep.getId(), e.getMessage());
+        }
     }
 
     @PostMapping
