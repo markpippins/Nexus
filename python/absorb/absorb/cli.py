@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .core import pg_fetchall, source_rel_path
 from . import events as ev
+from . import emitter
 from .errors import AbsorbError
 from . import discovery, runner
 
@@ -95,6 +96,15 @@ def cmd_run(args) -> int:
         counts = {"done": len(results) - failed, "failed": failed}
         warnings = [w for _, r in results for w in r.get("warnings", [])]
         policy_skips = [sk for _, r in results for sk in r.get("skipped", [])]
+        # AC4: surface bus sent/dropped counters in the run-summary warnings
+        # section so bus outages are observable, never a run failure.
+        counters = emitter.COUNTERS.snapshot()
+        if emitter.COUNTERS.total() > 0:
+            warnings.append({
+                "code": "W_EVENT_BUS",
+                "message": "absorb.events: sent=%d dropped=%d"
+                            % (counters["sent"], counters["dropped"]),
+            })
         ev.emit_run_completed(batch_id, counts, warnings, policy_skips,
                               causation_id=started_event_id)
         runner.BATCH.clear()

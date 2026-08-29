@@ -1,0 +1,17 @@
+[Unit]
+Description=absorb NATS → cascade.events mirror (plan 0003)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/codex/dev/nexus/python/absorb
+Environment=NATS_URL=nats://localhost:4222
+Environment=ABSORB_NATS_URL=nats://localhost:4222
+Environment=ABSORB_PG_DSN=postgresql://pguser:pgpass@localhost:5432/nexus
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 -u -m absorb.bus_mirror
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
