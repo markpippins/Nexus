@@ -10,6 +10,7 @@
     <module>spring/service-broker</module>
     <module>spring/service-registry</module>
     <module>spring/terrain</module>
+    <module>spring/conformance-verifier</module>
   </modules>
   <properties>
     <maven.compiler.source>21</maven.compiler.source>
