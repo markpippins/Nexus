@@ -16,42 +16,28 @@ let pollingInterval = null;
 let isProcessing = false;
 
 // ── Agent record notification ──────────────────────────────────────
+//
+// NOTE (2026-08-29, architect): inbox-tagging agent records on every
+// processed event floods role inboxes (the "Wind: event harvest.created
+// → instance ..." spam). The event/instance/ticket data is already
+// durable in the `wind` schema (wind.events, wind.workflow_instances,
+// wind.tickets) and visible via cascade/nebula/assembly. We therefore do
+// NOT emit `to:<role>` inbox-routed agent records here anymore. The
+// function is retained (disabled) to document the previous behavior; if
+// role-directed outbox notification is ever needed, re-enable with a
+// non-inbox visibility scope rather than the `to:<role>` tag.
 
 /**
- * Post a nebula agent record notification for a role's inbox.
- * Tags the record with `to:<role>` for inbox routing.
+ * (Disabled) Post a nebula agent record notification for a role's inbox.
+ * Previously tagged records with `to:<role>` for inbox routing, which
+ * flooded inboxes on high-volume events such as `harvest.created`.
  */
+// eslint-disable-next-line no-unused-vars
 async function notifyRole(event, instanceId, ticketIds, role) {
-  try {
-    const url = `${config.nebulaUrl}/api/agent-records`;
-    const body = {
-      recordType: 'report',
-      role: 'architect',
-      title: `Wind: event ${event.event_type} → instance ${instanceId}`,
-      content: [
-        `**Event processed** | \`${event.event_type}\` | \`${event.id}\``,
-        `Instance: \`${instanceId}\``,
-        `Tickets: ${ticketIds.join(', ') || 'none'}`,
-        `Source: ${event.source || 'unknown'}`,
-        event.payload ? `Payload: \`\`\`json\n${JSON.stringify(event.payload, null, 2)}\n\`\`\`` : '',
-      ].join('\n\n'),
-      tags: [`to:${role}`, 'type:status-update', 'source:wind'],
-      level: 2,
-      visibilityScope: role === 'architect' ? 'architect' : 'all',
-    };
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!resp.ok) {
-      const text = await resp.text();
-      console.warn(`[event-processor] notifyRole failed (${resp.status}): ${text}`);
-    }
-  } catch (err) {
-    // Nebula might be down — log and continue, don't block processing
-    console.warn(`[event-processor] notifyRole error:`, err.message);
-  }
+  // Intentionally inert: see NOTE above. Kept so call sites remain valid
+  // and the durable inventory of work (tickets/instances) is retained
+  // without inbox noise.
+  void event; void instanceId; void ticketIds; void role;
 }
 
 // ── Core processing ─────────────────────────────────────────────────
