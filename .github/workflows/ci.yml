@@ -1,10 +1,14 @@
 name: CI
 
+# The verifier (conformance-verifier) must run on every supported PR/push path.
+# `dev` is included in both push and pull_request triggers so a PR targeting
+# `dev` is NOT silently skipped — otherwise verifier regressions could merge
+# to dev without the required check (W2.04, finding fb4de028).
 on:
   push:
-    branches: [ main, master, feature/* ]
+    branches: [ main, master, dev, feature/* ]
   pull_request:
-    branches: [ main, master, feature/* ]
+    branches: [ main, master, dev, feature/* ]
 
 jobs:
   build:
