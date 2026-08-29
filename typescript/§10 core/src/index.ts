@@ -5,6 +5,7 @@ export * from "./adapter/types";
 export * from "./adapter/runtime";
 export * from "./adapter/governed";
 export * from "./widget/catalog";
+export * from "./widget/contractCatalog";
 export * from "./compiler/compiler";
 export * from "./compiler/regionResolver";
 export { SimpleEventBus } from "./runtime/eventBus";
@@ -13,6 +14,10 @@ export * from "./runtime/contractState";
 export { DefaultActionInterpreter } from "./runtime/actionInterpreter";
 export * from "./runtime/runtime";
 export * from "./runtime/governedAction";
+export * from "./runtime/replayVerifier";
+export * from "./runtime/witnessedRun";
+export * from "./runtime/witnessedRunSource";
+export * from "./runtime/doctrineLookup";
 export * from "./runtime/modes";
 export * from "./runtime/lifecycle";
 export type {
