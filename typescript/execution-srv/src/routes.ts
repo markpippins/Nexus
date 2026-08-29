@@ -195,77 +195,7 @@ export function createRoutes(pool: Pool): Router {
   //    only when persisted in existing JSON metadata. No browser-side join or
   //    authority decision is performed here.
   // ═══════════════════════════════════════════════════════════════════
-  router.get('/witnessed-runs', async (req: Request, res: Response) => {
-    try {
-      const workflowInstanceId = (req.query.workflow_instance_id as string | undefined)?.trim();
-      const nodeId = (req.query.node_id as string | undefined)?.trim();
-      if (!workflowInstanceId || !nodeId) return badRequest(res, 'workflow_instance_id and node_id are required');
-
-      const { rows } = await pool.query(
-        `SELECT
-           r.id AS request_id,
-           COALESCE(r.metadata->>'workflow_instance_id', r.business_key) AS workflow_instance_id,
-           COALESCE(a.metadata->>'node_id', r.metadata->>'node_id') AS node_id,
-           r.metadata->'envelope' AS envelope,
-           r.metadata->'manifest' AS manifest,
-           r.metadata->'law' AS law,
-           r.metadata->'assessment' AS assessment,
-           r.metadata->'evidence' AS evidence,
-           r.metadata->'replay' AS replay,
-           (SELECT rc.metadata->>'peb_transaction_id' FROM receipts rc WHERE rc.request_id = r.id AND rc.type IN ('PEB_ADMISSION','ADMISSION') ORDER BY rc.issued_at DESC LIMIT 1) AS peb_admission,
-           (SELECT rc.metadata->>'conduit_transition_id' FROM receipts rc WHERE rc.request_id = r.id AND rc.type IN ('CONDUIT_TRANSITION','TRANSITION') ORDER BY rc.issued_at DESC LIMIT 1) AS conduit_transition
-         FROM requests r
-         LEFT JOIN LATERAL (
-           SELECT * FROM attempts a0 WHERE a0.request_id = r.id ORDER BY a0.created_at DESC LIMIT 1
-         ) a ON true
-         WHERE COALESCE(r.metadata->>'workflow_instance_id', r.business_key) = $1
-           AND COALESCE(a.metadata->>'node_id', r.metadata->>'node_id') = $2
-         LIMIT 1`,
-        [workflowInstanceId, nodeId],
-      );
-      if (rows.length === 0) return notFound(res, 'witnessed run not found');
-      const row = rows[0];
-      const envelope = row.envelope ?? {};
-      const manifest = row.manifest ?? {};
-      const law = row.law ?? {};
-      const assessment = row.assessment ?? {};
-      const evidence = row.evidence ?? {};
-      const replay = row.replay ?? {};
-      res.json({
-        projection: {
-          workflow: { instanceId: workflowInstanceId, nodeId },
-          envelope: {
-            id: envelope.id ?? envelope.envelope_id ?? null,
-            evaluationFingerprint: envelope.evaluationFingerprint ?? envelope.evaluation_fingerprint ?? null,
-            contractId: envelope.contractId ?? envelope.contract_id ?? null,
-            contractVersion: envelope.contractVersion ?? envelope.contract_version ?? null,
-            contractDigest: envelope.contractDigest ?? envelope.contract_digest ?? null,
-          },
-          manifest: {
-            id: manifest.id ?? manifest.artifactId ?? manifest.artifact_id ?? null,
-            version: manifest.version ?? manifest.artifactVersion ?? manifest.artifact_version ?? null,
-            digest: manifest.digest ?? manifest.artifactDigest ?? manifest.artifact_digest ?? null,
-          },
-          law: {
-            propositionIds: law.propositionIds ?? law.proposition_ids ?? [],
-            doctrineIds: law.doctrineIds ?? law.doctrine_ids ?? [],
-            evaluatorId: law.evaluatorId ?? law.evaluator_id ?? null,
-          },
-          assessment: {
-            disposition: assessment.disposition ?? null,
-            status: assessment.status ?? null,
-            reason: assessment.reason ?? null,
-          },
-          receipts: { pebAdmission: row.peb_admission, conduitTransition: row.conduit_transition },
-          evidence: { ids: evidence.ids ?? evidence.evidence_ids ?? [], fingerprint: evidence.fingerprint ?? evidence.evidence_fingerprint ?? null },
-          replay: { fixtureId: replay.fixtureId ?? replay.fixture_id ?? null, status: replay.status ?? null },
-          status: 'unknown',
-        },
-      });
-    } catch (err) {
-      sendError(res, err);
-    }
-  });
+  router.get('/witnessed-runs', witnessedRunHandler(pool));
 
   // ═══════════════════════════════════════════════════════════════════
   // 2. LIFECYCLE STATE — the natural aggregate root
@@ -811,4 +741,148 @@ export function createRoutes(pool: Pool): Router {
   });
 
   return router;
+}
+
+/**
+ * GET /api/execution/witnessed-runs handler — extracted so the conformance
+ * test (src/routes.test.ts) can drive it with a mocked pg Pool without
+ * faking the whole Express Router.
+ */
+export function witnessedRunHandler(pool: Pool) {
+  return async (req: Request, res: Response) => {
+    try {
+      const workflowInstanceId = (req.query.workflow_instance_id as string | undefined)?.trim();
+      const nodeId = (req.query.node_id as string | undefined)?.trim();
+      if (!workflowInstanceId || !nodeId) return badRequest(res, 'workflow_instance_id and node_id are required');
+
+      const { rows } = await pool.query(
+        `SELECT
+           r.id AS request_id,
+           COALESCE(r.metadata->>'workflow_instance_id', r.business_key) AS workflow_instance_id,
+           COALESCE(a.metadata->>'node_id', r.metadata->>'node_id') AS node_id,
+           r.metadata->'envelope' AS envelope,
+           r.metadata->'manifest' AS manifest,
+           r.metadata->'law' AS law,
+           r.metadata->'assessment' AS assessment,
+           r.metadata->'evidence' AS evidence,
+           r.metadata->'replay' AS replay,
+           (SELECT rc.metadata->>'peb_transaction_id' FROM receipts rc WHERE rc.request_id = r.id AND rc.type IN ('PEB_ADMISSION','ADMISSION') ORDER BY rc.issued_at DESC LIMIT 1) AS peb_admission,
+           (SELECT rc.metadata->>'conduit_transition_id' FROM receipts rc WHERE rc.request_id = r.id AND rc.type IN ('CONDUIT_TRANSITION','TRANSITION') ORDER BY rc.issued_at DESC LIMIT 1) AS conduit_transition
+         FROM requests r
+         LEFT JOIN LATERAL (
+           SELECT * FROM attempts a0 WHERE a0.request_id = r.id ORDER BY a0.created_at DESC LIMIT 1
+         ) a ON true
+         WHERE COALESCE(r.metadata->>'workflow_instance_id', r.business_key) = $1
+           AND COALESCE(a.metadata->>'node_id', r.metadata->>'node_id') = $2
+         LIMIT 1`,
+        [workflowInstanceId, nodeId],
+      );
+      if (rows.length === 0) return notFound(res, 'witnessed run not found');
+      const row = rows[0];
+      const envelope = row.envelope ?? {};
+      const manifest = row.manifest ?? {};
+      const law = row.law ?? {};
+      const assessment = row.assessment ?? {};
+      const evidence = row.evidence ?? {};
+      const replay = row.replay ?? {};
+      res.json({
+        projection: {
+          workflow: { instanceId: workflowInstanceId, nodeId },
+          envelope: {
+            id: envelope.id ?? envelope.envelope_id ?? null,
+            evaluationFingerprint: envelope.evaluationFingerprint ?? envelope.evaluation_fingerprint ?? null,
+            contractId: envelope.contractId ?? envelope.contract_id ?? null,
+            contractVersion: envelope.contractVersion ?? envelope.contract_version ?? null,
+            contractDigest: envelope.contractDigest ?? envelope.contract_digest ?? null,
+          },
+          manifest: {
+            id: manifest.id ?? manifest.artifactId ?? manifest.artifact_id ?? null,
+            version: manifest.version ?? manifest.artifactVersion ?? manifest.artifact_version ?? null,
+            digest: manifest.digest ?? manifest.artifactDigest ?? manifest.artifact_digest ?? null,
+          },
+          law: {
+            propositionIds: law.propositionIds ?? law.proposition_ids ?? [],
+            doctrineIds: law.doctrineIds ?? law.doctrine_ids ?? [],
+            evaluatorId: law.evaluatorId ?? law.evaluator_id ?? null,
+          },
+          assessment: {
+            disposition: assessment.disposition ?? null,
+            status: assessment.status ?? null,
+            reason: assessment.reason ?? null,
+          },
+          receipts: { pebAdmission: row.peb_admission, conduitTransition: row.conduit_transition },
+          evidence: { ids: evidence.ids ?? evidence.evidence_ids ?? [], fingerprint: evidence.fingerprint ?? evidence.evidence_fingerprint ?? null },
+          replay: { fixtureId: replay.fixtureId ?? replay.fixture_id ?? null, status: replay.status ?? null },
+          status: classifyWitnessedRunStatus({
+            envelope: envelope as Record<string, unknown>,
+            manifest: manifest as Record<string, unknown>,
+            assessment: assessment as Record<string, unknown>,
+            replay: replay as Record<string, unknown>,
+            row: row as Record<string, unknown>,
+          }),
+        },
+      });
+    } catch (err) {
+      sendError(res, err);
+    }
+  };
+}
+
+/**
+ * Canonical witnessed-run state vocabulary, shared with the §10 core
+ * (typescript/§10 core/src/runtime/witnessedRun.ts — `WitnessedRunStatus`).
+ *
+ * This classifier is the AUTHORITATIVE join-state derivation for the read-only
+ * projection: the route calls it server-side and the §10 Manual Mode/provenance
+ * consumers rely on its output rather than re-deriving the join in the browser
+ * (AC4 — no browser-owned reconstruction).
+ *
+ * States:
+ *  - complete:           full authority-relevant lineage present
+ *  - missing_lineage:    a required lineage element is absent (envelope/manifest,
+ *                        PEB admission, Conduit transition, or evidence)
+ *  - unknown:            row exists but carries none of the lineage elements that
+ *                        would let us classify further (indeterminate)
+ *  - stale:              replay/assessment marked stale
+ *  - refusal:            assessment refused / disposition refuse
+ *  - drift:              replay/assessment marked drift
+ *  - duplicate_retry:    replay flagged duplicate retry
+ */
+export type WitnessedRunStatus =
+  | 'complete'
+  | 'missing_lineage'
+  | 'unknown'
+  | 'stale'
+  | 'refusal'
+  | 'drift'
+  | 'duplicate_retry';
+
+export function classifyWitnessedRunStatus(input: {
+  envelope: Record<string, unknown>;
+  manifest: Record<string, unknown>;
+  assessment: Record<string, unknown>;
+  replay: Record<string, unknown>;
+  row: Record<string, unknown>;
+}): WitnessedRunStatus {
+  const { envelope, manifest, assessment, replay, row } = input;
+  // Failure/edge states first — replay is authority-ranked for the conservative verdicts.
+  if (replay.status === 'stale' || assessment.status === 'stale') return 'stale';
+  if (replay.status === 'drift' || assessment.status === 'drift') return 'drift';
+  if (replay.status === 'duplicate_retry') return 'duplicate_retry';
+  if (assessment.status === 'refused' || assessment.disposition === 'refuse') return 'refusal';
+
+  // Lineage completeness (AC1 complete join vs partial/missing lineage).
+  const envelopeId = (envelope.id ?? envelope.envelope_id) as string | undefined;
+  const fingerprint = envelope.evaluationFingerprint ?? envelope.evaluation_fingerprint;
+  if (!envelopeId || !fingerprint) return 'missing_lineage';
+  const manifestId =
+    (manifest.id ?? manifest.artifact_id ?? manifest.artifactId) as string | undefined;
+  if (!manifestId) return 'missing_lineage';
+  const evidenceBlob = row.evidence as Record<string, unknown> | undefined;
+  const evidenceIds = (evidenceBlob?.ids ?? evidenceBlob?.evidence_ids) as string[] | undefined;
+  if (!row.peb_admission || !row.conduit_transition || !evidenceIds || evidenceIds.length === 0) {
+    return 'missing_lineage';
+  }
+
+  return 'complete';
 }

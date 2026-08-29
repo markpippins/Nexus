@@ -32,7 +32,11 @@ export class FetchWitnessedRunSource implements WitnessedRunSource {
     if (!body || typeof body !== "object" || !("projection" in body)) {
       throw new WitnessedRunSourceError("Witnessed-run response is invalid", "INVALID_SOURCE_RESPONSE");
     }
-    return (body as { projection: WitnessedRunProjection }).projection;
+    const projection = (body as { projection: unknown }).projection;
+    if (!projection || typeof projection !== "object") {
+      throw new WitnessedRunSourceError("Witnessed-run projection is invalid", "INVALID_SOURCE_PROJECTION");
+    }
+    return projection as WitnessedRunProjection;
   }
 }
 
