@@ -253,6 +253,31 @@ async function emitRoleLifecycleEvent(
   }
 }
 
+/**
+ * Route tags for role-lease lifecycle agent records (revoked / swept /
+ * exhausted). wr-conf / leased-builder conformance suites create synthetic
+ * test leases (roles like `wr-conf-002` / `wr_conf_*`, models like `test/...`);
+ * their lifecycle records must NOT tag real interactive roles — that floods
+ * real-role inboxes (R17 pointer checks) with harness noise (to-do 41505e71).
+ * Synthetic leases are routed to a `to:wr-conf-observer` tag instead; the
+ * domain tags (`type:*`, `role:*`, `domain:*`) and the record itself (audit
+ * trail) are unchanged.
+ */
+function roleLeaseRecordTags(
+  baseTags: string[],
+  role: string,
+  model: string | null | undefined,
+): string[] {
+  const synthetic =
+    /^wr[_-]conf/i.test(role) ||
+    (typeof model === 'string' && model.trim().startsWith('test/'));
+  if (!synthetic) return baseTags;
+  const REAL_TO =
+    /^to:(architect|engineer|engineer-ii|planner|reviewer|analyst|devops|topologist|inspector|critic)$/;
+  const domain = baseTags.filter((t) => !REAL_TO.test(t));
+  return [...domain, 'to:wr-conf-observer'];
+}
+
 export function createRoutes(pool: Pool): Router {
   const router = Router();
 
@@ -7123,7 +7148,7 @@ export function createRoutes(pool: Pool): Router {
           'architect',
           `Role lease revoked: ${updated.role} (${updated.channel || 'unknown'})`,
           `## Role lease revoked\n\n- **Role:** ${updated.role}\n- **Channel:** ${updated.channel || 'unknown'}\n- **Model:** ${updated.model || 'unknown'}\n- **Lease ID:** ${updated.id}\n- **Released at:** ${now}\n\nExplicit revoke (D-008 R3). The authorization envelope is withdrawn; history preserved.`,
-          ['type:lease-revoked', 'to:architect', 'to:engineer', `role:${updated.role}`],
+          roleLeaseRecordTags(['type:lease-revoked', 'to:architect', 'to:engineer', `role:${updated.role}`], updated.role, updated.model),
           now,
           updated.model || null
         ]
@@ -7247,7 +7272,7 @@ export function createRoutes(pool: Pool): Router {
               'engineer',
               `Stale role lease swept: ${lease.role} (${lease.channel})`,
               `## Stale role lease swept (D-007 R5)\n\n- **Role:** ${lease.role}\n- **Channel:** ${lease.channel}\n- **Lease ID:** ${lease.id}\n- **Window end:** ${lease.window_end}\n- **Model:** ${lease.model || 'unknown'}\n\nTransitioned ACTIVE → EXPIRED (window exceeded). No work was revoked mid-session; EXPIRED marks the lease as past its window for the worker-pool gate.`,
-              ['type:drift-finding', 'to:engineer', 'to:architect', 'domain:role-leases'],
+              roleLeaseRecordTags(['type:drift-finding', 'to:engineer', 'to:architect', 'domain:role-leases'], lease.role, lease.model),
               now,
               lease.model || null
             ]
@@ -7376,7 +7401,7 @@ export function createRoutes(pool: Pool): Router {
 - **Lease ID:** ${lease.id}
 
 The lease has been auto-revoked. Issue a new lease to resume work.`,
-              ['type:lease-exhausted', 'to:architect', 'to:engineer', `role:${role}`],
+              roleLeaseRecordTags(['type:lease-exhausted', 'to:architect', 'to:engineer', `role:${role}`], role, lease.model),
               now,
               lease.model || null
             ]
