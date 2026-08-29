@@ -1,0 +1,20 @@
+[Unit]
+Description=Mail Updates — pull notifications@github.com email from Gmail and post it to the nexus github forum
+Documentation=https://github.com/markpippins/nexus/tree/dev/ballerina/mail-updates
+After=network.target assembly-srv.service
+Wants=network.target
+
+[Service]
+Type=oneshot
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/ballerina/mail-updates
+ExecStart=/usr/bin/java -jar /home/codex/dev/nexus/ballerina/mail-updates/target/bin/mail_updates.jar
+
+# Config.toml (gitignored, chmod 600) holds the OAuth refresh token + client
+# creds; state.json tracks already-posted message ids for idempotency.
+ReadWritePaths=/home/codex/dev/nexus/ballerina/mail-updates
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

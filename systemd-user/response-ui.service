@@ -1,0 +1,38 @@
+[Unit]
+# response-ui — Response React + Vite UI on :4299 (prod build serving dist/ and
+# proxying /api/* to the response-service on :4400, with OAuth). Lives at
+# ~/dev/response/ui. Uses the esbuild-compiled prod server (dist/server.cjs);
+# NODE_ENV=production routes it to the static + proxy path (not the vite dev
+# middleware). Not registered in terrain's runnable-services.
+Description=Response UI (React/Vite, port 4299)
+After=network.target postgresql.service response-service.service
+Wants=network.target response-service.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/response/ui
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=NODE_ENV=production
+Environment=PORT=4299
+Environment=SERVICE_PORT=4400
+Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr/bin:/bin
+
+# ── Executable (prod server) ───────────────────────────────────────────
+ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/node dist/server.cjs
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart policy ─────────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=5
+
+# ── Logging ────────────────────────────────────────────────────────────
+StandardOutput=append:/home/codex/dev/response/logs/ui.log
+StandardError=append:/home/codex/dev/response/logs/ui.log
+
+[Install]
+WantedBy=default.target
