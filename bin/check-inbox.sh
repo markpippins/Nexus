@@ -181,7 +181,13 @@ try:
         header = "# inbox for %s since %s (limit %d)" % (role, pointer or "(none)", limit)
     else:
         # Explicit-pointer / --all path: nebula_list_agent_records with tag filter.
-        arguments = {"role": role, "tags": ["to:" + role], "limit": limit}
+        # Match the default nebula_get_inbox path: filter by the routing tag
+        # `to:<role>` ONLY — NOT by author `role` (records addressed to a
+        # role come from OTHER roles). Passing both `role` + `tag` would
+        # intersect to zero. Key must be `tag` (singular): `tags` (plural) is
+        # silently stripped by the tool schema, dropping the filter (issue
+        # #75).
+        arguments = {"tag": ["to:" + role], "limit": limit}
         if pointer:
             arguments["createdAfter"] = pointer
         result = client.call("nebula_list_agent_records", arguments)
