@@ -295,8 +295,53 @@ function mapAggregate(raw: any): PlatformAggregateState {
 }
 
 // ── CI-gateway (ballerina :9095 via /gateway passthrough) ──────────
+// The ci-gateway moat fronts external systems (Jenkins/SonarQube on vanadium,
+// Ballerina Central). Those upstreams may be offline (e.g. running barbie on a
+// laptop without vanadium). We surface a structured, typed error so the views
+// can render an explicit "unavailable" state instead of a fake-empty table.
+
+export class GatewayUpstreamError extends Error {
+  status: number;
+  upstream?: string;
+  detail?: string;
+  constructor(status: number, message: string, upstream?: string, detail?: string) {
+    super(message);
+    this.name = 'GatewayUpstreamError';
+    this.status = status;
+    this.upstream = upstream;
+    this.detail = detail;
+  }
+}
+
 async function gatewayJson<T>(path: string): Promise<T> {
-  const env = await fetchJson<{ data: T }>(`/gateway${path}`);
+  let res: Response;
+  try {
+    res = await fetch(`/gateway${path}`, { headers: { 'Content-Type': 'application/json' } });
+  } catch (e: any) {
+    // ci-gateway itself unreachable (barbie proxy -> :9095).
+    throw new GatewayUpstreamError(0, `CI gateway unreachable: ${e?.message ?? e}`, 'ci-gateway', e?.message ?? String(e));
+  }
+
+  const text = await res.text().catch(() => '');
+  if (!res.ok) {
+    // ci-gateway returns 502 {status:"upstream-failure", upstream, detail}
+    // when the upstream (vanadium's Jenkins/Sonar, or Ballerina Central) is down.
+    let upstream: string | undefined;
+    let detail: string | undefined;
+    try {
+      const parsed = JSON.parse(text);
+      if (typeof parsed?.upstream === 'string') upstream = parsed.upstream;
+      if (typeof parsed?.detail === 'string') detail = parsed.detail;
+    } catch { /* not JSON — fall through */ }
+    throw new GatewayUpstreamError(res.status, `Gateway error ${res.status}: ${text || res.statusText}`, upstream, detail);
+  }
+
+  let env: { data: T };
+  try {
+    env = JSON.parse(text);
+  } catch {
+    throw new GatewayUpstreamError(0, 'Gateway returned non-JSON response', undefined, text.slice(0, 200));
+  }
   return env.data;
 }
 
