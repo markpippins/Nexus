@@ -345,6 +345,28 @@ vocabulary is the target.
 
 ---
 
+## 13. absorb → cascade.events (subject `nexus.absorb.v1.*`)
+
+Ingest (absorb) run lifecycle — plan 0003. Emitter: `python/absorb/absorb/emitter.py`
+publishes to NATS (`nexus.absorb.v1.<event_type>`, shared `CanonicalEnvelope`);
+`bus_mirror.py` projects into `cascade.events` (idempotent `ON CONFLICT (event_id) DO NOTHING`).
+Envelope columns: `aggregate_type`/`aggregate_id` travel in the envelope payload;
+`correlation_id` = batch/run id; `causation_id` chains step-to-step.
+
+| # | Lifecycle occurrence | Canonical event type | Publish? | Payload keys |
+|---|---|---|---|---|
+| 1 | Batch run begins | `run.started` | **Yes** | profile_id, version, planned_count |
+| 2 | A source completed (content-hash aggregated) | `source.completed` | **Yes** | run_id, source_hash, watermark |
+| 3 | A step failed (C1 taxonomy) | `step.failed` | **Yes** | run_id, step, error_code, retryable |
+| 4 | Batch run ends (terminal outcome) | `run.completed` | **Yes** | counts, warnings, policy_skips |
+
+Registered per AC2 of plan 0003. No step-level completion events (deferred —
+~7k events for the full corpus ruled excessive). Publish is best-effort and
+failure-isolated (AC4); sent/dropped counters surface in the run-summary
+warnings.
+
+---
+
 ## Next wave (same method, not yet collapsed)
 
 - `bin/` operational script surface (v2 §28)
