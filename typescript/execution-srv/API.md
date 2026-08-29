@@ -5,7 +5,7 @@
 
 Read-only API over the execution schema: requests, leases, attempts, receipts, integrity scans, and cross-schema lineage.
 
-**15 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**16 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -23,6 +23,7 @@ Read-only API over the execution schema: requests, leases, attempts, receipts, i
 | GET | `/api/execution/requests/:id/attempts` | 4. ATTEMPT/LEASE/REQUEST TREE GET /api/execution/requests/{id}/attempts Every attempt for this request, each attempt's lease, chronological. |
 | GET | `/api/execution/requests/:id/receipts/lineage` | GET /api/execution/requests/{id}/receipts/lineage Split by lineage_source: native vs backfilled vs unknown. |
 | GET | `/api/execution/requests/:id/state` | GET /api/execution/requests/{id}/state Returns the request, its current lease (if any), its latest attempt, and all of its receipts — the "where does this stand right now" view that currently requires four joins nobody's written yet. |
+| GET | `/api/execution/witnessed-runs` | This endpoint deliberately exposes nullable lineage fields. The execution schema currently owns request/attempt/receipt identity; envelope, manifest, SOL, evidence, and replay identities are returned only when persisted in existing JSON metadata. No browser-side join or authority decision is perform |
 | GET | `/health` | Health Check Two-level health: process-up + DB-reachable. The integrity-scan endpoint (/api/execution/health/integrity-scan) is the deeper check. |
 
 ## Regeneration
@@ -33,6 +34,7 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
 
 
 
