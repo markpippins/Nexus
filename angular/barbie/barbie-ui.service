@@ -8,8 +8,11 @@ WorkingDirectory=/home/codex/dev/nexus/angular/barbie
 ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/node /home/codex/dev/nexus/angular/barbie/dist/server.cjs
 Environment=PORT=3010
 Environment=NODE_ENV=production
+# Primary backend only. FEDERATED_BACKEND_URLS=vd@... was removed 2026-08-29:
+# the vanadium peer (192.168.1.209:8085) was torn down (engineer-ii teardown);
+# the dead peer made every aggregate/list GET stall ~10s on fetchWithTimeout wait
+# against an unreachable host.
 Environment=BACKEND_URL=http://localhost:8085
-Environment=FEDERATED_BACKEND_URLS=vd@http://192.168.1.209:8085
 Restart=on-failure
 RestartSec=5
 

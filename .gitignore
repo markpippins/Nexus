@@ -68,6 +68,13 @@ docs/HISTORY/
 # Runtime output artifacts
 .artifacts/
 .receipts/
+
+# Separate/standalone repos checked out inside the nexus tree (never tracked here)
+angular/application-host/
+angular/atlas-ui/
+
+# Local backup artifacts (timestamped, generated)
+.atlas-backups/
 .runtime/
 
 # Temp / test files

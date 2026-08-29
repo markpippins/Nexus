@@ -1,0 +1,38 @@
+[Unit]
+# response-service — Response Express API (Gmail/Calendar/Contacts/Drive/Gemini/PG CRUD,
+# GitHub-notifications sync) on :4400. Lives at ~/dev/response/service.
+# Started as the counterpart to the response-ui Vite app; terrain-registered as
+# an Express runnable service (serviceTypeId 14). Uses the prod esbuild bundle
+# (dist/index.mjs) so no dev toolchain is needed at runtime. .env is loaded by
+# dotenv/config from the working directory.
+Description=Response Service (Express API, port 4400)
+After=network.target postgresql.service redis.service
+Wants=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/response/service
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=NODE_ENV=production
+Environment=PORT=4400
+Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr/bin:/bin
+
+# ── Executable (prod bundle) ───────────────────────────────────────────
+ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/node dist/index.mjs
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart policy ─────────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=5
+
+# ── Logging ────────────────────────────────────────────────────────────
+StandardOutput=append:/home/codex/dev/response/logs/service.log
+StandardError=append:/home/codex/dev/response/logs/service.log
+
+[Install]
+WantedBy=default.target
