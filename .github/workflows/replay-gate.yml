@@ -1,0 +1,102 @@
+# W3.04 — Cross-runtime replay conformance release gate
+#
+# A dedicated RELEASE GATE (workflow_dispatch + release tags), separate from
+# the per-PR CI (ci.yml). It proves Python / JVM / TS replay parity on the
+# shared, version-controlled agreement surface:
+#
+#   - python/governance-envelope/replay_fixtures/F01..F07.json
+#   - python/governance-envelope/jvm/expected-digests.json
+#
+# Fail-closed: any fixture failure, drift-classification miss, JVM parity
+# mismatch, or manifest drift fails the gate.
+
+name: Replay Conformance Release Gate
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  python-replay:
+    name: Python replay conformance + AC4 digest emission
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run Python replay conformance harness
+        working-directory: python/governance-envelope
+        run: |
+          python3 bin/run_replay_conformance.py
+
+      - name: Assert expected-digests.json is byte-identical to committed manifest
+        run: |
+          git diff --exit-code -- python/governance-envelope/jvm/expected-digests.json \
+            || { echo "::error::expected-digests.json drifted from committed manifest (AC4 byte-stability)"; exit 1; }
+
+      - name: Upload Python harness output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-replay-conformance
+          path: |
+            python/governance-envelope/jvm/expected-digests.json
+          if-no-files-found: error
+
+  typescript-conformance:
+    name: TypeScript §10 core conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run §10 core replay conformance
+        working-directory: typescript/§10 core
+        run: |
+          npm install --no-audit --no-fund
+          npx tsx scripts/run-replay-conformance.ts
+          npx tsx scripts/run-witnessed-run-conformance.ts
+          npx tsx scripts/run-doctrine-lookup-conformance.ts
+
+  jvm-verifier:
+    name: JVM replay verifier (release gate re-run)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Run JVM verifier (fixtures + fingerprint parity + drift matrix)
+        run: mvn -B -f jvm/pom.xml -pl spring/conformance-verifier test
+
+      - name: Upload verifier surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: replay-gate-verifier-reports
+          path: jvm/spring/conformance-verifier/target/surefire-reports/**
+          if-no-files-found: error
+
+  gate:
+    name: Release gate (all runtimes must pass)
+    runs-on: ubuntu-latest
+    needs: [python-replay, typescript-conformance, jvm-verifier]
+    steps:
+      - name: All runtimes passed
+        run: echo "Cross-runtime replay parity confirmed — release gate passed."
