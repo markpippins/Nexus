@@ -404,3 +404,96 @@ class TestAc7AdmissionEnforcement(unittest.TestCase):
         admission = body.get("admission", {})
         self.assertEqual(admission.get("outcome"), "ADMISSION_DENIED")
         self.assertEqual(admission.get("reason"), "NO_CONFIG")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  AC8 — Inbox pollution guard: synthetic test records must not tag real
+#        interactive roles (to-do 41505e71)
+# ═══════════════════════════════════════════════════════════════════════
+
+REAL_ROLE_TAGS = ("to:architect", "to:engineer", "to:planner",
+                  "to:engineer-ii", "to:devops", "to:reviewer",
+                  "to:analyst", "to:topologist", "to:inspector",
+                  "to:critic")
+
+
+def _recent_records_from_test_model(limit: int = 50) -> list:
+    """Return recent agent records whose model is a test/* harness model."""
+    resp = _get(f"/api/agent-records?limit={limit}")
+    out = []
+    for item in resp.get("items", []):
+        model = item.get("model") or ""
+        if str(model).strip().startswith("test/"):
+            out.append(item)
+    return out
+
+
+class TestAc8InboxPollutionGuard(unittest.TestCase):
+    """to-do 41505e71: test-emitted lease records must not carry
+    to:<real-role> tags. The audit trail stays (records still written and
+    queryable by domain tags), but routing must not flood real-role inboxes."""
+
+    def setUp(self):
+        _cleanup_leases()
+
+    def tearDown(self):
+        _cleanup_leases()
+
+    def test_test_model_exhaustion_record_has_no_real_role_tag(self):
+        """Exhausting a test-model lease emits a record routed to
+        to:wr-conf-observer, never to:architect/to:engineer/etc."""
+        _issue_lease(budget=1)
+        _consume()
+        time.sleep(0.7)  # allow async record emission
+        records = _recent_records_from_test_model()
+        matched = [r for r in records if "type:lease-exhausted" in (r.get("tags") or [])]
+        self.assertGreaterEqual(
+            len(matched), 1,
+            "expected at least one type:lease-exhausted record from test model"
+        )
+        for r in matched:
+            tags = r.get("tags") or []
+            for real in REAL_ROLE_TAGS:
+                self.assertNotIn(
+                    real, tags,
+                    f"test-model record {r.get('id')} must not carry {real}: {tags}"
+                )
+            self.assertIn("to:wr-conf-observer", tags,
+                          f"test-model record {r.get('id')} should route to wr-conf-observer: {tags}")
+
+    def test_test_model_revoke_record_has_no_real_role_tag(self):
+        """Explicitly revoking a test-model lease emits a type:lease-revoked
+        record routed to to:wr-conf-observer, never to a real role."""
+        lease = _issue_lease(budget=5)
+        _revoke(lease["id"])
+        time.sleep(0.7)
+        records = _recent_records_from_test_model()
+        matched = [r for r in records if "type:lease-revoked" in (r.get("tags") or [])]
+        self.assertGreaterEqual(
+            len(matched), 1,
+            "expected at least one type:lease-revoked record from test model"
+        )
+        for r in matched:
+            tags = r.get("tags") or []
+            for real in REAL_ROLE_TAGS:
+                self.assertNotIn(
+                    real, tags,
+                    f"test-model record {r.get('id')} must not carry {real}: {tags}"
+                )
+
+    def test_guard_full_run_zero_new_real_role_records(self):
+        """A full wr-conf-002 lifecycle (issue → consume → exhaust) produces
+        zero NEW records tagged to any real interactive role from test models.
+        Records for real interactive roles are untouched."""
+        _issue_lease(budget=2)
+        _consume()
+        _consume()
+        time.sleep(0.7)
+        records = _recent_records_from_test_model()
+        for r in records:
+            tags = r.get("tags") or []
+            for real in REAL_ROLE_TAGS:
+                self.assertNotIn(
+                    real, tags,
+                    f"guard: test-model record {r.get('id')} carries {real}: {tags}"
+                )

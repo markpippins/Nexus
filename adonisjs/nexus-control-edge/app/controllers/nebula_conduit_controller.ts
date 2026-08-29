@@ -23,6 +23,27 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   CANCELLED: [],
 }
 
+/**
+ * Route tags for role-lease lifecycle agent records (revoked / swept /
+ * exhausted). wr-conf / leased-builder conformance suites create synthetic
+ * test leases (roles like `wr-conf-002` / `wr_conf_*`, models like `test/...`);
+ * their lifecycle records must NOT tag real interactive roles — that floods
+ * real-role inboxes (R17 pointer checks) with harness noise (to-do 41505e71).
+ * Synthetic leases are routed to a `to:wr-conf-observer` tag instead; the
+ * domain tags (`type:*`, `role:*`, `domain:*`) and the record itself (audit
+ * trail) are unchanged. Mirrors roleLeaseRecordTags in nebula-srv routes.ts.
+ */
+function roleLeaseRecordTags(baseTags: string[], role: string, model: string | null | undefined): string[] {
+  const synthetic =
+    /^wr[_-]conf/i.test(role) ||
+    (typeof model === 'string' && model.trim().startsWith('test/'))
+  if (!synthetic) return baseTags
+  const REAL_TO =
+    /^to:(architect|engineer|engineer-ii|planner|reviewer|analyst|devops|topologist|inspector|critic)$/
+  const domain = baseTags.filter((t) => !REAL_TO.test(t))
+  return [...domain, 'to:wr-conf-observer']
+}
+
 export default class NebulaConduitController {
   // ── CONDUIT — plan history & point-in-time queries ──────────────────
 
@@ -673,7 +694,7 @@ export default class NebulaConduitController {
               'architect',
               `Role-lease exhausted: ${role} (${lease.consumed_units}/${lease.budget_units})`,
               `## Role lease exhausted\n\n- **Role:** ${role}\n- **Channel:** ${lease.channel || 'unknown'}\n- **Model:** ${lease.model || 'unknown'}\n- **Consumed:** ${lease.consumed_units}/${lease.budget_units}\n- **Window end:** ${lease.window_end}\n- **Lease ID:** ${lease.id}\n\nThe lease has been auto-revoked. Issue a new lease to resume work.`,
-              ['type:lease-exhausted', 'to:architect', 'to:engineer', `role:${role}`],
+              roleLeaseRecordTags(['type:lease-exhausted', 'to:architect', 'to:engineer', `role:${role}`], role, lease.model),
               now,
               now,
               lease.model || null
