@@ -50,9 +50,9 @@ class ScannerService:
         
     async def _init_clients(self):
         """Initialize database clients if not already done"""
-        if not self.redis_client:
+        if self.redis_client is None:
             self.redis_client = get_redis()
-        if not self.mongodb:
+        if self.mongodb is None:
             self.mongodb = get_mongodb()
 
     async def _redis(self, method: str, *args, default=None, **kwargs):
@@ -74,16 +74,19 @@ class ScannerService:
         await self._init_clients()
         
         from database import async_session_maker
+        from sqlalchemy import select
+
         async with async_session_maker() as session:
-            # TODO: Query all enabled library paths
-            # For now, use a placeholder
-            library_paths = ["/media/music", "/media/videos"]  # Placeholder
+            result = await session.execute(
+                select(LibraryPath).where(LibraryPath.scan_enabled == True)
+            )
+            libraries = result.scalars().all()
             
-        for path in library_paths:
-            if os.path.exists(path) and os.access(path, os.R_OK):
-                await self.scan_path(path)
-            else:
-                logger.warning("Path not accessible", path=path)
+            for lib in libraries:
+                if os.path.exists(lib.path) and os.access(lib.path, os.R_OK):
+                    await self.scan_path(lib.path, deep_scan=lib.deep_scan)
+                else:
+                    logger.warning("Path not accessible", path=lib.path)
     
     async def scan_path(self, root_path: str, deep_scan: bool = False):
         """
@@ -379,7 +382,7 @@ class ScannerService:
                 "status": "running",
                 "files_processed": 0,
                 "deep_scan": str(deep_scan),
-                "resume": False,
+                "resume": 0,
                 "current_directory": "",
                 "completed_files": "[]",  # JSON list of completed files
                 "remaining_queue": "[]"   # JSON list of remaining files

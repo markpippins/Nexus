@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     
     # Database URLs
     redis_url: str = Field(default="redis://localhost:6379", description="Redis connection URL")
-    mongodb_url: str = Field(default="mongodb://localhost:27017/media_metadata", description="MongoDB connection URL (credentials should be included in environment variable)")
+    mongodb_url: str = Field(default="mongodb://mongoUser:somePassword@localhost:27017/media_metadata?authSource=admin", description="MongoDB connection URL")
     mysql_url: str = Field(default="mysql://root:rootpass@localhost:3306/mysql", description="MySQL connection URL")
     
     # MongoDB settings

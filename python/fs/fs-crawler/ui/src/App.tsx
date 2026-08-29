@@ -9,25 +9,14 @@ import Statistics from './pages/Statistics'
 
 function App() {
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <Layout>
-        <Box
-          component="main"
-          sx={{
-            flexGrow: 1,
-            padding: { xs: 2, sm: 3 },
-            width: { sm: `calc(100% - 280px)` },
-            minHeight: '100vh',
-            backgroundColor: 'background.default',
-          }}
-        >
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/libraries" element={<Libraries />} />
-            <Route path="/scanning" element={<Scanning />} />
-            <Route path="/statistics" element={<Statistics />} />
-          </Routes>
-        </Box>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/libraries" element={<Libraries />} />
+          <Route path="/scanning" element={<Scanning />} />
+          <Route path="/statistics" element={<Statistics />} />
+        </Routes>
       </Layout>
     </Box>
   )

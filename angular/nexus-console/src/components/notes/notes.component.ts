@@ -43,6 +43,8 @@ export class NotesComponent implements OnDestroy {
     return '<p>Error: Markdown parsing libraries not loaded.</p>';
   });
 
+  private lastLoadedPath: string | null = null;
+
   constructor() {
     effect(() => {
       // When path changes, load the note for the new path.
