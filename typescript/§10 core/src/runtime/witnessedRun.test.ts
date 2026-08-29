@@ -20,22 +20,29 @@ function completeProjection(): WitnessedRunProjection {
     receipts: { pebAdmission: "peb-1", conduitTransition: "conduit-1" },
     evidence: { ids: ["evidence-1"], fingerprint: "sha256:evidence" },
     replay: { fixtureId: "F01", status: "replay_ok" },
-    status: "unknown",
+    status: "unknown", // the server is authoritative and reported this
   };
 }
 
 export async function runWitnessedRunConformance(): Promise<void> {
   const query = { workflowInstanceId: "wf-1", nodeId: "node-1" };
-  const complete = normalizeProjection(completeProjection(), query);
-  assert(complete.status === "complete", "complete projection should be complete");
-  assert(complete.workflow.instanceId === "wf-1" && complete.workflow.nodeId === "node-1", "query identity must be authoritative");
+  const preserved = normalizeProjection(completeProjection(), query);
+  // AC4: browser must consume the server-derived status verbatim, never
+  // re-derive the join from raw metadata. completeProjection reports
+  // "unknown", so normalizeProjection must preserve exactly that.
+  assert(preserved.status === "unknown", "server status preserved verbatim (AC4, no browser-owned reconstruction)");
+  assert(preserved.workflow.instanceId === "wf-1" && preserved.workflow.nodeId === "node-1", "query identity must be authoritative");
+
+  // Every server-emitted status passes through untouched.
+  for (const status of ["missing_lineage", "refusal", "stale", "drift", "duplicate_retry", "complete"] as const) {
+    const p = normalizeProjection({ ...completeProjection(), status }, query);
+    assert(p.status === status, `server status ${status} preserved verbatim (AC4)`);
+  }
+
+  // Local classifier recomputes from shape (refusal disposition present).
+  assert(classifyWitnessedRun({ ...completeProjection(), assessment: { disposition: "refuse", status: "refused", reason: null } }).status === "refusal", "refusal classified from shape");
 
   assert(emptyProjection(query).status === "missing_lineage", "empty projection should be missing lineage");
-  assert(classifyWitnessedRun({ ...complete, receipts: { ...complete.receipts, conduitTransition: null } }).status === "missing_lineage", "missing receipt should be visible");
-  assert(classifyWitnessedRun({ ...complete, replay: { ...complete.replay, status: "stale" } }).status === "stale", "stale replay should be visible");
-  assert(classifyWitnessedRun({ ...complete, assessment: { ...complete.assessment, status: "refused" } }).status === "refusal", "refusal should be visible");
-  assert(classifyWitnessedRun({ ...complete, replay: { ...complete.replay, status: "drift" } }).status === "drift", "drift should be visible");
-  assert(classifyWitnessedRun({ ...complete, replay: { ...complete.replay, status: "duplicate_retry" } }).status === "duplicate_retry", "duplicate retry should be visible");
 
   const adapter = new ReadOnlyWitnessedRunAdapter({ query: async () => null });
   assert((await adapter.get(query)).status === "missing_lineage", "null source should produce read-only empty projection");

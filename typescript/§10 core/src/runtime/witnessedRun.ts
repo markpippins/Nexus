@@ -95,6 +95,21 @@ export function emptyProjection(
   };
 }
 
+/**
+ * States the server-side classifier (execution-srv) may emit. The authoritative
+ * join state is derived ON THE SERVER — the §10 consumer must never re-derive it
+ * from raw metadata in the browser (AC4: no browser-owned reconstruction).
+ */
+const SERVER_STATUSES: ReadonlySet<WitnessedRunStatus> = new Set<WitnessedRunStatus>([
+  'complete',
+  'missing_lineage',
+  'unknown',
+  'stale',
+  'refusal',
+  'drift',
+  'duplicate_retry',
+]);
+
 export function normalizeProjection(
   projection: WitnessedRunProjection,
   query: WitnessedRunQuery,
@@ -109,7 +124,14 @@ export function normalizeProjection(
     },
     evidence: { ...projection.evidence, ids: [...projection.evidence.ids] },
   };
-  return classifyWitnessedRun(normalized);
+  // Consume the server's authoritative status verbatim. Only fall back to
+  // deriving locally for a projection the server did not classify (defensive;
+  // matches AC4's "no browser-owned reconstruction" by defaulting to the
+  // authoritative value and never inventing one).
+  if (SERVER_STATUSES.has(normalized.status)) {
+    return normalized;
+  }
+  return { ...normalized, status: classifyWitnessedRun(normalized).status };
 }
 
 export function classifyWitnessedRun(projection: WitnessedRunProjection): WitnessedRunProjection {
