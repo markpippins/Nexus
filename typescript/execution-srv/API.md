@@ -5,7 +5,7 @@
 
 Read-only API over the execution schema: requests, leases, attempts, receipts, integrity scans, and cross-schema lineage.
 
-**16 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**19 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -17,6 +17,8 @@ Read-only API over the execution schema: requests, leases, attempts, receipts, i
 | GET | `/api/execution/leases` |  |
 | GET | `/api/execution/leases/:id/lifecycle` | GET /api/execution/leases/{id}/lifecycle acquired_at → expires_at → released_at, actual vs promised. Computes how long the lease was actually held (or how long it's been held so far if still ACTIVE), and how that compares to the promised TTL. |
 | GET | `/api/execution/leases/stale` | 2. LEASE INTEGRITY — the expiry gap, made visible GET /api/execution/leases/stale Active leases whose expires_at < now() — the enforcement gap made queryable. Returns each stale lease joined to its request so callers see the executor that is holding dead ground. |
+| GET | `/api/execution/metrics` | GET /api/execution/metrics JSON snapshot of governance metric families. Values are derived from live classification/query outcomes and correlate to envelope and receipt identities — never payloads. |
+| GET | `/api/execution/projections/witnessed-runs` | W3.08 — versioned governed projection for downstream consumers. |
 | GET | `/api/execution/receipts` |  |
 | GET | `/api/execution/receipts/:id/pipeline-origin` | Follows lineage_original_id → vision.receipts.id and returns both records side by side, explicitly labeled by which audit trail each came from. Doesn't pretend there's one canonical receipt — it shows the seam. |
 | GET | `/api/execution/requests` | GET /api/execution/receipts ?type=&search=&limit=20&offset=0 Each returns { total, limit, offset, items: [...] } with DB-native column shapes. See DRIFT.md in execution-ui for field-name differences from the UI's expected TypeScript types. |
@@ -24,6 +26,7 @@ Read-only API over the execution schema: requests, leases, attempts, receipts, i
 | GET | `/api/execution/requests/:id/receipts/lineage` | GET /api/execution/requests/{id}/receipts/lineage Split by lineage_source: native vs backfilled vs unknown. |
 | GET | `/api/execution/requests/:id/state` | GET /api/execution/requests/{id}/state Returns the request, its current lease (if any), its latest attempt, and all of its receipts — the "where does this stand right now" view that currently requires four joins nobody's written yet. |
 | GET | `/api/execution/witnessed-runs` | This endpoint deliberately exposes nullable lineage fields. The execution schema currently owns request/attempt/receipt identity; envelope, manifest, SOL, evidence, and replay identities are returned only when persisted in existing JSON metadata. No browser-side join or authority decision is perform |
+| GET | `/api/execution/witnessed-runs/diagnostics` | Server-derived health summary for one witnessed run: authoritative status, enumerated missing lineage elements, receipt correlation validity, replay state. Correlates to immutable envelope and receipt identities — never reconstructs authority browser-side (AC4). |
 | GET | `/health` | Health Check Two-level health: process-up + DB-reachable. The integrity-scan endpoint (/api/execution/health/integrity-scan) is the deeper check. |
 
 ## Regeneration
@@ -34,6 +37,7 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
 
 
 
