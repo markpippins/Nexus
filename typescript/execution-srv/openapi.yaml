@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: execution-srv — Execution Observability API
-  version: 1.0.ca94caa7
+  version: 1.0.71abc922
   description: 'Read-only API over the execution schema: requests, leases, attempts, receipts, integrity scans, and cross-schema
     lineage.
 
@@ -272,6 +272,69 @@ paths:
                 $ref: '#/components/schemas/Error'
       summary: 2. LEASE INTEGRITY — the expiry gap, made visible GET /api/execution/leases/stale Active leases whose expires_at
         < now() — the enforcement g
+  /api/execution/metrics:
+    get:
+      tags:
+      - execution
+      operationId: get_execution_metrics
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: GET /api/execution/metrics JSON snapshot of governance metric families. Values are derived from live classification/query
+        outcomes and corre
+  /api/execution/projections/witnessed-runs:
+    get:
+      tags:
+      - execution
+      operationId: get_execution_projections_witnessed_runs
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: W3.08 — versioned governed projection for downstream consumers.
   /api/execution/receipts:
     get:
       tags:
@@ -517,6 +580,38 @@ paths:
                 $ref: '#/components/schemas/Error'
       summary: 'This endpoint deliberately exposes nullable lineage fields. The execution schema currently owns request/attempt/receipt
         identity; envelope, '
+  /api/execution/witnessed-runs/diagnostics:
+    get:
+      tags:
+      - execution
+      operationId: get_execution_witnessed_runs_diagnostics
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'Server-derived health summary for one witnessed run: authoritative status, enumerated missing lineage elements,
+        receipt correlation validity'
   /health:
     get:
       tags:
