@@ -197,6 +197,9 @@ export function createRoutes(pool: Pool): Router {
   // ═══════════════════════════════════════════════════════════════════
   router.get('/witnessed-runs', witnessedRunHandler(pool));
 
+  // W3.08 — versioned governed projection for downstream consumers.
+  router.get('/projections/witnessed-runs', witnessedRunProjectionHandler(pool));
+
   // ═══════════════════════════════════════════════════════════════════
   // 2. LIFECYCLE STATE — the natural aggregate root
   //
@@ -821,6 +824,115 @@ export function witnessedRunHandler(pool: Pool) {
             row: row as Record<string, unknown>,
           }),
         },
+      });
+    } catch (err) {
+      sendError(res, err);
+    }
+  };
+}
+
+/**
+ * W3.08 — Governed downstream projection (read-only, versioned).
+ *
+ * GET /api/execution/projections/witnessed-runs?workflow_instance_id=&node_id=
+ *
+ * A STABLE, VERSIONED projection surface for downstream consumers (including
+ * §10 core). Contract:
+ *  - `projectionVersion` is bumped only on breaking shape changes; consumers
+ *    pin to it and fail closed on mismatch (see §10 projection client).
+ *  - Everything is SERVER-DERIVED: authoritative status via
+ *    `classifyWitnessedRunStatus`, enumerated missing lineage elements,
+ *    receipt correlation ids. No client-side authority reconstruction.
+ *  - Identity correlation only — governance payloads are never included.
+ *  - Read-only: SELECTs only, no write path.
+ */
+// Bump only on breaking shape changes to the projection payload (W3.08).
+export const WITNESSED_RUN_PROJECTION_VERSION = 1;
+
+export function witnessedRunProjectionHandler(pool: Pool) {
+  return async (req: Request, res: Response) => {
+    try {
+      const workflowInstanceId = (req.query.workflow_instance_id as string | undefined)?.trim();
+      const nodeId = (req.query.node_id as string | undefined)?.trim();
+      if (!workflowInstanceId || !nodeId) return badRequest(res, 'workflow_instance_id and node_id are required');
+
+      const { rows } = await pool.query(
+        `SELECT
+           r.id AS request_id,
+           COALESCE(r.metadata->>'workflow_instance_id', r.business_key) AS workflow_instance_id,
+           COALESCE(a.metadata->>'node_id', r.metadata->>'node_id') AS node_id,
+           r.metadata->'envelope' AS envelope,
+           r.metadata->'manifest' AS manifest,
+           r.metadata->'assessment' AS assessment,
+           r.metadata->'evidence' AS evidence,
+           r.metadata->'replay' AS replay,
+           r.updated_at AS updated_at,
+           (SELECT rc.metadata->>'peb_transaction_id' FROM receipts rc WHERE rc.request_id = r.id AND rc.type IN ('PEB_ADMISSION','ADMISSION') ORDER BY rc.issued_at DESC LIMIT 1) AS peb_admission,
+           (SELECT rc.metadata->>'conduit_transition_id' FROM receipts rc WHERE rc.request_id = r.id AND rc.type IN ('CONDUIT_TRANSITION','TRANSITION') ORDER BY rc.issued_at DESC LIMIT 1) AS conduit_transition
+         FROM requests r
+         LEFT JOIN LATERAL (
+           SELECT * FROM attempts a0 WHERE a0.request_id = r.id ORDER BY a0.created_at DESC LIMIT 1
+         ) a ON true
+         WHERE COALESCE(r.metadata->>'workflow_instance_id', r.business_key) = $1
+           AND COALESCE(a.metadata->>'node_id', r.metadata->>'node_id') = $2
+         LIMIT 1`,
+        [workflowInstanceId, nodeId],
+      );
+      if (rows.length === 0) return notFound(res, 'witnessed run not found');
+      const row = rows[0];
+      const envelope = (row.envelope ?? {}) as Record<string, unknown>;
+      const manifest = (row.manifest ?? {}) as Record<string, unknown>;
+      const assessment = (row.assessment ?? {}) as Record<string, unknown>;
+      const evidence = (row.evidence ?? {}) as Record<string, unknown>;
+      const replay = (row.replay ?? {}) as Record<string, unknown>;
+
+      const envelopeId = (envelope.id ?? envelope.envelope_id ?? null) as string | null;
+      const evaluationFingerprint = (envelope.evaluationFingerprint ?? envelope.evaluation_fingerprint ?? null) as string | null;
+      const manifestId = (manifest.id ?? manifest.artifactId ?? manifest.artifact_id ?? null) as string | null;
+      const evidenceIds = (evidence.ids ?? evidence.evidence_ids ?? []) as string[];
+      const pebAdmission = row.peb_admission ?? null;
+      const conduitTransition = row.conduit_transition ?? null;
+
+      const status = classifyWitnessedRunStatus({
+        envelope: envelope,
+        manifest: manifest,
+        assessment: assessment,
+        replay: replay,
+        row: row as Record<string, unknown>,
+      });
+
+      // Enumerate the missing lineage elements (server-derived diagnostics).
+      const missingLineage: string[] = [];
+      if (!envelopeId) missingLineage.push('envelope_id');
+      if (!evaluationFingerprint) missingLineage.push('evaluation_fingerprint');
+      if (!manifestId) missingLineage.push('manifest_id');
+      if (!pebAdmission) missingLineage.push('peb_admission_receipt');
+      if (!conduitTransition) missingLineage.push('conduit_transition_receipt');
+      if (!evidenceIds || evidenceIds.length === 0) missingLineage.push('evidence_ids');
+
+      res.set('Cache-Control', 'no-store');
+      res.json({
+        projectionVersion: WITNESSED_RUN_PROJECTION_VERSION,
+        projection: 'witnessed-run',
+        generatedAt: new Date().toISOString(),
+        sourceUpdatedAt: row.updated_at ?? null,
+        workflow: { instanceId: workflowInstanceId, nodeId },
+        request: { id: row.request_id ?? null },
+        identities: {
+          envelopeId,
+          evaluationFingerprint,
+          manifestId,
+          pebAdmissionReceiptId: pebAdmission,
+          conduitTransitionReceiptId: conduitTransition,
+          evidenceIds,
+        },
+        assessment: {
+          disposition: assessment.disposition ?? null,
+          status: assessment.status ?? null,
+        },
+        replay: { fixtureId: replay.fixtureId ?? replay.fixture_id ?? null, status: replay.status ?? null },
+        status,
+        missingLineage,
       });
     } catch (err) {
       sendError(res, err);
