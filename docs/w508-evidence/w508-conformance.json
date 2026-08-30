@@ -1,0 +1,21 @@
+{
+  "workItem": "W5.08",
+  "title": "governed UI + downstream projection conformance (engineer side)",
+  "generatedAt": "2026-08-30T20:05:45.366Z",
+  "basis": {
+    "projectionSurface": "typescript/execution-srv/src/routes.ts (W3.08, merged PR #95)",
+    "consumer": "typescript/§10 core/src/runtime/witnessedRun.ts + witnessedRunSource.ts",
+    "governedAdapter": "typescript/§10 core/src/adapter/governed.ts",
+    "admissionBoundary": "typescript/§10 core/src/runtime/contractAdmission.ts (W4.06, PR #99)",
+    "decision": "05d0fe54 + amendments v1-v4 (f61d94e6 / 41d30b44 / 3a30651a)"
+  },
+  "results": {
+    "C1_versionedContract": "projection payload carries projectionVersion; consumer consumes matching payloads",
+    "C2_serverDerivedOnly": "server status consumed verbatim for all 7 states (AC4, no browser-owned reconstruction)",
+    "C3_readOnly": "adapter surface is get-only; 404 -> empty missing_lineage projection; server errors propagate (no synthesized status)",
+    "C4_identityCorrelation": "manifest validation rejects malformed manifests; identity mismatch fails closed (PROJECTION_IDENTITY_MISMATCH); non-server sources rejected (SOURCE_NOT_GOVERNED)",
+    "C5_noUiAdmission": "governed adapter does not export the admission registry; admission registry remains fail-closed"
+  },
+  "drillFingerprint": "sha256:958065e6bd962a6252de34d3a5dcc7cfb98efc8569134ca1e8eb42b3f6d0b6ca",
+  "exportPattern": "evidence committed to docs/w508-evidence/ as repo artifacts; no ephemeral DB rows"
+}
