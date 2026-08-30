@@ -131,6 +131,25 @@ export async function runWitnessedRunRoutesConformance(): Promise<void> {
   assert(allDistinct.size === 2, 'AC3 PEB and Conduit receipt ids remain distinct');
 
   // ── AC5 partial / missing lineage + edge states ──────────────────────────
+  // PR #70 review finding: a row with NO lineage at all must classify as
+  // 'unknown' (indeterminate), not 'missing_lineage' (partial witnessed run).
+  assert(
+    classify({
+      envelope: { id: null, evaluationFingerprint: null },
+      manifest: { id: null },
+      row: { peb_admission: null, conduit_transition: null, evidence: null },
+    }) === 'unknown',
+    'AC5 empty lineage -> unknown (indeterminate, not a partial witnessed run)',
+  );
+  // A row with SOME lineage but not all still classifies as missing_lineage.
+  assert(
+    classify({
+      envelope: { id: 'env-1', evaluationFingerprint: 'sha256:fp' },
+      manifest: { id: null },
+      row: { peb_admission: null, conduit_transition: null, evidence: null },
+    }) === 'missing_lineage',
+    'AC5 partial lineage (envelope only) -> missing_lineage',
+  );
   assert(classify({ manifest: { id: null } }) === 'missing_lineage', 'AC5 missing manifest -> missing_lineage');
   assert(classify({ envelope: { id: null, evaluationFingerprint: null } }) === 'missing_lineage', 'AC5 missing envelope -> missing_lineage');
   assert(classify({ replay: { fixtureId: 'F01', status: 'stale' } }) === 'stale', 'AC5 stale classified');

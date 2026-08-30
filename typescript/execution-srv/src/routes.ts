@@ -839,9 +839,10 @@ export function witnessedRunHandler(pool: Pool) {
  *
  * States:
  *  - complete:           full authority-relevant lineage present
- *  - missing_lineage:    a required lineage element is absent (envelope/manifest,
- *                        PEB admission, Conduit transition, or evidence)
- *  - unknown:            row exists but carries none of the lineage elements that
+ *  - missing_lineage:    SOME lineage present but a required element is absent
+ *                        (envelope/manifest, PEB admission, Conduit transition,
+ *                        or evidence) — a partial witnessed run
+ *  - unknown:            row exists but carries NONE of the lineage elements that
  *                        would let us classify further (indeterminate)
  *  - stale:              replay/assessment marked stale
  *  - refusal:            assessment refused / disposition refuse
@@ -872,17 +873,26 @@ export function classifyWitnessedRunStatus(input: {
   if (assessment.status === 'refused' || assessment.disposition === 'refuse') return 'refusal';
 
   // Lineage completeness (AC1 complete join vs partial/missing lineage).
+  //
+  // Three-way distinction (PR #70 review finding: `unknown` was unreachable):
+  //   - none of the lineage elements are present  -> 'unknown' (indeterminate:
+  //     we cannot tell a blank row apart from a partial witnessed run, and the
+  //     §10 vocabulary reserves `unknown` for exactly this case)
+  //   - some elements present but a required one is absent -> 'missing_lineage'
+  //   - all elements present -> 'complete'
   const envelopeId = (envelope.id ?? envelope.envelope_id) as string | undefined;
   const fingerprint = envelope.evaluationFingerprint ?? envelope.evaluation_fingerprint;
-  if (!envelopeId || !fingerprint) return 'missing_lineage';
   const manifestId =
     (manifest.id ?? manifest.artifact_id ?? manifest.artifactId) as string | undefined;
-  if (!manifestId) return 'missing_lineage';
   const evidenceBlob = row.evidence as Record<string, unknown> | undefined;
   const evidenceIds = (evidenceBlob?.ids ?? evidenceBlob?.evidence_ids) as string[] | undefined;
-  if (!row.peb_admission || !row.conduit_transition || !evidenceIds || evidenceIds.length === 0) {
-    return 'missing_lineage';
-  }
+  const hasEnvelope = Boolean(envelopeId && fingerprint);
+  const hasManifest = Boolean(manifestId);
+  const hasReceipts = Boolean(row.peb_admission && row.conduit_transition);
+  const hasEvidence = Boolean(evidenceIds && evidenceIds.length > 0);
+
+  if (!hasEnvelope && !hasManifest && !hasReceipts && !hasEvidence) return 'unknown';
+  if (!hasEnvelope || !hasManifest || !hasReceipts || !hasEvidence) return 'missing_lineage';
 
   return 'complete';
 }
