@@ -1,7 +1,7 @@
 {
   "workItem": "W5.05",
   "title": "deny_contract_promotion rollback/disablement/replay drill operations (gate 6)",
-  "generatedAt": "2026-08-30T18:10:06.348Z",
+  "generatedAt": "2026-08-30T18:23:00.188Z",
   "pin": {
     "decisionClass": "deny_contract_promotion",
     "decisionId": "05d0fe54",
