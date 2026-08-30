@@ -14,7 +14,12 @@
  * Run:  tsx src/routes.test.ts   (from execution-srv)
  */
 import { Pool } from 'pg';
-import { witnessedRunHandler, classifyWitnessedRunStatus } from './routes.js';
+import {
+  witnessedRunHandler,
+  witnessedRunProjectionHandler,
+  classifyWitnessedRunStatus,
+  WITNESSED_RUN_PROJECTION_VERSION,
+} from './routes.js';
 import type { WitnessedRunStatus } from './routes.js';
 
 function assert(cond: unknown, msg: string): asserts cond {
@@ -46,6 +51,7 @@ function callHandler(
         res._status = code;
         return res;
       },
+      set(_k: string, _v: string) { return res; },
       // `badRequest`/`notFound` call res.status(...).json(...); resolve on json.
       json: (payload: unknown) => resolve({ status: res._status, body: payload }),
       send: (payload: unknown) => resolve({ status: res._status, body: payload }),
@@ -163,6 +169,74 @@ export async function runWitnessedRunRoutesConformance(): Promise<void> {
     QUERY,
   );
   assert(nf.status === 404, 'no matching row -> 404');
+
+  // ── W3.08 governed projection endpoint ───────────────────────────────
+  {
+    const handler = witnessedRunProjectionHandler(
+      new MockPool([completeRow()]) as unknown as Pool,
+    );
+    const { status, body } = await callHandler(handler, QUERY);
+    assert(status === 200, 'projection complete join -> 200');
+    assert(body.projectionVersion === WITNESSED_RUN_PROJECTION_VERSION,
+      'projection carries its version');
+    assert(body.projection === 'witnessed-run', 'projection type labeled');
+    assert(typeof body.generatedAt === 'string', 'generatedAt present');
+    assert(body.status === 'complete', 'server-derived authoritative status');
+    assert(Array.isArray(body.missingLineage) && body.missingLineage.length === 0,
+      'no missing lineage on complete join');
+    assert(body.identities.envelopeId === 'env-1', 'envelope identity projected');
+    assert(body.identities.pebAdmissionReceiptId === '77777777-3333-4444-8555-666666666666',
+      'peb receipt id correlated');
+    assert(body.identities.conduitTransitionReceiptId === '88888888-4444-4555-8666-777777777777',
+      'conduit receipt id correlated (separate identity, AC3)');
+    assert(body.request.id === '11111111-1111-4111-8111-111111111111', 'request id correlated');
+    // No governance payloads leak — only identity correlation + derived status.
+    const flat = JSON.stringify(body);
+    assert(!flat.includes('"law"'), 'no law payload in projection');
+    assert(!flat.includes('contractDigest'), 'no contract digest payload');
+
+    // Partial lineage: missing elements enumerated, status server-derived.
+    const partial = { ...completeRow(), peb_admission: null, conduit_transition: null };
+    const pr = await callHandler(
+      witnessedRunProjectionHandler(new MockPool([partial]) as unknown as Pool),
+      QUERY,
+    );
+    assert(pr.status === 200, 'partial join still 200');
+    assert(pr.body.status === 'missing_lineage', 'partial join classified server-side');
+    const ml = pr.body.missingLineage as string[];
+    assert(ml.includes('peb_admission_receipt'), 'missing peb receipt enumerated');
+    assert(ml.includes('conduit_transition_receipt'), 'missing conduit receipt enumerated');
+    assert(!ml.includes('envelope_id'), 'present elements not listed as missing');
+
+    // Unknown row (no lineage at all) -> unknown + full enumeration.
+    const empty = {
+      request_id: '11111111-1111-4111-8111-111111111111',
+      workflow_instance_id: 'wf-0007', node_id: 'node-admission',
+      envelope: null, manifest: null, assessment: null, evidence: null, replay: null,
+      updated_at: null, peb_admission: null, conduit_transition: null,
+    };
+    const ur = await callHandler(
+      witnessedRunProjectionHandler(new MockPool([empty]) as unknown as Pool),
+      QUERY,
+    );
+    assert(ur.status === 200, 'unknown row still 200');
+    assert(ur.body.status === 'unknown', 'empty lineage -> unknown');
+    assert((ur.body.missingLineage as string[]).length === 6, 'all six lineage elements enumerated');
+
+    // 404 path
+    const nf = await callHandler(
+      witnessedRunProjectionHandler(new MockPool([]) as unknown as Pool),
+      QUERY,
+    );
+    assert(nf.status === 404, 'projection 404 on unknown run');
+
+    // 400 path
+    const br = await callHandler(
+      witnessedRunProjectionHandler(new MockPool([completeRow()]) as unknown as Pool),
+      { workflow_instance_id: 'wf-0007' },
+    );
+    assert(br.status === 400, 'projection 400 without node_id');
+  }
 
   console.log('witnessed-run routes: conformance passed');
 }
