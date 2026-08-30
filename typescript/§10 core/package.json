@@ -12,6 +12,7 @@
     "test:witnessed-run": "tsx scripts/run-witnessed-run-conformance.ts",
     "test:doctrine-lookup": "tsx scripts/run-doctrine-lookup-conformance.ts",
     "test:doctrine-lookup-pg": "tsx scripts/run-doctrine-lookup-pg-conformance.ts",
+    "test:doctrine-lookup-registry": "tsx scripts/run-doctrine-lookup-registry-conformance.ts",
     "test:contract-catalog": "tsx scripts/run-contract-catalog-conformance.ts"
   },
   "devDependencies": {
