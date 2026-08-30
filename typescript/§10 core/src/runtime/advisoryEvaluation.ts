@@ -28,7 +28,7 @@ export interface AdvisoryEvaluationInput {
 }
 
 export interface AdvisoryEvaluationResult {
-  verdict: AdvisoryVerdict2;
+  verdict: AdvisoryVerdict;
   /** True when this request was selected by the sampling policy. */
   sampled: boolean;
   consulted: boolean;
@@ -38,19 +38,12 @@ export interface AdvisoryEvaluationResult {
   record?: { id: string; version: number; digest: string };
 }
 
-export type AdvisoryVerdict2 = 'advisory_pass' | 'advisory_fail' | 'advisory_unknown';
-
 export interface AdvisoryPolicy {
   /** Fraction of requests sampled, 0..1. Deterministic by request id hash. */
   sampleRate: number;
 }
 
 export const DEFAULT_ADVISORY_POLICY: AdvisoryPolicy = { sampleRate: 1.0 };
-
-export interface AdvisoryPolicy {
-  /** Fraction of requests sampled, 0..1. Deterministic by request id hash. */
-  sampleRate: number;
-}
 
 /** Deterministic 32-bit FNV-1a hash — stable across processes for sampling. */
 export function advisorySampleHash(requestId: string): number {
