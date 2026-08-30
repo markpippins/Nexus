@@ -22,7 +22,10 @@
  *       transcripts; replay fingerprint recorded.
  *   G5  c5 compliance via export pattern — evidence committed to
  *       docs/w504-evidence/ as repo artifacts (no ephemeral DB rows;
- *       R9 replication NOT a precondition per c5-b 31d30b44).
+ *       R9 replication NOT a precondition per c5-b 41d30b44).
+ *       Evidence-integrity fix (Architect review PR #103): corrected v2
+ *       amendment UUID (f61d94e6) and c5-b citation (41d30b44); canonical
+ *       v4 triplet wording.
  *
  * CONSTRAINTS: canary is simulation only — never live authority. No
  * writes to peb.decisions, no global blocking toggle (prohibition stands
@@ -92,11 +95,11 @@ function lcg(seed: number): () => number {
 const CANARY_PIN = {
   decisionClass: "deny_contract_promotion",
   decisionId: "05d0fe54",
-  amendments: ["1a7b466d (v1 c5 reframe)", "0f27d1cb (v2 c5-barium)", "41d30b44 (v3 c5 scope)", "3a30651a (v4 triplet)"],
+  amendments: ["1a7b466d (v1 c5 reframe)", "f61d94e6 (v2 c5-barium)", "41d30b44 (v3 c5 scope)", "3a30651a (v4 triplet)"],
   triplet: {
-    contract: "wrp-core (commit pins: PR #97-#102 heads)",
-    evaluator: "§10 core governed evaluation (advisory semantics, PR #97)",
-    law: "doctrine lookup + witnessed-run classifier (PRs #96/#98/#99/#100)",
+    contract: "admission envelope v1",
+    evaluator: "W4.02 governed evaluation (advisory semantics)",
+    law: "doctrine corpus (lookup + witnessed-run classifier)",
   },
   mode: "canary_simulation_non_blocking",
   authorityCeiling: "advisory (no live blocking; prohibition stands until new gate-12 decision)",
@@ -419,7 +422,7 @@ const summary = {
   },
   c5: {
     c5a: "canary is not a durable-authority transition (41d30b44) — simulation only, zero durable counters",
-    c5b: "R9 replication NOT a precondition (31d30b44) — schema migrations only",
+    c5b: "R9 replication NOT a precondition (41d30b44) — schema migrations only",
     exportPattern: "evidence committed to docs/w504-evidence/ as repo artifacts; no ephemeral DB rows",
   },
   evidenceRowCount: evidenceRows.length,
