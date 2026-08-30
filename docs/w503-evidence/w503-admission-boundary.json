@@ -1,0 +1,143 @@
+{
+  "workItem": "W5.03",
+  "title": "deny_contract_promotion admission-boundary verification",
+  "generatedAt": "2026-08-30T15:37:16.354Z",
+  "basis": {
+    "implementation": "typescript/§10 core/src/runtime/contractAdmission.ts",
+    "mergedCommit": "e814fbc2 (W4.06, PR #99)",
+    "decision": "05d0fe54 + amendments v1-v4 (41d30b44 scope, 3a30651a triplet)"
+  },
+  "results": {
+    "A1_admittedShape": "only a fully-formed set (valid sha256 digests, all framing dimensions, monotonic version) is admitted; removing any single predicate flips to refused",
+    "A2_failClosed": "11 refusal classes, each with a named reason; refusals never grant state",
+    "A3_determinism": "two independent registries replay the same input sequence byte-identically",
+    "A4_authorityBounded": "public surface is admit-only; no blocking toggle, no store writes, no verdict mutation"
+  },
+  "replayFingerprint": "sha256:178e269c3ff023759d0638a7400c4663f5244191098f6b9bfc79d052cf5159bf",
+  "transcript": [
+    {
+      "case": "A1 valid_admission",
+      "verdict": {
+        "status": "admitted",
+        "contractId": "wrp-core",
+        "version": 1
+      }
+    },
+    {
+      "case": "A1 weakened:authority",
+      "verdict": {
+        "status": "refused",
+        "reason": "missing_framing_dimension:authority"
+      }
+    },
+    {
+      "case": "A1 weakened:provenance",
+      "verdict": {
+        "status": "refused",
+        "reason": "missing_framing_dimension:provenance"
+      }
+    },
+    {
+      "case": "A1 weakened:frame",
+      "verdict": {
+        "status": "refused",
+        "reason": "missing_framing_dimension:frame"
+      }
+    },
+    {
+      "case": "A2 missing contractId",
+      "verdict": {
+        "status": "refused",
+        "reason": "invalid_contract_identity"
+      }
+    },
+    {
+      "case": "A2 zero version",
+      "verdict": {
+        "status": "refused",
+        "reason": "invalid_contract_identity"
+      }
+    },
+    {
+      "case": "A2 non-integer version",
+      "verdict": {
+        "status": "refused",
+        "reason": "invalid_contract_identity"
+      }
+    },
+    {
+      "case": "A2 missing artifact kind (cue)",
+      "verdict": {
+        "status": "refused",
+        "reason": "missing_artifact:cue"
+      }
+    },
+    {
+      "case": "A2 invalid digest shape",
+      "verdict": {
+        "status": "refused",
+        "reason": "invalid_digest:typespec"
+      }
+    },
+    {
+      "case": "A2 wrong algorithm prefix",
+      "verdict": {
+        "status": "refused",
+        "reason": "invalid_digest:typespec"
+      }
+    },
+    {
+      "case": "A2 duplicate artifact kind",
+      "verdict": {
+        "status": "refused",
+        "reason": "duplicate_artifact:typespec"
+      }
+    },
+    {
+      "case": "A2 missing framing dimension",
+      "verdict": {
+        "status": "refused",
+        "reason": "missing_framing_dimension:frame"
+      }
+    },
+    {
+      "case": "A2 blank framing dimension value",
+      "verdict": {
+        "status": "refused",
+        "reason": "missing_framing_dimension:frame"
+      }
+    },
+    {
+      "case": "A2 refusals_dont_grant_state",
+      "verdict": {
+        "status": "admitted",
+        "contractId": "wrp-core",
+        "version": 1
+      }
+    },
+    {
+      "case": "A2 non-monotonic version (2 after 3)",
+      "verdict": {
+        "status": "refused",
+        "reason": "version_not_monotonic:2<=3"
+      }
+    },
+    {
+      "case": "A2 digest rewrite at same version",
+      "verdict": {
+        "status": "refused",
+        "reason": "version_not_monotonic:1<=1"
+      }
+    },
+    {
+      "case": "A3 replay_fingerprint",
+      "fingerprint": "sha256:178e269c3ff023759d0638a7400c4663f5244191098f6b9bfc79d052cf5159bf"
+    },
+    {
+      "case": "A4 public_surface",
+      "methods": [
+        "admit"
+      ]
+    }
+  ]
+}
