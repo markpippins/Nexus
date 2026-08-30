@@ -1,0 +1,124 @@
+{
+  "fingerprint": "sha256:f3d94e70948c1051407ac690e6fc41f766223b176926cb3905c18e396263a687",
+  "transcript": [
+    {
+      "drill": "D1_doctrine_drift",
+      "step": "baseline_v1_admitted",
+      "verdict": {
+        "status": "admitted",
+        "contractId": "wrp-core",
+        "version": 1
+      }
+    },
+    {
+      "drill": "D1_doctrine_drift",
+      "step": "drifted_digest_refused",
+      "verdict": {
+        "status": "refused",
+        "reason": "version_not_monotonic:1<=1"
+      }
+    },
+    {
+      "drill": "D1_doctrine_drift",
+      "step": "recovery_v2_admitted",
+      "verdict": {
+        "status": "admitted",
+        "contractId": "wrp-core",
+        "version": 2
+      }
+    },
+    {
+      "drill": "D2_adapter_failure",
+      "step": "hostile_config_threw",
+      "verdict": {
+        "threw": "admission_requires_framing_dimensions"
+      }
+    },
+    {
+      "drill": "D2_adapter_failure",
+      "step": "recovery_after_config_fix",
+      "verdict": {
+        "status": "admitted",
+        "contractId": "wrp-core",
+        "version": 1
+      }
+    },
+    {
+      "drill": "D3_receipt_loss",
+      "step": "seed_v1_admitted",
+      "verdict": {
+        "status": "admitted",
+        "contractId": "wrp-core",
+        "version": 1
+      }
+    },
+    {
+      "drill": "D3_receipt_loss",
+      "step": "receipt_loss_refused",
+      "verdict": {
+        "status": "refused",
+        "reason": "missing_artifact:typespec"
+      }
+    },
+    {
+      "drill": "D3_receipt_loss",
+      "step": "identity_loss_refused",
+      "verdict": {
+        "status": "refused",
+        "reason": "invalid_contract_identity"
+      }
+    },
+    {
+      "drill": "D3_receipt_loss",
+      "step": "recovery_v2_admitted",
+      "verdict": {
+        "status": "admitted",
+        "contractId": "wrp-core",
+        "version": 2
+      }
+    },
+    {
+      "drill": "D4_evaluator_version",
+      "step": "v1_admitted",
+      "verdict": {
+        "status": "admitted",
+        "contractId": "wrp-core",
+        "version": 1
+      }
+    },
+    {
+      "drill": "D4_evaluator_version",
+      "step": "v2_admitted",
+      "verdict": {
+        "status": "admitted",
+        "contractId": "wrp-core",
+        "version": 2
+      }
+    },
+    {
+      "drill": "D4_evaluator_version",
+      "step": "replay_v1_refused",
+      "verdict": {
+        "status": "refused",
+        "reason": "version_not_monotonic:1<=2"
+      }
+    },
+    {
+      "drill": "D4_evaluator_version",
+      "step": "replay_v2_refused_state_immutable",
+      "verdict": {
+        "status": "refused",
+        "reason": "version_not_monotonic:2<=2"
+      }
+    },
+    {
+      "drill": "D4_evaluator_version",
+      "step": "recovery_v3_admitted",
+      "verdict": {
+        "status": "admitted",
+        "contractId": "wrp-core",
+        "version": 3
+      }
+    }
+  ]
+}
