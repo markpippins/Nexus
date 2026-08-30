@@ -298,6 +298,76 @@ class ReplayVerifierTest {
                 () -> Fingerprints.evaluateFingerprint(core));
     }
 
+    // -------------------------------------------------------------------------
+    // W2.04 hardening: RFC3339 timestamps normalize to instants, so equivalent
+    // textual forms (Z, positive/negative offsets, fractional-precision
+    // variants) compare equal instead of ordering by raw string bytes.
+    // -------------------------------------------------------------------------
+
+    @Test
+    void equivalentRfc3339InstantsNormalizeEqual() {
+        long z = Replayer.tsMillis("2026-08-26T14:41:25Z");
+        long pos = Replayer.tsMillis("2026-08-26T15:41:25+01:00");
+        long neg = Replayer.tsMillis("2026-08-26T09:41:25-05:00");
+        assertEquals(z, pos, "Z and positive offset are the same instant");
+        assertEquals(z, neg, "Z and negative offset are the same instant");
+    }
+
+    @Test
+    void differingTextualSuffixFormsNormalizeEqual() {
+        long plain = Replayer.tsMillis("2026-08-26T14:41:25Z");
+        long micro = Replayer.tsMillis("2026-08-26T14:41:25.000000Z");
+        long milli = Replayer.tsMillis("2026-08-26T14:41:25.000Z");
+        assertEquals(plain, micro, "fractional-second variants must compare equal");
+        assertEquals(plain, milli, "millisecond-precision variant must compare equal");
+    }
+
+    @Test
+    void bareLocalTimestampInterpretedAsUtc() {
+        long bare = Replayer.tsMillis("2026-08-26T14:41:25.000000");
+        long z = Replayer.tsMillis("2026-08-26T14:41:25Z");
+        assertEquals(bare, z, "bare local form is interpreted as UTC");
+    }
+
+    @Test
+    void normalizedTimestampsOrderChronologically() {
+        long earlier = Replayer.tsMillis("2026-08-20T00:00:00.000000");
+        long later = Replayer.tsMillis("2026-08-26T12:00:00+02:00");
+        assertTrue(earlier < later, "instants must order chronologically across forms");
+    }
+
+    @Test
+    void unparseableTimestampFailsClosed() {
+        assertThrows(VerifierException.class, () -> Replayer.tsMillis("not-a-timestamp"));
+    }
+
+    @Test
+    void lawResolutionUsesInstantNotRawString() {
+        // Entity X v1 effective 2026-08-20T00:00:00Z; v2 effective 2026-08-26T10:00:00Z
+        // expressed with a +02:00 offset (= 08:00Z? no: 10:00Z == 12:00+02:00).
+        Map<String, Object> registry = new LinkedHashMap<>();
+        registry.put("doctrines", List.of(
+                lawRow("X", "2026-08-20T00:00:00.000000", null, 1L),
+                lawRow("X", "2026-08-26T12:00:00+02:00", null, 2L)));
+        // as-of 2026-08-26T11:00:00Z: v2 (effective 10:00Z) is in force, v1 superseded.
+        long asOf = Replayer.tsMillis("2026-08-26T11:00:00Z");
+        List<Map<String, Object>> resolved = Replayer.resolveLawAsOf(registry, "doctrines", asOf);
+        assertEquals(1, resolved.size());
+        assertEquals("2", String.valueOf(resolved.get(0).get("version")),
+                "offset-encoded effective_from must resolve by instant");
+    }
+
+    private static Map<String, Object> lawRow(String key, String eff, String sup, long version) {
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("entity_key", key);
+        r.put("effective_from", eff);
+        if (sup != null) {
+            r.put("superseded_at", sup);
+        }
+        r.put("version", version);
+        return r;
+    }
+
     @Test
     void nanValueFailsClosed() {
         Map<String, Object> env = baseEnvelope();

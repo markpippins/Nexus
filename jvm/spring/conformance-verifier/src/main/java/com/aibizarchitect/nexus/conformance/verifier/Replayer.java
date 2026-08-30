@@ -1,5 +1,9 @@
 package com.aibizarchitect.nexus.conformance.verifier;
 
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -45,10 +49,10 @@ public final class Replayer {
     // law-snapshot resolution (supersession-by-insertion, valid-time selection)
     // -------------------------------------------------------------------------
 
-    /** Rows in force at {@code asOf}: effective, not superseded before it. */
+    /** Rows in force at {@code asOf} (epoch millis): effective, not superseded before it. */
     @SuppressWarnings("unchecked")
     public static List<Map<String, Object>> resolveLawAsOf(
-            Map<String, Object> registry, String kind, String asOf) {
+            Map<String, Object> registry, String kind, long asOf) {
         Object raw = registry.get(kind);
         if (!(raw instanceof List<?> rows)) {
             return List.of();
@@ -62,20 +66,20 @@ public final class Replayer {
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map.Entry<String, List<Map<String, Object>>> e : entities.entrySet()) {
             Map<String, Object> best = null;
-            String bestFrom = null;
+            long bestFrom = Long.MIN_VALUE;
             long bestVersion = Long.MIN_VALUE;
             for (Map<String, Object> r : e.getValue()) {
-                String from = String.valueOf(r.get("effective_from"));
-                if (from.compareTo(asOf) > 0) {
+                long from = tsMillis(String.valueOf(r.get("effective_from")));
+                if (from > asOf) {
                     continue;                                   // not yet in force
                 }
                 Object sup = r.get("superseded_at");
-                if (sup != null && String.valueOf(sup).compareTo(asOf) <= 0) {
+                if (sup != null && tsMillis(String.valueOf(sup)) <= asOf) {
                     continue;                                   // superseded before as_of
                 }
                 long version = r.get("version") instanceof Number n ? n.longValue() : 0;
-                if (best == null || from.compareTo(bestFrom) > 0
-                        || (from.equals(bestFrom) && version > bestVersion)) {
+                if (best == null || from > bestFrom
+                        || (from == bestFrom && version > bestVersion)) {
                     best = r;
                     bestFrom = from;
                     bestVersion = version;
@@ -111,14 +115,14 @@ public final class Replayer {
     // replay verdicts
     // -------------------------------------------------------------------------
 
-    private static String asOfFor(Map<String, Object> envelope) {
+    private static long asOfMillis(Map<String, Object> envelope) {
         Object effective = dig(envelope, "law", "effective_at");
         if (effective instanceof String s && !s.isEmpty()) {
-            return s.replace("Z", "");
+            return tsMillis(s);
         }
         Object evaluated = dig(envelope, "evaluation", "evaluated_at");
         if (evaluated instanceof String s && !s.isEmpty()) {
-            return s.replace("Z", "");
+            return tsMillis(s);
         }
         throw new VerifierException("fixture has no resolvable as-of timestamp");
     }
@@ -138,7 +142,7 @@ public final class Replayer {
             out.put("claimed", dig(envelope, "fingerprint", "evaluation_fingerprint"));
             return out;
         }
-        String asOf = asOfFor(envelope);
+        long asOf = asOfMillis(envelope);
 
         // Contract identity must match its registered artifact version.
         Map<String, Object> contract = (Map<String, Object>) envelope.get("contract");
@@ -290,6 +294,36 @@ public final class Replayer {
             cur = ((Map<String, Object>) cur).get(key);
         }
         return cur;
+    }
+
+    /**
+     * Normalize an RFC3339 / ISO-8601 timestamp to a comparable instant (epoch
+     * millis) so equivalent instants with differing textual forms compare equal.
+     *
+     * <ul>
+     *   <li>Handles {@code Z} and explicit offsets ({@code +01:00}, {@code -05:00}).</li>
+     *   <li>A bare local datetime with no zone (as used by the law-registry
+     *       fixture {@code effective_from}/{@code superseded_at} rows) is
+     *       interpreted as UTC, matching the prior behavior of stripping {@code Z}
+     *       and comparing the remaining local form.</li>
+     *   <li>Fail-closed on an unparseable timestamp.</li>
+     * </ul>
+     */
+    static long tsMillis(String ts) {
+        if (ts == null || ts.isBlank()) {
+            throw new VerifierException("empty timestamp in replay");
+        }
+        String t = ts.trim();
+        try {
+            return OffsetDateTime.parse(t).toInstant().toEpochMilli();
+        } catch (DateTimeParseException e) {
+            // no zone/offset — fall through to the bare-local form
+        }
+        try {
+            return LocalDateTime.parse(t).toInstant(ZoneOffset.UTC).toEpochMilli();
+        } catch (DateTimeParseException e2) {
+            throw new VerifierException("unparseable RFC3339 timestamp: " + ts);
+        }
     }
 
     @SuppressWarnings("unchecked")
