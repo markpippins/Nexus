@@ -11,6 +11,7 @@
     "test:replay": "tsx scripts/run-replay-conformance.ts",
     "test:witnessed-run": "tsx scripts/run-witnessed-run-conformance.ts",
     "test:doctrine-lookup": "tsx scripts/run-doctrine-lookup-conformance.ts",
+    "test:doctrine-lookup-pg": "tsx scripts/run-doctrine-lookup-pg-conformance.ts",
     "test:contract-catalog": "tsx scripts/run-contract-catalog-conformance.ts"
   },
   "devDependencies": {
