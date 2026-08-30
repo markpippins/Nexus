@@ -1,0 +1,37 @@
+{
+  "generated_at": "2026-08-30T07:30:22.277431+00:00",
+  "requested_size": 1200,
+  "summary": {
+    "total_comparisons": 1344,
+    "by_verdict": {
+      "match": 1296,
+      "divergent": 48
+    },
+    "by_disposition": {
+      "agreement": 1296,
+      "explained_divergence": 48
+    },
+    "by_case_class": {
+      "clean": 768,
+      "refusal": 96,
+      "unknown": 96,
+      "duplicate_retry": 288,
+      "stale": 48,
+      "drift": 48
+    },
+    "missing_lineage_records": 0,
+    "infra_errors_counted_as_agreement": 0,
+    "eligible_comparisons": 1344,
+    "strict_agreement_rate": 0.964286,
+    "classified_agreement_rate": 1.0,
+    "explained_divergences": 48,
+    "unexplained_divergences": 0,
+    "gate_assessment_inputs": {
+      "threshold_proposal": ">= 0.99 disposition agreement, zero unexplained divergences, zero missing lineage, zero infra errors as agreement",
+      "strict_agreement_meets_0_99": false,
+      "classified_agreement_meets_0_99": true,
+      "zero_unexplained": true,
+      "gate_pass_under_classified_metric": true
+    }
+  }
+}
