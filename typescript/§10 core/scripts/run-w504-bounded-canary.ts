@@ -433,11 +433,21 @@ const summary = {
 const outDir = resolve(import.meta.dirname ?? ".", "..", "..", "..", "docs", "w504-evidence");
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, "w504-canary-summary.json"), JSON.stringify(summary, null, 2) + "\n");
-// Bounded transcript sample (first 50 + last 10 rows) — full row set stays
-// bounded by design; the summary carries the aggregates.
+// Bounded transcript sample (first 50 + last 10 rows) — the summary carries
+// the aggregates.
 writeFileSync(
   join(outDir, "w504-canary-transcript-sample.json"),
   JSON.stringify({ fingerprint: canaryFingerprint, head: evidenceRows.slice(0, 50), tail: evidenceRows.slice(-10) }, null, 2) + "\n",
+);
+// FULL row-level transcript (W5.06 evidence-completeness fix, Architect
+// 01012bd0): all 1,344 records so the Analyst can do row-level shadow-vs-live
+// reconciliation without re-running the canary. NOTE the pairing key: the
+// shadow export (w405_shadow_evidence.json) uses request ids req:<class>:N
+// while the canary uses canary-42-<class>-NNNN, so the join is NOT direct —
+// pair by (case_class, ordinal-within-class) at seed 42.
+writeFileSync(
+  join(outDir, "w504-canary-transcript-full.json"),
+  JSON.stringify({ fingerprint: canaryFingerprint, pairingKey: "(case_class, ordinal-within-class) at seed 42 — id schemes differ from the W4.05 shadow export, do not join by id", rowCount: evidenceRows.length, rows: evidenceRows }, null, 2) + "\n",
 );
 
 console.log("W5.04 bounded off-site canary: PASS");

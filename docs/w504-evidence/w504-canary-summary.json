@@ -1,7 +1,7 @@
 {
   "workItem": "W5.04",
   "title": "deny_contract_promotion bounded off-site canary (5-item gate)",
-  "generatedAt": "2026-08-30T17:50:06.768Z",
+  "generatedAt": "2026-08-30T19:07:17.261Z",
   "pin": {
     "decisionClass": "deny_contract_promotion",
     "decisionId": "05d0fe54",
