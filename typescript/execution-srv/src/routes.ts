@@ -34,6 +34,7 @@
 
 import { Request, Response, Router } from 'express';
 import { Pool, QueryResult } from 'pg';
+import { governanceMetrics, METRIC_WITNESSED_RUN_STATUS, METRIC_RECEIPT_CORRELATION_INVALID, isUuidShape } from './metrics';
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -196,6 +197,31 @@ export function createRoutes(pool: Pool): Router {
   //    authority decision is performed here.
   // ═══════════════════════════════════════════════════════════════════
   router.get('/witnessed-runs', witnessedRunHandler(pool));
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 1b. GOVERNANCE METRICS — server-derived counters (W3.05)
+  //
+  //     GET /api/execution/metrics
+  //
+  //     JSON snapshot of governance metric families. Values are derived
+  //     from live classification/query outcomes and correlate to envelope
+  //     and receipt identities — never payloads.
+  // ═══════════════════════════════════════════════════════════════════
+  router.get('/metrics', (_req: Request, res: Response) => {
+    res.json(governanceMetrics.snapshot());
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 1c. WITNESSED-RUN DIAGNOSTICS — structured per-run health (W3.05)
+  //
+  //     GET /api/execution/witnessed-runs/diagnostics?workflow_instance_id=&node_id=
+  //
+  //     Server-derived health summary for one witnessed run: authoritative
+  //     status, enumerated missing lineage elements, receipt correlation
+  //     validity, replay state. Correlates to immutable envelope and receipt
+  //     identities — never reconstructs authority browser-side (AC4).
+  // ═══════════════════════════════════════════════════════════════════
+  router.get('/witnessed-runs/diagnostics', witnessedRunDiagnosticsHandler(pool));
 
   // ═══════════════════════════════════════════════════════════════════
   // 2. LIFECYCLE STATE — the natural aggregate root
@@ -813,13 +839,112 @@ export function witnessedRunHandler(pool: Pool) {
           receipts: { pebAdmission: row.peb_admission, conduitTransition: row.conduit_transition },
           evidence: { ids: evidence.ids ?? evidence.evidence_ids ?? [], fingerprint: evidence.fingerprint ?? evidence.evidence_fingerprint ?? null },
           replay: { fixtureId: replay.fixtureId ?? replay.fixture_id ?? null, status: replay.status ?? null },
-          status: classifyWitnessedRunStatus({
-            envelope: envelope as Record<string, unknown>,
-            manifest: manifest as Record<string, unknown>,
-            assessment: assessment as Record<string, unknown>,
-            replay: replay as Record<string, unknown>,
-            row: row as Record<string, unknown>,
-          }),
+          status: (() => {
+            const status = classifyWitnessedRunStatus({
+              envelope: envelope as Record<string, unknown>,
+              manifest: manifest as Record<string, unknown>,
+              assessment: assessment as Record<string, unknown>,
+              replay: replay as Record<string, unknown>,
+              row: row as Record<string, unknown>,
+            });
+            governanceMetrics.inc(METRIC_WITNESSED_RUN_STATUS, { status });
+            // W3.05: flag malformed receipt correlation ids seen in the wild.
+            for (const rid of [row.peb_admission, row.conduit_transition]) {
+              if (rid != null && !isUuidShape(rid)) {
+                governanceMetrics.inc(METRIC_RECEIPT_CORRELATION_INVALID);
+              }
+            }
+            return status;
+          })(),
+        },
+      });
+    } catch (err) {
+      sendError(res, err);
+    }
+  };
+}
+
+/**
+ * GET /api/execution/witnessed-runs/diagnostics handler (W3.05).
+ *
+ * Server-derived health summary for one witnessed run. Enumerates exactly
+ * which lineage elements are missing, validates receipt correlation ids,
+ * and correlates to the immutable envelope/receipt identities — never
+ * reconstructing authority browser-side (AC4).
+ */
+export function witnessedRunDiagnosticsHandler(pool: Pool) {
+  return async (req: Request, res: Response) => {
+    try {
+      const workflowInstanceId = (asString(req.query.workflow_instance_id as string | string[] | undefined) ?? '').trim();
+      const nodeId = (asString(req.query.node_id as string | string[] | undefined) ?? '').trim();
+      if (!workflowInstanceId || !nodeId) return badRequest(res, 'workflow_instance_id and node_id are required');
+
+      const { rows } = await pool.query(
+        `SELECT
+           r.id AS request_id,
+           r.metadata->'envelope' AS envelope,
+           r.metadata->'manifest' AS manifest,
+           r.metadata->'assessment' AS assessment,
+           r.metadata->'evidence' AS evidence,
+           r.metadata->'replay' AS replay,
+           (SELECT rc.metadata->>'peb_transaction_id' FROM receipts rc WHERE rc.request_id = r.id AND rc.type IN ('PEB_ADMISSION','ADMISSION') ORDER BY rc.issued_at DESC LIMIT 1) AS peb_admission,
+           (SELECT rc.metadata->>'conduit_transition_id' FROM receipts rc WHERE rc.request_id = r.id AND rc.type IN ('CONDUIT_TRANSITION','TRANSITION') ORDER BY rc.issued_at DESC LIMIT 1) AS conduit_transition
+         FROM requests r
+         LEFT JOIN LATERAL (
+           SELECT * FROM attempts a0 WHERE a0.request_id = r.id ORDER BY a0.created_at DESC LIMIT 1
+         ) a ON true
+         WHERE COALESCE(r.metadata->>'workflow_instance_id', r.business_key) = $1
+           AND COALESCE(a.metadata->>'node_id', r.metadata->>'node_id') = $2
+         LIMIT 1`,
+        [workflowInstanceId, nodeId],
+      );
+      if (rows.length === 0) return notFound(res, 'witnessed run not found');
+      const row = rows[0];
+      const envelope = (row.envelope ?? {}) as Record<string, unknown>;
+      const manifest = (row.manifest ?? {}) as Record<string, unknown>;
+      const assessment = (row.assessment ?? {}) as Record<string, unknown>;
+      const evidence = (row.evidence ?? {}) as Record<string, unknown>;
+      const replay = (row.replay ?? {}) as Record<string, unknown>;
+
+      const status = classifyWitnessedRunStatus({
+        envelope, manifest, assessment, replay, row: row as Record<string, unknown>,
+      });
+      governanceMetrics.inc(METRIC_WITNESSED_RUN_STATUS, { status });
+
+      // Enumerate exactly which lineage elements are missing (W3.05 acceptance:
+      // queryable correlation to immutable envelope and receipt identities).
+      const envelopeId = (envelope.id ?? envelope.envelope_id) as string | undefined;
+      const fingerprint = envelope.evaluationFingerprint ?? envelope.evaluation_fingerprint;
+      const manifestId = (manifest.id ?? manifest.artifact_id ?? manifest.artifactId) as string | undefined;
+      const evidenceBlob = evidence as Record<string, unknown> | undefined;
+      const evidenceIds = (evidenceBlob?.ids ?? evidenceBlob?.evidence_ids) as string[] | undefined;
+      const missing: string[] = [];
+      if (!(envelopeId && fingerprint)) missing.push('envelope');
+      if (!manifestId) missing.push('manifest');
+      if (!row.peb_admission) missing.push('peb_admission_receipt');
+      if (!row.conduit_transition) missing.push('conduit_transition_receipt');
+      if (!evidenceIds || evidenceIds.length === 0) missing.push('evidence');
+
+      // Correlation validity of the receipt references (W3.05 acceptance).
+      const correlation = {
+        pebAdmission: { id: row.peb_admission ?? null, valid: row.peb_admission ? isUuidShape(row.peb_admission) : null },
+        conduitTransition: { id: row.conduit_transition ?? null, valid: row.conduit_transition ? isUuidShape(row.conduit_transition) : null },
+      };
+      for (const side of [correlation.pebAdmission, correlation.conduitTransition]) {
+        if (side.id !== null && side.valid === false) governanceMetrics.inc(METRIC_RECEIPT_CORRELATION_INVALID);
+      }
+
+      res.json({
+        projection: {
+          workflow: { instanceId: workflowInstanceId, nodeId },
+          request_id: row.request_id,
+          status,
+          missing_lineage_elements: missing,
+          receipt_correlation: correlation,
+          envelope_id: envelopeId ?? null,
+          evaluation_fingerprint: fingerprint ?? null,
+          replay_status: replay.status ?? null,
+          assessment: { disposition: assessment.disposition ?? null, status: assessment.status ?? null },
         },
       });
     } catch (err) {
