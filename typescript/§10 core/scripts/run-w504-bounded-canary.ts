@@ -229,7 +229,7 @@ interface CanaryOutcome {
   recordFingerprint: string;
 }
 
-function runCanaryPass(records: CanaryRecord[]): CanaryOutcome[] {
+function runCanaryPass(records: CanaryRecord[], passOrdinal: 1 | 2): CanaryOutcome[] {
   const registry = new ContractAdmissionRegistry(["authority", "provenance", "frame"]);
   const outcomes: CanaryOutcome[] = [];
   for (const record of records) {
@@ -248,6 +248,7 @@ function runCanaryPass(records: CanaryRecord[]): CanaryOutcome[] {
     outcomes.push(outcome);
     store.recordCanaryEvidence({
       at: "canary-pass",
+      passOrdinal,
       requestId: record.requestId,
       class: record.caseClass,
       status: admission.status,
@@ -367,8 +368,8 @@ function validReq(version: number): ContractAdmissionRequest {
 // ── execution ───────────────────────────────────────────────────────────
 
 const sample = buildSample();
-const pass1 = runCanaryPass(sample);
-const pass2 = runCanaryPass(sample); // G4: double-run determinism
+const pass1 = runCanaryPass(sample, 1);
+const pass2 = runCanaryPass(sample, 2); // G4: double-run determinism
 
 // G4 — byte-identical transcripts across the two passes.
 const transcript1 = canonicalJson(pass1.map(({ recordFingerprint, ...rest }) => ({ ...rest, fp: recordFingerprint })));
@@ -433,11 +434,36 @@ const summary = {
 const outDir = resolve(import.meta.dirname ?? ".", "..", "..", "..", "docs", "w504-evidence");
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, "w504-canary-summary.json"), JSON.stringify(summary, null, 2) + "\n");
-// Bounded transcript sample (first 50 + last 10 rows) — full row set stays
-// bounded by design; the summary carries the aggregates.
+// Bounded transcript sample (first 50 + last 10 rows) — the summary carries
+// the aggregates.
 writeFileSync(
   join(outDir, "w504-canary-transcript-sample.json"),
   JSON.stringify({ fingerprint: canaryFingerprint, head: evidenceRows.slice(0, 50), tail: evidenceRows.slice(-10) }, null, 2) + "\n",
+);
+// FULL row-level transcript (W5.06 evidence-completeness fix, Architect
+// 01012bd0 + review 88edc2c4): PASS-1 rows ONLY (1,344). The G4 double-run
+// determinism check runs pass 2 in-memory; those rows are intentionally NOT
+// exported — the transcript hash covers the pass-1 verdict records, which are
+// identical across passes, so the fingerprint is unaffected. Pairing key: the
+// shadow export (w405_shadow_evidence.json) uses request ids req:<class>:N
+// while the canary uses canary-42-<class>-NNNN, so the join is NOT direct —
+// pair by (case_class, ordinal-within-class) at seed 42.
+const pass1Rows = evidenceRows.filter((r) => r.passOrdinal === 1);
+equal(pass1Rows.length, SAMPLE_TOTAL, "pass-1 transcript has exactly one row per record");
+writeFileSync(
+  join(outDir, "w504-canary-transcript-full.json"),
+  JSON.stringify(
+    {
+      fingerprint: canaryFingerprint,
+      pairingKey: "(case_class, ordinal-within-class) at seed 42 — id schemes differ from the W4.05 shadow export, do not join by id",
+      layout: "pass-1 rows only; pass 2 rows are generated in-memory for the G4 determinism check and intentionally not exported",
+      passOrdinal: 1,
+      rowCount: pass1Rows.length,
+      rows: pass1Rows,
+    },
+    null,
+    2,
+  ) + "\n",
 );
 
 console.log("W5.04 bounded off-site canary: PASS");
