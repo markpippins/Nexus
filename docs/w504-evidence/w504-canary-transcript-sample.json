@@ -1,0 +1,667 @@
+{
+  "fingerprint": "sha256:dc0fe075d8d94214e0319608edc202d80785b7d912fd699a2782597414ea2f47",
+  "head": [
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0000",
+      "class": "clean",
+      "status": "admitted",
+      "reason": null,
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0001",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:2<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0002",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0003",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:2<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0004",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0005",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:2<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0006",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0007",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:2<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0008",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0009",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0010",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0011",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0012",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0013",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0014",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0015",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:2<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0016",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:2<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0017",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0018",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0019",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0020",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0021",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:2<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0022",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0023",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:2<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0024",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0025",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0026",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:2<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0027",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0028",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0029",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:2<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0030",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:2<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0031",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0032",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0033",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0034",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0035",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0036",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0037",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0038",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0039",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0040",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0041",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0042",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:2<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0043",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:2<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0044",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0045",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:2<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0046",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0047",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0048",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-clean-0049",
+      "class": "clean",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    }
+  ],
+  "tail": [
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-drift-0038",
+      "class": "drift",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-drift-0039",
+      "class": "drift",
+      "status": "refused",
+      "reason": "version_not_monotonic:2<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-drift-0040",
+      "class": "drift",
+      "status": "refused",
+      "reason": "version_not_monotonic:2<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-drift-0041",
+      "class": "drift",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-drift-0042",
+      "class": "drift",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-drift-0043",
+      "class": "drift",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-drift-0044",
+      "class": "drift",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-drift-0045",
+      "class": "drift",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-drift-0046",
+      "class": "drift",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    },
+    {
+      "at": "canary-pass",
+      "requestId": "canary-42-drift-0047",
+      "class": "drift",
+      "status": "refused",
+      "reason": "version_not_monotonic:1<=2",
+      "pin": {
+        "class": "deny_contract_promotion",
+        "decision": "05d0fe54"
+      }
+    }
+  ]
+}
