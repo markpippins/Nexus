@@ -1,0 +1,124 @@
+{
+  "workItem": "W5.04",
+  "title": "deny_contract_promotion bounded off-site canary (5-item gate)",
+  "generatedAt": "2026-08-30T17:41:42.513Z",
+  "pin": {
+    "decisionClass": "deny_contract_promotion",
+    "decisionId": "05d0fe54",
+    "amendments": [
+      "1a7b466d (v1 c5 reframe)",
+      "0f27d1cb (v2 c5-barium)",
+      "41d30b44 (v3 c5 scope)",
+      "3a30651a (v4 triplet)"
+    ],
+    "triplet": {
+      "contract": "wrp-core (commit pins: PR #97-#102 heads)",
+      "evaluator": "§10 core governed evaluation (advisory semantics, PR #97)",
+      "law": "doctrine lookup + witnessed-run classifier (PRs #96/#98/#99/#100)"
+    },
+    "mode": "canary_simulation_non_blocking",
+    "authorityCeiling": "advisory (no live blocking; prohibition stands until new gate-12 decision)"
+  },
+  "sample": {
+    "seed": 42,
+    "total": 1344,
+    "plan": [
+      {
+        "caseClass": "clean",
+        "n": 768
+      },
+      {
+        "caseClass": "refusal",
+        "n": 96
+      },
+      {
+        "caseClass": "unknown",
+        "n": 96
+      },
+      {
+        "caseClass": "duplicate_retry",
+        "n": 288
+      },
+      {
+        "caseClass": "stale",
+        "n": 48
+      },
+      {
+        "caseClass": "drift",
+        "n": 48
+      }
+    ],
+    "outcomes": {
+      "clean": {
+        "admitted": 1,
+        "refused": 767
+      },
+      "refusal": {
+        "admitted": 0,
+        "refused": 96
+      },
+      "unknown": {
+        "admitted": 0,
+        "refused": 96
+      },
+      "duplicate_retry": {
+        "admitted": 20,
+        "refused": 268
+      },
+      "stale": {
+        "admitted": 0,
+        "refused": 48
+      },
+      "drift": {
+        "admitted": 0,
+        "refused": 48
+      }
+    }
+  },
+  "drills": [
+    {
+      "drill": "D1_doctrine_drift",
+      "disabledCleanly": true,
+      "historyAppendOnly": true,
+      "detail": "digest change for same identity -> admission refused; evidence append-only"
+    },
+    {
+      "drill": "D2_adapter_failure",
+      "disabledCleanly": true,
+      "historyAppendOnly": true,
+      "detail": "unreachable/failed adapter -> advisory_unknown, config fail-closed"
+    },
+    {
+      "drill": "D3_receipt_loss",
+      "disabledCleanly": true,
+      "historyAppendOnly": true,
+      "detail": "lost correlation -> admission refused; append-only history preserved"
+    },
+    {
+      "drill": "D4_evaluator_version",
+      "disabledCleanly": true,
+      "historyAppendOnly": true,
+      "detail": "evaluator-version change -> visible verdict flip; append-only history"
+    }
+  ],
+  "isolation": {
+    "counters": {
+      "pebDecisionsWrites": 0,
+      "blockingToggles": 0,
+      "durableTransitions": 0,
+      "envelopeRewrites": 0
+    },
+    "assertion": "all four counters zero — canary never touched peb.decisions, blocking, or durable authority"
+  },
+  "determinism": {
+    "doubleRunByteIdentical": true,
+    "canaryFingerprint": "sha256:dc0fe075d8d94214e0319608edc202d80785b7d912fd699a2782597414ea2f47",
+    "perRecordFingerprints": 1344
+  },
+  "c5": {
+    "c5a": "canary is not a durable-authority transition (41d30b44) — simulation only, zero durable counters",
+    "c5b": "R9 replication NOT a precondition (31d30b44) — schema migrations only",
+    "exportPattern": "evidence committed to docs/w504-evidence/ as repo artifacts; no ephemeral DB rows"
+  },
+  "evidenceRowCount": 2688
+}
