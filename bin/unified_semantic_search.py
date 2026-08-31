@@ -46,9 +46,9 @@ log = logging.getLogger("unified_search")
 
 # ── Config ─────────────────────────────────────────────────────
 # Embedding provider is governed by embed_client.py (decision 8ae276bf):
-# NVIDIA NIM -> OpenRouter -> local ollama fallback.  These constants
-# are legacy defaults; the actual embed call uses embed_client.embed_one()
-# which reads its own env-driven provider chain.
+# local ollama on helium (default) -> Gemini -> NVIDIA NIM -> OpenRouter.
+# These constants are legacy defaults; the actual embed call uses
+# embed_client.embed_one() which reads its own env-driven provider chain.
 OLLAMA_URL = os.environ.get('EMBED_OLLAMA_URL', 'http://192.168.1.202:11434')
 EMBED_MODEL = os.environ.get('EMBED_MODEL', 'nomic-embed-text')
 DOCKER_PSQL = [
