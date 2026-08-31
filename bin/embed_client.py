@@ -4,7 +4,7 @@
 Provider chain (first available wins):
   1. NVIDIA NIM external API      (primary)
   2. OpenRouter embeddings        (secondary; pending key activation)
-  3. Local ollama                 (OFFLINE fallback — thallium per probe
+  3. Local ollama                 (OFFLINE fallback — helium per probe
                                    verdict 97970f12, NOT titanium)
 
 Contract:
@@ -95,8 +95,8 @@ def _openrouter_key():
 
 
 def _ollama_host():
-    # Default stays local for dev; offline fleet leg points at thallium.
-    return os.environ.get("OLLAMA_EMBED_HOST", "http://localhost:11434")
+    # Default rehomed to helium (192.168.1.202); env still overrides.
+    return os.environ.get("OLLAMA_EMBED_HOST", "http://192.168.1.202:11434")
 
 
 def _chunk(text: str, limit: int = LOCAL_CHUNK_CHARS) -> list[str]:
@@ -225,7 +225,7 @@ _TIERS = [
     ("gemini", _embed_gemini),        # 768-dim, dimension-compatible external default
     ("nim", _embed_nim),              # hosted NIM models are 1024-dim -> dim-guard rejects
     ("openrouter", _embed_openrouter),
-    ("ollama-local", _embed_ollama),  # offline fallback (thallium leg)
+    ("ollama-local", _embed_ollama),  # offline fallback (helium leg)
 ]
 
 

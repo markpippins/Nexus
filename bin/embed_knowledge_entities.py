@@ -34,7 +34,7 @@ logging.basicConfig(
 log = logging.getLogger("embed_knowledge")
 
 # ── Config ─────────────────────────────────────────────────────
-OLLAMA_URL = "http://localhost:11434"  # legacy local leg (tiered chain in embed_client)
+OLLAMA_URL = "http://192.168.1.202:11434"  # legacy local leg (tiered chain in embed_client)
 EMBED_MODEL = "nomic-embed-text"
 EMBED_DIM = 768
 

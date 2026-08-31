@@ -627,6 +627,7 @@ const DEFAULT_ROLES: { name: string; description: string }[] = [
   { name: "reviewer", description: "Quality gate — reviews changes, issues approval/rejection receipts" },
   { name: "critic", description: "Adversarial evaluator — surfaces risks, contradictions, and blind spots" },
   { name: "analyst", description: "Gap and triage analyst — identifies missing coverage, classifies incidents" },
+  { name: "analyst-ii", description: "Analysis-only role — sits and does analysis (findings/recommendations); zero decision authority; never an escalation target; findings route to the analyst chair to close" },
   { name: "inspector", description: "Compliance auditor — verifies invariants, issues violation reports" },
   { name: "auditor", description: "Audit and compliance reviewer — verifies records, constraints, and drift; issues inspection findings" },
   { name: "epistemologist", description: "Epistemic governance — tracks knowledge stratification, role boundaries, and cross-role divergence" },
@@ -1661,7 +1662,7 @@ export type { ResolvedRoleConfig as RoleConfigResolved };
 const DEFAULT_PROVIDERS = [
   { name: "OpenAI", type: "openai", endpoint_url: "https://api.openai.com/v1" },
   { name: "Anthropic", type: "anthropic", endpoint_url: "https://api.anthropic.com/v1" },
-  { name: "Ollama", type: "ollama", endpoint_url: "http://localhost:11434" },
+  { name: "Ollama", type: "ollama", endpoint_url: "http://192.168.1.202:11434" },
   { name: "OpenCode", type: "opencode", endpoint_url: "http://localhost:3100" },
   { name: "Codex", type: "codex", endpoint_url: "" },
 ];

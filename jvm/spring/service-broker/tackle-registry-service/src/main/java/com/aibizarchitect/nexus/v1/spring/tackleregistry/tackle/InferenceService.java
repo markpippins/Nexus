@@ -148,7 +148,7 @@ public class InferenceService {
     private static ChatModel ollama(String endpointUrl, String modelId) {
         var api = org.springframework.ai.ollama.api.OllamaApi.builder()
                 .baseUrl(endpointUrl != null && !endpointUrl.isBlank()
-                        ? endpointUrl : "http://localhost:11434")
+                        ? endpointUrl : "http://192.168.1.202:11434")
                 .build();
         return org.springframework.ai.ollama.OllamaChatModel.builder()
                 .ollamaApi(api)
