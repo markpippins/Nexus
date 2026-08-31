@@ -1,0 +1,21 @@
+[Unit]
+Description=Agent-records → Shrapnel Bridge — mirrors new nebula.agent_records into the shrapnel EAV store
+Documentation=https://github.com/nexus/bin/agent-records-to-shrapnel-bridge.py
+After=network.target postgresql.service shrapnel-srv.service
+Wants=postgresql.service shrapnel-srv.service
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/bin
+
+# Uses the anaconda python3 which has psycopg2 installed.
+ExecStart=/home/codex/opt/anaconda3/bin/python3 /home/codex/dev/nexus/bin/agent-records-to-shrapnel-bridge.py --interval 5
+ExecReload=/bin/kill -HUP $MAINPID
+
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
