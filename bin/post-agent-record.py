@@ -27,9 +27,34 @@ Exit codes: 0 ok, 1 API error, 2 usage error
 
 import argparse
 import json
+import os
 import sys
 import urllib.request
 import urllib.error
+
+
+def _writable_roles():
+    """Roles allowed to write agent records (canonical source:
+    config/roles/roles.json nebulaCheck=true, plus registered active roles)."""
+    registry = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            "config", "roles", "roles.json")
+    fallback = {"architect", "engineer", "engineer-ii", "devops", "topologist",
+                "planner", "reviewer", "analyst", "inspector", "critic"}
+    try:
+        with open(registry) as f:
+            data = json.load(f)
+        defaults = data.get("roleDefaults", {})
+        roles = {}
+        for name, overrides in (data.get("roles") or {}).items():
+            if isinstance(overrides, dict) and overrides.get("nebulaCheck",
+                                                             defaults.get("nebulaCheck", False)):
+                roles[name] = True
+    except Exception:
+        return fallback
+    # Registered active roles not (yet) in the registry are still writable.
+    for extra in ("engineer-ii", "analyst-ii", "dba"):
+        roles[extra] = True
+    return set(roles)
 
 
 def parse_args():
@@ -54,8 +79,10 @@ def main():
         print(__doc__)
         sys.exit(0)
 
-    # Validate role
-    valid_roles = {"architect", "engineer", "engineer-ii", "devops", "topologist", "planner", "reviewer", "analyst", "inspector", "critic"}
+    # Validate role against the canonical role registry (config/roles/roles.json,
+    # doc b80f0bdf). A role is writable when its effective nebulaCheck is true.
+    # Roles registered in tackle.roles that predate the registry are kept.
+    valid_roles = _writable_roles()
     if args.role not in valid_roles:
         print(f"ERROR: role must be one of: {', '.join(sorted(valid_roles))}", file=sys.stderr)
         sys.exit(2)
