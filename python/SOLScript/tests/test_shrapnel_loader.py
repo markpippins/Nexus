@@ -9,7 +9,6 @@ hand-built EAV rows (no live database required).
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any, List
 
 import pytest
@@ -17,58 +16,7 @@ import pytest
 from solscript import Concept, ResolutionInterpreter
 from solscript.database_loader import DatabaseLoader
 
-
-def _run(coro: Any) -> Any:
-    return asyncio.get_event_loop().run_until_complete(coro)
-
-
-class FakeRow(dict):
-    """dict that also supports row["col"] lookup (asyncpg Record-like)."""
-
-    def __getitem__(self, key: str) -> Any:
-        return dict.__getitem__(self, key)
-
-
-class FakeConn:
-    """Minimal asyncpg connection: fetch() returns scripted responses."""
-
-    def __init__(self, script: List[List[FakeRow]]) -> None:
-        self._script = script
-
-    async def fetch(self, sql: str, *args: Any) -> List[FakeRow]:
-        if not self._script:
-            return []
-        return self._script.pop(0)
-
-
-class BoomConn:
-    """Connection that raises on every query (missing schema simulation)."""
-
-    async def fetch(self, sql: str, *args: Any) -> List[FakeRow]:
-        raise Exception('relation "shrapnel.field" does not exist')
-
-
-class Ctx:
-    def __init__(self, conn: Any) -> None:
-        self._conn = conn
-
-    async def __aenter__(self) -> Any:
-        return self._conn
-
-    async def __aexit__(self, *exc: Any) -> None:
-        return None
-
-
-class FakePool:
-    def __init__(self, conn: Any) -> None:
-        self._conn = conn
-
-    def acquire(self) -> Ctx:
-        return Ctx(self._conn)
-
-
-def _row(**kwargs: Any) -> FakeRow:
-    return FakeRow(kwargs)
+from .conftest import BoomConn, FakeConn, FakePool, _row, _run
 
 
 def test_shrapnel_facts_hydrate_entities() -> None:

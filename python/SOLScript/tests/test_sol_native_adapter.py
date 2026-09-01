@@ -7,7 +7,6 @@ with NO Nexus dependency. Uses a fake asyncpg-style pool with scripted rows.
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any, List
 
 import pytest
@@ -19,50 +18,7 @@ from solscript.adapters import (
     SolNativeAdapter,
 )
 
-
-def _run(coro: Any) -> Any:
-    return asyncio.get_event_loop().run_until_complete(coro)
-
-
-class FakeRow(dict):
-    def __getitem__(self, key: str) -> Any:
-        return dict.__getitem__(self, key)
-
-
-class FakeConn:
-    def __init__(self, script: List[List[FakeRow]]) -> None:
-        self._script = script
-
-    async def fetch(self, sql: str, *args: Any) -> List[FakeRow]:
-        if not self._script:
-            return []
-        return self._script.pop(0)
-
-    async def close(self) -> None:
-        return None
-
-
-class Ctx:
-    def __init__(self, conn: Any) -> None:
-        self._conn = conn
-
-    async def __aenter__(self) -> Any:
-        return self._conn
-
-    async def __aexit__(self, *exc: Any) -> None:
-        return None
-
-
-class FakePool:
-    def __init__(self, conn: Any) -> None:
-        self._conn = conn
-
-    def acquire(self) -> Ctx:
-        return Ctx(self._conn)
-
-
-def _row(**kwargs: Any) -> FakeRow:
-    return FakeRow(kwargs)
+from .conftest import FakeConn, FakePool, _row, _run
 
 
 def test_list_concepts_normalizes() -> None:
