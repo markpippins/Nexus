@@ -1,6 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { SonarProject, SonarMetricPoint, SonarRating } from '../../types';
-import { registryApi, GatewayUpstreamError } from '../../lib/api';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  SonarProject,
+  SonarMetricPoint,
+  SonarRating,
+} from '../../types';
+import {
+  SonarIssueRow,
+  SonarHotspotRow,
+  SonarListEnvelope,
+  registryApi,
+  GatewayUpstreamError,
+} from '../../lib/api';
 import {
   Gauge,
   Filter,
@@ -8,7 +18,13 @@ import {
   ShieldCheck,
   LineChart,
   Clock,
-  WifiOff
+  WifiOff,
+  Bug,
+  Flame,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
 } from 'lucide-react';
 
 interface SonarQubeTableProps {
@@ -21,12 +37,104 @@ const ratingColors: Record<SonarRating, string> = {
   B: 'text-lime-400 bg-lime-500/10 ring-lime-500/30',
   C: 'text-amber-400 bg-amber-500/10 ring-amber-500/30',
   D: 'text-orange-400 bg-orange-500/10 ring-orange-500/30',
-  E: 'text-rose-400 bg-rose-500/10 ring-rose-500/30'
+  E: 'text-rose-400 bg-rose-500/10 ring-rose-500/30',
 };
 
-export const SonarQubeTable: React.FC<SonarQubeTableProps> = ({
+const severityColors: Record<string, string> = {
+  BLOCKER: 'text-rose-400 bg-rose-500/10 ring-rose-500/30',
+  CRITICAL: 'text-orange-400 bg-orange-500/10 ring-orange-500/30',
+  MAJOR: 'text-amber-400 bg-amber-500/10 ring-amber-500/30',
+  MINOR: 'text-sky-400 bg-sky-500/10 ring-sky-500/30',
+  INFO: 'text-slate-400 bg-slate-500/10 ring-slate-500/30',
+};
+
+const probabilityColors: Record<string, string> = {
+  HIGH: 'text-rose-400 bg-rose-500/10 ring-rose-500/30',
+  MEDIUM: 'text-amber-400 bg-amber-500/10 ring-amber-500/30',
+  LOW: 'text-sky-400 bg-sky-500/10 ring-sky-500/30',
+  NORMAL: 'text-slate-400 bg-slate-500/10 ring-slate-500/30',
+};
+
+const severityRank: Record<string, number> = { BLOCKER: 4, CRITICAL: 3, MAJOR: 2, MINOR: 1, INFO: 0 };
+const probabilityRank: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1, NORMAL: 0 };
+
+function severityBadge(sev?: string | null) {
+  const s = sev ?? 'INFO';
+  return (
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ${severityColors[s] ?? severityColors.INFO}`}>
+      {s}
+    </span>
+  );
+}
+
+function probabilityBadge(p?: string | null) {
+  const v = p ?? 'NORMAL';
+  return (
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ${probabilityColors[v] ?? probabilityColors.NORMAL}`}>
+      {v}
+    </span>
+  );
+}
+
+function reviewBadge(reviewStatus?: string | null) {
+  if (!reviewStatus) {
+    return <span className="text-[10px] font-mono text-slate-500">—</span>;
+  }
+  const reviewed = reviewStatus !== 'to-review';
+  return (
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${
+        reviewed ? 'text-emerald-400 bg-emerald-500/10 ring-emerald-500/30' : 'text-amber-400 bg-amber-500/10 ring-amber-500/30'
+      }`}
+    >
+      {reviewStatus}
+    </span>
+  );
+}
+
+function truncate(s: string, n: number) {
+  return s.length > n ? s.slice(0, n) + '…' : s;
+}
+
+type SonarMode = 'projects' | 'issues' | 'hotspots';
+
+export const SonarQubeTable: React.FC<SonarQubeTableProps> = ({ searchQuery, refreshTrigger }) => {
+  const [mode, setMode] = useState<SonarMode>('projects');
+
+  return (
+    <div className="space-y-4">
+      {/* Mode tabs — SonarQube Quality covers live project metrics (gateway)
+          plus the canonical issue/hotspot mirror (sonar-sync schema). */}
+      <div className="flex items-center gap-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-1 w-fit">
+        {([
+          ['projects', 'Projects', Gauge],
+          ['issues', 'Issues', Bug],
+          ['hotspots', 'Security Hotspots', Flame],
+        ] as const).map(([m, label, Icon]) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+              mode === m ? 'bg-sky-500/15 text-sky-300' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-main)]'
+            }`}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'projects' && <ProjectsView searchQuery={searchQuery} refreshTrigger={refreshTrigger} />}
+      {mode === 'issues' && <IssuesView searchQuery={searchQuery} refreshTrigger={refreshTrigger} />}
+      {mode === 'hotspots' && <HotspotsView searchQuery={searchQuery} refreshTrigger={refreshTrigger} />}
+    </div>
+  );
+};
+
+/* ── Projects (live metrics via ci-gateway) ───────────────────────── */
+const ProjectsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = ({
   searchQuery,
-  refreshTrigger
+  refreshTrigger,
 }) => {
   const [projects, setProjects] = useState<SonarProject[]>([]);
   const [metrics, setMetrics] = useState<Record<string, SonarMetricPoint[]>>({});
@@ -43,7 +151,7 @@ export const SonarQubeTable: React.FC<SonarQubeTableProps> = ({
       try {
         const data = await registryApi.getSonarProjects({
           search: searchQuery,
-          gate: gateFilter
+          gate: gateFilter,
         });
 
         if (isMounted) {
@@ -292,6 +400,385 @@ export const SonarQubeTable: React.FC<SonarQubeTableProps> = ({
           <ShieldCheck className="h-3 w-3 text-sky-400" />
           SonarQube Code Quality Registry — A–E ratings, quality gates, coverage trend
         </span>
+      </div>
+    </div>
+  );
+};
+
+/* ── Shared filter-chrome + pagination for the mirror tables ─────── */
+interface MirrorTableProps<T> {
+  envelope: SonarListEnvelope<T>;
+  page: number;
+  pageSize: number;
+  onPageChange: (p: number) => void;
+  isLoading: boolean;
+  unavailable: string | null;
+  columns: number;
+}
+
+function Pager({ envelope, page, pageSize, onPageChange, columns, isLoading, unavailable }: MirrorTableProps<never>) {
+  if (unavailable) {
+    return (
+      <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-8">
+        <div className="flex items-center gap-3 text-[var(--text-secondary)]">
+          <WifiOff className="h-6 w-6 text-amber-400 flex-shrink-0" />
+          <div>
+            <div className="font-semibold text-amber-400">Sonar sync unavailable</div>
+            <div className="text-xs">{unavailable}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (isLoading) {
+    return (
+      <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-8 text-center text-sm text-[var(--text-secondary)]">
+        Loading...
+      </div>
+    );
+  }
+  if (envelope.items.length === 0) {
+    return (
+      <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-8 text-center text-sm text-[var(--text-secondary)]">
+        No items match the current filters.
+      </div>
+    );
+  }
+  const totalPages = Math.max(1, Math.ceil(envelope.count / pageSize));
+  return (
+    <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
+      <span className="font-mono">
+        {envelope.count} total · page {page}/{totalPages}
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          className="flex items-center gap-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 py-1 disabled:opacity-40 hover:bg-[var(--bg-card-hover)]"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" /> Prev
+        </button>
+        <button
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+          className="flex items-center gap-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 py-1 disabled:opacity-40 hover:bg-[var(--bg-card-hover)]"
+        >
+          Next <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: [string, string][];
+}) {
+  return (
+    <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-secondary)]">
+      {label}:
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] px-2 py-1 text-xs text-[var(--text-primary)] focus:outline-none"
+      >
+        {options.map(([v, l]) => (
+          <option key={v} value={v}>{l}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+type IssueSortKey = 'severity' | 'updated' | 'component';
+
+/* ── Issues (canonical mirror) ───────────────────────────────────── */
+const IssuesView: React.FC<{ searchQuery: string; refreshTrigger: number }> = ({ searchQuery, refreshTrigger }) => {
+  const [items, setItems] = useState<SonarIssueRow[]>([]);
+  const [count, setCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [severity, setSeverity] = useState('');
+  const [issueType, setIssueType] = useState('');
+  const [status, setStatus] = useState('');
+  const [query, setQuery] = useState('');
+  const [sortKey, setSortKey] = useState<IssueSortKey>('severity');
+  const [isLoading, setIsLoading] = useState(false);
+  const [unavailable, setUnavailable] = useState<string | null>(null);
+  const PAGE_SIZE = 25;
+
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoading(true);
+    (async () => {
+      try {
+        const env = await registryApi.getSonarIssues({
+          severity: severity || undefined,
+          issueType: issueType || undefined,
+          status: status || undefined,
+          query: query || undefined,
+          page,
+          pageSize: PAGE_SIZE,
+        });
+        if (isMounted) {
+          setItems(env.items);
+          setCount(env.count);
+          setUnavailable(null);
+        }
+      } catch (err: any) {
+        console.error('Failed fetching sonar issues:', err);
+        if (isMounted) {
+          setItems([]);
+          setCount(0);
+          setUnavailable(err?.upstream ? `sonar-sync unreachable (upstream: ${err.upstream})` : 'Failed to load sonar issues.');
+        }
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, [severity, issueType, status, query, page, refreshTrigger]);
+
+  const ordered = useMemo(() => {
+    const copy = [...items];
+    switch (sortKey) {
+      case 'severity':
+        copy.sort((a, b) => (severityRank[b.severity ?? ''] ?? -1) - (severityRank[a.severity ?? ''] ?? -1));
+        break;
+      case 'component':
+        copy.sort((a, b) => (a.component_key ?? '').localeCompare(b.component_key ?? ''));
+        break;
+      case 'updated':
+        copy.sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
+        break;
+    }
+    return copy;
+  }, [items, sortKey]);
+
+  const resetPageOnFilter = (setter: (v: string) => void) => (v: string) => { setPage(1); setter(v); };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3">
+        <FilterSelect label="Severity" value={severity} onChange={resetPageOnFilter(setSeverity)}
+          options={[['', 'Any'], ['BLOCKER', 'Blocker'], ['CRITICAL', 'Critical'], ['MAJOR', 'Major'], ['MINOR', 'Minor'], ['INFO', 'Info']]} />
+        <FilterSelect label="Type" value={issueType} onChange={resetPageOnFilter(setIssueType)}
+          options={[['', 'Any'], ['BUG', 'Bug'], ['VULNERABILITY', 'Vulnerability'], ['CODE_SMELL', 'Code Smell']]} />
+        <FilterSelect label="Status" value={status} onChange={resetPageOnFilter(setStatus)}
+          options={[['', 'Any'], ['OPEN', 'Open'], ['CONFIRMED', 'Confirmed'], ['REOPENED', 'Reopened'], ['RESOLVED', 'Resolved']]} />
+        <div className="flex items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] px-2 py-1">
+          <Search className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
+          <input
+            value={query}
+            onChange={(e) => { setPage(1); setQuery(e.target.value); }}
+            placeholder="Search message / component…"
+            className="w-52 bg-transparent text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
+          />
+        </div>
+        <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-[var(--text-secondary)]">
+          <ArrowUpDown className="h-3.5 w-3.5 text-sky-400" />
+          Sort:
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as IssueSortKey)}
+            className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] px-2 py-1 text-xs text-[var(--text-primary)] focus:outline-none"
+          >
+            <option value="severity">Severity</option>
+            <option value="updated">Updated</option>
+            <option value="component">Component</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
+        <table className="w-full text-left text-sm text-[var(--text-primary)]">
+          <thead className="border-b border-[var(--border-color)] bg-[var(--bg-main)]/60 text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+            <tr>
+              <th className="p-3">Severity</th>
+              <th className="p-3">Type</th>
+              <th className="p-3">Status</th>
+              <th className="p-3">Message</th>
+              <th className="p-3">Component</th>
+              <th className="p-3">Line</th>
+              <th className="p-3">Review</th>
+              <th className="p-3">Updated</th>
+            </tr>
+          </thead>
+          {!unavailable && !isLoading && items.length > 0 && (
+            <tbody className="divide-y divide-[var(--border-color)]">
+              {ordered.map((it) => (
+                <tr key={it.key} className="hover:bg-[var(--bg-card-hover)] transition-colors">
+                  <td className="p-3">{severityBadge(it.severity)}</td>
+                  <td className="p-3 font-mono text-xs text-[var(--text-secondary)]">{it.sonar_type ?? ''}</td>
+                  <td className="p-3 text-xs text-[var(--text-secondary)]">{it.status ?? ''}</td>
+                  <td className="p-3 max-w-md">
+                    <span className="text-xs text-[var(--text-primary)]" title={it.message ?? ''}>{truncate(it.message ?? '', 110)}</span>
+                    <span className="block text-[10px] font-mono text-[var(--text-secondary)]">{it.rule_key ?? ''}</span>
+                  </td>
+                  <td className="p-3 font-mono text-[11px] text-[var(--text-secondary)]">{truncate(it.component_key ?? '', 40)}</td>
+                  <td className="p-3 font-mono text-xs text-[var(--text-secondary)]">{it.line ?? ''}</td>
+                  <td className="p-3">{reviewBadge(it.review_status)}</td>
+                  <td className="p-3 text-xs text-[var(--text-secondary)]">
+                    {it.updated_at ? new Date(it.updated_at).toLocaleDateString() : ''}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          )}
+        </table>
+        <div className="p-3 border-t border-[var(--border-color)]">
+          <Pager envelope={{ items, count }} page={page} pageSize={PAGE_SIZE} onPageChange={setPage}
+            isLoading={isLoading} unavailable={unavailable} columns={8} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ── Security Hotspots (canonical mirror) ────────────────────────── */
+const HotspotsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = ({ searchQuery, refreshTrigger }) => {
+  const [items, setItems] = useState<SonarHotspotRow[]>([]);
+  const [count, setCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [category, setCategory] = useState('');
+  const [status, setStatus] = useState('');
+  const [query, setQuery] = useState('');
+  const [sortKey, setSortKey] = useState<'probability' | 'updated' | 'component'>('probability');
+  const [isLoading, setIsLoading] = useState(false);
+  const [unavailable, setUnavailable] = useState<string | null>(null);
+  const PAGE_SIZE = 25;
+
+  const categories = useMemo(() => {
+    const seen = new Set<string>();
+    return ['', ...items.map((h) => h.security_category ?? '').filter((c) => c && !seen.has(c) && seen.add(c))];
+  }, [items]);
+
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoading(true);
+    (async () => {
+      try {
+        const env = await registryApi.getSonarHotspots({
+          category: category || undefined,
+          status: status || undefined,
+          query: query || undefined,
+          page,
+          pageSize: PAGE_SIZE,
+        });
+        if (isMounted) {
+          setItems(env.items);
+          setCount(env.count);
+          setUnavailable(null);
+        }
+      } catch (err: any) {
+        console.error('Failed fetching sonar hotspots:', err);
+        if (isMounted) {
+          setItems([]);
+          setCount(0);
+          setUnavailable(err?.upstream ? `sonar-sync unreachable (upstream: ${err.upstream})` : 'Failed to load sonar hotspots.');
+        }
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, [category, status, query, page, refreshTrigger]);
+
+  const ordered = useMemo(() => {
+    const copy = [...items];
+    switch (sortKey) {
+      case 'probability':
+        copy.sort((a, b) => (probabilityRank[b.vulnerability_probability ?? ''] ?? -1) - (probabilityRank[a.vulnerability_probability ?? ''] ?? -1));
+        break;
+      case 'component':
+        copy.sort((a, b) => (a.component_key ?? '').localeCompare(b.component_key ?? ''));
+        break;
+      case 'updated':
+        copy.sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
+        break;
+    }
+    return copy;
+  }, [items, sortKey]);
+
+  const resetPageOnFilter = (setter: (v: string) => void) => (v: string) => { setPage(1); setter(v); };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3">
+        <FilterSelect label="Category" value={category} onChange={resetPageOnFilter(setCategory)}
+          options={[['', 'Any'], ...categories.filter((c) => c !== '').map((c) => [c, c] as [string, string])]} />
+        <FilterSelect label="Status" value={status} onChange={resetPageOnFilter(setStatus)}
+          options={[['', 'Any'], ['TO_REVIEW', 'To Review'], ['REVIEWED', 'Reviewed'], ['REVIEWED_FIXED', 'Fixed']]} />
+        <div className="flex items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] px-2 py-1">
+          <Search className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
+          <input
+            value={query}
+            onChange={(e) => { setPage(1); setQuery(e.target.value); }}
+            placeholder="Search message / component…"
+            className="w-52 bg-transparent text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
+          />
+        </div>
+        <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-[var(--text-secondary)]">
+          <ArrowUpDown className="h-3.5 w-3.5 text-sky-400" />
+          Sort:
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as 'probability' | 'updated' | 'component')}
+            className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] px-2 py-1 text-xs text-[var(--text-primary)] focus:outline-none"
+          >
+            <option value="probability">Probability</option>
+            <option value="updated">Updated</option>
+            <option value="component">Component</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
+        <table className="w-full text-left text-sm text-[var(--text-primary)]">
+          <thead className="border-b border-[var(--border-color)] bg-[var(--bg-main)]/60 text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+            <tr>
+              <th className="p-3">Probability</th>
+              <th className="p-3">Category</th>
+              <th className="p-3">Status</th>
+              <th className="p-3">Message</th>
+              <th className="p-3">Component</th>
+              <th className="p-3">Line</th>
+              <th className="p-3">Review</th>
+              <th className="p-3">Updated</th>
+            </tr>
+          </thead>
+          {!unavailable && !isLoading && items.length > 0 && (
+            <tbody className="divide-y divide-[var(--border-color)]">
+              {ordered.map((h) => (
+                <tr key={h.key} className="hover:bg-[var(--bg-card-hover)] transition-colors">
+                  <td className="p-3">{probabilityBadge(h.vulnerability_probability)}</td>
+                  <td className="p-3 font-mono text-xs text-[var(--text-secondary)]">{h.security_category ?? ''}</td>
+                  <td className="p-3 text-xs text-[var(--text-secondary)]">{h.status ?? ''}</td>
+                  <td className="p-3 max-w-md">
+                    <span className="text-xs text-[var(--text-primary)]" title={h.message ?? ''}>{truncate(h.message ?? '', 110)}</span>
+                    <span className="block text-[10px] font-mono text-[var(--text-secondary)]">{h.rule_key ?? ''}</span>
+                  </td>
+                  <td className="p-3 font-mono text-[11px] text-[var(--text-secondary)]">{truncate(h.component_key ?? '', 40)}</td>
+                  <td className="p-3 font-mono text-xs text-[var(--text-secondary)]">{h.line ?? ''}</td>
+                  <td className="p-3">{reviewBadge(h.review_status)}</td>
+                  <td className="p-3 text-xs text-[var(--text-secondary)]">
+                    {h.updated_at ? new Date(h.updated_at).toLocaleDateString() : ''}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          )}
+        </table>
+        <div className="p-3 border-t border-[var(--border-color)]">
+          <Pager envelope={{ items, count }} page={page} pageSize={PAGE_SIZE} onPageChange={setPage}
+            isLoading={isLoading} unavailable={unavailable} columns={8} />
+        </div>
       </div>
     </div>
   );

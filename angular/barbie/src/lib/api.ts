@@ -313,6 +313,73 @@ export class GatewayUpstreamError extends Error {
   }
 }
 
+// ── sonar-sync reads (canonical `sonar` schema mirror) ────────────
+// browser -> :3010 /sonar-sync/* -> loopback ballerina sonar-sync :9096.
+// Read-only surface; review writeback happens agent-side.
+const SONAR_SYNC_BASE = '/sonar-sync';
+
+export interface SonarIssueRow {
+  key: string;
+  sonar_type?: string | null;
+  severity?: string | null;
+  status?: string | null;
+  resolution?: string | null;
+  component_key?: string | null;
+  line?: number | null;
+  rule_key?: string | null;
+  message?: string | null;
+  review_status?: string | null;
+  review_owner?: string | null;
+  first_seen_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface SonarHotspotRow {
+  key: string;
+  security_category?: string | null;
+  vulnerability_probability?: string | null;
+  status?: string | null;
+  resolution?: string | null;
+  component_key?: string | null;
+  line?: number | null;
+  rule_key?: string | null;
+  message?: string | null;
+  review_status?: string | null;
+  review_owner?: string | null;
+  first_seen_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface SonarListEnvelope<T> {
+  items: T[];
+  count: number;
+}
+
+async function sonarSyncJson<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+  const q = new URLSearchParams();
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') q.set(k, String(v));
+    });
+  }
+  const qs = q.toString();
+  let res: Response;
+  try {
+    res = await fetch(`${SONAR_SYNC_BASE}${path}${qs ? `?${qs}` : ''}`, { headers: { 'Content-Type': 'application/json' } });
+  } catch (e: any) {
+    throw new GatewayUpstreamError(0, `sonar-sync unreachable: ${e?.message ?? e}`, 'sonar-sync', e?.message ?? String(e));
+  }
+  const text = await res.text().catch(() => '');
+  if (!res.ok) {
+    throw new GatewayUpstreamError(res.status, `sonar-sync error ${res.status}: ${text.slice(0, 200) || res.statusText}`, 'sonar-sync', text.slice(0, 200));
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new GatewayUpstreamError(0, 'sonar-sync returned non-JSON response', 'sonar-sync', text.slice(0, 200));
+  }
+}
+
 async function gatewayJson<T>(path: string): Promise<T> {
   let res: Response;
   try {
@@ -961,5 +1028,27 @@ export const registryApi = {
     if (params?.status) query.append('status', params.status);
     // Live Ballerina runtime services via the ci-gateway moat.
     return gatewayJson<BallerinaService[]>(`/ballerina/services?${query.toString()}`);
+  },
+
+  // Canonical `sonar` schema reads (mirrored from SonarQube by sonar-sync).
+  getSonarIssues: async (params?: {
+    severity?: string;
+    issueType?: string;
+    status?: string;
+    query?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<SonarListEnvelope<SonarIssueRow>> => {
+    return sonarSyncJson<SonarListEnvelope<SonarIssueRow>>('/issues', params);
+  },
+
+  getSonarHotspots: async (params?: {
+    category?: string;
+    status?: string;
+    query?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<SonarListEnvelope<SonarHotspotRow>> => {
+    return sonarSyncJson<SonarListEnvelope<SonarHotspotRow>>('/hotspots', params);
   }
 };

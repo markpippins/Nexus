@@ -79,6 +79,21 @@ app.use("/gateway", async (req, res) => {
   }
 });
 
+// sonar-sync passthrough — reads the canonical `sonar` schema (issues /
+// hotspots mirrored from SonarQube by the ballerina sonar-sync service).
+// browser -> :3010 /sonar-sync/* -> loopback sonar-sync :9096.
+const SONAR_SYNC_URL = process.env.SONAR_SYNC_URL || "http://127.0.0.1:9096";
+app.use("/sonar-sync", async (req, res) => {
+  try {
+    const r = await fetchWithTimeout(`${SONAR_SYNC_URL}${req.originalUrl}`, 15000);
+    const text = await r.text();
+    res.status(r.status).set("Content-Type", r.headers.get("content-type") ?? "application/json");
+    res.send(text);
+  } catch (err: any) {
+    res.status(502).json({ error: "sonar-sync unreachable", detail: String(err?.message || err) });
+  }
+});
+
 if (FEDERATED.length > 0) {
   console.log(`[barbie] Federation enabled: ${FEDERATED.map((f) => `${f.label}@${f.url}`).join(", ")} (read-only)`);
 
