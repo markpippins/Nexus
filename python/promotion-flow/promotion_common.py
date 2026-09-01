@@ -17,7 +17,7 @@ STATE_DIR = os.environ.get(
     "PROMOTION_STATE_DIR", "/home/codex/dev/nexus/state/promotion-flow"
 )
 ENGINEER_USER_CANDIDATES = ("engineer", "engineer-ii")
-OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+OLLAMA = os.environ.get("OLLAMA_HOST", "http://192.168.1.202:11434")
 
 
 def _req(url, method="GET", body=None, timeout=30):

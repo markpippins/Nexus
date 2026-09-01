@@ -2,10 +2,11 @@
 """Tiered embedding client — decision 8ae276bf (tiered inference policy).
 
 Provider chain (first available wins):
-  1. NVIDIA NIM external API      (primary)
-  2. OpenRouter embeddings        (secondary; pending key activation)
-  3. Local ollama                 (OFFLINE fallback — thallium per probe
-                                   verdict 97970f12, NOT titanium)
+  1. Local ollama on helium        (DEFAULT for embed tasks — user directive
+                                   2026-08-31; rehomed from localhost)
+  2. Gemini                        (external fallback; 768-dim)
+  3. NVIDIA NIM external API       (external fallback)
+  4. OpenRouter embeddings         (external fallback; pending key activation)
 
 Contract:
   - model family nomic-embed-text, 768-dim output
@@ -95,8 +96,8 @@ def _openrouter_key():
 
 
 def _ollama_host():
-    # Default stays local for dev; offline fleet leg points at thallium.
-    return os.environ.get("OLLAMA_EMBED_HOST", "http://localhost:11434")
+    # Default rehomed to helium (192.168.1.202); env still overrides.
+    return os.environ.get("OLLAMA_EMBED_HOST", "http://192.168.1.202:11434")
 
 
 def _chunk(text: str, limit: int = LOCAL_CHUNK_CHARS) -> list[str]:
@@ -222,10 +223,10 @@ def _embed_ollama(texts: list[str]) -> list[list[float]]:
 
 
 _TIERS = [
-    ("gemini", _embed_gemini),        # 768-dim, dimension-compatible external default
+    ("ollama-local", _embed_ollama),  # DEFAULT: helium (192.168.1.202) — user directive
+    ("gemini", _embed_gemini),        # 768-dim, dimension-compatible external fallback
     ("nim", _embed_nim),              # hosted NIM models are 1024-dim -> dim-guard rejects
     ("openrouter", _embed_openrouter),
-    ("ollama-local", _embed_ollama),  # offline fallback (thallium leg)
 ]
 
 

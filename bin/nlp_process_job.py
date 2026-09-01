@@ -18,7 +18,7 @@ from mcp import ClientSession
 from mcp.client.sse import sse_client
 
 ROVER_URL = "http://localhost:3102/sse"
-OLLAMA_URL = "http://localhost:11434"
+OLLAMA_URL = "http://192.168.1.202:11434"
 MODEL = "qwen3:4b"   # will fall back to gemma4 if not available
 
 async def get_chunk(session, job_id, ollama_url="", model=""):

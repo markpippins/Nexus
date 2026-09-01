@@ -254,7 +254,7 @@ def main() -> int:
 
     # Pre-flight Ollama health check
     try:
-        with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=5) as r:
+        with urllib.request.urlopen("http://192.168.1.202:11434/api/tags", timeout=5) as r:
             models = json.loads(r.read().decode()).get("models", [])
             model_names = {m["name"] for m in models}
             if args.model not in model_names and f"{args.model}:latest" not in model_names:
@@ -263,7 +263,7 @@ def main() -> int:
                     args.model, ", ".join(sorted(model_names)[:10]),
                 )
     except Exception as e:
-        log.error("Ollama not reachable at localhost:11434 — %s", e)
+        log.error("Ollama not reachable at 192.168.1.202:11434 — %s", e)
         return 1
 
     log.info("Fetching finalized agent records...")

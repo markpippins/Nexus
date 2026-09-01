@@ -5479,7 +5479,7 @@ export async function listGovernanceEvents(filters: {
 const DEFAULT_PROVIDERS = [
   { name: "OpenAI", type: "openai", endpoint_url: "https://api.openai.com/v1" },
   { name: "Anthropic", type: "anthropic", endpoint_url: "https://api.anthropic.com/v1" },
-  { name: "Ollama", type: "ollama", endpoint_url: "http://localhost:11434" },
+  { name: "Ollama", type: "ollama", endpoint_url: "http://192.168.1.202:11434" },
   { name: "OpenCode", type: "opencode", endpoint_url: "http://localhost:3100" },
   { name: "Codex", type: "codex", endpoint_url: "" },
 ];

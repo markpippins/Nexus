@@ -286,7 +286,7 @@ def ollama_chat(model: str, chunk_text: str, timeout: int = 900) -> list[dict]:
         "stream": False,
         "options": {"temperature": 0.1, "num_predict": 2048},
     }
-    resp = _post_json("http://localhost:11434/api/chat", body, timeout=timeout)
+    resp = _post_json("http://192.168.1.202:11434/api/chat", body, timeout=timeout)
     content = resp.get("message", {}).get("content", "")
     parsed = _loads_loose(content)
     return [n for n in (normalize_candidate(c) for c in parsed.get("candidates", [])) if n]
