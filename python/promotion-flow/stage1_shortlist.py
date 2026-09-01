@@ -12,8 +12,8 @@ import sys
 import uuid
 
 from promotion_common import (
-    NEBULA, agent_record, forum_post, get, inbox_ping, log, now_iso,
-    save_manifest,
+    NEBULA, agent_record, candidate_set_identity, forum_post, get,
+    inbox_ping, log, now_iso, open_batch_covering_set, save_manifest,
 )
 
 EXCLUDED_STATUS = {"promoted", "discarded", "rejected"}
@@ -138,6 +138,38 @@ def main():
         return 0
     attach_discovery_proposals(candidates)
 
+    # ── ST.01 duplicate-emission guard ──────────────────────────────────
+    # Prevent stage 1 from re-emitting an already-open candidate set. The set
+    # identity is deterministic (sha256 over sorted candidate UUIDs); if an
+    # open batch already covers the same set, the hourly retry is IDEMPOTENT
+    # (no new batch). A materially changed set or a lifecycle transition (the
+    # covering batch became executed) yields a different identity / no open
+    # match and MAY emit. Historical manifests are never deleted or rewritten.
+    set_identity = candidate_set_identity(candidates)
+    existing = open_batch_covering_set(set_identity)
+    if existing:
+        existing_bid = existing.get("batch_id")
+        log(
+            f"ST.01 guard: candidate-set {set_identity[:12]} already open as "
+            f"batch {existing_bid} (thread {existing.get('thread_id')}) — "
+            f"skipping duplicate emission (idempotent, no new batch)"
+        )
+        if not args.dry_run:
+            agent_record(
+                f"promotion-flow ST.01 guard: set {set_identity[:12]} already open as batch {existing_bid}",
+                (
+                    f"Duplicate-emission guard blocked a new batch for candidate-set "
+                    f"`{set_identity}`.\n"
+                    f"- covering open batch: {existing_bid} (thread {existing.get('thread_id')})\n"
+                    f"- candidates in set: {len(candidates)}\n"
+                    f"- action: skipped (idempotent no-op) — no new batch created\n"
+                    f"- ST.01 (wave 6): deterministic guard against re-emitting an open set"
+                ),
+                ["spec:promotion-flow", "ST.01", "type:guard", "status:resolved",
+                 f"batch:{existing_bid}", "idempotent-skip"],
+            )
+        return 0
+
     import json  # noqa: F401  (used by open_question_count)
 
     batch_id = uuid.uuid4().hex[:8]
@@ -159,6 +191,7 @@ def main():
         "thread_title": f"[promotion-batch {batch_id}] {len(candidates)} candidates ready for gate",
         "forum": "planning",
         "card_format": True,
+        "set_identity": set_identity,
         "candidates": [
             {
                 "id": c["id"],
