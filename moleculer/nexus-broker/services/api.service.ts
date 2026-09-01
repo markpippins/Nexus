@@ -26,7 +26,7 @@ export default class ApiService extends Service {
           {
             path: "/api",
 
-            whitelist: ["api.*", "worker.**", "sol-ir-snapshot.**"],
+            whitelist: ["api.*", "worker.**", "sol-ir-snapshot.**", "keychain-snapshot.**"],
 
             aliases: {
               "GET /health": "api.health",
@@ -41,6 +41,13 @@ export default class ApiService extends Service {
               "GET /workers/harness/sessions": "worker.harness.sessions",
               "GET /sol-ir-snapshot/status": "sol-ir-snapshot.status",
               "POST /sol-ir-snapshot/snapshot": "sol-ir-snapshot.snapshot",
+              // Keychains — agent-record contextual layer (state vector + rewind)
+              "GET /keychain-snapshot/status": "keychain-snapshot.status",
+              "POST /keychain-snapshot/snapshot": "keychain-snapshot.snapshot",
+              "GET /keychain-snapshot/agent-records/status": "keychain-snapshot.agentRecordsStatus",
+              "POST /keychain-snapshot/agent-records/snapshot": "keychain-snapshot.agentRecordsSnapshot",
+              "GET /keychain-snapshot/agent-records/transitions": "keychain-snapshot.agentRecordsTransitions",
+              "GET /keychain-snapshot/agent-records/rewind": "keychain-snapshot.agentRecordsRewind",
             },
 
             bodyParsers: {

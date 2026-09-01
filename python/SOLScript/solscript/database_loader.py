@@ -2,7 +2,22 @@
 
 from __future__ import annotations
 
+import os
+import uuid
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+# Config-namespace for in-memory fallback ids (e.g. a ShrapnelFact concept
+# created by the loader when the DB carries no resolution row for it).
+# Domain-agnostic per directive d6ffdc06: derived from the same env-overridable
+# namespace candidate_state.py uses, never a database literal.
+SOLSCRIPT_MODEL_NAMESPACE = os.environ.get(
+    "SOLSCRIPT_CANDIDATE_STATE_NAMESPACE", "solscript:candidate-state"
+)
+
+
+def _ns_uuid(seed: str) -> str:
+    """Deterministic UUID in the configured namespace (stable across runs)."""
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"{SOLSCRIPT_MODEL_NAMESPACE}:{seed}"))
 
 from .models import (
     AttributeBinding,
@@ -50,6 +65,7 @@ class DatabaseLoader:
         await self.load_attributes()
         await self.load_relationships()
         await self.load_expressions()
+        await self.load_state_transitions()
         await self.load_rules()
         await self.load_frame_dimensions()
         await self.load_propositions()
@@ -145,10 +161,12 @@ class DatabaseLoader:
                 return
 
             # Register entities under the given concept (create if absent).
+            # The fallback id is config-namespace-derived, never a database
+            # literal (directive d6ffdc06 — no nexus ids in solscript).
             concept = self.interpreter.get_concept_by_name(concept_name)
             if not concept:
                 concept = Concept(
-                    id="f0000000-0000-4000-8000-0000000000f1",
+                    id=_ns_uuid(f"concept:{concept_name}"),
                     name=concept_name,
                     description="Shrapnel EAV fact objects (standalone facts store)",
                 )
@@ -237,7 +255,11 @@ class DatabaseLoader:
             )
             for row in rows:
                 binding = None
-                if row["from_schema"] and row["to_schema"]:
+                # Hydrate the binding whenever the binding ROW exists — even
+                # attribute-level bindings (empty schema/table, columns only),
+                # which the candidate-state model uses. The LEFT JOIN gives NULL
+                # for a missing row; a present row is always non-NULL.
+                if row["from_column"] is not None:
                     binding = RelationshipBinding(
                         from_schema=row["from_schema"],
                         from_table=row["from_table"],
@@ -321,6 +343,49 @@ class DatabaseLoader:
                     parent.operands[pos] = child
 
     # ── Rules ────────────────────────────────────────────────────
+
+    async def load_state_transitions(self) -> None:
+        """Load concept state transitions (resolution.concept_state_transition).
+
+        `from_value_id`/`to_value_id` reference value rows in
+        `resolution.concept_attribute_value`; we join to resolve the display
+        strings the interpreter compares against state-attribute values.
+        """
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT st.id, st.concept_id, st.from_value_id, st.to_value_id, "
+                "st.name, st.notes "
+                "FROM resolution.concept_state_transition st "
+                "WHERE st.expired_at IS NULL"
+            )
+            if not rows:
+                return
+            # Resolve value ids -> strings
+            value_rows = await conn.fetch(
+                "SELECT id, value FROM resolution.concept_attribute_value"
+            )
+            value_by_id = {str(vr["id"]): vr["value"] for vr in value_rows}
+            for row in rows:
+                trans = ConceptStateTransition(
+                    id=str(row["id"]),
+                    concept_id=str(row["concept_id"]),
+                    from_value=(
+                        value_by_id.get(str(row["from_value_id"]))
+                        if row["from_value_id"]
+                        else None
+                    ),
+                    to_value=(
+                        value_by_id.get(str(row["to_value_id"]))
+                        if row["to_value_id"]
+                        else ""
+                    ),
+                    name=row["name"],
+                    notes=row["notes"],
+                )
+                self.interpreter.state_transitions[trans.id] = trans
+                concept = self.interpreter.get_concept(str(row["concept_id"]))
+                if concept:
+                    concept.state_transitions.append(trans)
 
     async def load_rules(self) -> None:
         async with self.pool.acquire() as conn:

@@ -59,6 +59,9 @@ class ResolutionInterpreter:
         self.evaluation_cache: Dict[str, Any] = {}
         self.execution_context: Dict[str, Any] = {}
         self.event_handlers: List[Callable[..., Any]] = []
+        # State-transition listeners: fired after a SUCCESSFUL transition
+        # (keychains snapshot hook, catalogue 332d6831 — decision points).
+        self.transition_listeners: List[Callable[..., Any]] = []
 
         # Components
         self.expression_compiler = ExpressionCompiler(self)
@@ -242,7 +245,24 @@ class ResolutionInterpreter:
                 if target is not None:
                     entity.attributes[state_attr.name] = target
 
+        # Fired only on a successful transition (rejected/no-op guards do
+        # NOT snapshot — the guarded transition never happened).
+        for listener in self.transition_listeners:
+            try:
+                listener(
+                    transition_id=transition_id,
+                    entity_id=entity_id,
+                    to_value=transition.to_value,
+                    effective_at=datetime.now().isoformat(),
+                )
+            except Exception:
+                pass
+
         return True, results
+
+    def register_transition_listener(self, listener: Callable[..., Any]) -> None:
+        """Register a callback fired after each successful state transition."""
+        self.transition_listeners.append(listener)
 
     def add_frame_dimension(self, dim: FrameDimension) -> None:
         self.frame_dimensions[dim.id] = dim
