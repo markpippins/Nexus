@@ -98,15 +98,14 @@ export async function runRegistryConformance(): Promise<void> {
     threw = false;
     try {
       new DoctrineLookupRegistry({
-        primary: { id: "a", adapter: staticLookup("resolved") },
+        // @ts-expect-error intentionally missing adapter.lookup
+        primary: { id: "a", adapter: {} },
         fallback: { id: "b", adapter: staticLookup("resolved") },
-        // @ts-expect-error intentionally missing primary.lookup
-        primary: { id: "a" },
-      } as never);
-    } catch {
-      threw = true;
+      });
+    } catch (e) {
+      threw = (e as Error).message === "registry_requires_primary_and_fallback";
     }
-    ok(threw, "missing fallback rejected");
+    ok(threw, "missing adapter lookup rejected");
   }
 
   // ── 3. Primary failure → fallback authoritative + divergence recorded ──
