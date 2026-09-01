@@ -56,6 +56,29 @@ const MERGEABLE_EXTRA = [
   "/api/v1/registry/services/with-hosted",
 ];
 
+// Resolve an inbound passthrough request against a fixed loopback base so
+// user-controlled URL components can never redirect the fetch to another
+// host (SSRF). Returns the absolute URL to fetch, or null when the request
+// would escape the configured origin.
+function resolveLoopback(req: any, baseUrl: string): string | null {
+  let base: URL;
+  try {
+    base = new URL(baseUrl);
+  } catch {
+    return null;
+  }
+  let target: URL;
+  try {
+    target = new URL(req.originalUrl ?? req.url ?? "/", base);
+  } catch {
+    return null;
+  }
+  if (target.origin !== base.origin || target.protocol !== base.protocol) {
+    return null;
+  }
+  return target.toString();
+}
+
 function fetchWithTimeout(url: string, ms = 12000, method?: string, headers?: Record<string, string>, body?: Buffer): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
@@ -70,11 +93,14 @@ function fetchWithTimeout(url: string, ms = 12000, method?: string, headers?: Re
 // CI gateway passthrough (to-do d9ac7608 follow-on; proposal 13890307):
 // browser -> :3010 /gateway/* -> loopback ballerina ci-gateway :9095.
 // Read-only; upstream binds loopback so this is the only exposure.
+const CI_GATEWAY_URL = process.env.CI_GATEWAY_URL || "http://127.0.0.1:9095";
 app.use("/gateway", async (req, res) => {
   try {
-    // Accept header omitted — fetchWithTimeout pins JSON content-type;
-    // gateway always answers JSON anyway.
-    const r = await fetchWithTimeout(`http://127.0.0.1:9095${req.originalUrl}`, 10000);
+    const target = resolveLoopback(req, CI_GATEWAY_URL);
+    if (!target) {
+      return res.status(400).json({ error: "bad gateway path" });
+    }
+    const r = await fetchWithTimeout(target, 10000);
     const text = await r.text();
     res.status(r.status).set("Content-Type", r.headers.get("content-type") ?? "application/json");
     res.send(text);
@@ -90,6 +116,10 @@ app.use("/gateway", async (req, res) => {
 const SONAR_SYNC_URL = process.env.SONAR_SYNC_URL || "http://127.0.0.1:9096";
 app.use("/sonar-sync", async (req, res) => {
   try {
+    const target = resolveLoopback(req, SONAR_SYNC_URL);
+    if (!target) {
+      return res.status(400).json({ error: "bad sonar-sync path" });
+    }
     const headers: Record<string, string> = {};
     if (req.method !== "GET") {
       headers["Content-Type"] = req.headers["content-type"]?.toString() ?? "application/json";
@@ -100,7 +130,7 @@ app.use("/sonar-sync", async (req, res) => {
       for await (const chunk of req) chunks.push(Buffer.from(chunk as any));
       body = Buffer.concat(chunks);
     }
-    const r = await fetchWithTimeout(`${SONAR_SYNC_URL}${req.originalUrl}`, 15000, req.method, headers, body);
+    const r = await fetchWithTimeout(target, 15000, req.method, headers, body);
     const text = await r.text();
     res.status(r.status).set("Content-Type", r.headers.get("content-type") ?? "application/json");
     res.send(text);

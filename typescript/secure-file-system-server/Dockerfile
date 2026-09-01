@@ -18,4 +18,7 @@ RUN mkdir -p fs_root
 EXPOSE 4040
 
 # Run the application
+# Drop privileges: the base image runs as root by default.
+RUN chown -R node:node /app
+USER node
 CMD ["npm", "start"]

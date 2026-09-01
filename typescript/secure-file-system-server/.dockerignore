@@ -1,0 +1,15 @@
+# Keep secrets and dev-only files out of the image (docker:S6470).
+.env
+.env.*
+node_modules
+dist
+*.log
+.git
+.gitignore
+Dockerfile
+fs_root
+root
+server.log
+run-tests.sh
+test-*.ts
+*.service

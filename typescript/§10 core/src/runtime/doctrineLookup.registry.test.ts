@@ -99,9 +99,7 @@ export async function runRegistryConformance(): Promise<void> {
     try {
       new DoctrineLookupRegistry({
         primary: { id: "a", adapter: staticLookup("resolved") },
-        fallback: { id: "b", adapter: staticLookup("resolved") },
-        // @ts-expect-error intentionally missing primary.lookup
-        primary: { id: "a" },
+        fallback: { id: "b" },
       } as never);
     } catch {
       threw = true;

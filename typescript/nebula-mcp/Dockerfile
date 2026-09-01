@@ -24,4 +24,7 @@ COPY --from=build /app/nebula-mcp/dist ./dist
 ENV NEBULA_MCP_PORT=3102
 EXPOSE 3102
 
+# Drop privileges: the base image runs as root by default.
+RUN chown -R node:node /app
+USER node
 CMD ["node", "dist/sse.js"]

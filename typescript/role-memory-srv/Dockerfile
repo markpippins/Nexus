@@ -25,4 +25,7 @@ COPY --from=build /app/role-memory-srv/dist ./dist
 ENV MEMORY_SRV_PORT=3500
 EXPOSE 3500
 
+# Drop privileges: the base image runs as root by default.
+RUN chown -R node:node /app
+USER node
 CMD ["node", "dist/index.js"]
