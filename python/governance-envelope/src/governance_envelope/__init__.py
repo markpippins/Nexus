@@ -10,6 +10,12 @@ contract (`nexus/go/wrp/ccnf-ref/SERIALIZATION_CONTRACT.md`).
 """
 
 from .admission import AdmissionAssessment, AdmissionError, assess_candidate, envelope_from_candidate
+from .binding import (
+    BindingDecision,
+    BindingValidationError,
+    binding_idempotency_key,
+    validate_binding_decision,
+)
 from .canonical import (
     canonical_json,
     canonicalize,
@@ -30,6 +36,10 @@ __all__ = [
     "AdmissionError",
     "assess_candidate",
     "envelope_from_candidate",
+    "BindingDecision",
+    "BindingValidationError",
+    "binding_idempotency_key",
+    "validate_binding_decision",
     "__version__",
 ]
 

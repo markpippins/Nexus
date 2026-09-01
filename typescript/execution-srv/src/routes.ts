@@ -428,10 +428,15 @@ export function createRoutes(pool: Pool): Router {
         },
         {
           kind: 'receipt_attempt_mismatch',
-          sql: `SELECT rc.id AS entity_id, rc.attempt_id, NULL AS detail
+          // Backfilled pipeline receipts intentionally have no execution
+          // attempt. Only native execution receipts are eligible for this
+          // invariant; legacy vision/conduit lineage is reported separately.
+          sql: `SELECT rc.id AS entity_id, rc.attempt_id, rc.lineage_source AS detail
                   FROM receipts rc
              LEFT JOIN attempts a ON a.id = rc.attempt_id
-                 WHERE a.id IS NULL`,
+                 WHERE rc.lineage_source IS NULL
+                   AND rc.attempt_id IS NOT NULL
+                   AND a.id IS NULL`,
         },
         {
           kind: 'unreleased_lease_for_terminal_request',

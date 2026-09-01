@@ -1,0 +1,72 @@
+{
+  "spec_item": "P2-P6",
+  "contract_version": 1,
+  "authority_level": "advisory",
+  "decision_class": "deny_contract_promotion",
+  "canonicalization": "UTF-8 compact JSON with lexicographically sorted keys; SHA-256 prefixed sha256:",
+  "vectors": [
+    {
+      "id": "binding-allow-001",
+      "decision": {
+        "binding_contract_version": 1,
+        "decision_class": "deny_contract_promotion",
+        "contract": {"id": "promotion-contract", "version": "1"},
+        "proposition_id": "pg:ready",
+        "doctrine_ids": ["law-1"],
+        "evaluator": {"id": "sol", "version": "1"},
+        "evidence_ids": ["evidence-1"],
+        "subject_id": "candidate-1",
+        "work_item_id": "work-1",
+        "as_of": "2026-09-01T12:00:00.000000Z",
+        "disposition": "allow",
+        "authority_level": "advisory",
+        "evaluation_fingerprint": "sha256:abababababababababababababababababababababababababababababababab",
+        "decision_id": "decision-1",
+        "evidence_fresh": true,
+        "replay_context": "attempt-1"
+      },
+      "expected": {
+        "valid": true,
+        "lineage_fingerprint": "sha256:TO_BE_COMPUTED_BY_JVM_REFERENCE",
+        "idempotency_key": "peb:binding:decision-1:sha256:abababababababababababababababababababababababababababababababab"
+      }
+    },
+    {
+      "id": "binding-refused-001",
+      "inherits": "binding-allow-001",
+      "mutations": {"disposition": "refused"},
+      "expected": {"valid": true, "disposition": "refused"}
+    },
+    {
+      "id": "binding-unknown-001",
+      "inherits": "binding-allow-001",
+      "mutations": {"disposition": "unknown"},
+      "expected": {"valid": true, "disposition": "unknown"}
+    },
+    {
+      "id": "binding-authority-reject-001",
+      "inherits": "binding-allow-001",
+      "mutations": {"authority_level": "blocking"},
+      "expected": {"valid": false, "error": "binding decisions must remain advisory"}
+    },
+    {
+      "id": "binding-subject-reject-001",
+      "inherits": "binding-allow-001",
+      "mutations": {"subject_id": "candidate-2"},
+      "expected": {"valid": false, "error": "subject binding mismatch when expected subject is candidate-1"}
+    },
+    {
+      "id": "binding-freshness-reject-001",
+      "inherits": "binding-allow-001",
+      "mutations": {"evidence_fresh": false},
+      "expected": {"valid": false, "error": "evidence is not fresh"}
+    }
+  ],
+  "parity_rules": [
+    "Lineage fingerprint is computed over the immutable authority fields only.",
+    "Idempotency is decision_id plus evaluation_fingerprint; wall-clock time is excluded.",
+    "Every disposition remains explicit, including negative outcomes.",
+    "Blocking authority and subject/work-item/replay mismatches fail closed.",
+    "A valid result is advisory and cannot activate lifecycle behavior by itself."
+  ]
+}
