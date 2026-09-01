@@ -1,7 +1,18 @@
 /**
- * tables.ts — registry of the 21 semantics.* tables
- *   (V057 design model + V060 relationship vocabulary + V065 T02 Phase 1
- *    asset spine + V066 T02 Phase 2 relationship layer).
+ * tables.ts — registry of the 12 semantics.* tables after convergence to the
+ *   standalone sol.semantics shape (2026-09-01, cutover reconciliation
+ *   deliverable 3 / record f3320458).
+ *
+ * Removed (retired — owned by resolution.* as the evaluation model):
+ *   owning_subsystem, concept, concept_relationship, representation,
+ *   representation_identity, representation_relationship, identity_strategy,
+ *   consumer_operation, execution_claim.
+ *
+ * Retained pending the canonical_asset ownership decision (handoff 5e2884db):
+ *   canonical_asset — the only asset spine in the nexus DB (47,632 rows,
+ *   21 FKs from 8 external schemas). If the decision places assets in
+ *   resolution.* instead, this entry and the canonical_asset routes must be
+ *   removed in a follow-up.
  *
  * The stored-procedure write surface is generated from this registry:
  *   add_<table>(p_id?, p_<writable>...)           INSERT ... RETURNING *
@@ -40,99 +51,57 @@ export interface TableMeta {
 }
 
 export const TABLES: TableMeta[] = [
+  // ── V060: relationship type vocabulary ────────────────────────────
   {
-    table: "owning_subsystem",
-    label: "owning subsystem (fleet)",
-    idType: "smallint",
-    idAuto: false,
-    smallintCols: ["id"],
-    jsonbCols: [],
-    writable: ["name", "description", "path", "expired_at"],
-    required: ["id", "name"],
-    note: "Stable smallint lookup key — id is caller-supplied; update requires p_new_id.",
-  },
-  {
-    table: "concept",
-    label: "concept (class)",
+    table: "relationship_type",
+    label: "relationship type (vocabulary of legal edge types)",
     idType: "uuid",
     idAuto: true,
     smallintCols: [],
     jsonbCols: [],
-    writable: ["name", "description", "expired_at"],
-    required: ["name"],
+    writable: ["name", "description", "scope", "notes", "expired_at"],
+    required: ["name", "description"],
+    idCol: "name",
+    idParam: "p_name",
+    note: "Vocabulary table — FK-referenced by concept_relationship / representation_relationship (only defined types are legal edges). update takes p_new_name (names are never reused).",
   },
+  // ── V072: Evidence spine ──────────────────────────────────────────
   {
-    table: "representation",
-    label: "representation (physical form of a concept)",
-    idType: "uuid",
-    idAuto: true,
-    smallintCols: ["owning_subsystem_id"],
-    jsonbCols: ["raw_metadata"],
-    writable: [
-      "concept_id",
-      "label",
-      "schema_name",
-      "table_name",
-      "owning_subsystem_id",
-      "owner",
-      "raw_metadata",
-      "expired_at",
-    ],
-    required: ["concept_id", "label", "owning_subsystem_id"],
-  },
-  {
-    table: "representation_relationship",
-    label: "representation relationship (fidelity/lineage between forms)",
+    table: "evidence_type",
+    label: "evidence type (vocabulary of evidence kinds)",
     idType: "uuid",
     idAuto: true,
     smallintCols: [],
     jsonbCols: [],
-    writable: [
-      "from_representation_id",
-      "to_representation_id",
-      "relationship_type",
-      "notes",
-      "expired_at",
-    ],
-    required: ["from_representation_id", "to_representation_id", "relationship_type"],
-    note: "Evidence is now modelled as first-class evidence_item + statement_evidence (V072); provenance query joins through statement_evidence.",
+    writable: ["name", "description", "origin_category", "notes", "expired_at"],
+    required: ["name", "description"],
+    idCol: "name",
+    idParam: "p_name",
+    note: "Vocabulary table — FK-referenced by evidence_item. update takes p_new_name.",
   },
   {
-    table: "consumer_operation",
-    label: "consumer operation (who touches a representation and how)",
+    table: "evidence_item",
+    label: "evidence item (immutable, hash-deduplicated evidence record)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: ["metadata"],
+    writable: ["evidence_type_id", "uri", "excerpt", "note", "origin", "captured_at", "source_hash", "metadata", "valid_from", "valid_to", "expired_at"],
+    required: ["evidence_type_id"],
+    note: "Immutable after creation (no update_ proc). Soft-close via soft_delete_. Dedup on (evidence_type_id, source_hash).",
+  },
+  {
+    table: "statement_evidence",
+    label: "statement evidence (evidence linked to a relationship claim)",
     idType: "uuid",
     idAuto: true,
     smallintCols: [],
     jsonbCols: [],
-    writable: ["representation_id", "consumer_name", "operation", "notes", "expired_at"],
-    required: ["representation_id", "consumer_name", "operation"],
+    writable: ["evidence_item_id", "statement_type", "statement_id", "role", "strength", "comment", "expired_at"],
+    required: ["evidence_item_id", "statement_type", "statement_id", "role"],
+    note: "Polymorphic junction — statement_type includes source_observation, concept_relationship, representation_relationship, execution_claim, resolution_proposition (sol vocabulary). Unique on (evidence_item_id, statement_type, statement_id, role).",
   },
-  {
-    table: "identity_strategy",
-    label: "identity strategy (what identity means for a concept)",
-    idType: "uuid",
-    idAuto: true,
-    smallintCols: [],
-    jsonbCols: [],
-    writable: ["concept_id", "canonical_key_description", "notes", "expired_at"],
-    required: ["concept_id", "canonical_key_description"],
-  },
-  {
-    table: "representation_identity",
-    label: "representation identity (how a form expresses its concept's identity)",
-    idType: "uuid",
-    idAuto: true,
-    smallintCols: [],
-    jsonbCols: [],
-    writable: [
-      "representation_id",
-      "identity_strategy_id",
-      "identity_expression",
-      "notes",
-      "expired_at",
-    ],
-    required: ["representation_id", "identity_strategy_id", "identity_expression"],
-  },
+  // ── V057: snapshots & drift ───────────────────────────────────────
   {
     table: "snapshot",
     label: "snapshot (per-baseline judgment record)",
@@ -161,6 +130,7 @@ export const TABLES: TableMeta[] = [
       "expired_at",
     ],
     required: ["snapshot_id", "representation_id", "lifecycle_state"],
+    note: "representation_id column retained (matches sol.semantics) but its FK to semantics.representation is dropped under convergence — the id is historical.",
   },
   {
     table: "drift_finding",
@@ -172,37 +142,6 @@ export const TABLES: TableMeta[] = [
     writable: ["observation_id", "description", "severity", "resolved_at", "expired_at"],
     required: ["observation_id", "description", "severity"],
     note: "Lifecycle: detected (resolved_at NULL) → resolved via semantics_resolve_drift_finding.",
-  },
-  {
-    table: "concept_relationship",
-    label: "concept relationship (legal pipeline shape between classes)",
-    idType: "uuid",
-    idAuto: true,
-    smallintCols: [],
-    jsonbCols: [],
-    writable: [
-      "from_concept_id",
-      "to_concept_id",
-      "relationship_type",
-      "path",
-      "notes",
-      "expired_at",
-    ],
-    required: ["from_concept_id", "to_concept_id", "relationship_type"],
-    note: "path is 'green' | 'red' | null (branch tag). Evidence is now first-class via evidence_item + statement_evidence (V072).",
-  },
-  {
-    table: "relationship_type",
-    label: "relationship type (vocabulary of legal edge types)",
-    idType: "uuid",
-    idAuto: true,
-    smallintCols: [],
-    jsonbCols: [],
-    writable: ["name", "description", "scope", "notes", "expired_at"],
-    required: ["name", "description"],
-    idCol: "name",
-    idParam: "p_name",
-    note: "Vocabulary table — FK-referenced by concept_relationship / representation_relationship (only defined types are legal edges). update takes p_new_name (names are never reused).",
   },
   // ── V065: T02 Phase 1 — canonical asset identity spine ──────────────
   // canonical_asset / asset_revision / source_observation. Append-only /
@@ -226,7 +165,7 @@ export const TABLES: TableMeta[] = [
       "expired_at",
     ],
     required: ["canonical_asset_id", "asset_kind"],
-    note: "T02 Phase 1. canonical_asset_id is the durable business key (compound asset:<platform>:<ns>:<key>); partial unique index on active rows. revisions/claims/relations hang off it.",
+    note: "T02 Phase 1. canonical_asset_id is the durable business key (compound asset:<platform>:<ns>:<key>); partial unique index on active rows. revisions/claims/relations hang off it. Retained pending the asset-ownership decision (handoff 5e2884db); do not remove without that decision.",
   },
   {
     table: "asset_revision",
@@ -313,73 +252,6 @@ export const TABLES: TableMeta[] = [
     ],
     required: ["from_asset_id", "to_asset_id", "relation_type"],
     note: "T02 Phase 2. Self-loops forbidden (from_asset_id <> to_asset_id). Append-only with expired_at soft-delete; active edge uniqueness on (from, to, type).",
-  },
-  // ── V072: Evidence spine ──────────────────────────────────────────
-  {
-    table: "evidence_type",
-    label: "evidence type (vocabulary of evidence kinds)",
-    idType: "uuid",
-    idAuto: true,
-    smallintCols: [],
-    jsonbCols: [],
-    writable: ["name", "description", "origin_category", "notes", "expired_at"],
-    required: ["name", "description"],
-    idCol: "name",
-    idParam: "p_name",
-    note: "Vocabulary table — FK-referenced by evidence_item. update takes p_new_name.",
-  },
-  {
-    table: "evidence_item",
-    label: "evidence item (immutable, hash-deduplicated evidence record)",
-    idType: "uuid",
-    idAuto: true,
-    smallintCols: [],
-    jsonbCols: ["metadata"],
-    writable: ["evidence_type_id", "uri", "excerpt", "note", "origin", "captured_at", "source_hash", "metadata", "valid_from", "valid_to", "expired_at"],
-    required: ["evidence_type_id"],
-    note: "Immutable after creation (no update_ proc). Soft-close via soft_delete_. Dedup on (evidence_type_id, source_hash).",
-  },
-  {
-    table: "statement_evidence",
-    label: "statement evidence (evidence linked to a relationship claim)",
-    idType: "uuid",
-    idAuto: true,
-    smallintCols: [],
-    jsonbCols: [],
-    writable: ["evidence_item_id", "statement_type", "statement_id", "role", "strength", "comment", "expired_at"],
-    required: ["evidence_item_id", "statement_type", "statement_id", "role"],
-    note: "Polymorphic junction — statement_type includes concept_relationship, representation_relationship, and execution_claim. Unique on (evidence_item_id, statement_type, statement_id, role).",
-  },
-  {
-    table: "execution_claim",
-    label: "execution claim (semantics projection of a bounded SOL execution claim)",
-    idType: "uuid",
-    idAuto: true,
-    smallintCols: [],
-    jsonbCols: ["subject_ref", "object_value", "verification_summary"],
-    writable: [
-      "resolution_claim_id",
-      "claim_key",
-      "subject_kind",
-      "subject_ref",
-      "predicate",
-      "object_value",
-      "policy_version_hash",
-      "lease_id",
-      "grant_id",
-      "attempt_id",
-      "declared_by",
-      "declared_at",
-      "observed_at",
-      "disposition",
-      "verification_method",
-      "verified_by",
-      "verified_at",
-      "verification_summary",
-      "expired_at",
-    ],
-    required: ["claim_key", "subject_kind", "predicate", "declared_by"],
-    note: "Projection/correlation surface for resolution.execution_claim. It does not issue leases, grant capabilities, authorize execution, or prove kernel materialization; link evidence with statement_type=execution_claim.",
   },
 ];
 

@@ -52,12 +52,6 @@ function buildUpdateCall(
   };
   const idParam = t.idParam ?? "p_id";
   push(idParam, body[idParam] ?? body.p_id);
-  if (t.table === "owning_subsystem") {
-    if (body.p_new_id === undefined) {
-      throw new Error("update owning_subsystem requires p_new_id (the new smallint key)");
-    }
-    push("p_new_id", body.p_new_id);
-  }
   if (t.table === "relationship_type") {
     if (body.p_new_name === undefined) {
       throw new Error("update relationship_type requires p_new_name (the new type name)");
@@ -449,7 +443,7 @@ for (const t of TABLES) {
       const offset = Math.max(parseInt(String(req.query.offset || "0"), 10) || 0, 0);
       const where = includeExpired ? "" : "WHERE expired_at IS NULL";
       const { rows } = await getDb().query(
-        `SELECT * FROM semantics.${t.table} ${where} ORDER BY ${t.table === "owning_subsystem" ? "id" : "id"} LIMIT $1 OFFSET $2`,
+        `SELECT * FROM semantics.${t.table} ${where} ORDER BY id LIMIT $1 OFFSET $2`,
         [limit, offset],
       );
       res.json({ table: t.table, count: rows.length, items: rows });
@@ -536,104 +530,10 @@ for (const t of TABLES) {
 }
 
 // ── Evidence join endpoints ──────────────────────────────────────────
-
-// GET /api/concept-relationship/:id/evidence — all evidence for a concept relationship
-semanticsRouter.get("/concept_relationship/:id/evidence", async (req, res) => {
-  try {
-    const db = getDb();
-    const { rows: [rel] } = await db.query(
-      "SELECT * FROM semantics.concept_relationship WHERE id = $1",
-      [req.params.id],
-    );
-    if (!rel) return res.status(404).json({ error: "Concept relationship not found" });
-
-    const { rows: evidence } = await db.query(
-      `SELECT se.id AS "statementEvidenceId", se.role, se.strength, se.comment,
-              ei.id, ei.uri, ei.excerpt, ei.origin, ei.captured_at AS "capturedAt",
-              ei.source_hash AS "sourceHash",
-              et.name AS "evidenceType"
-       FROM semantics.statement_evidence se
-       JOIN semantics.evidence_item ei ON ei.id = se.evidence_item_id
-          AND ei.recorded_until_dt = '9999-12-31 23:59:59+00'
-       JOIN semantics.evidence_type et ON et.id = ei.evidence_type_id
-       WHERE se.statement_type = 'concept_relationship'
-         AND se.statement_id = $1
-         AND se.expired_at IS NULL
-       ORDER BY se.effective_at DESC`,
-      [req.params.id],
-    );
-
-    res.json({
-      relationship: rel,
-      evidence: evidence.map((e: any) => ({
-        statementEvidenceId: e.statementEvidenceId,
-        role: e.role,
-        strength: e.strength,
-        comment: e.comment,
-        evidenceItem: {
-          id: e.id,
-          evidenceType: e.evidenceType,
-          uri: e.uri,
-          excerpt: e.excerpt,
-          origin: e.origin,
-          capturedAt: e.capturedAt ? new Date(e.capturedAt).getTime() : null,
-          sourceHash: e.sourceHash,
-        },
-      })),
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: "evidence_lookup_failed", message: err.message });
-  }
-});
-
-// GET /api/representation-relationship/:id/evidence
-semanticsRouter.get("/representation_relationship/:id/evidence", async (req, res) => {
-  try {
-    const db = getDb();
-    const { rows: [rel] } = await db.query(
-      "SELECT * FROM semantics.representation_relationship WHERE id = $1",
-      [req.params.id],
-    );
-    if (!rel) return res.status(404).json({ error: "Representation relationship not found" });
-
-    const { rows: evidence } = await db.query(
-      `SELECT se.id AS "statementEvidenceId", se.role, se.strength, se.comment,
-              ei.id, ei.uri, ei.excerpt, ei.origin, ei.captured_at AS "capturedAt",
-              ei.source_hash AS "sourceHash",
-              et.name AS "evidenceType"
-       FROM semantics.statement_evidence se
-       JOIN semantics.evidence_item ei ON ei.id = se.evidence_item_id
-          AND ei.recorded_until_dt = '9999-12-31 23:59:59+00'
-       JOIN semantics.evidence_type et ON et.id = ei.evidence_type_id
-       WHERE se.statement_type = 'representation_relationship'
-         AND se.statement_id = $1
-         AND se.expired_at IS NULL
-       ORDER BY se.effective_at DESC`,
-      [req.params.id],
-    );
-
-    res.json({
-      relationship: rel,
-      evidence: evidence.map((e: any) => ({
-        statementEvidenceId: e.statementEvidenceId,
-        role: e.role,
-        strength: e.strength,
-        comment: e.comment,
-        evidenceItem: {
-          id: e.id,
-          evidenceType: e.evidenceType,
-          uri: e.uri,
-          excerpt: e.excerpt,
-          origin: e.origin,
-          capturedAt: e.capturedAt ? new Date(e.capturedAt).getTime() : null,
-          sourceHash: e.sourceHash,
-        },
-      })),
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: "evidence_lookup_failed", message: err.message });
-  }
-});
+// NOTE: the concept_relationship / representation_relationship evidence
+// endpoints were removed with the retired ontology tables (cutover
+// reconciliation, record f3320458). statement_evidence remains and is
+// queryable generically via GET /api/statement_evidence?statementType=...
 
 // ── T02: Asset sub-resource routes ───────────────────────────────────
 
