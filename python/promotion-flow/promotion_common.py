@@ -4,6 +4,7 @@
 Doctrine: D-2026-08-23-D (befca0bb). All external targets are isolated here
 so the Adonis/Moleculer cutover only touches this module.
 """
+import hashlib
 import json
 import os
 import sys
@@ -137,6 +138,59 @@ def load_manifests():
             with open(os.path.join(STATE_DIR, fn)) as f:
                 out.append(json.load(f))
     return out
+
+
+def candidate_set_identity(candidates):
+    """Deterministic canonical identity of a candidate set.
+
+    ST.01: a candidate-set's identity is the sha256 digest of the sorted
+    candidate UUIDs. Order-independent and stable, so the same 20-card set
+    always hashes to the same identity regardless of emission order or the
+    timestamp/batch metadata that distinguish re-emissions.
+    """
+    ids = sorted(str(c["id"]) for c in candidates if c.get("id"))
+    return hashlib.sha256(",".join(ids).encode("utf-8")).hexdigest()
+
+
+def is_open_batch(manifest):
+    """A promotion batch is OPEN when it is not fully executed.
+
+    ``executed`` is set only by stage 3 once EVERY candidate is promoted or
+    struck (fully drained). Until then the batch remains open and awaiting
+    operator verdicts. Superseded duplicates (ST.02) count as open too — they
+    are historical lineage, not fresh admission pressure.
+    """
+    return not manifest.get("executed")
+
+
+def open_batch_covering_set(identity, manifests=None):
+    """Return the first OPEN batch whose candidate-set identity matches.
+
+    ST.01 admission guard: stage 1 must not re-emit a candidate set that an
+    open batch already covers. A materially-changed set (different identity)
+    or a lifecycle transition (the covering batch became executed) MAY emit a
+    new batch — this check answers to both.
+    """
+    manifests = load_manifests() if manifests is None else manifests
+    for m in manifests:
+        if not is_open_batch(m):
+            continue
+        if candidate_set_identity(m.get("candidates", [])) == identity:
+            return m
+    return None
+
+
+def mark_superseded(manifest, superseded_by, reason):
+    """Append-only supersession marker (ST.02).
+
+    Never deletes or rewrites historical candidate rows — only adds
+    supersession lineage pointing a duplicate manifest at its active twin.
+    The original manifest content is preserved verbatim.
+    """
+    manifest["superseded_by"] = superseded_by
+    manifest["superseded_at"] = now_iso()
+    manifest["supersession_reason"] = reason
+    return manifest
 
 
 def ollama_available(timeout=4):
