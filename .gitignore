@@ -72,6 +72,7 @@ docs/HISTORY/
 # Separate/standalone repos checked out inside the nexus tree (never tracked here)
 angular/application-host/
 angular/atlas-ui/
+angular/nebula-operations-ui/
 
 # Local backup artifacts (timestamped, generated)
 .atlas-backups/
