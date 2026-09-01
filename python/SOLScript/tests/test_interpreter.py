@@ -371,6 +371,45 @@ class TestStateTransitions:
         assert passed is False
         assert entity.attributes["status"] == "DRAFT"  # unchanged
 
+    def test_transition_listener_fires_on_success_only(
+        self, interp: ResolutionInterpreter, wr_concept: Concept,
+    ) -> None:
+        """Listeners fire after a SUCCESSFUL transition, never after a guard failure."""
+        entity = interp.add_entity_by_concept_name(
+            "WorkRequest", {"status": "DRAFT"},
+        )
+        bad_expr = Expression(
+            id=_uid(), kind=ExpressionKind.LITERAL,
+            return_type="boolean", literal_value=False,
+        )
+        guard = Rule(
+            id=_uid(), name="always fails",
+            rule_type=RuleType.GUARD, expression=bad_expr,
+            severity=Severity.HARD,
+        )
+        transition = ConceptStateTransition(
+            id=_uid(), concept_id=wr_concept.id,
+            from_value="DRAFT", to_value="APPROVED",
+            name="approve", notes=None, guards=[guard],
+        )
+        interp.state_transitions[transition.id] = transition
+
+        calls = []
+        interp.register_transition_listener(
+            lambda **kw: calls.append(kw.get("transition_id"))
+        )
+
+        # Guard fails -> no listener call
+        passed, _ = interp.transition_entity(entity.id, transition.id)
+        assert passed is False
+        assert calls == []
+
+        # Remove the guard, transition succeeds -> listener fires with kwargs
+        transition.guards = []
+        passed, _ = interp.transition_entity(entity.id, transition.id)
+        assert passed is True
+        assert calls == [transition.id]
+
     def test_transition_entity_not_found(self, interp: ResolutionInterpreter) -> None:
         passed, results = interp.transition_entity("nonexistent", "nonexistent")
         assert passed is False

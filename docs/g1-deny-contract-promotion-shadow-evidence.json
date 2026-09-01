@@ -1,0 +1,43 @@
+{
+  "gate": "G1",
+  "decisionClass": "deny_contract_promotion",
+  "mode": "shadow",
+  "authority": "advisory_only",
+  "activation": false,
+  "boundedSample": {
+    "source": "docs/w504-evidence/w504-canary-transcript-full.json",
+    "size": 1344,
+    "caseClasses": ["clean", "refusal", "unknown", "duplicate_retry", "stale", "drift"],
+    "decisionId": "05d0fe54"
+  },
+  "lineageFindings": {
+    "legacyNullableAttemptRows": 258,
+    "sources": {
+      "vision.receipts": 170,
+      "conduit": 88
+    },
+    "classification": "intentional non-execution pipeline lineage; excluded from native execution attempt mismatch",
+    "remediation": "integrity scan now checks attempt linkage only for native execution receipts; historical rows are preserved",
+    "postRemediationNativeMismatchCount": 0
+  },
+  "checks": {
+    "completeLineage": "not_proven",
+    "zeroUnexplainedDivergences": "native_execution_scan_green; full_gate_not_proven",
+    "resolutionConduitUiAgreement": "not_proven",
+    "noBypass": "supported_by_boundary_and_read_only_canary",
+    "rollback": "covered_by_existing_w505_drill_evidence",
+    "operatorAuthorization": "not_granted"
+  },
+  "result": "FAIL_CLOSED_NOT_READY",
+  "reasons": [
+    "No live bounded deny_contract_promotion PEB evidence rows exist",
+    "Operator authorization and architect activation are absent"
+  ],
+  "verification": {
+    "pythonGovernanceEnvelopeTests": 59,
+    "replayConformance": "ALL GREEN",
+    "executionSrvBuild": "PASS",
+    "witnessedRunConformance": "ALL GREEN",
+    "integrityScan": {"anomalies": 0, "kindsFired": 0}
+  }
+}

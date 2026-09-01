@@ -48,6 +48,40 @@ namespace org.nexus.nexusbroker {
   op solirSnapshot(@body body: SolIrSnapshotRequest): SolIrSnapshotResult;
 
   // ========================================================================
+  // Keychains — agent-record contextual layer (state vector + rewind)
+  // ========================================================================
+
+  @route("/api/keychain-snapshot/status")
+  @get
+  @doc("Legacy observations/assessments keychain projection status.")
+  op keychainStatus(): KeychainStatus;
+
+  @route("/api/keychain-snapshot/snapshot")
+  @post
+  @doc("Trigger the legacy observations/assessments keychain snapshot (timer-based; running stack, not state vector).")
+  op keychainSnapshot(@body body: SolIrSnapshotRequest): SolIrSnapshotResult;
+
+  @route("/api/keychain-snapshot/agent-records/status")
+  @get
+  @doc("Agent-records keychain status: latest state-vector snapshot, entry count.")
+  op keychainAgentRecordsStatus(): KeychainAgentRecordsStatus;
+
+  @route("/api/keychain-snapshot/agent-records/snapshot")
+  @post
+  @doc("Project agent records -> keychain entries (current issuance per instance). Trigger events are normalized to the shared contract and deduplicated on (kind, id).")
+  op keychainAgentRecordsSnapshot(@body body: KeychainSnapshotRequest): KeychainSnapshotResult;
+
+  @route("/api/keychain-snapshot/agent-records/transitions")
+  @get
+  @doc("List recorded snapshot-trigger events (decision points).")
+  op keychainAgentRecordsTransitions(): KeychainTransitionsResult;
+
+  @route("/api/keychain-snapshot/agent-records/rewind")
+  @get
+  @doc("Rewind: reconstruct the per-record-type state vector as of a past decision-point snapshot version.")
+  op keychainAgentRecordsRewind(@query at: int32): KeychainRewindResult;
+
+  // ========================================================================
   // Worker tier (Wave 4 — harness/pty/execution as Moleculer workers)
   // ========================================================================
 

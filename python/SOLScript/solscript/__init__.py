@@ -8,6 +8,13 @@ Usage::
     result = interp.evaluate_proposition(prop)
 """
 
+from .candidate_state import (
+    CANDIDATE_STATE_MEMBERS,
+    build_member_exists_expression,
+    deterministic_seed_members,
+    ensure_candidate_state_model,
+    evaluate_candidate_state_members,
+)
 from .database_loader import DatabaseLoader
 from .expression_compiler import ExpressionCompiler
 from .inference_engine import InferenceEngine, KnowledgeBase
@@ -86,6 +93,12 @@ __all__ = [
     "RepresentationIdentity",
     "RepresentationComparison",
     "FunctionBinding",
+    # Candidate state (SOL wiring, directive 96b22ed4)
+    "CANDIDATE_STATE_MEMBERS",
+    "build_member_exists_expression",
+    "deterministic_seed_members",
+    "ensure_candidate_state_model",
+    "evaluate_candidate_state_members",
     # Reasoning
     "DeterministicReasoner",
     "HybridReasoner",

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { fleetHealthRouter } from './fleet-health.js';
 import { eventsRouter } from './events.js';
 import { transactionsRouter } from './transactions.js';
+import { bindingDecisionsRouter } from './binding-decisions.js';
 import { decisionsRouter } from './decisions.js';
 import { tracesRouter } from './traces.js';
 import { entitiesRouter } from './entities.js';
@@ -17,6 +18,9 @@ routes.use('/health', fleetHealthRouter);
 // swallow "stream" as a receipt id and return 404 for the SSE endpoint.
 routes.use('/events/stream', streamRouter);
 routes.use('/events', eventsRouter);
+// Binding decisions are a transaction-adjacent read-only projection, but
+// must be mounted before /transactions/:id-style consumers.
+routes.use('/binding-decisions', bindingDecisionsRouter);
 routes.use('/transactions', transactionsRouter);
 routes.use('/decisions', decisionsRouter);
 routes.use('/traces', tracesRouter);
