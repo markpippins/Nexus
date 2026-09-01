@@ -96,6 +96,34 @@ function truncate(s: string, n: number) {
   return s.length > n ? s.slice(0, n) + '…' : s;
 }
 
+type WriteAction = { label: string; value: string; cls: string };
+
+function ActionButtons({
+  busy,
+  actions,
+  onAction,
+}: {
+  busy: boolean;
+  actions: WriteAction[];
+  onAction: (value: string) => void;
+}) {
+  if (busy) return <span className="inline-block mt-1 text-[10px] text-[var(--text-secondary)] animate-pulse">saving…</span>;
+  return (
+    <span className="flex flex-wrap gap-1 mt-1">
+      {actions.map((a) => (
+        <button
+          key={a.value}
+          onClick={(e) => { e.stopPropagation(); onAction(a.value); }}
+          title={`Write review decision back to SonarQube + local schema`}
+          className={`rounded border px-1.5 py-0.5 text-[9px] font-semibold transition-colors ${a.cls}`}
+        >
+          {a.label}
+        </button>
+      ))}
+    </span>
+  );
+}
+
 type SonarMode = 'projects' | 'issues' | 'hotspots';
 
 export const SonarQubeTable: React.FC<SonarQubeTableProps> = ({ searchQuery, refreshTrigger }) => {
@@ -511,6 +539,9 @@ const IssuesView: React.FC<{ searchQuery: string; refreshTrigger: number }> = ({
   const [sortKey, setSortKey] = useState<IssueSortKey>('severity');
   const [isLoading, setIsLoading] = useState(false);
   const [unavailable, setUnavailable] = useState<string | null>(null);
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [writeError, setWriteError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
   const PAGE_SIZE = 25;
 
   useEffect(() => {
@@ -543,7 +574,21 @@ const IssuesView: React.FC<{ searchQuery: string; refreshTrigger: number }> = ({
       }
     })();
     return () => { isMounted = false; };
-  }, [severity, issueType, status, query, page, refreshTrigger]);
+  }, [severity, issueType, status, query, page, refreshTrigger, revision]);
+
+  const applyReview = async (key: string, transition: string) => {
+    setBusy((p) => ({ ...p, [key]: true }));
+    setWriteError(null);
+    try {
+      await registryApi.reviewIssue(key, transition as 'resolve' | 'wontfix' | 'falsepositive', 'ui');
+      setRevision((r) => r + 1);
+    } catch (err: any) {
+      console.error('issue writeback failed:', err);
+      setWriteError(err?.message ?? 'Writeback failed — sonar-sync unreachable?');
+    } finally {
+      setBusy((p) => { const n = { ...p }; delete n[key]; return n; });
+    }
+  };
 
   const ordered = useMemo(() => {
     const copy = [...items];
@@ -596,6 +641,12 @@ const IssuesView: React.FC<{ searchQuery: string; refreshTrigger: number }> = ({
         </div>
       </div>
 
+      {writeError && (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-400">
+          Writeback failed: {writeError}
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
         <table className="w-full text-left text-sm text-[var(--text-primary)]">
           <thead className="border-b border-[var(--border-color)] bg-[var(--bg-main)]/60 text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
@@ -623,7 +674,20 @@ const IssuesView: React.FC<{ searchQuery: string; refreshTrigger: number }> = ({
                   </td>
                   <td className="p-3 font-mono text-[11px] text-[var(--text-secondary)]">{truncate(it.component_key ?? '', 40)}</td>
                   <td className="p-3 font-mono text-xs text-[var(--text-secondary)]">{it.line ?? ''}</td>
-                  <td className="p-3">{reviewBadge(it.review_status)}</td>
+                  <td className="p-3">
+                    {reviewBadge(it.review_status)}
+                    {!it.review_status && (
+                      <ActionButtons
+                        busy={!!busy[it.key]}
+                        onAction={(v) => applyReview(it.key, v)}
+                        actions={[
+                          { label: 'Resolve', value: 'resolve', cls: 'border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10' },
+                          { label: "Won't fix", value: 'wontfix', cls: 'border-amber-500/30 text-amber-400 hover:bg-amber-500/10' },
+                          { label: 'False pos', value: 'falsepositive', cls: 'border-sky-500/30 text-sky-400 hover:bg-sky-500/10' },
+                        ]}
+                      />
+                    )}
+                  </td>
                   <td className="p-3 text-xs text-[var(--text-secondary)]">
                     {it.updated_at ? new Date(it.updated_at).toLocaleDateString() : ''}
                   </td>
@@ -652,6 +716,9 @@ const HotspotsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = 
   const [sortKey, setSortKey] = useState<'probability' | 'updated' | 'component'>('probability');
   const [isLoading, setIsLoading] = useState(false);
   const [unavailable, setUnavailable] = useState<string | null>(null);
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [writeError, setWriteError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
   const PAGE_SIZE = 25;
 
   const categories = useMemo(() => {
@@ -688,7 +755,21 @@ const HotspotsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = 
       }
     })();
     return () => { isMounted = false; };
-  }, [category, status, query, page, refreshTrigger]);
+  }, [category, status, query, page, refreshTrigger, revision]);
+
+  const applyReview = async (key: string, action: string) => {
+    setBusy((p) => ({ ...p, [key]: true }));
+    setWriteError(null);
+    try {
+      await registryApi.reviewHotspot(key, action as 'safe' | 'fixed' | 'accept-risk', 'ui');
+      setRevision((r) => r + 1);
+    } catch (err: any) {
+      console.error('hotspot writeback failed:', err);
+      setWriteError(err?.message ?? 'Writeback failed — sonar-sync unreachable?');
+    } finally {
+      setBusy((p) => { const n = { ...p }; delete n[key]; return n; });
+    }
+  };
 
   const ordered = useMemo(() => {
     const copy = [...items];
@@ -739,6 +820,12 @@ const HotspotsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = 
         </div>
       </div>
 
+      {writeError && (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-400">
+          Writeback failed: {writeError}
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
         <table className="w-full text-left text-sm text-[var(--text-primary)]">
           <thead className="border-b border-[var(--border-color)] bg-[var(--bg-main)]/60 text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
@@ -766,7 +853,20 @@ const HotspotsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = 
                   </td>
                   <td className="p-3 font-mono text-[11px] text-[var(--text-secondary)]">{truncate(h.component_key ?? '', 40)}</td>
                   <td className="p-3 font-mono text-xs text-[var(--text-secondary)]">{h.line ?? ''}</td>
-                  <td className="p-3">{reviewBadge(h.review_status)}</td>
+                  <td className="p-3">
+                    {reviewBadge(h.review_status)}
+                    {!h.review_status && h.status === 'TO_REVIEW' && (
+                      <ActionButtons
+                        busy={!!busy[h.key]}
+                        onAction={(v) => applyReview(h.key, v)}
+                        actions={[
+                          { label: 'Safe', value: 'safe', cls: 'border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10' },
+                          { label: 'Fixed', value: 'fixed', cls: 'border-sky-500/30 text-sky-400 hover:bg-sky-500/10' },
+                          { label: 'Accept risk', value: 'accept-risk', cls: 'border-amber-500/30 text-amber-400 hover:bg-amber-500/10' },
+                        ]}
+                      />
+                    )}
+                  </td>
                   <td className="p-3 text-xs text-[var(--text-secondary)]">
                     {h.updated_at ? new Date(h.updated_at).toLocaleDateString() : ''}
                   </td>

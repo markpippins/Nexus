@@ -380,6 +380,34 @@ async function sonarSyncJson<T>(path: string, params?: Record<string, string | n
   }
 }
 
+// Review writeback — POSTs against the sonar-sync moat (hotspot review /
+// issue transition). Both the upstream action and the local review_status
+// update happen server-side; the UI just refreshes its list after.
+async function sonarSyncPost<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+  const q = new URLSearchParams();
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') q.set(k, String(v));
+    });
+  }
+  const qs = q.toString();
+  let res: Response;
+  try {
+    res = await fetch(`${SONAR_SYNC_BASE}${path}${qs ? `?${qs}` : ''}`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+  } catch (e: any) {
+    throw new GatewayUpstreamError(0, `sonar-sync unreachable: ${e?.message ?? e}`, 'sonar-sync', e?.message ?? String(e));
+  }
+  const text = await res.text().catch(() => '');
+  if (!res.ok) {
+    throw new GatewayUpstreamError(res.status, `sonar-sync writeback error ${res.status}: ${text.slice(0, 200)}`, 'sonar-sync', text.slice(0, 200));
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new GatewayUpstreamError(0, 'sonar-sync returned non-JSON response', 'sonar-sync', text.slice(0, 200));
+  }
+}
+
 async function gatewayJson<T>(path: string): Promise<T> {
   let res: Response;
   try {
@@ -1050,5 +1078,14 @@ export const registryApi = {
     pageSize?: number;
   }): Promise<SonarListEnvelope<SonarHotspotRow>> => {
     return sonarSyncJson<SonarListEnvelope<SonarHotspotRow>>('/hotspots', params);
+  },
+
+  // Realm review writebacks (mirrored into the `sonar` schema + SonarQube).
+  reviewHotspot: async (key: string, action: 'safe' | 'fixed' | 'accept-risk', owner?: string) => {
+    return sonarSyncPost<{ ok: boolean; key: string }>('/hotspotReview', { hotspotKey: key, action, owner });
+  },
+
+  reviewIssue: async (key: string, transition: 'resolve' | 'wontfix' | 'falsepositive', owner?: string) => {
+    return sonarSyncPost<{ ok: boolean; key: string }>('/issueReview', { issueKey: key, transition, owner });
   }
 };

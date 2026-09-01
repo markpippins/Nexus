@@ -56,11 +56,15 @@ const MERGEABLE_EXTRA = [
   "/api/v1/registry/services/with-hosted",
 ];
 
-function fetchWithTimeout(url: string, ms = 12000): Promise<Response> {
+function fetchWithTimeout(url: string, ms = 12000, method?: string, headers?: Record<string, string>, body?: Buffer): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
-  return fetch(url, { headers: { "Content-Type": "application/json" }, signal: controller.signal })
-    .finally(() => clearTimeout(timer));
+  return fetch(url, {
+    method: method ?? "GET",
+    headers: headers ?? { "Content-Type": "application/json" },
+    body,
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timer));
 }
 
 // CI gateway passthrough (to-do d9ac7608 follow-on; proposal 13890307):
@@ -80,12 +84,23 @@ app.use("/gateway", async (req, res) => {
 });
 
 // sonar-sync passthrough — reads the canonical `sonar` schema (issues /
-// hotspots mirrored from SonarQube by the ballerina sonar-sync service).
+// hotspots mirrored from SonarQube by the ballerina sonar-sync service)
+// and forwards review writebacks (POST /hotspotReview, /issueReview).
 // browser -> :3010 /sonar-sync/* -> loopback sonar-sync :9096.
 const SONAR_SYNC_URL = process.env.SONAR_SYNC_URL || "http://127.0.0.1:9096";
 app.use("/sonar-sync", async (req, res) => {
   try {
-    const r = await fetchWithTimeout(`${SONAR_SYNC_URL}${req.originalUrl}`, 15000);
+    const headers: Record<string, string> = {};
+    if (req.method !== "GET") {
+      headers["Content-Type"] = req.headers["content-type"]?.toString() ?? "application/json";
+    }
+    let body: Buffer | undefined;
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) chunks.push(Buffer.from(chunk as any));
+      body = Buffer.concat(chunks);
+    }
+    const r = await fetchWithTimeout(`${SONAR_SYNC_URL}${req.originalUrl}`, 15000, req.method, headers, body);
     const text = await r.text();
     res.status(r.status).set("Content-Type", r.headers.get("content-type") ?? "application/json");
     res.send(text);
