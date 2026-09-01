@@ -1,8 +1,11 @@
 """
-Epistemologist database layer — read audit source_observations, write concepts/
-relationships/evidence to the semantics schema.
+Epistemologist database layer — read audit source_observations, write
+concepts/relationships to the resolution ontology and evidence to the
+semantics schema.
 
-Built against the verified live schema (2026-08-07): reads observation text
+Built against the verified live schema (2026-08-07; ontology writes
+repointed at resolution.* on 2026-09-01 after V134 retired the duplicated
+semantics ontology tables — see record 716362c7): reads observation text
 from `raw_location` files, joins through canonical_asset for kind filtering,
 and uses real evidence_item rows for processing markers (FK constraint).
 """
@@ -214,13 +217,13 @@ def mark_observation_processed(observation_id: str) -> None:
 # ── Read: seeded concepts and relationship types ────────────────────
 
 def fetch_seeded_concepts() -> list[dict]:
-    """Fetch all active (non-expired) concepts from the semantics ontology."""
+    """Fetch all active (non-expired) concepts from the resolution ontology."""
     with _connect() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 """
                 SELECT id, name, description
-                FROM semantics.concept
+                FROM resolution.concept
                 WHERE expired_at IS NULL
                 ORDER BY name
                 """
@@ -252,7 +255,7 @@ def find_concept_by_name(name: str) -> Optional[dict]:
             cur.execute(
                 """
                 SELECT id, name, description
-                FROM semantics.concept
+                FROM resolution.concept
                 WHERE LOWER(name) = LOWER(%s) AND expired_at IS NULL
                 """,
                 (name,),
@@ -272,9 +275,11 @@ def create_concept(name: str, description: str, is_proposal: bool = False) -> di
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 """
-                INSERT INTO semantics.concept (id, name, description)
+                INSERT INTO resolution.concept (id, name, description)
                 VALUES (%s, %s, %s)
-                ON CONFLICT (name) WHERE expired_at IS NULL
+                -- resolution.concept has a plain UNIQUE(name) (no partial
+                -- active-row index) — upsert on the name, refresh description.
+                ON CONFLICT (name)
                 DO UPDATE SET description = EXCLUDED.description
                 RETURNING id, name, description
                 """,
@@ -308,7 +313,7 @@ def create_concept_relationship(
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 """
-                INSERT INTO semantics.concept_relationship
+                INSERT INTO resolution.concept_relationship
                     (id, from_concept_id, to_concept_id, relationship_type,
                      path, notes)
                 VALUES (%s, %s, %s, %s, %s, %s)

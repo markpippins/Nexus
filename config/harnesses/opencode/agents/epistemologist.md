@@ -2,14 +2,17 @@
 description: |
   Layer-2 concept/relationship/evidence extraction on audit data. Reads
   source_observations produced by the Auditor, uses an LLM to extract typed
-  concepts, relationships, and evidence, and writes them to the semantics
-  schema (concept, concept_relationship, evidence_item, statement_evidence).
+  concepts, relationships, and evidence, and writes concepts/relationships to
+  the resolution ontology (resolution.concept, resolution.concept_relationship)
+  and evidence to the semantics schema (evidence_item, statement_evidence).
+  (2026-09-01: ontology writes repointed at resolution.* after V134 retired
+  the duplicated semantics ontology tables — record 716362c7.)
 mode: primary
 permission:
   read: allow
   edit:
-    'semantics.concept': allow
-    'semantics.concept_relationship': allow
+    'resolution.concept': allow
+    'resolution.concept_relationship': allow
     'semantics.evidence_item': allow
     'semantics.statement_evidence': allow
     '*': deny
@@ -50,24 +53,24 @@ Each run processes unprocessed `semantics.source_observation` rows
    (concepts + relationship types).
 4. Call the role-resolved LLM (`tackle.inference.call_llm`) at temperature
    0.1 for deterministic extraction.
-5. Persist: concepts (`semantics.concept`), relationships
-   (`semantics.concept_relationship`), evidence (`semantics.evidence_item`
-   type `llm_extraction` + `statement_evidence` links).
+5. Persist: concepts (`resolution.concept`), relationships
+   (`resolution.concept_relationship`), evidence (`semantics.evidence_item`
+   type `llm_extraction` + `semantics.statement_evidence` links).
 6. Mark the observation processed.
 
 ## The extraction model
 
 | Output | Table | Notes |
 |--------|-------|-------|
-| Concepts | `semantics.concept` | Match seeded concepts; `is_new` proposals flagged `[PROPOSED]` |
-| Relationships | `semantics.concept_relationship` | Exact relationship-type names only; confidence 0-1 |
+| Concepts | `resolution.concept` | Match seeded concepts; `is_new` proposals flagged `[PROPOSED]` |
+| Relationships | `resolution.concept_relationship` | Exact relationship-type names only; confidence 0-1 (stored in `notes`) |
 | Evidence | `semantics.evidence_item` | Evidence type `llm_extraction`; excerpt + note |
-| Statement links | `semantics.statement_evidence` | `statement_type=concept_relationship` |
+| Statement links | `semantics.statement_evidence` | `statement_type=concept_relationship` (validates against `resolution.concept_relationship`) |
 
 ## Tools
 
-- **PostgreSQL** — INSERT into semantics.concept, concept_relationship,
-  evidence_item, statement_evidence; query source_observation
+- **PostgreSQL** — INSERT into resolution.concept, resolution.concept_relationship,
+  semantics.evidence_item, semantics.statement_evidence; query source_observation
 - **tackle-mcp** (port 3400) — role-resolved LLM config; knowledge graph
   cross-ref queries
 - **nebula-mcp** (port 3102) — agent records, inbox
