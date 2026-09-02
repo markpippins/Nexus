@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   SonarProject,
   SonarMetricPoint,
@@ -171,9 +171,19 @@ const ProjectsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = 
   const [gateFilter, setGateFilter] = useState<string>('all');
   const [unavailable, setUnavailable] = useState<string | null>(null);
 
+  // Update-in-place on refresh (same pattern as ServicesTable): a pure refresh
+  // (auto-refresh / manual refresh bumping refreshTrigger with NO change to
+  // search/filter) keeps existing rows visible and swaps in fresh data on
+  // arrival; context changes and initial mount show the loading row.
+  const prevContext = useRef<string | null>(null);
+
   useEffect(() => {
     let isMounted = true;
-    setIsLoading(true);
+
+    const context = JSON.stringify([searchQuery, gateFilter]);
+    const isPureRefresh = prevContext.current === context;
+    prevContext.current = context;
+    if (!isPureRefresh) setIsLoading(true);
 
     const loadData = async () => {
       try {
@@ -544,9 +554,16 @@ const IssuesView: React.FC<{ searchQuery: string; refreshTrigger: number }> = ({
   const [revision, setRevision] = useState(0);
   const PAGE_SIZE = 25;
 
+  // Update-in-place on refresh (same pattern as ServicesTable): pure refresh
+  // keeps rows visible; context changes (filters/page/mount) show loading row.
+  const prevContext = useRef<string | null>(null);
+
   useEffect(() => {
     let isMounted = true;
-    setIsLoading(true);
+    const context = JSON.stringify([severity, issueType, status, query, page]);
+    const isPureRefresh = prevContext.current === context;
+    prevContext.current = context;
+    if (!isPureRefresh) setIsLoading(true);
     (async () => {
       try {
         const env = await registryApi.getSonarIssues({
@@ -575,7 +592,6 @@ const IssuesView: React.FC<{ searchQuery: string; refreshTrigger: number }> = ({
     })();
     return () => { isMounted = false; };
   }, [severity, issueType, status, query, page, refreshTrigger, revision]);
-
   const applyReview = async (key: string, transition: string) => {
     setBusy((p) => ({ ...p, [key]: true }));
     setWriteError(null);
@@ -726,9 +742,16 @@ const HotspotsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = 
     return ['', ...items.map((h) => h.security_category ?? '').filter((c) => c && !seen.has(c) && seen.add(c))];
   }, [items]);
 
+  // Update-in-place on refresh (same pattern as ServicesTable): pure refresh
+  // keeps rows visible; context changes (filters/page/mount) show loading row.
+  const prevContext = useRef<string | null>(null);
+
   useEffect(() => {
     let isMounted = true;
-    setIsLoading(true);
+    const context = JSON.stringify([category, status, query, page]);
+    const isPureRefresh = prevContext.current === context;
+    prevContext.current = context;
+    if (!isPureRefresh) setIsLoading(true);
     (async () => {
       try {
         const env = await registryApi.getSonarHotspots({
