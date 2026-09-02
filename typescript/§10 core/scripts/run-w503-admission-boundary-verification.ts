@@ -309,9 +309,20 @@ let replayFingerprint = "";
   const methodNames = Object.getOwnPropertyNames(Object.getPrototypeOf(registry)).filter(
     (n) => n !== "constructor",
   );
-  // The ONLY public behavior is admit — no blocking toggle, no store writes,
-  // no verdict mutation.
-  equal(methodNames.sort().join(","), "admit", "A4 public surface is admit-only");
+  // The public surface is the admission boundary only — no blocking
+  // toggle, no store writes, no verdict mutation. G1 activation (verdict
+  // 986ec482) extends the surface with two read-only additions:
+  //   admitGoverned            — the governed submit surface (enforces
+  //                              persisted PEB denials for the narrowly-
+  //                              binding class only)
+  //   setBindingAuthorityConsult — host-injected READ-ONLY consult attach
+  //                              (no blocking flip; authority lives in
+  //                              peb.state, not in process state)
+  equal(
+    methodNames.sort().join(","),
+    "admit,admitGoverned,setBindingAuthorityConsult",
+    "A4 public surface is admit + governed submit + read-only consult attach",
+  );
   equal(
     typeof (registry as { admit: unknown }).admit,
     "function",
