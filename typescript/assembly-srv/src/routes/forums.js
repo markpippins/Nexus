@@ -393,6 +393,30 @@ forumsRouter.post('/threads/:threadId/comments', async (req, res, next) => {
   }
 });
 
+// PUT /threads/:threadId — update a thread's title/body in place (used by
+// scheduled syncs like sonar-forum-sync to keep grouped-thread bodies current;
+// authorship/role/model are preserved).  { title?, body? }
+forumsRouter.put('/threads/:threadId', async (req, res, next) => {
+  try {
+    const { title, body } = req.body ?? {};
+    if (!title && !body) throw new BadRequestError('title or body is required');
+    const result = await pool.query(
+      `UPDATE assembly.posts
+       SET title = COALESCE($2, title),
+           text  = COALESCE($3, text),
+           updated = now()
+       WHERE id = $1 AND (expiration_dt = 'infinity'::timestamptz OR expiration_dt > now())
+       RETURNING id, title`,
+      [req.params.threadId, title == null ? null : String(title).slice(0, 500), body == null ? null : String(body)]
+    );
+    if (result.rows.length === 0) throw new NotFoundError('Thread not found');
+    invalidateThreadListCache();
+    res.json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // PUT /threads/:threadId/status — set the colored status indicator on a
 // thread (root post rating). Any commenter may update; no auth by design
 // (assembly is an internal, identity-by-convention system). Body:
