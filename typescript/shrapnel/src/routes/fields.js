@@ -58,7 +58,9 @@ fieldsRouter.post('/', async (req, res, next) => {
     );
     res.status(201).json({ field: r.rows[0] });
   } catch (err) {
-    // Defensive: assertKnownTypeName throws {status:400} Error objects
-    next(err && err.status ? err : err);
+    // Defensive: assertKnownTypeName throws {status:400} Error objects (S3923:
+    // the old `err && err.status ? err : err` ternary was a no-op — both
+    // branches returned err, so just forward it).
+    next(err);
   }
 });

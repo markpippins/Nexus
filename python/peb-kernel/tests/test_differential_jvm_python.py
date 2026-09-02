@@ -373,15 +373,11 @@ def test_python_matches_fixture_expectations(case: dict[str, Any]) -> None:
         # Python controller receives as None and rejects at the boundary.
         # If Python admits it, the null was converted to {} by the test's
         # payload builder — a test artifact, not a runtime behavior.
-        if case["name"] == "null input fails structural validation":
-            # Python should reject null input at the boundary (400)
-            assert py["admitted"] is False or py["admitted"] is None, (
-                f"Python should deny '{case['name']}' but got admitted={py['admitted']}"
-            )
-        else:
-            assert py["admitted"] is False or py["admitted"] is None, (
-                f"Python should deny '{case['name']}' but got admitted={py['admitted']}"
-            )
+        # Either way Python must not admit the case; collapse the formerly
+        # identical if/else branches into this single assertion (S3923).
+        assert py["admitted"] is False or py["admitted"] is None, (
+            f"Python should deny '{case['name']}' but got admitted={py['admitted']}"
+        )
 
     # Check message for admitted/rejected cases (skip 400 malformed)
     if py["status"] in (200, 422):

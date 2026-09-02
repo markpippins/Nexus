@@ -437,7 +437,7 @@ forumsRouter.post('/', async (req, res, next) => {
   try {
     const { name, slug, description } = req.body;
     if (!name) throw new BadRequestError('name is required');
-    const genSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const genSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(?:^-)|(?:-$)/g, '');
     const result = await pool.query(
       'SELECT * FROM assembly.create_forum($1, $2, $3)',
       [name, genSlug, description || null]
