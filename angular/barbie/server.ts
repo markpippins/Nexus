@@ -62,7 +62,10 @@ const MERGEABLE_EXTRA = [
 // starts with a single "/", or null when the request path is unacceptable.
 // This deliberately avoids flowing raw request input into a URL constructor:
 // the fixed base + user-suffix concatenation below is what keeps SSRF out.
-const PASSTHROUGH_PATH = /^\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$/;
+// Path + query chars only (RFC 3986 pchar + ?/= as needed by our
+// /hotspots?category=..&severity=.. queries and hotspots are keyed by
+// alnum + ':' + '-'). No '#' (fragment), no whitespace, no '\\'.
+const PASSTHROUGH_PATH = /^\/[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*$/;
 function passthroughPath(req: any): string | null {
   const raw = String(req.originalUrl ?? req.url ?? "/");
   // Take only the path + query portion; drop fragment and anything before
