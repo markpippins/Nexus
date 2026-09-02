@@ -960,13 +960,12 @@ export const registryApi = {
   getSonarProjects: async (params?: {
     search?: string;
     gate?: string;
-  }): Promise<SonarProject[]> => {
-    const query = new URLSearchParams();
-    if (params?.search) query.append('search', params.search);
-    if (params?.gate) query.append('gate', params.gate);
-    // Live path rides the ballerina ci-gateway.
+  }): Promise<SonarListEnvelope<SonarProject>> => {
+    // Live path rides the ballerina ci-gateway, which loops ALL pages of
+    // SonarQube's /api/components/search so the list is never silently
+    // truncated as the TRK count grows; the count is the filtered total.
     type SonarComp = { key?: string; name?: string; qualifier?: string };
-    const raw = await gatewayJson<{ paging?: unknown; components?: SonarComp[] }>('/sonar/projects');
+    const raw = await gatewayJson<{ paging?: { total?: number }; components?: SonarComp[] }>('/sonar/projects');
     let projects: SonarProject[] = (raw.components ?? [])
       .filter((c) => (c.qualifier ?? 'TRK') === 'TRK')
       .map((c, i) => ({
@@ -990,7 +989,7 @@ export const registryApi = {
     if (params?.gate && params.gate !== 'all') {
       projects = projects.filter((p) => p.gate === params.gate);
     }
-    return projects;
+    return { items: projects, count: projects.length };
   },
 
   getSonarMetrics: async (projectId: string): Promise<SonarMetricPoint[]> => {

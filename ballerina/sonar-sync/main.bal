@@ -419,6 +419,34 @@ function queryJson(sql:ParameterizedQuery qry) returns json|sql:Error {
     return {items: out, count: out.length()};
 }
 
+// Filtered row total for the list endpoints. COUNT(*) comes back as bigint,
+// which the sql driver can surface as int/decimal/float/string — normalize
+// defensively so the envelope's `count` is the TRUE total matching the
+// filters, never the page size (that was the root of the "only ~25 items"
+// misread: the pager showed the page length as the total).
+function countRows(sql:ParameterizedQuery qry) returns int {
+    int total = 0;
+    stream<record {}, sql:Error?> rs = db->query(qry);
+    record {}|sql:Error? row = rs.next();
+    if row is record {} {
+        map<anydata> cols = rowMap(row);
+        anydata n = cols["n"];
+        if n is int {
+            total = n;
+        } else if n is decimal {
+            total = <int>n;
+        } else if n is float {
+            total = <int>n;
+        } else if n is string {
+            int|error parsed = int:fromString(n);
+            if parsed is int {
+                total = parsed;
+            }
+        }
+    }
+    return total;
+}
+
 // The sql driver (1.19) returns open-typed rows packed as {"value": {...}};
 // unwrap to the actual column map.
 function rowMap(record {} row) returns map<anydata> {
@@ -479,6 +507,12 @@ service "/sonar-sync" on new http:Listener(port, { host: bindHost }) {
             ORDER BY (severity = 'BLOCKER') DESC, (severity = 'CRITICAL') DESC,
                      (severity = 'MAJOR') DESC, updated_at DESC
             LIMIT ${ps} OFFSET ${(p - 1) * ps}`;
+        sql:ParameterizedQuery countQry = `SELECT COUNT(*) AS n FROM sonar.issues
+            WHERE (${t} = '' OR sonar_type = ${t})
+              AND (${sev} = '' OR severity = ${sev})
+              AND (${st} = '' OR status = ${st})
+              AND (${q} = '' OR message ILIKE '%' || ${q} || '%' OR component_key ILIKE '%' || ${q} || '%')`;
+        int total = countRows(countQry);
         json|sql:Error rows = queryJson(qry);
         if rows is sql:Error {
             http:Response err = new;
@@ -486,7 +520,8 @@ service "/sonar-sync" on new http:Listener(port, { host: bindHost }) {
             err.setJsonPayload({"error": rows.message()});
             return err;
         }
-        return rows;
+        map<json> env = <map<json>>rows;
+        return {items: env["items"], count: total};
     }
 
     // Hotspots from the canonical DB with filters.
@@ -508,6 +543,11 @@ service "/sonar-sync" on new http:Listener(port, { host: bindHost }) {
             ORDER BY (vulnerability_probability = 'HIGH') DESC,
                      (vulnerability_probability = 'MEDIUM') DESC, updated_at DESC
             LIMIT ${ps} OFFSET ${(p - 1) * ps}`;
+        sql:ParameterizedQuery countQry = `SELECT COUNT(*) AS n FROM sonar.hotspots
+            WHERE (${cat} = '' OR security_category = ${cat})
+              AND (${st} = '' OR status = ${st})
+              AND (${q} = '' OR message ILIKE '%' || ${q} || '%' OR component_key ILIKE '%' || ${q} || '%')`;
+        int total = countRows(countQry);
         json|sql:Error rows = queryJson(qry);
         if rows is sql:Error {
             http:Response err = new;
@@ -515,7 +555,8 @@ service "/sonar-sync" on new http:Listener(port, { host: bindHost }) {
             err.setJsonPayload({"error": rows.message()});
             return err;
         }
-        return rows;
+        map<json> env = <map<json>>rows;
+        return {items: env["items"], count: total};
     }
 
     // Review a hotspot: action = safe | fixed | accept-risk

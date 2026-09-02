@@ -170,6 +170,10 @@ const ProjectsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = 
   const [isLoading, setIsLoading] = useState(false);
   const [gateFilter, setGateFilter] = useState<string>('all');
   const [unavailable, setUnavailable] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pureRefresh, setPureRefresh] = useState(false);
+  const PAGE_SIZE = 25;
 
   // Update-in-place on refresh (same pattern as ServicesTable): a pure refresh
   // (auto-refresh / manual refresh bumping refreshTrigger with NO change to
@@ -177,41 +181,41 @@ const ProjectsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = 
   // arrival; context changes and initial mount show the loading row.
   const prevContext = useRef<string | null>(null);
 
+  // Local pagination over the fully-fetched filtered list (see fetch effect).
+  const pagedProjects = projects.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Data is fully client-side (the gateway loops every SonarQube TRK page), so
+  // pagination never refetches — a filter/search change just snaps back to
+  // page 1 while the fetch effect (deps below) runs independently.
+  useEffect(() => { setPage(1); }, [searchQuery, gateFilter]);
+
   useEffect(() => {
     let isMounted = true;
 
     const context = JSON.stringify([searchQuery, gateFilter]);
     const isPureRefresh = prevContext.current === context;
     prevContext.current = context;
+    setPureRefresh(isPureRefresh);
     if (!isPureRefresh) setIsLoading(true);
 
     const loadData = async () => {
       try {
-        const data = await registryApi.getSonarProjects({
+        const env = await registryApi.getSonarProjects({
           search: searchQuery,
           gate: gateFilter,
         });
 
         if (isMounted) {
           setUnavailable(null);
-          setProjects(data);
-          // Pre-fetch metric history for each project
-          const metricMap: Record<string, SonarMetricPoint[]> = {};
-          for (const proj of data) {
-            try {
-              const m = await registryApi.getSonarMetrics(proj.id);
-              metricMap[proj.id] = m;
-            } catch {
-              metricMap[proj.id] = []; // per-project measures unavailable; keep project row
-            }
-          }
-          setMetrics(metricMap);
+          setProjects(env.items);
+          setTotalCount(env.count);
         }
       } catch (err) {
         console.error('Failed fetching SonarQube projects:', err);
         if (isMounted) {
           setProjects([]);
           setMetrics({});
+          setTotalCount(0);
           if (err instanceof GatewayUpstreamError) {
             setUnavailable(err.upstream
               ? `SonarQube is unreachable (upstream: ${err.upstream}). The vanadium host may be offline.`
@@ -228,6 +232,26 @@ const ProjectsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = 
     loadData();
     return () => { isMounted = false; };
   }, [searchQuery, gateFilter, refreshTrigger]);
+
+  // Metric history for the CURRENT page only — re-fetched whenever the visible
+  // page or the project list changes so the chart slice always matches the rows
+  // (a filter change while on page 2 can't leave page-1 charts empty).
+  useEffect(() => {
+    let isMounted = true;
+    const metricMap: Record<string, SonarMetricPoint[]> = {};
+    (async () => {
+      for (const proj of pagedProjects) {
+        try {
+          const m = await registryApi.getSonarMetrics(proj.id);
+          if (isMounted) metricMap[proj.id] = m;
+        } catch {
+          if (isMounted) metricMap[proj.id] = []; // per-project measures unavailable; keep project row
+        }
+      }
+      if (isMounted) setMetrics(metricMap);
+    })();
+    return () => { isMounted = false; };
+  }, [page, projects]);
 
   const getGateBadge = (gate: SonarProject['gate']) => {
     switch (gate) {
@@ -295,7 +319,7 @@ const ProjectsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = 
         </div>
 
         <div className="text-xs text-[var(--text-secondary)] font-mono">
-          {projects.length} project{projects.length !== 1 ? 's' : ''} analyzed
+          {totalCount} project{totalCount !== 1 ? 's' : ''} analyzed
         </div>
       </div>
 
@@ -344,7 +368,7 @@ const ProjectsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = 
                 </td>
               </tr>
             ) : (
-              projects.map((proj) => (
+              pagedProjects.map((proj) => (
                 <React.Fragment key={proj.id}>
                   <tr
                     onClick={() => setExpandedProject(expandedProject === proj.id ? null : proj.id)}
@@ -432,6 +456,14 @@ const ProjectsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = 
         </table>
       </div>
 
+      {/* Pager — future-proofing: the gateway loops every SonarQube TRK page,
+          and ProjectsView pages the full list locally (PAGE_SIZE per page). */}
+      {totalCount > 0 && (
+        <Pager envelope={{ items: pagedProjects, count: totalCount }} page={page} pageSize={PAGE_SIZE}
+          onPageChange={setPage} isLoading={isLoading} unavailable={unavailable}
+          isPureRefresh={pureRefresh} columns={10} />
+      )}
+
       {/* Footer */}
       <div className="text-xs text-[var(--text-secondary)] text-center">
         <span className="inline-flex items-center gap-1">
@@ -452,9 +484,13 @@ interface MirrorTableProps<T> {
   isLoading: boolean;
   unavailable: string | null;
   columns: number;
+  // True when the current load is a pure refresh (context unchanged, only
+  // refreshTrigger bumped) — the pager then keeps its bar instead of blanking
+  // to the standalone Loading card, aligning with the in-place refresh pattern.
+  isPureRefresh?: boolean;
 }
 
-function Pager<T>({ envelope, page, pageSize, onPageChange, columns, isLoading, unavailable }: MirrorTableProps<T>) {
+function Pager<T>({ envelope, page, pageSize, onPageChange, columns, isLoading, unavailable, isPureRefresh }: MirrorTableProps<T>) {
   if (unavailable) {
     return (
       <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-8">
@@ -468,14 +504,19 @@ function Pager<T>({ envelope, page, pageSize, onPageChange, columns, isLoading, 
       </div>
     );
   }
-  if (isLoading) {
+  // Only a genuine context change with nothing to anchor (first load / empty
+  // filter) gets the standalone card. On a pure refresh — and on context
+  // changes where stale content is still on screen — the bar stays put so the
+  // view updates in place instead of blinking.
+  const loading = isLoading && !isPureRefresh;
+  if (loading && envelope.items.length === 0) {
     return (
       <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-8 text-center text-sm text-[var(--text-secondary)]">
         Loading...
       </div>
     );
   }
-  if (envelope.items.length === 0) {
+  if (!loading && envelope.items.length === 0) {
     return (
       <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-8 text-center text-sm text-[var(--text-secondary)]">
         No items match the current filters.
@@ -483,22 +524,25 @@ function Pager<T>({ envelope, page, pageSize, onPageChange, columns, isLoading, 
     );
   }
   const totalPages = Math.max(1, Math.ceil(envelope.count / pageSize));
+  const from = envelope.count === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, envelope.count);
   return (
     <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
-      <span className="font-mono">
-        {envelope.count} total · page {page}/{totalPages}
+      <span className="flex items-center gap-2 font-mono">
+        {envelope.count === 0 ? '0' : `${from}–${to}`} of {envelope.count} · page {page}/{totalPages}
+        {loading && <span className="animate-pulse">loading…</span>}
       </span>
       <div className="flex items-center gap-2">
         <button
           onClick={() => onPageChange(page - 1)}
-          disabled={page <= 1}
+          disabled={page <= 1 || loading}
           className="flex items-center gap-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 py-1 disabled:opacity-40 hover:bg-[var(--bg-card-hover)]"
         >
           <ChevronLeft className="h-3.5 w-3.5" /> Prev
         </button>
         <button
           onClick={() => onPageChange(page + 1)}
-          disabled={page >= totalPages}
+          disabled={page >= totalPages || loading}
           className="flex items-center gap-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 py-1 disabled:opacity-40 hover:bg-[var(--bg-card-hover)]"
         >
           Next <ChevronRight className="h-3.5 w-3.5" />
@@ -549,6 +593,7 @@ const IssuesView: React.FC<{ searchQuery: string; refreshTrigger: number }> = ({
   const [sortKey, setSortKey] = useState<IssueSortKey>('severity');
   const [isLoading, setIsLoading] = useState(false);
   const [unavailable, setUnavailable] = useState<string | null>(null);
+  const [pureRefresh, setPureRefresh] = useState(false);
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [writeError, setWriteError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
@@ -563,6 +608,7 @@ const IssuesView: React.FC<{ searchQuery: string; refreshTrigger: number }> = ({
     const context = JSON.stringify([severity, issueType, status, query, page]);
     const isPureRefresh = prevContext.current === context;
     prevContext.current = context;
+    setPureRefresh(isPureRefresh);
     if (!isPureRefresh) setIsLoading(true);
     (async () => {
       try {
@@ -714,7 +760,7 @@ const IssuesView: React.FC<{ searchQuery: string; refreshTrigger: number }> = ({
         </table>
         <div className="p-3 border-t border-[var(--border-color)]">
           <Pager envelope={{ items, count }} page={page} pageSize={PAGE_SIZE} onPageChange={setPage}
-            isLoading={isLoading} unavailable={unavailable} columns={8} />
+            isLoading={isLoading} unavailable={unavailable} isPureRefresh={pureRefresh} columns={8} />
         </div>
       </div>
     </div>
@@ -732,6 +778,7 @@ const HotspotsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = 
   const [sortKey, setSortKey] = useState<'probability' | 'updated' | 'component'>('probability');
   const [isLoading, setIsLoading] = useState(false);
   const [unavailable, setUnavailable] = useState<string | null>(null);
+  const [pureRefresh, setPureRefresh] = useState(false);
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [writeError, setWriteError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
@@ -751,6 +798,7 @@ const HotspotsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = 
     const context = JSON.stringify([category, status, query, page]);
     const isPureRefresh = prevContext.current === context;
     prevContext.current = context;
+    setPureRefresh(isPureRefresh);
     if (!isPureRefresh) setIsLoading(true);
     (async () => {
       try {
@@ -900,7 +948,7 @@ const HotspotsView: React.FC<{ searchQuery: string; refreshTrigger: number }> = 
         </table>
         <div className="p-3 border-t border-[var(--border-color)]">
           <Pager envelope={{ items, count }} page={page} pageSize={PAGE_SIZE} onPageChange={setPage}
-            isLoading={isLoading} unavailable={unavailable} columns={8} />
+            isLoading={isLoading} unavailable={unavailable} isPureRefresh={pureRefresh} columns={8} />
         </div>
       </div>
     </div>
