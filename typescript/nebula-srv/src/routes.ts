@@ -8089,7 +8089,7 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
       for (const [camel, col] of fieldMap) {
         if (b[camel] !== undefined) {
           sets.push(`${col} = $${i++}`);
-          vals.push(Array.isArray(b[camel]) ? b[camel] : b[camel]);
+          vals.push(b[camel]);
         }
       }
       if (sets.length === 0) return res.json({ ok: true });

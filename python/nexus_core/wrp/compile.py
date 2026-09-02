@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import time
@@ -521,7 +522,7 @@ def _reject_nonfinite(v: Any) -> None:
     """Fail closed on NaN / +Inf / -Inf floats (not representable in canonical
     form — the CCNF spec says implementations SHOULD reject them at ingress)."""
     if isinstance(v, float):
-        if v != v or v in (float("inf"), float("-inf")):
+        if not math.isfinite(v):  # NaN, +Inf, -Inf (rejects v != v self-compare, S1764)
             raise StructuralParseFailure(
                 "non-finite float is not representable in canonical form"
             )
