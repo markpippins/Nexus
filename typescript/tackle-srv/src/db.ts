@@ -993,8 +993,45 @@ Nexus follows a database-first architecture: canonical state lives in PostgreSQL
           RETURN NEW;
         END;
         $$ LANGUAGE plpgsql;
+      `);          console.log("[tackle-migrations] v17: verified-model gate INTERACTIVE exemption installed");
+    },
+  },
+  {
+    version: 18,
+    description: "INTERACTIVE-hosted priority pin on tackle.config_bundle — a BEFORE INSERT OR UPDATE trigger pins the priority of any INTERACTIVE bundle to the role's minimum (best) priority, so a CLI primary (e.g. upsertAIRoleConfig's hardcoded priority=0) can never shadow an INTERACTIVE-hosted (harn-freebuff) role in the resolver's ascending-priority pick. Complements the app-level guard in upsertAIRoleConfig/upsertConfigBundles; the DB rule covers every write path (REST, import, seed-defaults, CLI, external tooling).",
+    up: async (exec) => {
+      await exec(`
+        CREATE OR REPLACE FUNCTION ${TACKLE_SCHEMA}.config_bundle_interactive_priority_pin()
+        RETURNS trigger AS $$
+        DECLARE
+          v_min_launchable_priority integer;
+        BEGIN
+          IF NEW.invocation_mode = 'INTERACTIVE' THEN
+            -- Pin strictly ABOVE (numerically below) every launchable sibling
+            -- so the ascending-priority resolver can never pick a CLI bundle
+            -- over an INTERACTIVE-hosted role.
+            SELECT MIN(priority) INTO v_min_launchable_priority
+              FROM ${TACKLE_SCHEMA}.config_bundle
+             WHERE role = NEW.role AND id <> NEW.id
+               AND invocation_mode <> 'INTERACTIVE';
+            IF v_min_launchable_priority IS NOT NULL
+               AND NEW.priority >= v_min_launchable_priority THEN
+              NEW.priority := v_min_launchable_priority - 1;
+            END IF;
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
       `);
-      console.log("[tackle-migrations] v17: verified-model gate INTERACTIVE exemption installed");
+      await exec(`
+        DROP TRIGGER IF EXISTS trg_config_bundle_interactive_priority_pin ON ${TACKLE_SCHEMA}.config_bundle
+      `);
+      await exec(`
+        CREATE TRIGGER trg_config_bundle_interactive_priority_pin
+        BEFORE INSERT OR UPDATE ON ${TACKLE_SCHEMA}.config_bundle
+        FOR EACH ROW EXECUTE FUNCTION ${TACKLE_SCHEMA}.config_bundle_interactive_priority_pin()
+      `);
+      console.log("[tackle-migrations] v18: INTERACTIVE-hosted priority pin trigger installed");
     },
   },
 ];
@@ -1323,15 +1360,38 @@ export async function upsertAIRoleConfig(
   // stored inactive so it never resolves.
   const verified = await isModelVerified(rc.model_id);
   const isActive = verified ? 1 : 0;
+  // INTERACTIVE-hosted guard: this single-role upsert always writes a CLI
+  // primary at priority 0. If the role also has an INTERACTIVE (harn-freebuff)
+  // bundle — i.e. the role is Freebuff-resident — slot the CLI primary BELOW
+  // it so the resolver's ascending-priority pick still resolves INTERACTIVE.
+  // Without this, saving a primary config for a Freebuff-resident role makes
+  // it CLI-launchable (wr-conf-005 drift, seen 2026-09-02 on leased-builder).
+  const interactiveBundle = await qOne(
+    `SELECT id, priority FROM config_bundle
+      WHERE role = @role AND invocation_mode = 'INTERACTIVE'
+      ORDER BY priority ASC LIMIT 1`,
+    { role: rc.role }
+  );
+  let priority = 0;
+  if (interactiveBundle) {
+    priority = (interactiveBundle.priority ?? 0) + 1;
+    // Keep the INTERACTIVE bundle pinned at the top (it may itself have been
+    // displaced by an earlier drift — restore it while we are here).
+    if (interactiveBundle.priority !== 0) {
+      await qRun(`UPDATE config_bundle SET priority = 0, updated_at = @now WHERE id = @id`,
+        { now, id: interactiveBundle.id });
+    }
+  }
   await qRun(
     `INSERT INTO config_bundle (id, name, role, model_id, provider_id, harness_id, priority, invocation_mode, is_active, metadata, created_at, updated_at)
-     VALUES (@id, @name, @role, @model_id, @provider_id, @harness_id, 0, 'CLI', @is_active, '{}', @created_at, @updated_at)
+     VALUES (@id, @name, @role, @model_id, @provider_id, @harness_id, @priority, 'CLI', @is_active, '{}', @created_at, @updated_at)
      ON CONFLICT (id) DO UPDATE SET
        name = EXCLUDED.name, role = EXCLUDED.role, model_id = EXCLUDED.model_id,
        provider_id = EXCLUDED.provider_id, harness_id = EXCLUDED.harness_id,
-       priority = 0, is_active = EXCLUDED.is_active, updated_at = EXCLUDED.updated_at`,
+       priority = EXCLUDED.priority, is_active = EXCLUDED.is_active, updated_at = EXCLUDED.updated_at`,
     { ...rc, name: `Primary: ${rc.model_id} for ${rc.role}`,
       is_active: isActive,
+      priority,
       extra_params: rc.extra_params ?? "{}",
       created_at: rc.created_at ?? now, updated_at: now }
   );
@@ -1433,9 +1493,22 @@ export async function upsertConfigBundles(
     const deleteResult = await tRun(client, "DELETE FROM config_bundle WHERE role = @role", { role });
     console.log(`[upsertConfigBundles] Deleted rows for role ${role}:`, deleteResult);
     
+    // INTERACTIVE-hosted guard: the resolver picks the ascending-priority
+    // first active bundle, so an INTERACTIVE (harn-freebuff) bundle must sit
+    // at the role's best priority or a CLI sibling can shadow it and make a
+    // Freebuff-resident role launchable (wr-conf-005 drift, 2026-09-02).
+    const minInteractivePriority = Math.min(
+      ...bundles.filter((b) => b.invocation_mode === "INTERACTIVE").map((b) => b.priority),
+      Infinity
+    );
     for (const b of bundles) {
       const id = `cb-${role}-${b.model_id}`;
-      console.log(`[upsertConfigBundles] Inserting bundle: ${id}`);
+      // Slide non-INTERACTIVE bundles below the best INTERACTIVE one.
+      const priority =
+        b.invocation_mode !== "INTERACTIVE" && Number.isFinite(minInteractivePriority) && b.priority < minInteractivePriority
+          ? minInteractivePriority + b.priority
+          : b.priority;
+      console.log(`[upsertConfigBundles] Inserting bundle: ${id} (priority ${priority})`);
       await tRun(client,
         `INSERT INTO config_bundle
            (id, name, role, model_id, provider_id, harness_id, priority, invocation_mode,
@@ -1448,7 +1521,7 @@ export async function upsertConfigBundles(
           name: b.name ?? `Bundle: ${b.model_id}`,
           role,
           model_id: b.model_id,
-          priority: b.priority,
+          priority,
           // INTERACTIVE bundles never spawn a harness — exemption from the
           // verified gate (see trigger v17). Note: this batch path has no
           // is_active channel in its input, so INTERACTIVE always lands
