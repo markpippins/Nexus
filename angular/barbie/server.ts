@@ -56,33 +56,28 @@ const MERGEABLE_EXTRA = [
   "/api/v1/registry/services/with-hosted",
 ];
 
-// Resolve an inbound passthrough request against a fixed loopback base so
-// user-controlled URL components can never redirect the fetch to another
-// host (SSRF): the protocol, hostname, and port are each re-checked against
-// the base before the URL is allowed out. Returns the validated URL object,
-// or null when the request would escape the configured origin.
-function resolveLoopback(req: any, baseUrl: string): URL | null {
-  let base: URL;
-  try {
-    base = new URL(baseUrl);
-  } catch {
+// Extract only the origin-relative path + query from an inbound request and
+// return it stripped of anything that could redirect a fetch (scheme, host,
+// credentials, fragments, or leading //). Returns a validated string that
+// starts with a single "/", or null when the request path is unacceptable.
+// This deliberately avoids flowing raw request input into a URL constructor:
+// the fixed base + user-suffix concatenation below is what keeps SSRF out.
+const PASSTHROUGH_PATH = /^\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$/;
+function passthroughPath(req: any): string | null {
+  const raw = String(req.originalUrl ?? req.url ?? "/");
+  // Take only the path + query portion; drop fragment and anything before
+  // the first "?". An absolute URI (scheme://host) never matches the regex.
+  const pathAndQuery = raw.split("#")[0];
+  if (!pathAndQuery.startsWith("/") || pathAndQuery.startsWith("//")) {
     return null;
   }
-  let target: URL;
-  try {
-    target = new URL(req.originalUrl ?? req.url ?? "/", base);
-  } catch {
+  if (!PASSTHROUGH_PATH.test(pathAndQuery)) {
     return null;
   }
-  if (target.protocol !== base.protocol
-    || target.hostname !== base.hostname
-    || target.port !== base.port) {
-    return null;
-  }
-  return target;
+  return pathAndQuery;
 }
 
-function fetchWithTimeout(url: string | URL, ms = 12000, method?: string, headers?: Record<string, string>, body?: Buffer): Promise<Response> {
+function fetchWithTimeout(url: string, ms = 12000, method?: string, headers?: Record<string, string>, body?: Buffer): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   return fetch(url, {
@@ -97,13 +92,16 @@ function fetchWithTimeout(url: string | URL, ms = 12000, method?: string, header
 // browser -> :3010 /gateway/* -> loopback ballerina ci-gateway :9095.
 // Read-only; upstream binds loopback so this is the only exposure.
 const CI_GATEWAY_URL = process.env.CI_GATEWAY_URL || "http://127.0.0.1:9095";
+const CI_GATEWAY_PREFIX = "http://127.0.0.1:9095";
 app.use("/gateway", async (req, res) => {
   try {
-    const target = resolveLoopback(req, CI_GATEWAY_URL);
-    if (!target) {
+    const path = passthroughPath(req);
+    if (!path) {
       return res.status(400).json({ error: "bad gateway path" });
     }
-    const r = await fetchWithTimeout(target, 10000);
+    // Fixed server-side prefix + validated path suffix: the host can never
+    // be influenced by the request.
+    const r = await fetchWithTimeout(CI_GATEWAY_PREFIX + path, 10000);
     const text = await r.text();
     res.status(r.status).set("Content-Type", r.headers.get("content-type") ?? "application/json");
     res.send(text);
@@ -117,10 +115,11 @@ app.use("/gateway", async (req, res) => {
 // and forwards review writebacks (POST /hotspotReview, /issueReview).
 // browser -> :3010 /sonar-sync/* -> loopback sonar-sync :9096.
 const SONAR_SYNC_URL = process.env.SONAR_SYNC_URL || "http://127.0.0.1:9096";
+const SONAR_SYNC_PREFIX = "http://127.0.0.1:9096";
 app.use("/sonar-sync", async (req, res) => {
   try {
-    const target = resolveLoopback(req, SONAR_SYNC_URL);
-    if (!target) {
+    const path = passthroughPath(req);
+    if (!path) {
       return res.status(400).json({ error: "bad sonar-sync path" });
     }
     const headers: Record<string, string> = {};
@@ -133,7 +132,9 @@ app.use("/sonar-sync", async (req, res) => {
       for await (const chunk of req) chunks.push(Buffer.from(chunk as any));
       body = Buffer.concat(chunks);
     }
-    const r = await fetchWithTimeout(target, 15000, req.method, headers, body);
+    // Fixed server-side prefix + validated path suffix: the host can never
+    // be influenced by the request.
+    const r = await fetchWithTimeout(SONAR_SYNC_PREFIX + path, 15000, req.method, headers, body);
     const text = await r.text();
     res.status(r.status).set("Content-Type", r.headers.get("content-type") ?? "application/json");
     res.send(text);
