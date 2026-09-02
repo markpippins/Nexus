@@ -152,9 +152,12 @@ def grouped_title(rule):
 def grouped_body(rule, findings):
     lines = ["| # | Severity | Component | Line | Message |", "|---|---|---|---|---|"]
     for i, f in enumerate(findings, 1):
-        msg = truncate((f.get("message") or "").replace("|", "/").replace("\n", " "), 80)
+        # Caps are guard rails only — real SonarQube messages run to ~160 chars
+        # and components to ~80, so on live data nothing is ever ellipsized.
+        # (80/60 caps used to cut real content — e.g. S2681 lost its key clause.)
+        msg = truncate((f.get("message") or "").replace("|", "/").replace("\n", " "), 400)
         lines.append(
-            f"| {i} | {f.get('severity') or '—'} | `{truncate(f.get('component_key') or '—', 60)}` "
+            f"| {i} | {f.get('severity') or '—'} | `{truncate(f.get('component_key') or '—', 120)}` "
             f"| {f.get('line') or '—'} | {msg} |")
     return (
         f"## SonarQube rule family — `{rule}` — {len(findings)} open (MAJOR+)\n\n"
