@@ -444,7 +444,7 @@ interface MirrorTableProps<T> {
   columns: number;
 }
 
-function Pager({ envelope, page, pageSize, onPageChange, columns, isLoading, unavailable }: MirrorTableProps<never>) {
+function Pager<T>({ envelope, page, pageSize, onPageChange, columns, isLoading, unavailable }: MirrorTableProps<T>) {
   if (unavailable) {
     return (
       <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-8">

@@ -58,9 +58,10 @@ const MERGEABLE_EXTRA = [
 
 // Resolve an inbound passthrough request against a fixed loopback base so
 // user-controlled URL components can never redirect the fetch to another
-// host (SSRF). Returns the absolute URL to fetch, or null when the request
-// would escape the configured origin.
-function resolveLoopback(req: any, baseUrl: string): string | null {
+// host (SSRF): the protocol, hostname, and port are each re-checked against
+// the base before the URL is allowed out. Returns the validated URL object,
+// or null when the request would escape the configured origin.
+function resolveLoopback(req: any, baseUrl: string): URL | null {
   let base: URL;
   try {
     base = new URL(baseUrl);
@@ -73,13 +74,15 @@ function resolveLoopback(req: any, baseUrl: string): string | null {
   } catch {
     return null;
   }
-  if (target.origin !== base.origin || target.protocol !== base.protocol) {
+  if (target.protocol !== base.protocol
+    || target.hostname !== base.hostname
+    || target.port !== base.port) {
     return null;
   }
-  return target.toString();
+  return target;
 }
 
-function fetchWithTimeout(url: string, ms = 12000, method?: string, headers?: Record<string, string>, body?: Buffer): Promise<Response> {
+function fetchWithTimeout(url: string | URL, ms = 12000, method?: string, headers?: Record<string, string>, body?: Buffer): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   return fetch(url, {
