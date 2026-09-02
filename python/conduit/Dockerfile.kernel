@@ -17,4 +17,8 @@ ENV KERNEL_PORT="3103"
 
 EXPOSE 3103
 
+# Drop privileges: the base image runs as root by default.
+RUN useradd --create-home --uid 10001 appuser && \
+    chown -R appuser:appuser /app
+USER appuser
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3103"]

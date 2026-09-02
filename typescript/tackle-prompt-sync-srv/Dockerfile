@@ -35,4 +35,7 @@ COPY --from=build /app/heartbeat-client /app/heartbeat-client
 ENV PROMPT_SRV_PORT=3501
 EXPOSE 3501
 
+# Drop privileges: the base image runs as root by default.
+RUN chown -R node:node /app
+USER node
 CMD ["node", "dist/index.js"]

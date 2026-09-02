@@ -39,4 +39,7 @@ COPY --from=build /app/tackle-seeds /app/tackle-seeds
 ENV TACKLE_SRV_PORT=3410
 EXPOSE 3410
 
+# Drop privileges: the base image runs as root by default.
+RUN chown -R node:node /app
+USER node
 CMD ["node", "dist/index.js"]

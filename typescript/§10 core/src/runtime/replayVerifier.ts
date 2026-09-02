@@ -65,7 +65,7 @@ function normalizeUuid(value: string): string {
   return `${raw.slice(0, 8)}-${raw.slice(8, 12)}-${raw.slice(12, 16)}-${raw.slice(16, 20)}-${raw.slice(20)}`.toLowerCase();
 }
 function normalizeTimestamp(value: string): string {
-  if (!/[zZ]|[+-]\d\d:\d\d$/.test(value)) throw new ReplayError(`invalid timestamp: ${value}`);
+  if (!/(?:[zZ]|[+-]\d\d:\d\d)$/.test(value)) throw new ReplayError(`invalid timestamp: ${value}`);
   const match = value.trim().match(/^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d+))?(Z|[+-]\d\d:\d\d)$/i);
   if (!match) throw new ReplayError(`invalid timestamp: ${value}`);
   const date = new Date(value);
