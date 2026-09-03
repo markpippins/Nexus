@@ -4,7 +4,10 @@
 // has Java 21 + sonar-scanner + Docker CLI (socket mounted). Node.js and
 // Python stages run in lightweight Docker containers via the mounted socket.
 //
-// Triggered by GitHub webhook on PR open/update and push to main.
+// Trigger: pollSCM every 5 min (the github plugin is not installed on
+// vd-ci-jenkins, so githubPush() is invalid there — build #1 died at Groovy
+// parse with "Invalid trigger type githubPush"). A GitHub webhook can be
+// added later if the plugin is installed.
 // sonar-project.properties governs SonarQube scope; quality gate enforced.
 
 pipeline {
@@ -12,11 +15,12 @@ pipeline {
 
     options {
         timeout(time: 30, unit: 'MINUTES')
-        timestamps()
+        disableConcurrentBuilds()
     }
-
     triggers {
-        githubPush()
+        // github plugin is not installed on vd-ci-jenkins — pollSCM needs
+        // nothing beyond the (installed) git plugin.
+        pollSCM('H/5 * * * *')
     }
 
     environment {
@@ -27,7 +31,17 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
+                // Inline pipeline jobs have no SCM provenance, so checkout scm
+                // fails to resolve — check out main explicitly instead.
+                // (No credentialsId: the repo is publicly clonable; add one
+                // here if it ever goes private.)
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/markpippins/nexus.git'
+                    ]]
+                ])
             }
         }
 
@@ -38,6 +52,7 @@ pipeline {
         stage('Typecheck') {
             steps {
                 script {
+                    def hostWs = env.WORKSPACE.replace('/var/jenkins_home', '/home/codex/vd-jenkins-home')
                     def tsconfigs = sh(
                         script: 'find typescript -maxdepth 2 -name tsconfig.json | sort',
                         returnStdout: true
@@ -54,9 +69,9 @@ pipeline {
                         def rc = sh(
                             script: """
                                 docker run --rm \
-                                    -v "\$(pwd):/ws" -w /ws \
+                                    -v "${hostWs}:/ws" -w /ws \
                                     node:20-bookworm \
-                                    bash -c "cd 'typescript/${svc}' && npm install --ignore-scripts --no-audit --no-fund --silent 2>/dev/null && npx tsc --noEmit" \
+                                    bash -c "set -o pipefail; cd 'typescript/${svc}' && npm install --ignore-scripts --no-audit --no-fund --silent 2>/dev/null && npx tsc --noEmit" \
                                     2>&1 | tail -20
                             """,
                             returnStatus: true
@@ -81,6 +96,7 @@ pipeline {
         stage('Python Tests') {
             steps {
                 script {
+                    def hostWs = env.WORKSPACE.replace('/var/jenkins_home', '/home/codex/vd-jenkins-home')
                     def pyPkgs = sh(
                         script: 'find python -maxdepth 2 -type d -name tests | sed "s|/tests||" | sort',
                         returnStdout: true
@@ -97,9 +113,9 @@ pipeline {
                         def rc = sh(
                             script: """
                                 docker run --rm \
-                                    -v "\$(pwd):/ws" -w /ws \
+                                    -v "${hostWs}:/ws" -w /ws \
                                     python:3.12-slim \
-                                    bash -c "cd 'python/${pkgName}' && \
+                                    bash -c "set -o pipefail; cd 'python/${pkgName}' && \
                                         pip install -q -e '.[test]' 2>/dev/null || pip install -q -e . 2>/dev/null || true && \
                                         pip install -q pytest 2>/dev/null && \
                                         python -m pytest tests/ -x -q --tb=short 2>&1 | tail -30" \
@@ -146,9 +162,9 @@ pipeline {
                         def rc = sh(
                             script: """
                                 docker run --rm \
-                                    -v "\$(pwd):/ws" -w /ws \
+                                    -v "${hostWs}:/ws" -w /ws \
                                     node:20-bookworm \
-                                    bash -c "cd 'typescript/${svc}' && npm install --ignore-scripts --no-audit --no-fund --silent 2>/dev/null && npm test" \
+                                    bash -c "set -o pipefail; cd 'typescript/${svc}' && npm install --ignore-scripts --no-audit --no-fund --silent 2>/dev/null && npm test" \
                                     2>&1 | tail -30
                             """,
                             returnStatus: true

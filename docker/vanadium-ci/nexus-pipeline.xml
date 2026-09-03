@@ -3,59 +3,237 @@
   <keepDependencies>false</keepDependencies>
   <properties/>
   <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps">
-    <script><![CDATA[pipeline {
-  agent any
-  triggers { githubPush() }
-  options { timeout(time: 30, unit: 'MINUTES') }
-  environment {
-    SONAR_HOST = 'http://sonarqube:9000'
-    SONAR_TOKEN = credentials('sonar-token')
-  }
-  stages {
-    stage('Checkout') {
-      steps {
-        checkout([
-          $class: 'GitSCM',
-          branches: [[name: '*/main']],
-          userRemoteConfigs: [[url: 'https://github.com/markpippins/nexus.git']]
-        ])
-      }
+    <script>// Jenkinsfile — vanadium CI pipeline
+//
+// Runs on vd-ci-jenkins (vanadium, 192.168.1.209). The Jenkins container
+// has Java 21 + sonar-scanner + Docker CLI (socket mounted). Node.js and
+// Python stages run in lightweight Docker containers via the mounted socket.
+//
+// Trigger: pollSCM every 5 min (the github plugin is not installed on
+// vd-ci-jenkins, so githubPush() is invalid there — build #1 died at Groovy
+// parse with "Invalid trigger type githubPush"). A GitHub webhook can be
+// added later if the plugin is installed.
+// sonar-project.properties governs SonarQube scope; quality gate enforced.
+
+pipeline {
+    agent any
+
+    options {
+        timeout(time: 30, unit: &#x27;MINUTES&#x27;)
+        disableConcurrentBuilds()
     }
-    stage('Typecheck') {
-      steps {
-        sh '''
-          find typescript -maxdepth 2 -name tsconfig.json | sort | while read tc; do
-            svc=$(dirname "$tc" | sed "s|typescript/||")
-            echo "[Typecheck] $svc..."
-            docker run --rm -v "$(pwd):/ws" -w /ws node:20-bookworm \
-              bash -c "cd typescript/$svc && npm install --ignore-scripts --no-audit --no-fund --silent 2>/dev/null && npx tsc --noEmit" \
-              || echo "FAILED: $svc"
-          done
-        '''
-      }
+    triggers {
+        // github plugin is not installed on vd-ci-jenkins — pollSCM needs
+        // nothing beyond the (installed) git plugin.
+        pollSCM(&#x27;H/5 * * * *&#x27;)
     }
-    stage('SonarQube') {
-      steps {
-        withSonarQubeEnv('vd-sonar') {
-          sh '/var/jenkins_home/tools/sonar-scanner/bin/sonar-scanner \
-            -Dsonar.host.url="$SONAR_HOST_URL" \
-            -Dsonar.projectKey=nexus \
-            -Dsonar.qualitygate.wait=true'
+
+    environment {
+        SONAR_HOST = &#x27;http://sonarqube:9000&#x27;
+        SONAR_TOKEN = credentials(&#x27;sonar-token&#x27;)
+    }
+
+    stages {
+        stage(&#x27;Checkout&#x27;) {
+            steps {
+                // Inline pipeline jobs have no SCM provenance, so checkout scm
+                // fails to resolve — check out main explicitly instead.
+                // (No credentialsId: the repo is publicly clonable; add one
+                // here if it ever goes private.)
+                checkout([
+                    $class: &#x27;GitSCM&#x27;,
+                    branches: [[name: &#x27;*/main&#x27;]],
+                    userRemoteConfigs: [[
+                        url: &#x27;https://github.com/markpippins/nexus.git&#x27;
+                    ]]
+                ])
+            }
         }
-      }
-    }
-    stage('Quality Gate') {
-      steps {
-        timeout(time: 5, unit: 'MINUTES') {
-          waitForQualityGate abortPipeline: true
+
+        // ── TypeScript typecheck ────────────────────────────────────
+        // Runs npx tsc --noEmit in each service that has a tsconfig.
+        // One Node.js container per service; failures are collected,
+        // not short-circuited, so you see ALL broken services at once.
+        stage(&#x27;Typecheck&#x27;) {
+            steps {
+                script {
+                    def hostWs = env.WORKSPACE.replace(&#x27;/var/jenkins_home&#x27;, &#x27;/home/codex/vd-jenkins-home&#x27;)
+                    def tsconfigs = sh(
+                        script: &#x27;find typescript -maxdepth 2 -name tsconfig.json | sort&#x27;,
+                        returnStdout: true
+                    ).trim().split(&#x27;\n&#x27;).findAll { it }
+
+                    def failures = []
+                    def total = tsconfigs.size()
+                    def current = 0
+
+                    for (tc in tsconfigs) {
+                        current++
+                        def svc = tc.replace(&#x27;typescript/&#x27;, &#x27;&#x27;).replace(&#x27;/tsconfig.json&#x27;, &#x27;&#x27;)
+                        echo "[Typecheck ${current}/${total}] ${svc}..."
+                        def rc = sh(
+                            script: """
+                                docker run --rm \
+                                    -v "${hostWs}:/ws" -w /ws \
+                                    node:20-bookworm \
+                                    bash -c "set -o pipefail; cd &#x27;typescript/${svc}&#x27; &amp;&amp; npm install --ignore-scripts --no-audit --no-fund --silent 2&gt;/dev/null &amp;&amp; npx tsc --noEmit" \
+                                    2&gt;&amp;1 | tail -20
+                            """,
+                            returnStatus: true
+                        )
+                        if (rc != 0) {
+                            failures &lt;&lt; svc
+                            echo "  ✗ ${svc} FAILED"
+                        } else {
+                            echo "  ✓ ${svc} OK"
+                        }
+                    }
+
+                    if (failures) {
+                        error("Typecheck failed: ${failures.join(&#x27;, &#x27;)}")
+                    }
+                }
+            }
         }
-      }
+
+        // ── Python tests ───────────────────────────────────────────
+        // Runs pytest in each Python package that has a tests/ dir.
+        stage(&#x27;Python Tests&#x27;) {
+            steps {
+                script {
+                    def hostWs = env.WORKSPACE.replace(&#x27;/var/jenkins_home&#x27;, &#x27;/home/codex/vd-jenkins-home&#x27;)
+                    def pyPkgs = sh(
+                        script: &#x27;find python -maxdepth 2 -type d -name tests | sed "s|/tests||" | sort&#x27;,
+                        returnStdout: true
+                    ).trim().split(&#x27;\n&#x27;).findAll { it }
+
+                    def failures = []
+                    def total = pyPkgs.size()
+                    def current = 0
+
+                    for (pkg in pyPkgs) {
+                        current++
+                        def pkgName = pkg.replace(&#x27;python/&#x27;, &#x27;&#x27;)
+                        echo "[Pytest ${current}/${total}] ${pkgName}..."
+                        def rc = sh(
+                            script: """
+                                docker run --rm \
+                                    -v "${hostWs}:/ws" -w /ws \
+                                    python:3.12-slim \
+                                    bash -c "set -o pipefail; cd &#x27;python/${pkgName}&#x27; &amp;&amp; \
+                                        pip install -q -e &#x27;.[test]&#x27; 2&gt;/dev/null || pip install -q -e . 2&gt;/dev/null || true &amp;&amp; \
+                                        pip install -q pytest 2&gt;/dev/null &amp;&amp; \
+                                        python -m pytest tests/ -x -q --tb=short 2&gt;&amp;1 | tail -30" \
+                                    2&gt;&amp;1 | tail -30
+                            """,
+                            returnStatus: true
+                        )
+                        if (rc != 0) {
+                            failures &lt;&lt; pkgName
+                            echo "  ✗ ${pkgName} FAILED"
+                        } else {
+                            echo "  ✓ ${pkgName} OK"
+                        }
+                    }
+
+                    if (failures) {
+                        error("Python tests failed: ${failures.join(&#x27;, &#x27;)}")
+                    }
+                }
+            }
+        }
+
+        // ── TypeScript tests ────────────────────────────────────────
+        // Runs npm test in each TS service that declares a test script.
+        stage(&#x27;TS Tests&#x27;) {
+            steps {
+                script {
+                    def tsPkgs = sh(
+                        script: """
+                            grep -rl &#x27;"test"&#x27; typescript/*/package.json 2&gt;/dev/null \
+                                | sed &#x27;s|/package.json||&#x27; | sort
+                        """,
+                        returnStdout: true
+                    ).trim().split(&#x27;\n&#x27;).findAll { it }
+
+                    def failures = []
+                    def total = tsPkgs.size()
+                    def current = 0
+
+                    for (pkg in tsPkgs) {
+                        current++
+                        def svc = pkg.replace(&#x27;typescript/&#x27;, &#x27;&#x27;)
+                        echo "[TS Test ${current}/${total}] ${svc}..."
+                        def rc = sh(
+                            script: """
+                                docker run --rm \
+                                    -v "${hostWs}:/ws" -w /ws \
+                                    node:20-bookworm \
+                                    bash -c "set -o pipefail; cd &#x27;typescript/${svc}&#x27; &amp;&amp; npm install --ignore-scripts --no-audit --no-fund --silent 2&gt;/dev/null &amp;&amp; npm test" \
+                                    2&gt;&amp;1 | tail -30
+                            """,
+                            returnStatus: true
+                        )
+                        if (rc != 0) {
+                            failures &lt;&lt; svc
+                            echo "  ✗ ${svc} FAILED"
+                        } else {
+                            echo "  ✓ ${svc} OK"
+                        }
+                    }
+
+                    if (failures) {
+                        error("TS tests failed: ${failures.join(&#x27;, &#x27;)}")
+                    }
+                }
+            }
+        }
+
+        // ── SonarQube scan ─────────────────────────────────────────
+        // Uses the sonar-scanner installed in the Jenkins container.
+        // sonar-project.properties governs scope; quality gate enforced.
+        stage(&#x27;SonarQube&#x27;) {
+            steps {
+                withSonarQubeEnv(&#x27;vd-sonar&#x27;) {
+                    sh &#x27;&#x27;&#x27;
+                        /var/jenkins_home/tools/sonar-scanner/bin/sonar-scanner \
+                            -Dsonar.host.url="$SONAR_HOST_URL" \
+                            -Dsonar.projectKey=nexus \
+                            -Dsonar.projectBaseDir="$WORKSPACE" \
+                            -Dsonar.qualitygate.wait=true \
+                            -Dsonar.qualitygate.timeout=600
+                    &#x27;&#x27;&#x27;
+                }
+            }
+        }
+
+        // ── Quality gate ────────────────────────────────────────────
+        stage(&#x27;Quality Gate&#x27;) {
+            steps {
+                timeout(time: 5, unit: &#x27;MINUTES&#x27;) {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
     }
-  }
-  post {
-    always { sh 'docker container prune -f 2>/dev/null || true' }
-  }
-}]]></script>
+
+    post {
+        always {
+            // Clean up Docker containers used by typecheck/test stages
+            sh &#x27;docker container prune -f 2&gt;/dev/null || true&#x27;
+        }
+        success {
+            echo &#x27;✅ Pipeline passed — typecheck, tests, and SonarQube gate all green.&#x27;
+        }
+        failure {
+            echo &#x27;❌ Pipeline failed — check stage logs above for details.&#x27;
+        }
+        unstable {
+            echo &#x27;⚠️ Pipeline unstable — some tests may have been skipped.&#x27;
+        }
+    }
+}
+</script>
     <sandbox>true</sandbox>
   </definition>
   <triggers/>
