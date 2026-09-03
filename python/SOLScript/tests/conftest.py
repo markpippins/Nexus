@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime
-from typing import Dict
+from typing import Any, Dict, List
 
 import pytest
 
@@ -102,3 +103,59 @@ def wr_invariant(interp: ResolutionInterpreter, wr_concept: Concept) -> Rule:
     wr_concept.invariants.append(rule)
     interp.rules[rule.id] = rule
     return rule
+
+
+def _run(coro: Any) -> Any:
+    return asyncio.get_event_loop().run_until_complete(coro)
+
+
+class FakeRow(dict):
+    """dict that also supports row["col"] lookup (asyncpg Record-like)."""
+
+    def __getitem__(self, key: str) -> Any:
+        return dict.__getitem__(self, key)
+
+
+class FakeConn:
+    """Minimal asyncpg connection: fetch() returns scripted responses."""
+
+    def __init__(self, script: List[List[FakeRow]]) -> None:
+        self._script = script
+
+    async def fetch(self, sql: str, *args: Any) -> List[FakeRow]:
+        if not self._script:
+            return []
+        return self._script.pop(0)
+
+    async def close(self) -> None:
+        return None
+
+
+class BoomConn:
+    """Connection that raises on every query (missing schema simulation)."""
+
+    async def fetch(self, sql: str, *args: Any) -> List[FakeRow]:
+        raise Exception('relation "shrapnel.field" does not exist')
+
+
+class Ctx:
+    def __init__(self, conn: Any) -> None:
+        self._conn = conn
+
+    async def __aenter__(self) -> Any:
+        return self._conn
+
+    async def __aexit__(self, *exc: Any) -> None:
+        return None
+
+
+class FakePool:
+    def __init__(self, conn: Any) -> None:
+        self._conn = conn
+
+    def acquire(self) -> Ctx:
+        return Ctx(self._conn)
+
+
+def _row(**kwargs: Any) -> FakeRow:
+    return FakeRow(kwargs)

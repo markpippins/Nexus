@@ -104,7 +104,7 @@ export async function runRegistryConformance(): Promise<void> {
     } catch {
       threw = true;
     }
-    ok(threw, "missing fallback rejected");
+    ok(threw, "missing adapter lookup rejected");
   }
 
   // ── 3. Primary failure → fallback authoritative + divergence recorded ──
