@@ -17,3 +17,23 @@ def embed_texts(texts, model="nomic-embed-text", **_kw):
     """Embed texts via NIM/Gemini/OpenRouter -> local-ollama fallback chain."""
     vectors, _provider = _tiered_embed([t if isinstance(t, str) else str(t) for t in texts])
     return np.array(vectors, dtype=np.float32)
+
+
+def cosine_similarity_matrix(
+    candidate_embeddings: np.ndarray,
+    reference_embeddings: np.ndarray,
+) -> np.ndarray:
+    """Compute cosine similarity between candidates (rows) and references (cols).
+
+    Returns an (N_candidates, N_references) matrix.
+    Restored from the pre-retirement rover/embed_util.py (commit f116d9ae^)
+    so the restored agenda_matcher.py and other legacy consumers keep their
+    import surface.
+    """
+    cand_norm = candidate_embeddings / (
+        np.linalg.norm(candidate_embeddings, axis=1, keepdims=True) + 1e-8
+    )
+    ref_norm = reference_embeddings / (
+        np.linalg.norm(reference_embeddings, axis=1, keepdims=True) + 1e-8
+    )
+    return cand_norm @ ref_norm.T
