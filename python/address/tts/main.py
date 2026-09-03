@@ -79,6 +79,14 @@ from address.tts.audio import play
 
 
 # ── Configuration ───────────────────────────────────────────────────
+def _env_bool(name: str, default: bool) -> bool:
+    """Parse an env var as a boolean. Accepts true/false/1/0/yes/no (any case)."""
+    val = os.getenv(name)
+    if val is None:
+        return default
+    return val.strip().lower() in ("1", "true", "yes", "on")
+
+
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgres://pguser:pgpass@localhost:5432/nexus",
@@ -90,6 +98,14 @@ NATS_SUBJECT = os.getenv(
 )
 REST_PORT = int(os.getenv("TTS_PORT", "8600"))
 HEALTH_CHECK_INTERVAL = float(os.getenv("TTS_HEALTH_INTERVAL", "300.0"))  # 5 min
+# Mute flag: when true, incoming messages (NATS transitions + periodic health
+# announcements) are NOT spoken aloud. The daemon keeps running — it still
+# subscribes, queues, and synthesizes — but suppresses the passive/automatic
+# `play()` so the speaker stays silent. Explicit on-demand REST requests
+# (/speak, /synthesize with play:true) still honor their caller-supplied
+# `play` param and remain audible, so muting never blocks an intentional
+# request. Default true (muted until explicitly unmuted).
+MUTED = _env_bool("TTS_MUTED", True)
 
 # ── Global state ────────────────────────────────────────────────────
 _queue = UtteranceQueue()
@@ -456,15 +472,22 @@ def speech_worker_loop() -> None:
             # Synthesize
             result = synthesize(utterance.text)
 
-            # Play
-            play(result.audio_path)
-
-            _log(
-                "Spoken: %d chars → %s (%dms)",
-                len(utterance.text),
-                result.audio_path,
-                result.duration_ms,
-            )
+            # Play (unless muted — muted still synthesizes but stays silent)
+            if MUTED:
+                _log(
+                    "MUTED: not playing %d chars → %s (%dms)",
+                    len(utterance.text),
+                    result.audio_path,
+                    result.duration_ms,
+                )
+            else:
+                play(result.audio_path)
+                _log(
+                    "Spoken: %d chars → %s (%dms)",
+                    len(utterance.text),
+                    result.audio_path,
+                    result.duration_ms,
+                )
 
         except Exception as e:
             _log("Speech error: %s", e)
@@ -498,6 +521,7 @@ class TTSRequestHandler(BaseHTTPRequestHandler):
                 "queue_size": _queue.size(),
                 "engine": "piper",
                 "audio_cache": str(AUDIO_CACHE_DIR),
+                "muted": MUTED,
             })
 
         elif parsed.path.startswith("/audio/"):
@@ -664,6 +688,7 @@ def main() -> None:
     _log("REST port: %d", REST_PORT)
     _log("Health interval: %.0fs", HEALTH_CHECK_INTERVAL)
     _log("Audio cache: %s", AUDIO_CACHE_DIR)
+    _log("Muted: %s (incoming messages %s)", MUTED, "NOT spoken" if MUTED else "spoken aloud")
 
     # Ensure audio cache directory exists
     AUDIO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
