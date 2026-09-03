@@ -5,11 +5,12 @@
 
 Push Event Bus: decisions, transactions, fleet health, events, entities, state, traces, and the SSE event stream.
 
-**24 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**25 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/peb/binding-decisions` | GET /api/peb/binding-decisions?subject_id=&disposition=&decision_class=&limit=&offset= |
+| GET | `/api/peb/binding-decisions/authority/:decisionClass` | activation). Returns the authority level carried by the durable peb.state row `binding_authority_mode` (migration V135) for the requested decision class. Fail-safe contract (mirrors peb-kernel binding_authority.py): no row, malformed content, a different class, or any DB error resolves to `advisory` |
 | GET | `/api/peb/decisions` | List decisions GET /api/peb/decisions?status=&author_id=&adr_number=&affected_key=&limit=&offset= |
 | POST | `/api/peb/decisions` | Create decision (ADR) POST /api/peb/decisions Body: { title, author_id, summary?, affected_keys?, entropy_class?, parent_decision_id?, rollback_of?, adr_number?, status?, transaction_id? } |
 | GET | `/api/peb/decisions/:id` | Get decision by ID GET /api/peb/decisions/:id |
@@ -42,6 +43,7 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
 
 
 

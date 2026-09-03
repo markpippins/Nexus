@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: tackle-srv — Tackle Role Memory + Agent Orchestration
-  version: 1.0.51c60128
+  version: 1.0.698cea61
   description: 'Tackle role memory and orchestration: AI config, sessions, roles, scheduler, memory, prompts, tool access,
     failure recovery, tasks, and logs.
 
@@ -1177,6 +1177,38 @@ paths:
         required: true
         schema:
           type: string
+  /config/ai/verify/purge-unverified:
+    post:
+      tags:
+      - config
+      operationId: post_config_ai_verify_purge_unverified
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: Purge unverified models from the inference chain Force-deactivates every config bundle (across all roles) whose
+        model is unverified or missi
   /config/failure-recovery:
     get:
       tags:

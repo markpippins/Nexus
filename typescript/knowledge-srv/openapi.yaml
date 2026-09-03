@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: knowledge-srv — Knowledge Graph REST API
-  version: 1.0.94052059
+  version: 1.0.f46de7d7
   description: 'Knowledge graph surface: entities by section, relation edges, cross-references, migrations, and summary.
 
 
@@ -105,7 +105,74 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: graph_cross_references GET /knowledge/cross-references?map_name=&source_section=&target_id=&limit=&offset=
+      summary: GET /knowledge/cross-references?map_name=&source_section=&target_id=&limit=&offset=
+    post:
+      tags:
+      - knowledge
+      operationId: post_knowledge_cross_references
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: graph_cross_references POST /knowledge/cross-references — create a cross-reference mapping
+  /knowledge/cross-references/{id}:
+    delete:
+      tags:
+      - knowledge
+      operationId: delete_knowledge_cross_references_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: DELETE /knowledge/cross-references/:id — delete a cross-reference by UUID
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
   /knowledge/edges:
     get:
       tags:
@@ -137,7 +204,105 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       summary: graph_edges GET /knowledge/edges?source_section=&source_id=&target_section=&target_id=&relation_type=&limit=&offset=
+    post:
+      tags:
+      - knowledge
+      operationId: post_knowledge_edges
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: graph_cross_references POST /knowledge/edges — create a graph edge
+  /knowledge/edges/{id}:
+    delete:
+      tags:
+      - knowledge
+      operationId: delete_knowledge_edges_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: DELETE /knowledge/edges/:id — delete a graph edge by UUID
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
   /knowledge/entities:
+    delete:
+      tags:
+      - knowledge
+      operationId: delete_knowledge_entities
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'DELETE /knowledge/entities?section=... — purge an entire section (and its edges via cascade). The canonical
+        eviction path for non-canonical '
     get:
       tags:
       - knowledge
@@ -168,7 +333,78 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       summary: graph_entities GET /knowledge/entities?section=&entity_type=&status=&search=&limit=&offset=
+    post:
+      tags:
+      - knowledge
+      operationId: post_knowledge_entities
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: POST /knowledge/entities — create a graph entity (upsert on (section, entity_id))
   /knowledge/entities/{section}/{entity_id}:
+    delete:
+      tags:
+      - knowledge
+      operationId: delete_knowledge_entities_section_entity_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: DELETE /knowledge/entities/:section/:entity_id — delete a single graph entity (cascades edges)
+      parameters:
+      - name: section
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: entity_id
+        in: path
+        required: true
+        schema:
+          type: string
     get:
       tags:
       - knowledge
@@ -199,6 +435,47 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       summary: GET /knowledge/entities/:section/:entity_id
+      parameters:
+      - name: section
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: entity_id
+        in: path
+        required: true
+        schema:
+          type: string
+    put:
+      tags:
+      - knowledge
+      operationId: put_knowledge_entities_section_entity_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: PUT /knowledge/entities/:section/:entity_id — update a graph entity
       parameters:
       - name: section
         in: path

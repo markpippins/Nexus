@@ -5,7 +5,7 @@
 
 Tackle role memory and orchestration: AI config, sessions, roles, scheduler, memory, prompts, tool access, failure recovery, tasks, and logs.
 
-**83 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**84 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -44,6 +44,7 @@ Tackle role memory and orchestration: AI config, sessions, roles, scheduler, mem
 | GET | `/config/ai/validate` | Validate |
 | POST | `/config/ai/verify` |  |
 | GET | `/config/ai/verify/:sessionId` |  |
+| POST | `/config/ai/verify/purge-unverified` | Purge unverified models from the inference chain Force-deactivates every config bundle (across all roles) whose model is unverified or missing, so no role's resolver queue can select a bundle whose model has not been certified. Returns per-role affected bundle counts. |
 | GET | `/config/failure-recovery` |  |
 | POST | `/config/failure-recovery` |  |
 | GET | `/health` | Health |
@@ -101,6 +102,7 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
 
 
 

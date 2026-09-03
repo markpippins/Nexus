@@ -5,16 +5,24 @@
 
 Knowledge graph surface: entities by section, relation edges, cross-references, migrations, and summary.
 
-**9 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**17 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/` | Root health check |
 | GET | `/health` |  |
-| GET | `/knowledge/cross-references` | graph_cross_references GET /knowledge/cross-references?map_name=&source_section=&target_id=&limit=&offset= |
+| GET | `/knowledge/cross-references` | GET /knowledge/cross-references?map_name=&source_section=&target_id=&limit=&offset= |
+| POST | `/knowledge/cross-references` | graph_cross_references POST /knowledge/cross-references — create a cross-reference mapping |
+| DELETE | `/knowledge/cross-references/:id` | DELETE /knowledge/cross-references/:id — delete a cross-reference by UUID |
 | GET | `/knowledge/edges` | graph_edges GET /knowledge/edges?source_section=&source_id=&target_section=&target_id=&relation_type=&limit=&offset= |
+| POST | `/knowledge/edges` | graph_cross_references POST /knowledge/edges — create a graph edge |
+| DELETE | `/knowledge/edges/:id` | DELETE /knowledge/edges/:id — delete a graph edge by UUID |
+| DELETE | `/knowledge/entities` | DELETE /knowledge/entities?section=... — purge an entire section (and its edges via cascade). The canonical eviction path for non-canonical sections (e.g. work_requests, plans). |
 | GET | `/knowledge/entities` | graph_entities GET /knowledge/entities?section=&entity_type=&status=&search=&limit=&offset= |
+| POST | `/knowledge/entities` | POST /knowledge/entities — create a graph entity (upsert on (section, entity_id)) |
+| DELETE | `/knowledge/entities/:section/:entity_id` | DELETE /knowledge/entities/:section/:entity_id — delete a single graph entity (cascades edges) |
 | GET | `/knowledge/entities/:section/:entity_id` | GET /knowledge/entities/:section/:entity_id |
+| PUT | `/knowledge/entities/:section/:entity_id` | PUT /knowledge/entities/:section/:entity_id — update a graph entity |
 | GET | `/knowledge/entities/:section/:entity_id/relations` | GET /knowledge/entities/:section/:entity_id/relations |
 | GET | `/knowledge/migrations` | graph_migrations GET /knowledge/migrations?limit= |
 | GET | `/knowledge/summary` | summary GET /knowledge/summary |
@@ -27,6 +35,7 @@ python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json   # (v
 ```
 
 <!-- API-SPEC-BEGIN -->
+
 
 
 
