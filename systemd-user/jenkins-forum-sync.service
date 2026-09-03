@@ -1,0 +1,15 @@
+[Unit]
+# jenkins-forum-sync — reconcile Jenkins job failures into the assembly
+# `jenkins` forum (idempotent: one thread per failing job with build
+# history, one CI overview thread, close-on-green, reopen-on-fail).
+# Canonical copy: nexus/systemd-user/jenkins-forum-sync.{service,timer}
+Description=Jenkins forum sync (Jenkins failures -> assembly jenkins forum)
+After=network.target postgresql.service
+Wants=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/codex/dev/nexus
+ExecStart=/home/codex/opt/anaconda3/bin/python3 /home/codex/dev/nexus/bin/jenkins-forum-sync.py
+StandardOutput=append:/home/codex/dev/nexus/logs/jenkins-forum-sync.service.log
+StandardError=append:/home/codex/dev/nexus/logs/jenkins-forum-sync.service.log
