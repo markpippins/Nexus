@@ -948,26 +948,30 @@ BEGIN
         END LOOP;
     END IF;
     -- ──────────────────────────────────────────────────────────
-    -- 20. Knowledge Stratification (L1-L4)
+    -- 20. Knowledge Stratification (L1-L4) — altitude, not rank
     -- ──────────────────────────────────────────────────────────
     v_memory_id := NULL;
     INSERT INTO ${SQL}.memory (slug, title, summary, body_md, tags, triggers, mcp_tools)
     VALUES (
         'knowledge-stratification',
-        'Knowledge Stratification (L1-L4)',
-        'Two-axis knowledge model: abstraction levels L1-L4 combined with visibility scopes.',
+        'Knowledge Stratification (L1-L4) — altitude, not rank',
+        'Two-axis knowledge model: abstraction levels L1-L4 (explanatory altitude, NOT a rank) combined with visibility scopes.',
         '## Knowledge Stratification\n'
         '\n'
         'Every document and chunk has two independent attributes: Abstraction Level and Visibility Scope.\n'
         '\n'
+        'IMPORTANT: Level is an abstraction / explanatory altitude, NOT a rank. It does not rank truth, confidence, importance, visibility, lifecycle, or authority. Authority lives with owning systems and admission paths; visibility is a separate scope (Axis 2). A higher level is not "better" or more senior — it is a different altitude of explanation. The same canonical subject may carry L1, L2, L3, and L4 projections simultaneously; level belongs on the projected assertion/version, never the canonical identity.\n'
+        '\n'
         '### Axis 1: Abstraction Level (L1-L4)\n'
         '\n'
-        '| Level | Name | Description | Primary Consumers |\n'
-        '|-------|------|-------------|-------------------|\n'
-        '| L1 | Raw / operational | APIs, schemas, contracts, error codes, configs | Builder |\n'
-        '| L2 | Structured / intermediate | Subsystem design, DAG semantics, data models | Builder, Architect |\n'
-        '| L3 | Planning / architectural | Rationale, trade-offs, migration philosophy | Architect, Inspector |\n'
-        '| L4 | Meta / system reasoning | Cross-system doctrine, ontology, governance | Architect (opt-in) |\n'
+        '| Level | Name | Explains (altitude) |\n'
+        '|-------|------|---------------------|\n'
+        '| L1 | Evidence / mechanics | What happened and how it works at the operational level (APIs, schemas, contracts, error codes, configs, execution evidence) |\n'
+        '| L2 | Semantic structure | How data and state are organized (subsystem design, DAG semantics, data models) |\n'
+        '| L3 | Architecture / rationale | Why the system exists and the reasoning behind its shape (rationale, trade-offs, migration philosophy) |\n'
+        '| L4 | Doctrine / governing interpretation | The rules and boundaries that govern the system (cross-system doctrine, ontology, role boundaries, governance) |\n'
+        '\n'
+        'Levels are defaults, not source-system labels — content determines its level. A model-check result is L1 execution evidence even if Aegis produced it; its interpretation is L3. A level change produces a new projection/version, never a silent mutation. Unknown or disputed levels remain explicit rather than guessed.\n'
         '\n'
         '### Axis 2: Visibility Scope\n'
         '\n'
@@ -981,17 +985,20 @@ BEGIN
         '\n'
         '### Per-Role Query Filters\n'
         '\n'
-        '| Role | Level Filter | Visibility Filter |\n'
-        '|------|-------------|-------------------|\n'
-        '| Builder | level \\u2264 1 primary, \\u2264 2 secondary | scope IN (builder, all) |\n'
-        '| Architect | level \\u2264 3 primary, L4 allowed | scope IN (architect, all) |\n'
-        '| Planner | level \\u2264 2 primary, \\u2264 3 allowed | scope IN (planner, all) |\n'
-        '| Reviewer | level \\u2264 2 | scope IN (reviewer, builder, all) |\n'
-        '| Inspector | level \\u2264 3 | scope IN (all) |\n'
-        '| Analyst | level \\u2264 3 | scope IN (analyst, all) |\n'
+        'The ranges below are typical starting altitudes for retrieval and explanation — NOT permissions, clearances, or a rank ordering. Any role may move between altitudes explicitly; a broader range is a wider angle of explanation, not a promotion.\n'
+        '\n'
+        '| Role | Typical Starting Altitude | Visibility Filter |\n'
+        '|------|---------------------------|-------------------|\n'
+        '| Builder | L1 primary, L2 secondary | scope IN (builder, all) |\n'
+        '| Architect | L2-L3 primary, L4 allowed | scope IN (architect, all) |\n'
+        '| Planner | L1-L2 primary, L3 allowed | scope IN (planner, all) |\n'
+        '| Reviewer | L1-L2 | scope IN (reviewer, builder, all) |\n'
+        '| Inspector | L2-L3 with preference for normative chunks | scope IN (all) |\n'
+        '| Analyst | L2-L3 | scope IN (analyst, all) |\n'
         '\n'
         '### Cross-Reference Semantics\n'
-        'Cross-references are a conditional expansion operator, not a default join. Builders start narrow and expand when blocked; Architects start broader for design context; Inspectors expand aggressively for compliance.',
+        'Cross-references are a conditional expansion operator, not a default join. Builders start narrow and expand when blocked; Architects start broader for design context; Inspectors expand aggressively for compliance.\n'
+        '',
         ARRAY['reference', 'knowledge', 'stratification', 'levels'],
         ARRAY['knowledge levels', 'L1 L2 L3 L4', 'stratification', 'visibility'],
         '{}'

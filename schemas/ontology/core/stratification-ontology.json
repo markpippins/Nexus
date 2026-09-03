@@ -5,35 +5,34 @@
   "description": "Formal two-axis knowledge stratification ontology for Nebula. Controls how agents access the knowledge graph via abstraction level and visibility scope. Every document and chunk carries these two independent attributes.",
 
   "abstraction_levels": {
-    "description": "Axis 1: Abstraction Level (L1–L4). Single-primary-level per chunk — no multi-level ambiguity.",
+    "description": "Axis 1: Abstraction Level (L1–L4). Single-primary-level per chunk — no multi-level ambiguity. IMPORTANT: Level is an abstraction/explanatory altitude, NOT a rank. It does not rank truth, confidence, importance, visibility, lifecycle, or authority. Authority lives with the owning systems and admission paths; visibility is a separate scope. A higher level is a different altitude of explanation, not 'better' or more senior. The same canonical subject may carry L1, L2, L3, and L4 projections simultaneously; level belongs on the projected assertion/version, never the canonical asset identity.",
     "levels": {
       "L1": {
-        "name": "Raw / operational",
-        "description": "Build details, APIs, schemas, method contracts, error codes, config values",
-        "primary_consumers": ["builder"]
+        "name": "Evidence / mechanics",
+        "description": "What happened and how it works at the operational level — build details, APIs, schemas, method contracts, error codes, config values, execution evidence"
       },
       "L2": {
-        "name": "Structured / intermediate",
-        "description": "Subsystem design, DAG semantics, traversal behavior, data models",
-        "primary_consumers": ["builder", "architect"],
-        "notes": "Builder secondary, Architect primary"
+        "name": "Semantic structure",
+        "description": "How data and state are organized — subsystem design, DAG semantics, traversal behavior, data models"
       },
       "L3": {
-        "name": "Planning / architectural",
-        "description": "Why systems exist, migration philosophy, architectural rationale, trade-offs",
-        "primary_consumers": ["architect", "inspector"]
+        "name": "Architecture / rationale",
+        "description": "Why the system exists and the reasoning behind its shape — migration philosophy, architectural rationale, trade-offs, subsystem relationships"
       },
       "L4": {
-        "name": "Meta / system reasoning",
-        "description": "Cross-system doctrine, ontology definitions, role boundaries, governance rules",
-        "primary_consumers": ["architect"],
-        "notes": "Architect opt-in only"
+        "name": "Doctrine / governing interpretation",
+        "description": "The rules and boundaries that govern the system's own operation — cross-system doctrine, ontology definitions, role boundaries, ownership and governance rules"
       }
     },
     "rules": [
       "SINGLE_PRIMARY_LEVEL: A chunk targets exactly one abstraction level — no multi-level ambiguity",
       "CHUNK_CAN_OVERRIDE_DOCUMENT: Chunks can override their parent document's dominant level when content diverges",
-      "CONTENT_NODE_OWNS_LEVEL: Content nodes own the abstraction level — cross-reference edges remain level-neutral"
+      "CONTENT_NODE_OWNS_LEVEL: Content nodes own the abstraction level — cross-reference edges remain level-neutral",
+      "LEVEL_NOT_A_RANK: Level is abstraction/explanatory altitude, never a ranking of truth, confidence, importance, visibility, lifecycle, or authority",
+      "LEVEL_ON_PROJECTION: Level belongs on the projected assertion/version (or versioned projection), never the canonical asset identity — a level change produces a new projection/version, never a silent mutation",
+      "LEVEL_ORTHOGONAL_TO_VISIBILITY: A chunk's abstraction level (L1–L4) is independent of who may see it (visibility scope)",
+      "DEFAULTS_NOT_SOURCE_LABELS: Level defaults are content-determined, not source-system labels — e.g. a model-check result is L1 execution evidence even if produced by Aegis; its interpretation is L3",
+      "UNKNOWN_LEVEL_STAYS_EXPLICIT: Unknown or disputed levels remain explicit rather than being guessed; a disputed level is recorded as such"
     ]
   },
 
@@ -141,7 +140,7 @@
   },
 
   "role_query_filters": {
-    "description": "Per-role query filters that control access projections over the single shared knowledge graph.",
+    "description": "Per-role query filters that control access projections over the single shared knowledge graph. IMPORTANT: These describe the altitude each role typically starts from for retrieval and explanation — NOT permissions, clearances, or a rank ordering. The level_filter predicates are retrieval preferences (which altitude a role's query defaults to), not a promotion above another role; any role may move between altitudes explicitly, and a 'broader' starting range is a wider angle of explanation, not a seniority boost.",
     "roles": {
       "builder": {
         "level_filter": {
