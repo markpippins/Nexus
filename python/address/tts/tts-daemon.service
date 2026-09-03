@@ -16,6 +16,7 @@ Environment=NATS_URL=nats://localhost:4222
 Environment=TTS_PORT=8600
 Environment=TTS_HEALTH_INTERVAL=300
 Environment=PYTHONUNBUFFERED=1
+Environment=TTS_MUTED=true
 
 # ── Executable ─────────────────────────────────────────────────────────
 ExecStart=/usr/bin/python3 main.py
