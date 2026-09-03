@@ -1168,13 +1168,18 @@ app.post("/run-direct", async (req, res) => {
       }
 
       // Preserve partial output + exact exit/timeout metadata on the job.
+      // Exit metadata is only written while the job is still pre-terminal:
+      // a lost interrupt race (cancelled while the executor was in flight)
+      // must keep its cancellation exit code (137), not the executor's.
       const job = jobs.get(jobId);
       if (job) {
         job.stdout = stdout;
         job.stderr = stderr;
-        job.exitCode = exitCode;
         job.modelUsed = modelUsed;
         job.attempts = attemptLog;
+        if (job.state === "accepted" || job.state === "running") {
+          job.exitCode = exitCode;
+        }
       }
 
       await unlink(promptFile).catch(() => {});

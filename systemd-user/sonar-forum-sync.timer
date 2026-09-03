@@ -1,0 +1,13 @@
+[Unit]
+# sonar-forum-sync — every 30 min (operator request 2026-09-02). The sync is
+# idempotent and cheap when nothing changed, so a 30-min cadence keeps the
+# forum current as sonar-sync refreshes the mirror and agents resolve items.
+Description=Sonar forum sync (every 30 min)
+
+[Timer]
+OnCalendar=*:0/30
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

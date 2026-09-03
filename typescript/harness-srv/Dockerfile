@@ -24,4 +24,7 @@ COPY --from=build /app/harness-srv/dist ./dist
 ENV HARNESS_PORT=3420
 EXPOSE 3420
 
+# Drop privileges: the base image runs as root by default.
+RUN chown -R node:node /app
+USER node
 CMD ["node", "dist/index.js"]

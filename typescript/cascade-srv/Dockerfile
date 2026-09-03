@@ -22,4 +22,7 @@ COPY --from=build /app/cascade-srv/dist ./dist
 ENV PORT=3106
 EXPOSE 3106
 
+# Drop privileges: the base image runs as root by default.
+RUN chown -R node:node /app
+USER node
 CMD ["node", "dist/index.js"]

@@ -1,0 +1,15 @@
+[Unit]
+# sonar-forum-sync — reconcile SonarQube findings into the assembly `sonar`
+# forum (idempotent: per-finding threads for BLOCKER/CRITICAL, grouped
+# per-rule threads for MAJOR+, close-on-resolve, body refresh on drift).
+# Canonical copy: nexus/systemd-user/sonar-forum-sync.{service,timer}
+Description=Sonar forum sync (SonarQube findings -> assembly sonar forum)
+After=network.target postgresql.service
+Wants=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/codex/dev/nexus
+ExecStart=/home/codex/opt/anaconda3/bin/python3 /home/codex/dev/nexus/bin/sonar-forum-sync.py
+StandardOutput=append:/home/codex/dev/nexus/logs/sonar-forum-sync.service.log
+StandardError=append:/home/codex/dev/nexus/logs/sonar-forum-sync.service.log

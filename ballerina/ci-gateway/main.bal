@@ -57,6 +57,27 @@ function sonarGet(http:Client upstream, string path) returns json|http:ClientErr
     return upstream->get(path, { "Authorization": "Basic " + sonarAuthBasic });
 }
 
+// ── JSON field helpers ──────────────────────────────────────────────
+// `json` as such does not support member access; these helpers read
+// fields defensively, returning safe defaults for missing values.
+
+// Read a field out of a json map value (() when not a map / field missing).
+function jval(json payload, string col) returns json {
+    if payload is map<json> {
+        return payload[col];
+    }
+    return ();
+}
+
+// Field -> int? (nil when absent / not an integer).
+function jint(json payload, string col) returns int? {
+    json v = jval(payload, col);
+    if v is int {
+        return v;
+    }
+    return ();
+}
+
 final http:Client githubClient = check new (githubBase);
 
 // Ballerina Central registry (the real live source for barbie's Ballerina
@@ -155,17 +176,40 @@ service /gateway on new http:Listener(port, { host: bindHost }) {
         };
     }
 
-    // Onboarded Sonar projects (TRK components).
+    // Onboarded Sonar projects (TRK components). SonarQube caps page size at
+    // 500; loop all pages so the list is never silently truncated as the TRK
+    // count grows, and report the paging envelope alongside the components.
     resource function get sonar/projects() returns json|http:Response {
-        string endpoint = "/api/components/search?qualifiers=TRK";
-        json|http:ClientError res = sonarGet(self.sonar, endpoint);
-        if res is http:ClientError {
-            return upstreamFail("sonarqube", endpoint, res);
+        int pageSize = 500;
+        int maxPages = 100; // 50k TRK projects — far beyond any plausible fleet
+        json[] allComponents = [];
+        int total = 0;
+        int pageIndex = 1;
+        while pageIndex <= maxPages {
+            string endpoint = string `/api/components/search?qualifiers=TRK&ps=${pageSize}&p=${pageIndex}`;
+            json|http:ClientError res = sonarGet(self.sonar, endpoint);
+            if res is http:ClientError {
+                return upstreamFail("sonarqube", endpoint, res);
+            }
+            json payload = <json>res;
+            json[] pageComponents = jval(payload, "components") is json[] ? <json[]>jval(payload, "components") : [];
+            foreach json c in pageComponents {
+                allComponents.push(c);
+            }
+            int? pageTotal = jint(jval(payload, "paging"), "total");
+            if pageTotal is int && pageTotal > total {
+                total = pageTotal;
+            }
+            if allComponents.length() >= total || pageComponents.length() == 0 {
+                break;
+            }
+            pageIndex += 1;
         }
         return {
             "upstream": "sonarqube",
-            "endpoint": endpoint,
-            data: res
+            "endpoint": "/api/components/search?qualifiers=TRK",
+            paging: { "pageSize": pageSize, "pageIndex": pageIndex, "total": total },
+            "components": allComponents
         };
     }
 

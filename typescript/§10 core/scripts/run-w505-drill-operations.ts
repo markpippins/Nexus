@@ -331,14 +331,22 @@ const transcript2 = fullDrillTranscript();
 equal(transcript1, transcript2, "determinism: drill transcripts byte-identical across double run");
 const drillFingerprint = sha256(transcript1);
 
-// Isolation: the drill surface exposes admit only — no blocking toggle,
-// no store writes, no verdict mutation.
+// Isolation: the drill surface exposes the admission boundary only — no
+// blocking toggle, no store writes, no verdict mutation. G1 activation
+// (verdict 986ec482) adds admitGoverned (governed submit) and
+// setBindingAuthorityConsult (read-only consult attach); neither flips
+// global blocking. Drills still exercise the boundary through admit()
+// exclusively — zero durable authority touched.
 {
   const registry = new ContractAdmissionRegistry(DIMS) as unknown as Record<string, unknown>;
   const methodNames = Object.getOwnPropertyNames(Object.getPrototypeOf(registry)).filter(
     (n) => n !== "constructor",
   );
-  equal(methodNames.sort().join(","), "admit", "isolation: public surface is admit-only");
+  equal(
+    methodNames.sort().join(","),
+    "admit,admitGoverned,setBindingAuthorityConsult",
+    "isolation: public surface is admit + governed submit + read-only consult attach",
+  );
 }
 
 // ── evidence export (commit-artifact pattern) ───────────────────────────

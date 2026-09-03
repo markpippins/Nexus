@@ -224,15 +224,34 @@ def test_03_interrupt_cancels_job(test_role):
     assert status == 202
     job_id = data["job_id"]
 
-    # Interrupt while accepted/running (ollama path has no child pid — the
-    # direct-cancel branch marks it cancelled immediately).
+    # Race note: the fixture's ollama model 404s fast, so the job may reach
+    # its terminal `failed` state before the interrupt lands. The contract
+    # has two honest outcomes for the interrupt call itself:
+    #   (a) won the race  → state=cancelled (direct-cancel branch, no pid yet,
+    #       or SIGTERM of a live child) with exit_code 137, or
+    #   (b) lost the race → the terminal guard returns the envelope with
+    #       note="job already terminal" and the job's own terminal state
+    #       (completed/failed/timed_out) is preserved.
+    # Either way, the post-state MUST be terminal and MUST NOT be running.
     _, interrupt = _post(f"/jobs/{job_id}/interrupt", {})
-    assert interrupt.get("job", {}).get("state") == "cancelled", \
-        f"interrupt response={interrupt}"
+    interrupt_job = interrupt.get("job", {})
+    already_terminal = "already terminal" in (interrupt.get("note") or "")
 
     terminal = _poll_terminal(job_id, timeout_s=10)
-    assert terminal.get("state") == "cancelled", f"terminal envelope={terminal}"
-    assert terminal.get("exit_code") == 137
+    if already_terminal:
+        # (b) — the job's own terminal state stands; interrupt must not
+        # have retroactively rewritten it to cancelled.
+        assert terminal.get("state") in ("completed", "failed", "timed_out"), \
+            f"terminal envelope={terminal}"
+        assert interrupt_job.get("state") == terminal.get("state"), \
+            f"terminal guard must return the terminal envelope: interrupt={interrupt}"
+        assert interrupt_job.get("exit_code") == terminal.get("exit_code")
+    else:
+        # (a) — interrupt won: cancelled with the 137 cancellation code.
+        assert interrupt_job.get("state") == "cancelled", \
+            f"interrupt response={interrupt}"
+        assert terminal.get("state") == "cancelled", f"terminal envelope={terminal}"
+        assert terminal.get("exit_code") == 137
 
 
 @_skip_if_ci

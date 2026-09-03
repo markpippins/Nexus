@@ -19,4 +19,7 @@ COPY --from=build /app/semantics-srv/node_modules ./node_modules
 COPY --from=build /app/semantics-srv/dist ./dist
 COPY --from=build /app/heartbeat-client /app/heartbeat-client
 EXPOSE 3160
+# Drop privileges: the base image runs as root by default.
+RUN chown -R node:node /app
+USER node
 CMD ["node", "dist/index.js"]

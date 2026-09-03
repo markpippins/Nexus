@@ -19,4 +19,7 @@ COPY wind-srv/src ./src
 ENV WIND_SRV_PORT=3300
 EXPOSE 3300
 
+# Drop privileges: the base image runs as root by default.
+RUN chown -R node:node /app
+USER node
 CMD ["node", "src/index.js"]

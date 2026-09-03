@@ -313,6 +313,101 @@ export class GatewayUpstreamError extends Error {
   }
 }
 
+// ── sonar-sync reads (canonical `sonar` schema mirror) ────────────
+// browser -> :3010 /sonar-sync/* -> loopback ballerina sonar-sync :9096.
+// Read-only surface; review writeback happens agent-side.
+const SONAR_SYNC_BASE = '/sonar-sync';
+
+export interface SonarIssueRow {
+  key: string;
+  sonar_type?: string | null;
+  severity?: string | null;
+  status?: string | null;
+  resolution?: string | null;
+  component_key?: string | null;
+  line?: number | null;
+  rule_key?: string | null;
+  message?: string | null;
+  review_status?: string | null;
+  review_owner?: string | null;
+  first_seen_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface SonarHotspotRow {
+  key: string;
+  security_category?: string | null;
+  vulnerability_probability?: string | null;
+  status?: string | null;
+  resolution?: string | null;
+  component_key?: string | null;
+  line?: number | null;
+  rule_key?: string | null;
+  message?: string | null;
+  review_status?: string | null;
+  review_owner?: string | null;
+  first_seen_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface SonarListEnvelope<T> {
+  items: T[];
+  count: number;
+}
+
+async function sonarSyncJson<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+  const q = new URLSearchParams();
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') q.set(k, String(v));
+    });
+  }
+  const qs = q.toString();
+  let res: Response;
+  try {
+    res = await fetch(`${SONAR_SYNC_BASE}${path}${qs ? `?${qs}` : ''}`, { headers: { 'Content-Type': 'application/json' } });
+  } catch (e: any) {
+    throw new GatewayUpstreamError(0, `sonar-sync unreachable: ${e?.message ?? e}`, 'sonar-sync', e?.message ?? String(e));
+  }
+  const text = await res.text().catch(() => '');
+  if (!res.ok) {
+    throw new GatewayUpstreamError(res.status, `sonar-sync error ${res.status}: ${text.slice(0, 200) || res.statusText}`, 'sonar-sync', text.slice(0, 200));
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new GatewayUpstreamError(0, 'sonar-sync returned non-JSON response', 'sonar-sync', text.slice(0, 200));
+  }
+}
+
+// Review writeback — POSTs against the sonar-sync moat (hotspot review /
+// issue transition). Both the upstream action and the local review_status
+// update happen server-side; the UI just refreshes its list after.
+async function sonarSyncPost<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+  const q = new URLSearchParams();
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') q.set(k, String(v));
+    });
+  }
+  const qs = q.toString();
+  let res: Response;
+  try {
+    res = await fetch(`${SONAR_SYNC_BASE}${path}${qs ? `?${qs}` : ''}`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+  } catch (e: any) {
+    throw new GatewayUpstreamError(0, `sonar-sync unreachable: ${e?.message ?? e}`, 'sonar-sync', e?.message ?? String(e));
+  }
+  const text = await res.text().catch(() => '');
+  if (!res.ok) {
+    throw new GatewayUpstreamError(res.status, `sonar-sync writeback error ${res.status}: ${text.slice(0, 200)}`, 'sonar-sync', text.slice(0, 200));
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new GatewayUpstreamError(0, 'sonar-sync returned non-JSON response', 'sonar-sync', text.slice(0, 200));
+  }
+}
+
 async function gatewayJson<T>(path: string): Promise<T> {
   let res: Response;
   try {
@@ -865,13 +960,12 @@ export const registryApi = {
   getSonarProjects: async (params?: {
     search?: string;
     gate?: string;
-  }): Promise<SonarProject[]> => {
-    const query = new URLSearchParams();
-    if (params?.search) query.append('search', params.search);
-    if (params?.gate) query.append('gate', params.gate);
-    // Live path rides the ballerina ci-gateway.
+  }): Promise<SonarListEnvelope<SonarProject>> => {
+    // Live path rides the ballerina ci-gateway, which loops ALL pages of
+    // SonarQube's /api/components/search so the list is never silently
+    // truncated as the TRK count grows; the count is the filtered total.
     type SonarComp = { key?: string; name?: string; qualifier?: string };
-    const raw = await gatewayJson<{ paging?: unknown; components?: SonarComp[] }>('/sonar/projects');
+    const raw = await gatewayJson<{ paging?: { total?: number }; components?: SonarComp[] }>('/sonar/projects');
     let projects: SonarProject[] = (raw.components ?? [])
       .filter((c) => (c.qualifier ?? 'TRK') === 'TRK')
       .map((c, i) => ({
@@ -895,7 +989,7 @@ export const registryApi = {
     if (params?.gate && params.gate !== 'all') {
       projects = projects.filter((p) => p.gate === params.gate);
     }
-    return projects;
+    return { items: projects, count: projects.length };
   },
 
   getSonarMetrics: async (projectId: string): Promise<SonarMetricPoint[]> => {
@@ -961,5 +1055,36 @@ export const registryApi = {
     if (params?.status) query.append('status', params.status);
     // Live Ballerina runtime services via the ci-gateway moat.
     return gatewayJson<BallerinaService[]>(`/ballerina/services?${query.toString()}`);
+  },
+
+  // Canonical `sonar` schema reads (mirrored from SonarQube by sonar-sync).
+  getSonarIssues: async (params?: {
+    severity?: string;
+    issueType?: string;
+    status?: string;
+    query?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<SonarListEnvelope<SonarIssueRow>> => {
+    return sonarSyncJson<SonarListEnvelope<SonarIssueRow>>('/issues', params);
+  },
+
+  getSonarHotspots: async (params?: {
+    category?: string;
+    status?: string;
+    query?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<SonarListEnvelope<SonarHotspotRow>> => {
+    return sonarSyncJson<SonarListEnvelope<SonarHotspotRow>>('/hotspots', params);
+  },
+
+  // Realm review writebacks (mirrored into the `sonar` schema + SonarQube).
+  reviewHotspot: async (key: string, action: 'safe' | 'fixed' | 'accept-risk', owner?: string) => {
+    return sonarSyncPost<{ ok: boolean; key: string }>('/hotspotReview', { hotspotKey: key, action, owner });
+  },
+
+  reviewIssue: async (key: string, transition: 'resolve' | 'wontfix' | 'falsepositive', owner?: string) => {
+    return sonarSyncPost<{ ok: boolean; key: string }>('/issueReview', { issueKey: key, transition, owner });
   }
 };

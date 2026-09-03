@@ -177,7 +177,10 @@ async def capture_chain(
         # Write evidence bundle
         _write_bundle(bundle)
 
-        return bundle
+    # Return outside the finally block: a return in `finally` would swallow
+    # any in-flight exception (S1143) — e.g. CancelledError — and mask real
+    # capture failures from the caller.
+    return bundle
 
 
 # ── Persistence ─────────────────────────────────────────────────────

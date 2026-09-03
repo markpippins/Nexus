@@ -21,4 +21,7 @@ COPY --from=build /app/nebula-srv/migrations ./migrations
 
 ENV NEBULA_PORT=3101
 EXPOSE 3101
+# Drop privileges: the base image runs as root by default.
+RUN chown -R node:node /app
+USER node
 CMD ["node", "dist/index.js"]

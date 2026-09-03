@@ -19,4 +19,7 @@ COPY peb-srv/src ./src
 ENV PEB_SRV_PORT=3111
 EXPOSE 3111
 
+# Drop privileges: the base image runs as root by default.
+RUN chown -R node:node /app
+USER node
 CMD ["node", "src/index.js"]

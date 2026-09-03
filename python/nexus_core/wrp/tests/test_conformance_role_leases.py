@@ -31,6 +31,7 @@ import sys
 import time
 import unittest
 import urllib.request
+import uuid
 
 # Ensure nexus/python is on path for any shared imports
 _SELF_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -41,7 +42,21 @@ if _NEXUS_PYTHON not in sys.path:
 
 NEBULA_URL = os.environ.get("NEBULA_URL", "http://localhost:3101")
 HARNESS_URL = os.environ.get("HARNESS_URL", "http://localhost:3420")
+DSN = os.environ.get("CONDUIT_PG_DSN", "postgresql://pguser:pgpass@localhost:5432/nexus")
 TEST_ROLE = "wr-conf-002"
+
+
+def _db_exec(query: str, params=None) -> None:
+    """Run one statement against the nexus DB (committed)."""
+    import psycopg2
+    conn = psycopg2.connect(DSN)
+    try:
+        cur = conn.cursor()
+        cur.execute(query, params) if params else cur.execute(query)
+        conn.commit()
+        cur.close()
+    finally:
+        conn.close()
 
 
 def _post(path: str, body: dict, timeout: int = 10) -> dict:
@@ -361,16 +376,23 @@ class TestAc6StaleLeaseSweep(unittest.TestCase):
 #  AC7 — Admission enforcement (T20 B3): config validity gates harness work
 # ═══════════════════════════════════════════════════════════════════════
 
-# `inspector` is a canonical governance role (nebula.roles) with NO
-# config_bundle rows → the admission gate must deny /run-direct with
+# A hermetic synthetic runtime persona (created in setUpClass, dropped in
+# tearDownClass) guarantees the NO_CONFIG precondition: the role exists in
+# tackle.roles (passes the governance gate as a runtime persona) but has no
+# config_bundle rows → config admission denies /run-direct with
 # reason=NO_CONFIG (deterministic, no real work touched — denied pre-spawn).
-# NOTE (D-009 R6): a *nonexistent* role (e.g. wr-conf-002) is now denied
-# earlier at the governance gate with ROLE_MISSING, so NO_CONFIG is only
-# reachable for a canonical role lacking a bundle — exactly what `inspector`
-# provides. ROLE_REVOKED / CONFIG_INVALIDATED are covered at the unit level
-# (tests/admission.test.ts). Lease outcomes are enforced on the worker-pool
-# path (execution_worker.py), not harness-srv.
-NO_CONFIG_ROLE = "inspector"
+#
+# History: this test previously used the canonical `inspector` role on the
+# assumption it had no bundles. Live config drift (inspector now has bundle
+# rows) made that non-hermetic — and pointed a denial test at a real
+# governance role. The synthetic persona keeps AC7 exact and side-effect
+# free regardless of how live configs evolve.
+# NOTE (D-009 R6): a *nonexistent* role (e.g. wr-conf-002) is denied earlier
+# at the governance gate with ROLE_MISSING, so NO_CONFIG is only reachable
+# for a role that exists but lacks a bundle. ROLE_REVOKED /
+# CONFIG_INVALIDATED are covered at the unit level (tests/admission.test.ts).
+# Lease outcomes are enforced on the worker-pool path (execution_worker.py),
+# not harness-srv.
 
 
 def _run_direct(role: str, prompt: str = "ping", timeout_ms: int = 2000) -> tuple:
@@ -397,9 +419,22 @@ def _run_direct(role: str, prompt: str = "ping", timeout_ms: int = 2000) -> tupl
 class TestAc7AdmissionEnforcement(unittest.TestCase):
     """T20 B3: harness-srv denies work for roles with no valid config."""
 
+    @classmethod
+    def setUpClass(cls):
+        cls.no_config_role = f"wr-conf-002-noconfig-{uuid.uuid4().hex[:8]}"
+        _db_exec(
+            "INSERT INTO tackle.roles (id, name, description) VALUES (%s::uuid, %s, %s)",
+            (str(uuid.uuid4()), cls.no_config_role,
+             "wr-conf-002 AC7 NO_CONFIG admission test persona (no config_bundle)"),
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        _db_exec("DELETE FROM tackle.roles WHERE name = %s", (cls.no_config_role,))
+
     def test_no_config_denies_run_direct(self):
         """A role with no config_bundle → /run-direct returns 403 NO_CONFIG."""
-        status, body = _run_direct(NO_CONFIG_ROLE, "ping")
+        status, body = _run_direct(self.no_config_role, "ping")
         self.assertEqual(status, 403, f"expected 403, got {status}: {body}")
         admission = body.get("admission", {})
         self.assertEqual(admission.get("outcome"), "ADMISSION_DENIED")

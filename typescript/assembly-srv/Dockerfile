@@ -24,4 +24,7 @@ EXPOSE 3107
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.ASSEMBLY_SRV_PORT||3107)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
+# Drop privileges: the base image runs as root by default.
+RUN chown -R node:node /app
+USER node
 CMD ["node", "src/index.js"]

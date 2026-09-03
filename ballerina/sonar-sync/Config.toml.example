@@ -1,0 +1,13 @@
+# Copy to Config.toml and fill in. Config.toml is gitignored — never
+# commit real credentials. Keys are top-level (same convention as
+# ci-gateway's Config.toml).
+port = 9096
+sonarBase = "http://192.168.1.209:9000"
+# base64("<sonarqube-token>:") — same scheme as ci-gateway's Config.toml
+sonarAuthBasic = "<base64-token-colon>"
+dbHost = "localhost"
+dbPort = 5432
+dbDatabase = "nexus"
+dbUser = "pguser"
+dbPass = "<password>"
+syncIntervalSeconds = 600

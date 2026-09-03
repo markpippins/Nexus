@@ -1,9 +1,8 @@
 {
   "$schema": "sysadmin-config-schema.json",
   "version": 6,
-  "description": "Sysadmin ConfigBundle — declarative service registry for health monitoring",
+  "description": "Sysadmin ConfigBundle \u2014 declarative service registry for health monitoring",
   "lastUpdated": "2026-08-04",
-
   "global": {
     "stateDir": "${XDG_RUNTIME_DIR:-/run/user/1000}/nexus-sysadmin",
     "incidentLog": "${XDG_RUNTIME_DIR:-/run/user/1000}/nexus-sysadmin/incidents.json",
@@ -13,7 +12,6 @@
     "heartbeatIntervalHours": 1,
     "dailyRollupHour": 8
   },
-
   "services": [
     {
       "id": "redis",
@@ -27,7 +25,7 @@
       "systemdUnit": "redis.service",
       "timeout": 3,
       "dependencies": [],
-      "notes": "Infrastructure — all Redis-dependent services listed in dependency-monitor.sh"
+      "notes": "Infrastructure \u2014 all Redis-dependent services listed in dependency-monitor.sh"
     },
     {
       "id": "mongodb",
@@ -39,7 +37,7 @@
       "systemdUnit": "mongodb.service",
       "timeout": 3,
       "dependencies": [],
-      "notes": "Infrastructure — broker-gateway depends on MongoDB"
+      "notes": "Infrastructure \u2014 broker-gateway depends on MongoDB"
     },
     {
       "id": "postgresql",
@@ -53,7 +51,7 @@
       "systemdUnit": "postgresql.service",
       "timeout": 5,
       "dependencies": [],
-      "notes": "Infrastructure — most backends depend on PostgreSQL"
+      "notes": "Infrastructure \u2014 most backends depend on PostgreSQL"
     },
     {
       "id": "nats",
@@ -65,9 +63,8 @@
       "systemdUnit": "nats.service",
       "timeout": 3,
       "dependencies": [],
-      "notes": "Infrastructure — messaging backbone for cascade subscribers and TTS"
+      "notes": "Infrastructure \u2014 messaging backbone for cascade subscribers and TTS"
     },
-
     {
       "id": "service-registry",
       "displayName": "Service Registry",
@@ -79,7 +76,10 @@
       "expectedStatus": 200,
       "systemdUnit": "service-registry.service",
       "timeout": 5,
-      "dependencies": ["redis", "postgresql"],
+      "dependencies": [
+        "redis",
+        "postgresql"
+      ],
       "notes": "SSE health stream + service discovery"
     },
     {
@@ -93,8 +93,10 @@
       "expectedStatus": 200,
       "systemdUnit": "terrain.service",
       "timeout": 5,
-      "dependencies": ["postgresql"],
-      "notes": "Topology registry — primary tool for sysadmin"
+      "dependencies": [
+        "postgresql"
+      ],
+      "notes": "Topology registry \u2014 primary tool for sysadmin"
     },
     {
       "id": "peb-kernel",
@@ -107,8 +109,11 @@
       "expectedStatus": 200,
       "systemdUnit": "peb-kernel.service",
       "timeout": 5,
-      "dependencies": ["postgresql", "redis"],
-      "notes": "Persistent Engineering Brain — governance engine"
+      "dependencies": [
+        "postgresql",
+        "redis"
+      ],
+      "notes": "Persistent Engineering Brain \u2014 governance engine"
     },
     {
       "id": "broker-gateway",
@@ -121,7 +126,11 @@
       "expectedStatus": 200,
       "systemdUnit": "broker-gateway.service",
       "timeout": 5,
-      "dependencies": ["postgresql", "mongodb", "redis"],
+      "dependencies": [
+        "postgresql",
+        "mongodb",
+        "redis"
+      ],
       "notes": "Service broker gateway (Spring Boot)"
     },
     {
@@ -135,7 +144,9 @@
       "expectedStatus": 200,
       "systemdUnit": "helidon-user-access-service.service",
       "timeout": 5,
-      "dependencies": ["postgresql"],
+      "dependencies": [
+        "postgresql"
+      ],
       "notes": "User access control (Helidon MP)"
     },
     {
@@ -149,8 +160,10 @@
       "expectedStatus": 200,
       "systemdUnit": "timeclock.service",
       "timeout": 3,
-      "dependencies": ["postgresql"],
-      "notes": "Agent timeclock MCP server — responds on /, not /health"
+      "dependencies": [
+        "postgresql"
+      ],
+      "notes": "Agent timeclock MCP server \u2014 responds on /, not /health"
     },
     {
       "id": "role-memory-srv",
@@ -161,10 +174,12 @@
       "checkMethod": "port",
       "systemdUnit": "role-memory-srv.service",
       "timeout": 3,
-      "dependencies": ["postgresql", "redis"],
-      "notes": "PG→Redis procedure registry sync"
+      "dependencies": [
+        "postgresql",
+        "redis"
+      ],
+      "notes": "PG\u2192Redis procedure registry sync"
     },
-
     {
       "id": "conduit-mcp",
       "displayName": "Conduit MCP",
@@ -174,8 +189,10 @@
       "checkMethod": "port",
       "systemdUnit": "conduit-mcp.service",
       "timeout": 3,
-      "dependencies": ["postgresql"],
-      "notes": "Work request orchestration MCP server — MCP protocol, no HTTP health endpoint"
+      "dependencies": [
+        "postgresql"
+      ],
+      "notes": "Work request orchestration MCP server \u2014 MCP protocol, no HTTP health endpoint"
     },
     {
       "id": "nebula-srv",
@@ -188,8 +205,10 @@
       "expectedStatus": 200,
       "systemdUnit": "nebula-srv.service",
       "timeout": 5,
-      "dependencies": ["postgresql"],
-      "notes": "Nebula RMS API server — agent records, inbox, projections"
+      "dependencies": [
+        "postgresql"
+      ],
+      "notes": "Nebula RMS API server \u2014 agent records, inbox, projections"
     },
     {
       "id": "nebula-mcp",
@@ -202,7 +221,9 @@
       "expectedStatus": 200,
       "systemdUnit": "nebula-mcp-sse.service",
       "timeout": 5,
-      "dependencies": ["nebula-srv"],
+      "dependencies": [
+        "nebula-srv"
+      ],
       "notes": "Streaming MCP server for Nebula RMS"
     },
     {
@@ -216,8 +237,10 @@
       "expectedStatus": 200,
       "systemdUnit": "cascade-srv.service",
       "timeout": 5,
-      "dependencies": ["postgresql"],
-      "notes": "Cascade Event API — event lineage and analytics; health at /"
+      "dependencies": [
+        "postgresql"
+      ],
+      "notes": "Cascade Event API \u2014 event lineage and analytics; health at /"
     },
     {
       "id": "assembly-srv",
@@ -230,8 +253,10 @@
       "expectedStatus": 200,
       "systemdUnit": "assembly-srv.service",
       "timeout": 5,
-      "dependencies": ["postgresql"],
-      "notes": "Forums, threads, users REST API — primary outbound channel for sysadmin"
+      "dependencies": [
+        "postgresql"
+      ],
+      "notes": "Forums, threads, users REST API \u2014 primary outbound channel for sysadmin"
     },
     {
       "id": "kernel-srv",
@@ -244,7 +269,9 @@
       "expectedStatus": 200,
       "systemdUnit": "kernel-srv.service",
       "timeout": 5,
-      "dependencies": ["postgresql"],
+      "dependencies": [
+        "postgresql"
+      ],
       "notes": "Semantic Kernel REST API"
     },
     {
@@ -258,7 +285,9 @@
       "expectedStatus": 200,
       "systemdUnit": "wind-srv.service",
       "timeout": 5,
-      "dependencies": ["postgresql"],
+      "dependencies": [
+        "postgresql"
+      ],
       "notes": "Wind event-driven workflow API server"
     },
     {
@@ -272,7 +301,9 @@
       "expectedStatus": 200,
       "systemdUnit": "execution-srv.service",
       "timeout": 5,
-      "dependencies": ["postgresql"],
+      "dependencies": [
+        "postgresql"
+      ],
       "notes": "Execution observability API"
     },
     {
@@ -286,7 +317,9 @@
       "expectedStatus": 200,
       "systemdUnit": "knowledge-srv.service",
       "timeout": 5,
-      "dependencies": ["postgresql"],
+      "dependencies": [
+        "postgresql"
+      ],
       "notes": "Knowledge graph REST API"
     },
     {
@@ -300,7 +333,9 @@
       "expectedStatus": 200,
       "systemdUnit": "peb-srv.service",
       "timeout": 5,
-      "dependencies": ["postgresql"],
+      "dependencies": [
+        "postgresql"
+      ],
       "notes": "PEB observability REST API"
     },
     {
@@ -342,7 +377,9 @@
       "expectedStatus": 200,
       "systemdUnit": "losm-host.service",
       "timeout": 5,
-      "dependencies": ["postgresql"],
+      "dependencies": [
+        "postgresql"
+      ],
       "notes": "LOSM FastAPI server (Vision)"
     },
     {
@@ -356,7 +393,9 @@
       "expectedStatus": 200,
       "systemdUnit": "vision-srv-py.service",
       "timeout": 5,
-      "dependencies": ["postgresql"],
+      "dependencies": [
+        "postgresql"
+      ],
       "notes": "Vision Python FastAPI backend"
     },
     {
@@ -370,8 +409,10 @@
       "expectedStatus": 200,
       "systemdUnit": "substance.service",
       "timeout": 5,
-      "dependencies": ["postgresql"],
-      "notes": "Segment Sets API (FastAPI) — health at /healthz"
+      "dependencies": [
+        "postgresql"
+      ],
+      "notes": "Segment Sets API (FastAPI) \u2014 health at /healthz"
     },
     {
       "id": "mcp-bridge",
@@ -383,7 +424,7 @@
       "systemdUnit": "mcp-bridge.service",
       "timeout": 3,
       "dependencies": [],
-      "notes": "Generic stdio→SSE bridge for knowledge/vision/peb/terrain MCPs"
+      "notes": "Generic stdio\u2192SSE bridge for knowledge/vision/peb/terrain MCPs"
     },
     {
       "id": "ui-event-bus",
@@ -397,7 +438,6 @@
       "dependencies": [],
       "notes": "SSE event bus for cross-app UI communication"
     },
-
     {
       "id": "tackle-mcp",
       "displayName": "Tackle MCP",
@@ -407,7 +447,10 @@
       "checkMethod": "port",
       "systemdUnit": "tackle-mcp.service",
       "timeout": 3,
-      "dependencies": ["postgresql", "redis"],
+      "dependencies": [
+        "postgresql",
+        "redis"
+      ],
       "notes": "AI configuration registry MCP server"
     },
     {
@@ -433,8 +476,10 @@
       "expectedOutput": "active",
       "systemdUnit": "terrain-mcp.service",
       "timeout": 3,
-      "dependencies": ["terrain"],
-      "notes": "Terrain stdio MCP server — no TCP port, check via systemd"
+      "dependencies": [
+        "terrain"
+      ],
+      "notes": "Terrain stdio MCP server \u2014 no TCP port, check via systemd"
     },
     {
       "id": "address-tts-mcp",
@@ -445,7 +490,9 @@
       "checkMethod": "port",
       "systemdUnit": "address-tts-mcp.service",
       "timeout": 3,
-      "dependencies": ["nats"],
+      "dependencies": [
+        "nats"
+      ],
       "notes": "TTS service MCP server"
     },
     {
@@ -460,7 +507,6 @@
       "dependencies": [],
       "notes": "UI tools MCP server (port 3136, not 3114)"
     },
-
     {
       "id": "nexus-console",
       "displayName": "Nexus Console",
@@ -473,7 +519,7 @@
       "systemdUnit": "nexus-console.service",
       "timeout": 5,
       "dependencies": [],
-      "notes": "Angular/Vite dev server — main console"
+      "notes": "Angular/Vite dev server \u2014 main console"
     },
     {
       "id": "conduit-ui",
@@ -543,7 +589,7 @@
       "systemdUnit": "apidocs-srv.service",
       "timeout": 5,
       "dependencies": [],
-      "notes": "API docs index — Swagger UI + ReDoc over all *-srv OpenAPI specs (systemd-managed)"
+      "notes": "API docs index \u2014 Swagger UI + ReDoc over all *-srv OpenAPI specs (systemd-managed)"
     },
     {
       "id": "semantics-srv",
@@ -556,8 +602,10 @@
       "expectedStatus": 200,
       "systemdUnit": "semantics-srv.service",
       "timeout": 5,
-      "dependencies": ["postgresql"],
-      "notes": "Semantics REST API (semantics.* schema — type-level legend)"
+      "dependencies": [
+        "postgresql"
+      ],
+      "notes": "Semantics REST API (semantics.* schema \u2014 type-level legend)"
     },
     {
       "id": "semantics-mcp",
@@ -568,41 +616,143 @@
       "checkMethod": "port",
       "systemdUnit": "semantics-mcp.service",
       "timeout": 3,
-      "dependencies": ["semantics-srv"],
-      "notes": "Semantics MCP server (streamable HTTP on 3161 — port check, no health endpoint)"
+      "dependencies": [
+        "semantics-srv"
+      ],
+      "notes": "Semantics MCP server (streamable HTTP on 3161 \u2014 port check, no health endpoint)"
+    },
+    {
+      "id": "ci-gateway",
+      "displayName": "CI Gateway",
+      "category": "gateway",
+      "host": "localhost",
+      "port": 9095,
+      "checkMethod": "http",
+      "healthEndpoint": "/gateway/health",
+      "expectedStatus": 200,
+      "systemdUnit": "ballerina-ci-gateway.service",
+      "timeout": 5,
+      "dependencies": [],
+      "notes": "Ballerina moat \u2014 Jenkins/Sonar reads + drift sentinel for the UIs (barbie). Was found silently stopped 2026-09-01."
+    },
+    {
+      "id": "sonar-sync",
+      "displayName": "Sonar Sync",
+      "category": "gateway",
+      "host": "localhost",
+      "port": 9096,
+      "checkMethod": "http",
+      "healthEndpoint": "/sonar-sync/health",
+      "expectedStatus": 200,
+      "systemdUnit": "sonar-sync.service",
+      "timeout": 5,
+      "dependencies": [
+        "postgresql"
+      ],
+      "notes": "Ballerina moat \u2014 SonarQube weathervane mirror into nexus `sonar` schema (barbie + assembly-ui Sonar views)"
     }
   ],
-
   "dependencies": {
-    "_comment": "Inherited dependency edges (services → upstream that must be healthy first)",
+    "_comment": "Inherited dependency edges (services \u2192 upstream that must be healthy first)",
     "edges": [
-      {"from": "service-registry", "to": "redis"},
-      {"from": "service-registry", "to": "postgresql"},
-      {"from": "terrain", "to": "postgresql"},
-      {"from": "peb-kernel", "to": "postgresql"},
-      {"from": "peb-kernel", "to": "redis"},
-      {"from": "broker-gateway", "to": "postgresql"},
-      {"from": "broker-gateway", "to": "mongodb"},
-      {"from": "broker-gateway", "to": "redis"},
-      {"from": "conduit-mcp", "to": "postgresql"},
-      {"from": "nebula-srv", "to": "postgresql"},
-      {"from": "nebula-mcp", "to": "nebula-srv"},
-      {"from": "cascade-srv", "to": "postgresql"},
-      {"from": "assembly-srv", "to": "postgresql"},
-      {"from": "kernel-srv", "to": "postgresql"},
-      {"from": "wind-srv", "to": "postgresql"},
-      {"from": "execution-srv", "to": "postgresql"},
-      {"from": "knowledge-srv", "to": "postgresql"},
-      {"from": "tackle-mcp", "to": "postgresql"},
-      {"from": "tackle-mcp", "to": "redis"},
-      {"from": "terrain-mcp", "to": "terrain"},
-      {"from": "role-memory-srv", "to": "postgresql"},
-      {"from": "role-memory-srv", "to": "redis"},
-      {"from": "address-tts-mcp", "to": "nats"},
-      {"from": "semantics-mcp", "to": "semantics-srv"}
+      {
+        "from": "service-registry",
+        "to": "redis"
+      },
+      {
+        "from": "service-registry",
+        "to": "postgresql"
+      },
+      {
+        "from": "terrain",
+        "to": "postgresql"
+      },
+      {
+        "from": "peb-kernel",
+        "to": "postgresql"
+      },
+      {
+        "from": "peb-kernel",
+        "to": "redis"
+      },
+      {
+        "from": "broker-gateway",
+        "to": "postgresql"
+      },
+      {
+        "from": "broker-gateway",
+        "to": "mongodb"
+      },
+      {
+        "from": "broker-gateway",
+        "to": "redis"
+      },
+      {
+        "from": "conduit-mcp",
+        "to": "postgresql"
+      },
+      {
+        "from": "nebula-srv",
+        "to": "postgresql"
+      },
+      {
+        "from": "nebula-mcp",
+        "to": "nebula-srv"
+      },
+      {
+        "from": "cascade-srv",
+        "to": "postgresql"
+      },
+      {
+        "from": "assembly-srv",
+        "to": "postgresql"
+      },
+      {
+        "from": "kernel-srv",
+        "to": "postgresql"
+      },
+      {
+        "from": "wind-srv",
+        "to": "postgresql"
+      },
+      {
+        "from": "execution-srv",
+        "to": "postgresql"
+      },
+      {
+        "from": "knowledge-srv",
+        "to": "postgresql"
+      },
+      {
+        "from": "tackle-mcp",
+        "to": "postgresql"
+      },
+      {
+        "from": "tackle-mcp",
+        "to": "redis"
+      },
+      {
+        "from": "terrain-mcp",
+        "to": "terrain"
+      },
+      {
+        "from": "role-memory-srv",
+        "to": "postgresql"
+      },
+      {
+        "from": "role-memory-srv",
+        "to": "redis"
+      },
+      {
+        "from": "address-tts-mcp",
+        "to": "nats"
+      },
+      {
+        "from": "semantics-mcp",
+        "to": "semantics-srv"
+      }
     ]
   },
-
   "healthCheckTemplates": {
     "port": {
       "description": "Check if TCP port is open",
