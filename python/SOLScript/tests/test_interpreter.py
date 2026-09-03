@@ -371,6 +371,77 @@ class TestStateTransitions:
         assert passed is False
         assert entity.attributes["status"] == "DRAFT"  # unchanged
 
+    def test_transition_event_listener_captures_committed_read_set(
+        self, interp: ResolutionInterpreter, wr_concept: Concept,
+    ) -> None:
+        entity = interp.add_entity_by_concept_name(
+            "WorkRequest", {"status": "DRAFT"},
+        )
+        transition = ConceptStateTransition(
+            id=_uid(), concept_id=wr_concept.id,
+            from_value="DRAFT", to_value="APPROVED",
+            name="approve", notes=None,
+        )
+        interp.state_transitions[transition.id] = transition
+        events = []
+        interp.register_transition_event_listener(
+            lambda **kw: events.append(kw["event"])
+        )
+
+        passed, _ = interp.transition_entity(
+            entity.id, transition.id, source_event_id="evt-001",
+            correlation_id="corr-001", actor="test-agent",
+        )
+
+        assert passed is True
+        assert len(events) == 1
+        event = events[0]
+        assert event.event_id == "sol-api:evt-001"
+        assert event.idempotency_key == "sol-api:evt-001"
+        assert event.kind == "resolution.transition.committed"
+        assert event.outcome == "committed"
+        assert event.read_set["entity_id"] == entity.id
+        assert event.read_set["transition_id"] == transition.id
+        assert event.read_set["guard_results"] == []
+        assert event.payload == {"transition_id": transition.id}
+
+    def test_transition_event_listener_captures_refusal_without_mutation(
+        self, interp: ResolutionInterpreter, wr_concept: Concept,
+    ) -> None:
+        entity = interp.add_entity_by_concept_name(
+            "WorkRequest", {"status": "DRAFT"},
+        )
+        bad_expr = Expression(
+            id=_uid(), kind=ExpressionKind.LITERAL,
+            return_type="boolean", literal_value=False,
+        )
+        guard = Rule(
+            id=_uid(), name="always fails",
+            rule_type=RuleType.GUARD, expression=bad_expr,
+            severity=Severity.HARD,
+        )
+        transition = ConceptStateTransition(
+            id=_uid(), concept_id=wr_concept.id,
+            from_value="DRAFT", to_value="APPROVED",
+            name="approve", notes=None, guards=[guard],
+        )
+        interp.state_transitions[transition.id] = transition
+        events = []
+        interp.register_transition_event_listener(
+            lambda **kw: events.append(kw["event"])
+        )
+
+        passed, _ = interp.transition_entity(
+            entity.id, transition.id, source_event_id="evt-refused",
+        )
+
+        assert passed is False
+        assert entity.attributes["status"] == "DRAFT"
+        assert len(events) == 1
+        assert events[0].kind == "resolution.transition.refused"
+        assert events[0].outcome == "refused"
+        assert events[0].read_set["guard_results"][0]["passed"] is False
+
     def test_transition_listener_fires_on_success_only(
         self, interp: ResolutionInterpreter, wr_concept: Concept,
     ) -> None:
