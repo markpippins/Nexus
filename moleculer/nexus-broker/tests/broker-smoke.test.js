@@ -93,25 +93,65 @@ test('GET /api/workers/harness health action responds', async () => {
   assert.equal(body.status, 'ok')
 })
 
-test('GET /api/solir/status responds', async () => {
-  const res = await fetch(`${BASE}/solir/status`)
+test('GET /api/keychain-snapshot/agent-records/status exposes the active checkpoint', async () => {
+  const res = await fetch(`${BASE}/keychain-snapshot/agent-records/status`)
   assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.equal(body.enabled, true)
+  assert.ok(Number.isInteger(body.latestSnapshot) && body.latestSnapshot > 0)
+  assert.ok(Number.isInteger(body.entryCount) && body.entryCount >= 0)
+  assert.ok(body.checkpointId)
 })
 
-test('POST /api/solir/snapshot performs an idempotent write path', async () => {
-  const label = `p11-depth-${Date.now()}`
-  const res = await fetch(`${BASE}/solir/snapshot`, {
+test('replaying a delivered event is idempotent', async () => {
+  const status = await (await fetch(`${BASE}/keychain-snapshot/agent-records/status`)).json()
+  const transitions = await (await fetch(`${BASE}/keychain-snapshot/agent-records/transitions?limit=50`)).json()
+  const delivered = transitions.items.find((item) => item.checkpoint_status === 'delivered')
+  assert.ok(delivered, 'expected at least one delivered event')
+  const event = delivered.trigger_event || delivered
+  const res = await fetch(`${BASE}/keychain-snapshot/agent-records/snapshot`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ label }),
+    body: JSON.stringify({ triggerEvent: event, label: 'broker-smoke-replay' }),
   })
   assert.equal(res.status, 200)
   const body = await res.json()
   assert.equal(body.ok, true)
-  assert.equal(body.label, label)
-  // Replace-per-snapshot projection: versioned, counts are numbers.
-  assert.ok(Number.isInteger(body.version) && body.version > 0)
-  assert.ok(Number.isInteger(body.observations))
-  assert.ok(Number.isInteger(body.assessments))
-  assert.ok(Number.isInteger(body.driftFindings))
+  assert.equal(body.deduplicated, true)
+  assert.equal(body.version, status.latestSnapshot)
+})
+
+test('negative outcomes are archived without advancing the checkpoint', async () => {
+  const before = await (await fetch(`${BASE}/keychain-snapshot/agent-records/status`)).json()
+  const eventId = `broker-smoke-refused-${Date.now()}`
+  const res = await fetch(`${BASE}/keychain-snapshot/agent-records/snapshot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ triggerEvent: {
+      source_namespace: 'broker-smoke',
+      source_event_id: eventId,
+      kind: 'verification.decision.refused',
+      outcome: 'refused',
+      actor: 'broker-smoke',
+    } }),
+  })
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.equal(body.archived, true)
+  assert.equal(body.checkpoint_created, false)
+  const after = await (await fetch(`${BASE}/keychain-snapshot/agent-records/status`)).json()
+  assert.equal(after.latestSnapshot, before.latestSnapshot)
+  assert.equal(after.checkpointId, before.checkpointId)
+})
+
+test('rewind returns a committed state vector and rejects invalid versions', async () => {
+  const status = await (await fetch(`${BASE}/keychain-snapshot/agent-records/status`)).json()
+  const rewind = await (await fetch(`${BASE}/keychain-snapshot/agent-records/rewind?at=${status.latestSnapshot}`)).json()
+  assert.equal(rewind.ok, true)
+  assert.equal(rewind.version, status.latestSnapshot)
+  assert.ok(rewind.state_vector)
+  assert.ok(rewind.recordTypeCount > 0)
+
+  const invalid = await (await fetch(`${BASE}/keychain-snapshot/agent-records/rewind?at=0`)).json()
+  assert.equal(invalid.ok, false)
 })
