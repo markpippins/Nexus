@@ -33,6 +33,7 @@ import {
   endSession,
   setModelVerified,
   rearmBundlesForModel,
+  deactivateBundlesForUnverifiedModels,
 } from "../db";
 import fs from "fs";
 import path from "path";
@@ -614,16 +615,7 @@ aiConfigRouter.post("/verify", async (req, res) => {
       return;
     }
 
-    if (model.verified) {
-      res.json({
-        started: false,
-        alreadyVerified: true,
-        verified: true,
-        model_id,
-        message: "Model is already verified — nothing to run.",
-      });
-      return;
-    }    const harnesses = await getAIHarnesses();
+    const harnesses = await getAIHarnesses();
     const harness = harnesses.find((h: any) => h.id === model.harness_id);
     if (!harness) {
       res.status(404).json({ error: `Harness ${model.harness_id} not found` });
@@ -696,6 +688,14 @@ aiConfigRouter.post("/verify", async (req, res) => {
           await setModelVerified(model_id, true);
           const rearmed = await rearmBundlesForModel(model_id);
           console.log(`[verify] ${model_id} VERIFIED — ${rearmed} bundle(s) re-armed`);
+        } else {
+          // Failed reverify (or first-time verify): the model is no longer
+          // certifiably working — mark it unverified so its bundles are forced
+          // inactive (verified-model gate) and the UI surfaces it for role
+          // updates. This is the "beta model changed names / no longer works"
+          // case: a previously-verified model that now fails gets de-registered.
+          await setModelVerified(model_id, false);
+          console.log(`[verify] ${model_id} marked UNVERIFIED (reverify failed)`);
         }
         await endSession(sessionId, exitCode ?? -1, doneIso);
       } catch (e: any) {
@@ -780,6 +780,20 @@ aiConfigRouter.get("/verify/:sessionId", async (req, res) => {
       verified: running ? null : session.exit_code === 0,
       stale_settled: staleSettled,
     });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Purge unverified models from the inference chain ────────────────
+// Force-deactivates every config bundle (across all roles) whose model is
+// unverified or missing, so no role's resolver queue can select a bundle whose
+// model has not been certified. Returns per-role affected bundle counts.
+aiConfigRouter.post("/verify/purge-unverified", async (_req, res) => {
+  try {
+    const result = await deactivateBundlesForUnverifiedModels();
+    const total = result.reduce((sum, r) => sum + r.bundleIds.length, 0);
+    res.json({ purged: total, roles: result });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
