@@ -320,24 +320,20 @@ export default class KeychainService extends Service {
         this.pool = new Pool(PG_CONFIG);
         this.mongo = new MongoClient(MONGO_URL);
         await this.mongo.connect();
-        // Sparse uniqueness applies to the new durable contract field only;
-        // historical transition documents remain untouched.
-        await this.mongo
-          .db("keychains")
-          .collection("transitions")
-          .createIndex({ keychain_event_id: 1 }, { unique: true, sparse: true });
-        await this.mongo
-          .db("keychains")
-          .collection("ar_snapshots")
-          .createIndex({ source_namespace: 1, source_event_id: 1 }, { unique: true, sparse: true });
-        await this.mongo
-          .db("keychains")
-          .collection("checkpoint_entries")
-          .createIndex({ checkpoint_id: 1, instance_id: 1 }, { unique: true });
-        await this.mongo
-          .db("keychains")
-          .collection("ar_snapshots")
-          .createIndex({ checkpoint_status: 1, version: -1 });
+        const keychainsDb = this.mongo.db("keychains");
+        await keychainsDb.collection("transitions").createIndex(
+          { keychain_event_id: 1 },
+          { unique: true, sparse: true },
+        );
+        await keychainsDb.collection("ar_snapshots").createIndex(
+          { source_namespace: 1, source_event_id: 1 },
+          { unique: true, sparse: true },
+        );
+        await keychainsDb.collection("checkpoint_entries").createIndex(
+          { checkpoint_id: 1, instance_id: 1 },
+          { unique: true },
+        );
+        await keychainsDb.collection("ar_snapshots").createIndex({ checkpoint_status: 1, version: -1 });
 
         const sourceNames = (process.env.KEYCHAIN_SOURCE_DATABASES || "nexus,sol")
           .split(",")
@@ -350,12 +346,19 @@ export default class KeychainService extends Service {
           this.sourcePools.set(database, sourcePool);
         }
         await this.reconcileCommittedCheckpoints();
+        const latestCheckpoint = await keychainsDb.collection("ar_snapshots").findOne(
+          { $or: [{ checkpoint_status: "committed" }, { checkpoint_status: { $exists: false } }] },
+          { sort: { version: -1 }, projection: { version: 1 } },
+        );
+        await keychainsDb.collection("checkpoint_sequences").updateOne(
+          { _id: "agent-records" } as any,
+          { $max: { version: latestCheckpoint?.version || 0 } },
+          { upsert: true },
+        );
         this.outboxTimer = setInterval(
           () => void this.pollOutbox(),
           Number(process.env.KEYCHAIN_OUTBOX_POLL_MS || 5000),
         );
-        // Do not delay broker readiness while replaying a backlog. The poller
-        // is bounded and will continue draining in the background.
         void this.pollOutbox();
 
         // D3 (keychains thread e267263c): snapshots are driven by decision
@@ -444,8 +447,7 @@ export default class KeychainService extends Service {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      const result = await client.query<OutboxRow>(
-        `
+      const result = await client.query<OutboxRow>(`
         WITH candidate AS (
           SELECT id
           FROM resolution.keychain_event_outbox
@@ -468,8 +470,7 @@ export default class KeychainService extends Service {
                   e.correlation_id, e.actor, e.contract_id, e.evaluator_id,
                   e.law_id, e.effective_at, e.recorded_at, e.read_set, e.payload,
                   e.checkpoint_status, e.delivery_attempts
-        `,
-      );
+      `);
       if (!result.rows.length) {
         await client.query("ROLLBACK");
         client.release();
@@ -507,19 +508,31 @@ export default class KeychainService extends Service {
     }
   }
 
+  private async renewOutboxClaim(client: PoolClient, row: OutboxRow): Promise<void> {
+    await client.query(
+      `UPDATE resolution.keychain_event_outbox
+          SET claimed_at = now()
+        WHERE id = $1
+          AND checkpoint_status = 'delivering'
+          AND delivery_attempts = $2`,
+      [row.id, row.delivery_attempts],
+    );
+  }
+
   private async releaseTriggerReservation(triggerEvent: TriggerEventContract): Promise<void> {
     const client = await this.getMongo();
     await client.db("keychains").collection("transitions").updateOne(
-      {
-        keychain_event_id: triggerEvent.idempotency_key,
-        reservation: true,
-      },
+      { keychain_event_id: triggerEvent.idempotency_key, reservation: true },
       { $unset: { reservation: "", reservation_at: "", checkpoint_id: "" } },
     );
   }
 
-  private async processOutboxRow(pool: Pool, row: OutboxRow, client: PoolClient): Promise<void> {
+  private async processOutboxRow(_pool: Pool, row: OutboxRow, client: PoolClient): Promise<void> {
     const triggerEvent = this.outboxToTrigger(row);
+    const leaseRenewal = setInterval(
+      () => void this.renewOutboxClaim(client, row).catch((err) => this.logger.warn("failed to renew Keychains outbox claim", err)),
+      60_000,
+    );
     try {
       const result = await this.runAgentRecordsProjection({ triggerEvent });
       if (result?.checkpoint_pending) {
@@ -532,10 +545,9 @@ export default class KeychainService extends Service {
         this.logger.warn("failed to release Keychains trigger reservation", releaseErr);
       });
       await this.finishOutboxRow(client, row, "failed", err?.message || String(err));
-      this.logger.error(
-        `Keychains outbox delivery failed for ${row.source_namespace}:${row.source_event_id}`,
-        err,
-      );
+      this.logger.error(`Keychains outbox delivery failed for ${row.source_namespace}:${row.source_event_id}`, err);
+    } finally {
+      clearInterval(leaseRenewal);
     }
   }
 
@@ -544,8 +556,6 @@ export default class KeychainService extends Service {
     this.outboxPollInFlight = true;
     try {
       for (const pool of this.sourcePools.values()) {
-        // Drain a bounded batch per poll so a large backlog cannot starve
-        // Moleculer actions or hold the event loop indefinitely.
         for (let count = 0; count < 10; count += 1) {
           const claim = await this.claimNextOutboxRow(pool);
           if (!claim) break;
@@ -562,14 +572,11 @@ export default class KeychainService extends Service {
   private async reconcileCommittedCheckpoints(): Promise<void> {
     const client = await this.getMongo();
     const db = client.db("keychains");
-    // A crash can leave a reservation with no delivered snapshot. It is safe
-    // to release only old reservations; the source outbox worker will retry.
     const staleBefore = new Date(Date.now() - this.checkpointReservationTtlMs);
     await db.collection("transitions").updateMany(
       { reservation: true, reservation_at: { $lt: staleBefore } },
       { $unset: { reservation: "", reservation_at: "", checkpoint_id: "" } },
     );
-
     const staleStaged = await db.collection("ar_snapshots").find(
       { checkpoint_status: "staged", created_at: { $lt: staleBefore } },
       { projection: { checkpoint_id: 1 } },
@@ -581,30 +588,69 @@ export default class KeychainService extends Service {
       await db.collection("ar_snapshots").deleteMany({ checkpoint_id: { $in: staleCheckpointIds }, checkpoint_status: "staged" });
       await db.collection("checkpoint_entries").deleteMany({ checkpoint_id: { $in: staleCheckpointIds } });
     }
-
     const latest = await db.collection("ar_snapshots").findOne(
       { $or: [{ checkpoint_status: "committed" }, { checkpoint_status: { $exists: false } }] },
       { sort: { version: -1 } },
     );
-    if (latest?.checkpoint_id) {
-      await this.promoteActiveCheckpoint(db, latest);
-    }
+    if (latest?.checkpoint_id) await this.promoteActiveCheckpoint(db, latest);
   }
 
   private async promoteActiveCheckpoint(db: any, checkpoint: any): Promise<void> {
-    await db.collection("active_checkpoints").updateOne(
-      { _id: "agent-records" },
-      {
-        $set: {
-          checkpoint_id: checkpoint.checkpoint_id,
-          version: checkpoint.version,
-          source_namespace: checkpoint.source_namespace || null,
-          source_event_id: checkpoint.source_event_id || null,
-          updated_at: new Date().toISOString(),
-        },
+    const filter = {
+      _id: "agent-records",
+      $or: [
+        { version: { $lt: checkpoint.version } },
+        { version: { $exists: false } },
+      ],
+    };
+    const update = {
+      $set: {
+        checkpoint_id: checkpoint.checkpoint_id,
+        version: checkpoint.version,
+        source_namespace: checkpoint.source_namespace || null,
+        source_event_id: checkpoint.source_event_id || null,
+        updated_at: new Date().toISOString(),
       },
+      $setOnInsert: { _id: "agent-records" },
+    };
+    try {
+      const result = await db.collection("active_checkpoints").updateOne(filter, update, { upsert: true });
+      if (result.matchedCount === 0 && result.upsertedCount === 0) {
+        // A newer checkpoint already won the promotion race; preserve it.
+        return;
+      }
+    } catch (err: any) {
+      // Two processes can both observe an absent pointer and race on the
+      // _id upsert. The winner is authoritative; verify that the resulting
+      // pointer is at least as new before surfacing another error.
+      if (err?.code !== 11000) throw err;
+      const active = await db.collection("active_checkpoints").findOne({ _id: "agent-records" });
+      if (!active || Number(active.version || 0) < Number(checkpoint.version || 0)) throw err;
+    }
+  }
+
+  private async allocateCheckpointVersion(db: any): Promise<number> {
+    const latest = await db.collection("ar_snapshots").findOne(
+      { $or: [{ checkpoint_status: "committed" }, { checkpoint_status: { $exists: false } }] },
+      { sort: { version: -1 }, projection: { version: 1 } },
+    );
+    // The max update repairs a sequence created by an older deployment. The
+    // increment itself is atomic across broker processes.
+    await db.collection("checkpoint_sequences").updateOne(
+      { _id: "agent-records" } as any,
+      { $max: { version: latest?.version || 0 } },
       { upsert: true },
     );
+    const result = await db.collection("checkpoint_sequences").findOneAndUpdate(
+      { _id: "agent-records" } as any,
+      { $inc: { version: 1 } },
+      { returnDocument: "after", upsert: true },
+    ) as any;
+    const version = Number(result?.version ?? result?.value?.version);
+    if (!Number.isInteger(version) || version < 1) {
+      throw new Error("checkpoint sequence did not return a valid version");
+    }
+    return version;
   }
 
   private async runSnapshot(params: { label?: string }): Promise<any> {
@@ -1187,13 +1233,26 @@ export default class KeychainService extends Service {
             trigger: triggerEvent,
           };
         }
-        return {
-          ok: false,
-          deduplicated: true,
-          checkpoint_pending: true,
-          trigger: triggerEvent,
-          note: "another delivery owns checkpoint construction",
-        };
+        const staleBefore = new Date(Date.now() - this.checkpointReservationTtlMs);
+        const takeover = await db.collection("transitions").updateOne(
+          {
+            keychain_event_id: triggerEvent.idempotency_key,
+            reservation: true,
+            reservation_at: { $lt: staleBefore },
+          },
+          { $set: { reservation_at: new Date(), created_at: triggerEvent.recorded_at } },
+        );
+        if (takeover.modifiedCount === 0) {
+          return {
+            ok: false,
+            deduplicated: true,
+            checkpoint_pending: true,
+            trigger: triggerEvent,
+            note: "another delivery owns checkpoint construction",
+          };
+        }
+        // The previous owner is stale; this delivery now owns the reservation
+        // and continues through the normal checkpoint construction path.
       }
     }
 
@@ -1249,7 +1308,7 @@ export default class KeychainService extends Service {
       : new Set<string>();
 
     // ── Resolve logical instances ─────────────────────────────────────────
-    const version = prevVersion + 1;
+    const version = await this.allocateCheckpointVersion(db);
     const label = params.label || `ar-snapshot-v${version}`;
     const now = new Date().toISOString();
 
@@ -1302,15 +1361,21 @@ export default class KeychainService extends Service {
     // ── Stage the checkpoint before changing the active pointer ───────────
     // Mongo transactions are not assumed here because the deployed Mongo
     // topology may be standalone. The staged -> committed -> active protocol
-    // makes the previous checkpoint remain readable until promotion, and
-    // startup reconciliation can repair a crash between any two markers.
+    // keeps the prior checkpoint readable until promotion and allows startup
+    // reconciliation to recover an interrupted delivery.
     const checkpointId = randomUUID();
     const checkpointEntries = Array.from(entries.values()).map((entry) => ({
       ...entry,
       checkpoint_id: checkpointId,
     }));
-    if (checkpointEntries.length > 0) {
-      await db.collection("checkpoint_entries").insertMany(checkpointEntries);
+    let checkpointCommitted = false;
+    try {
+      if (checkpointEntries.length > 0) {
+        await db.collection("checkpoint_entries").insertMany(checkpointEntries);
+      }
+    } catch (err) {
+      await db.collection("checkpoint_entries").deleteMany({ checkpoint_id: checkpointId }).catch(() => undefined);
+      throw err;
     }
 
     const supersededCount = records.length - entries.size;
@@ -1364,14 +1429,21 @@ export default class KeychainService extends Service {
       checkpoint_status: "staged",
       prevVersion,
     };
-    await arSnapshots.insertOne(checkpoint);
-
-    // The staged checkpoint is complete before it becomes visible as current.
-    await arSnapshots.updateOne(
-      { checkpoint_id: checkpointId, checkpoint_status: "staged" },
-      { $set: { checkpoint_status: "committed", committed_at: new Date().toISOString() } },
-    );
-    await this.promoteActiveCheckpoint(db, checkpoint);
+    try {
+      await arSnapshots.insertOne(checkpoint);
+      await arSnapshots.updateOne(
+        { checkpoint_id: checkpointId, checkpoint_status: "staged" },
+        { $set: { checkpoint_status: "committed", committed_at: new Date().toISOString() } },
+      );
+      checkpointCommitted = true;
+      await this.promoteActiveCheckpoint(db, checkpoint);
+    } catch (err) {
+      if (!checkpointCommitted) {
+        await arSnapshots.deleteMany({ checkpoint_id: checkpointId, checkpoint_status: "staged" }).catch(() => undefined);
+        await db.collection("checkpoint_entries").deleteMany({ checkpoint_id: checkpointId }).catch(() => undefined);
+      }
+      throw err;
+    }
 
     if (driftFindings.length > 0) {
       await db.collection("ar_drift_findings").insertMany(
@@ -1379,15 +1451,19 @@ export default class KeychainService extends Service {
       );
     }
 
-    // Compatibility projections are refreshed only after checkpoint promotion.
-    // Consumers of the hardened path use checkpoint_entries + active_checkpoints.
-    await db.collection("entries").deleteMany({});
-    if (checkpointEntries.length > 0) {
-      await db.collection("entries").insertMany(checkpointEntries);
+    // Compatibility projections are refreshed only while this checkpoint is
+    // still active. A newer concurrent checkpoint may win immediately after
+    // promotion; in that case the canonical checkpoint collections remain
+    // correct and the older compatibility view is left untouched.
+    const activeAfterPromotion = await db.collection<any>("active_checkpoints").findOne({ _id: "agent-records" });
+    if (activeAfterPromotion?.checkpoint_id === checkpointId) {
+      await db.collection("entries").deleteMany({});
+      if (checkpointEntries.length > 0) {
+        await db.collection("entries").insertMany(checkpointEntries);
+      }
     }
 
     // ── Record the trigger event with the produced snapshot version ───────
-    // (after the snapshot insert, so dedup can key on snapshot_version)
     if (triggerEvent) {
       await db.collection("transitions").updateOne(
         { keychain_event_id: triggerEvent.idempotency_key },
@@ -1416,9 +1492,12 @@ export default class KeychainService extends Service {
       snapshot_version: version,
       checkpoint_id: checkpointId,
     }));
-    await db.collection("record_type_state").deleteMany({});
-    if (rtsDocs.length > 0) {
-      await db.collection("record_type_state").insertMany(rtsDocs);
+    const activeBeforeCompatibilityState = await db.collection<any>("active_checkpoints").findOne({ _id: "agent-records" });
+    if (activeBeforeCompatibilityState?.checkpoint_id === checkpointId) {
+      await db.collection("record_type_state").deleteMany({});
+      if (rtsDocs.length > 0) {
+        await db.collection("record_type_state").insertMany(rtsDocs);
+      }
     }
 
     return {
@@ -1439,9 +1518,7 @@ export default class KeychainService extends Service {
   }
 
   /**
-   * Backward-compatible parse of the legacy trigger string form:
-   *   "sol-transition:<transitionId>:<entityId>"
-   * Returns a normalized TriggerEventContract.
+   * Normalize a source event into the shared Keychains trigger contract.
    */
   private normalizeTriggerEvent(event: TriggerEventContract): TriggerEventContract {
     const sourceNamespace = event.source_namespace || event.source || "unknown";
@@ -1459,6 +1536,11 @@ export default class KeychainService extends Service {
     };
   }
 
+  /**
+   * Backward-compatible parse of the legacy trigger string form:
+   *   "sol-transition:<transitionId>:<entityId>"
+   * Returns a normalized TriggerEventContract.
+   */
   private parseLegacyTrigger(trigger: string): TriggerEventContract {
     if (trigger.startsWith("sol-transition:")) {
       const rest = trigger.slice("sol-transition:".length);
