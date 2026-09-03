@@ -1,0 +1,17 @@
+[Unit]
+Description=jenkins-sync — Jenkins API -> jenkins schema (nexus DB)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/codex/dev/nexus/ballerina/jenkins-sync
+Environment=JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+Environment=PATH=/usr/lib/jvm/java-21-openjdk-amd64/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/bal run
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/home/codex/dev/nexus/logs/jenkins-sync.service.log
+StandardError=append:/home/codex/dev/nexus/logs/jenkins-sync.service.log
+
+[Install]
+WantedBy=default.target
