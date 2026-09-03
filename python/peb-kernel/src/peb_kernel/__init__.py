@@ -22,6 +22,7 @@ from .domain import (
 from .engine import InvariantValidator, PebGovernanceEngine, PebTransactionEngine, PebViolationEngine
 from .hashing import PebHashService
 from .store import InMemoryPebStore, PostgresPebStore
+from .keychains import PebKeychainsAdapter
 
 __all__ = [
     "AdmissionPath", "AdmissionResponse", "AdmissionResult", "CapabilityToken",
@@ -30,4 +31,5 @@ __all__ = [
     "PebViolation", "ViolationResolution", "ViolationSeverity", "ViolationType",
     "InvariantValidator", "PebGovernanceEngine", "PebTransactionEngine",
     "PebViolationEngine", "PebHashService", "InMemoryPebStore", "PostgresPebStore",
+    "PebKeychainsAdapter",
 ]
