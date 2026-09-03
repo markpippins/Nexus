@@ -792,20 +792,14 @@ class TLAIntegrationLayer:
         if registry.transitions:
             lines.append("Next ==")
             for i, (trans_name, trans_def) in enumerate(registry.transitions.items()):
-                if i == 0:
-                    lines.append(f"    \\/ {trans_def.guard_expression or 'TRUE'}")
-                else:
-                    lines.append(f"    \\/ {trans_def.guard_expression or 'TRUE'}")
+                lines.append(f"    \\/ {trans_def.guard_expression or 'TRUE'}")
             lines.append("")
         
         # Invariants
         if registry.invariants:
             lines.append("Invariant ==")
             for i, (inv_name, inv_def) in enumerate(registry.invariants.items()):
-                if i == 0:
-                    lines.append(f"    /\\ {inv_def.expression}")
-                else:
-                    lines.append(f"    /\\ {inv_def.expression}")
+                lines.append(f"    /\\ {inv_def.expression}")
             lines.append("")
         
         # Temporal properties
