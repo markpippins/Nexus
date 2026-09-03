@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from .events import KeychainEvent, build_transition_event
 from .expression_compiler import ExpressionCompiler
 from .models import (
     Concept,
@@ -62,6 +63,10 @@ class ResolutionInterpreter:
         # State-transition listeners: fired after a SUCCESSFUL transition
         # (keychains snapshot hook, catalogue 332d6831 — decision points).
         self.transition_listeners: List[Callable[..., Any]] = []
+        # Event listeners receive both committed and refused transition
+        # attempts. API adapters persist these before dispatching projections.
+        self.transition_event_listeners: List[Callable[..., Any]] = []
+        self.last_transition_event: Optional[KeychainEvent] = None
 
         # Components
         self.expression_compiler = ExpressionCompiler(self)
@@ -219,31 +224,97 @@ class ResolutionInterpreter:
     # ── State transitions ────────────────────────────────────────
 
     def transition_entity(
-        self, entity_id: str, transition_id: str
+        self, entity_id: str, transition_id: str,
+        *, source_event_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+        actor: Optional[str] = None,
+        source_namespace: str = "sol-api",
     ) -> Tuple[bool, List[Dict[str, Any]]]:
         entity = self.entities.get(entity_id)
         if not entity:
-            return False, [{"error": "Entity not found"}]
+            results = [{"error": "Entity not found"}]
+            event = build_transition_event(
+                source_event_id=source_event_id or f"transition:{transition_id}:entity:{entity_id}",
+                entity_id=entity_id,
+                transition_id=transition_id,
+                outcome="rejected",
+                results=results,
+                correlation_id=correlation_id,
+                actor=actor,
+                source_namespace=source_namespace,
+                effective_at=datetime.now(timezone.utc).isoformat(),
+            )
+            self.last_transition_event = event
+            self._notify_transition_event(event)
+            return False, results
         transition = self.state_transitions.get(transition_id)
         if not transition:
-            return False, [{"error": "Transition not found"}]
-
-        all_passed, results = self.check_transition_guard(transition, entity)
-        if not all_passed:
+            results = [{"error": "Transition not found"}]
+            event = build_transition_event(
+                source_event_id=source_event_id or f"transition:{transition_id}:entity:{entity_id}",
+                entity_id=entity_id,
+                transition_id=transition_id,
+                outcome="rejected",
+                results=results,
+                concept_id=entity.concept_id,
+                correlation_id=correlation_id,
+                actor=actor,
+                source_namespace=source_namespace,
+                effective_at=datetime.now(timezone.utc).isoformat(),
+            )
+            self.last_transition_event = event
+            self._notify_transition_event(event)
             return False, results
 
+        all_passed, results = self.check_transition_guard(transition, entity)
+        event_id = source_event_id or f"transition:{transition_id}:entity:{entity_id}"
         concept = self.concepts.get(entity.concept_id)
-        if concept:
-            state_attr = next(
-                (a for a in concept.attributes.values() if a.is_state_attribute), None
+        state_attr = (
+            next((a for a in concept.attributes.values() if a.is_state_attribute), None)
+            if concept else None
+        )
+        state_before = entity.attributes.get(state_attr.name) if state_attr else None
+        outcome = "committed" if all_passed else "refused"
+
+        if not all_passed:
+            event = build_transition_event(
+                source_event_id=event_id,
+                entity_id=entity_id,
+                transition_id=transition_id,
+                outcome=outcome,
+                results=results,
+                concept_id=entity.concept_id,
+                state_before=state_before,
+                state_after=state_before,
+                correlation_id=correlation_id,
+                actor=actor,
+                source_namespace=source_namespace,
+                effective_at=datetime.now(timezone.utc).isoformat(),
             )
-            if state_attr:
-                target = next(
-                    (v for v in state_attr.allowed_values if v == transition.to_value),
-                    None,
-                )
-                if target is not None:
-                    entity.attributes[state_attr.name] = target
+            self.last_transition_event = event
+            self._notify_transition_event(event)
+            return False, results
+
+        if state_attr and transition.to_value in state_attr.allowed_values:
+            entity.attributes[state_attr.name] = transition.to_value
+        state_after = entity.attributes.get(state_attr.name) if state_attr else None
+        event = build_transition_event(
+            source_event_id=event_id,
+            entity_id=entity_id,
+            transition_id=transition_id,
+            outcome=outcome,
+            results=results,
+            concept_id=entity.concept_id,
+            state_before=state_before,
+            state_after=state_after,
+            correlation_id=correlation_id,
+            actor=actor,
+            source_namespace=source_namespace,
+            effective_at=datetime.now(timezone.utc).isoformat(),
+        )
+        self.last_transition_event = event
+        # The source API persists this event before dispatching its outbox.
+        self._notify_transition_event(event)
 
         # Fired only on a successful transition (rejected/no-op guards do
         # NOT snapshot — the guarded transition never happened).
@@ -253,7 +324,8 @@ class ResolutionInterpreter:
                     transition_id=transition_id,
                     entity_id=entity_id,
                     to_value=transition.to_value,
-                    effective_at=datetime.now().isoformat(),
+                    effective_at=event.effective_at,
+                    event=event,
                 )
             except Exception:
                 pass
@@ -263,6 +335,21 @@ class ResolutionInterpreter:
     def register_transition_listener(self, listener: Callable[..., Any]) -> None:
         """Register a callback fired after each successful state transition."""
         self.transition_listeners.append(listener)
+
+    def register_transition_event_listener(self, listener: Callable[..., Any]) -> None:
+        """Register a listener for every transition attempt outcome.
+
+        Unlike ``register_transition_listener``, this includes refused and
+        rejected attempts because negative governed outcomes are evidence.
+        """
+        self.transition_event_listeners.append(listener)
+
+    def _notify_transition_event(self, event: KeychainEvent) -> None:
+        for listener in self.transition_event_listeners:
+            try:
+                listener(event=event)
+            except Exception:
+                pass
 
     def add_frame_dimension(self, dim: FrameDimension) -> None:
         self.frame_dimensions[dim.id] = dim
