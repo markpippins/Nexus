@@ -1,0 +1,13 @@
+[Unit]
+# jenkins-forum-sync — every 30 min, same cadence as sonar-forum-sync. The
+# sync is idempotent and cheap when nothing changed; it only writes when a
+# job starts/stops failing or the build tables drift.
+Description=Jenkins forum sync (every 30 min)
+
+[Timer]
+OnCalendar=*:0/30
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target
