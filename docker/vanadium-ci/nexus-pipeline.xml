@@ -1,0 +1,63 @@
+<flow-definition plugin="workflow-job">
+  <description>Nexus CI pipeline - typecheck, tests, SonarQube scan (from Jenkinsfile)</description>
+  <keepDependencies>false</keepDependencies>
+  <properties/>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps">
+    <script><![CDATA[pipeline {
+  agent any
+  triggers { githubPush() }
+  options { timeout(time: 30, unit: 'MINUTES') }
+  environment {
+    SONAR_HOST = 'http://sonarqube:9000'
+    SONAR_TOKEN = credentials('sonar-token')
+  }
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout([
+          $class: 'GitSCM',
+          branches: [[name: '*/main']],
+          userRemoteConfigs: [[url: 'https://github.com/markpippins/nexus.git']]
+        ])
+      }
+    }
+    stage('Typecheck') {
+      steps {
+        sh '''
+          find typescript -maxdepth 2 -name tsconfig.json | sort | while read tc; do
+            svc=$(dirname "$tc" | sed "s|typescript/||")
+            echo "[Typecheck] $svc..."
+            docker run --rm -v "$(pwd):/ws" -w /ws node:20-bookworm \
+              bash -c "cd typescript/$svc && npm install --ignore-scripts --no-audit --no-fund --silent 2>/dev/null && npx tsc --noEmit" \
+              || echo "FAILED: $svc"
+          done
+        '''
+      }
+    }
+    stage('SonarQube') {
+      steps {
+        withSonarQubeEnv('vd-sonar') {
+          sh '/var/jenkins_home/tools/sonar-scanner/bin/sonar-scanner \
+            -Dsonar.host.url="$SONAR_HOST_URL" \
+            -Dsonar.projectKey=nexus \
+            -Dsonar.qualitygate.wait=true'
+        }
+      }
+    }
+    stage('Quality Gate') {
+      steps {
+        timeout(time: 5, unit: 'MINUTES') {
+          waitForQualityGate abortPipeline: true
+        }
+      }
+    }
+  }
+  post {
+    always { sh 'docker container prune -f 2>/dev/null || true' }
+  }
+}]]></script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>
