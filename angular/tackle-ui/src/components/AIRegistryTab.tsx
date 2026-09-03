@@ -629,29 +629,27 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => verifyModel(m)}
-                    disabled={!!verifyingId || m.verified}
+                    disabled={!!verifyingId}
                     title={
                       m.verified
-                        ? 'Verified — exercised through a harness; bundles referencing it are active'
+                        ? 'Re-verify — run a fresh inference to confirm the model still works. On failure it becomes UNVERIFIED and its bundles are forced inactive.'
                         : 'Run a real inference test — on success the model becomes VERIFIED and its bundles are re-armed'
                     }
                     className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold border transition ${
-                      m.verified
-                        ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50 cursor-default'
-                        : verifyingId === m.id
-                          ? 'bg-[var(--bg-tertiary)] border-[var(--accent-color)] text-[var(--accent-color)] cursor-wait'
+                      verifyingId === m.id
+                        ? 'bg-[var(--bg-tertiary)] border-[var(--accent-color)] text-[var(--accent-color)] cursor-wait'
+                        : m.verified
+                          ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50 hover:border-emerald-500/70 hover:text-emerald-300 cursor-pointer'
                           : 'bg-amber-950/30 border-amber-800/50 text-amber-300 hover:border-amber-500/70 hover:text-amber-200 cursor-pointer'
                     }`}
                   >
-                    {m.verified ? (
-                      <CheckCircle className="w-3.5 h-3.5" />
-                    ) : verifyingId === m.id ? (
+                    {verifyingId === m.id ? (
                       <ShieldCheck className="w-3.5 h-3.5 animate-pulse" />
                     ) : (
                       <ShieldCheck className="w-3.5 h-3.5" />
                     )}
                     <span>
-                      {m.verified ? 'Verified' : verifyingId === m.id ? 'Verifying…' : 'Verify Model'}
+                      {verifyingId === m.id ? 'Verifying…' : m.verified ? 'Re-verify' : 'Verify Model'}
                     </span>
                   </button>
 
