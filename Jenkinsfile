@@ -185,6 +185,7 @@ pipeline {
         stage('TS Tests') {
             steps {
                 script {
+                    def hostWs = env.WORKSPACE.replace('/var/jenkins_home', '/home/codex/vd-jenkins-home')
                     def tsPkgs = sh(
                         script: """
                             grep -rl '"test"' typescript/*/package.json 2>/dev/null \

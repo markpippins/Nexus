@@ -190,6 +190,7 @@ pipeline {
         stage(&#x27;TS Tests&#x27;) {
             steps {
                 script {
+                    def hostWs = env.WORKSPACE.replace(&#x27;/var/jenkins_home&#x27;, &#x27;/home/codex/vd-jenkins-home&#x27;)
                     def tsPkgs = sh(
                         script: """
                             grep -rl &#x27;"test"&#x27; typescript/*/package.json 2&gt;/dev/null \
