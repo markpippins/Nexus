@@ -1,15 +1,5 @@
 # syntax=docker/dockerfile:1
-# peb-kernel — Python Persistent Engineering Brain governance kernel.
-# The ACTIVE kernel (replaced the JVM Spring implementation in the runtime
-# path; JVM retained as reference). Packaged for the vanadium failover tier:
-# FastAPI + psycopg2, stateless beyond PEB_DATABASE_URL — the kernel writes
-# the shared `peb` schema, so a container here and the native unit there are
-# interchangeable as long as they point at the same PostgreSQL.
-#
-#   docker build -t nexus-vanadium/peb-kernel .
-#   docker run --rm -p 8098:8098 \
-#     -e PEB_DATABASE_URL=postgresql://pguser:...@172.17.0.1:5432/nexus \
-#     nexus-vanadium/peb-kernel
+# peb-kernel — Python governance kernel (FastAPI + psycopg2, peb schema writer).
 FROM python:3.12-slim
 
 WORKDIR /app
