@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -6,7 +7,13 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from losm_store.models import PlanningTask, WorkStatus, LifecycleEvent as LifecycleEventModel
+from losm_store.models import (
+    PlanningTask,
+    WorkStatus,
+    GovernanceEvent,
+    LifecycleEvent as LifecycleEventModel,
+)
+from losm_store.governed_triggers import GovernedTriggerAdapter
 from losm_store.repository import (
     create_work_request,
     get_work_request,
@@ -129,19 +136,68 @@ class TransitionRequest(BaseModel):
 def transition_wr(wr_id: int, payload: TransitionRequest, db: Session = Depends(get_db)):
     wr = get_work_request(db, wr_id)
     from_state = wr.status.value if hasattr(wr.status, "value") else wr.status
+    adapter = GovernedTriggerAdapter()
 
     validation = validate_transition(from_state, payload.to_state)
     if not validation.allowed:
+        # Refusals are durable evidence but never mutate lifecycle state or
+        # create a Keychains checkpoint. The digest makes repeated identical
+        # refusals source-idempotent while preserving the requested context.
+        refusal_material = ":".join([
+            str(wr_id), str(from_state), payload.to_state,
+            payload.actor, payload.reason or "",
+        ])
+        refusal_id = "transition-refused:" + hashlib.sha256(
+            refusal_material.encode("utf-8")
+        ).hexdigest()
+        governance = GovernanceEvent(
+            event_type="TRANSITION_REFUSED",
+            work_request_id=str(wr_id),
+            payload={
+                "from_state": str(from_state),
+                "requested_state": payload.to_state,
+                "actor": payload.actor,
+                "reason": payload.reason,
+                "validation_reason": validation.reason,
+            },
+        )
+        db.add(governance)
+        db.flush()
+        adapter.emit(
+            db,
+            adapter.lifecycle_refused(
+                source_event_id=refusal_id,
+                wr_id=str(wr_id),
+                from_state=str(from_state),
+                to_state=payload.to_state,
+                actor=payload.actor,
+                reason=validation.reason,
+            ),
+        )
+        db.commit()
         raise HTTPException(status_code=400, detail=validation.reason)
 
     wr.status = WorkStatus(payload.to_state)
-    db.add(LifecycleEventModel(
+    lifecycle = LifecycleEventModel(
         wr_id=str(wr_id),
         from_state=from_state,
         to_state=payload.to_state,
         actor=payload.actor,
         reason=payload.reason,
-    ))
+    )
+    db.add(lifecycle)
+    db.flush()
+    adapter.emit(
+        db,
+        adapter.lifecycle_committed(
+            event_id=str(lifecycle.event_id),
+            wr_id=str(wr_id),
+            from_state=str(from_state),
+            to_state=payload.to_state,
+            actor=payload.actor,
+            reason=payload.reason,
+        ),
+    )
     db.commit()
     db.refresh(wr)
 

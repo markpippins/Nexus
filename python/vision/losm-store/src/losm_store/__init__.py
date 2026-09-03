@@ -15,6 +15,12 @@ from losm_store.repository import (
     create_edge, get_edges_by_parent, get_edges_by_child, delete_edge,
 )
 from losm_store.ingestor import ExecutionReceiptIngestor
+from losm_store.governed_triggers import (
+    GOVERNED_TRIGGER_SCHEMA_VERSION,
+    GovernedTrigger,
+    GovernedTriggerAdapter,
+    build_governed_trigger,
+)
 from losm_store.branch_manager import BranchManager, branch_manager
 
 __all__ = [
@@ -30,5 +36,7 @@ __all__ = [
     "create_branch_artifact", "get_branch_artifacts",
     "create_edge", "get_edges_by_parent", "get_edges_by_child", "delete_edge",
     "ExecutionReceiptIngestor",
+    "GOVERNED_TRIGGER_SCHEMA_VERSION", "GovernedTrigger",
+    "GovernedTriggerAdapter", "build_governed_trigger",
     "BranchManager", "branch_manager",
 ]
