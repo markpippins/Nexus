@@ -1296,6 +1296,39 @@ export async function rearmBundlesForModel(modelId: string): Promise<number> {
   );
 }
 
+export interface PurgeResult {
+  role: string;
+  bundleIds: string[];
+}
+
+// deactivateBundlesForUnverifiedModels force-deactivates every config bundle
+// (across all roles) whose model is unverified or missing, so no role's
+// resolver queue can select a bundle whose model has not been certified.
+// Returns per-role affected bundle counts (role + bundle ids).
+export async function deactivateBundlesForUnverifiedModels(): Promise<PurgeResult[]> {
+  const affected: PurgeResult[] = [];
+  // All bundles whose model is missing OR present-but-unverified.
+  const bundles = await qAll(
+    `SELECT cb.id, cb.role, cb.model_id
+     FROM config_bundle cb
+     LEFT JOIN models m ON m.id = cb.model_id
+     WHERE cb.is_active = 1 AND (m.id IS NULL OR m.verified IS NOT TRUE)`
+  );
+  for (const b of bundles) {
+    await qRun(
+      "UPDATE config_bundle SET is_active = 0, updated_at = @updated_at WHERE id = @id AND is_active = 1",
+      { id: b.id, updated_at: new Date().toISOString() }
+    );
+    let entry = affected.find((r) => r.role === b.role);
+    if (!entry) {
+      entry = { role: b.role, bundleIds: [] };
+      affected.push(entry);
+    }
+    entry.bundleIds.push(b.id);
+  }
+  return affected;
+}
+
 // ── Verified-model gate helpers ────────────────────────────────────
 // A model only becomes usable once it has been verified (an inference
 // test actually passed through a harness). Bundles referencing unverified

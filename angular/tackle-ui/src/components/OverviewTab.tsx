@@ -44,6 +44,8 @@ interface OverviewTabProps {
   validationReport: ValidationReport | null;
   onValidate: () => void;
   onRunTest: (role: string, modelId: string, prompt: string) => void | Promise<unknown>;
+  onPurgeUnverified: () => void | Promise<unknown>;
+  onVerifyBundle: (bundleId: string, modelId: string) => void | Promise<unknown>;
   onSeedDefaults: () => void;
   onNavigateToTab: (tab: string) => void;
   onSaveBundle: (bundle: Partial<ConfigBundle>) => Promise<void>;
@@ -60,6 +62,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   validationReport,
   onValidate,
   onRunTest,
+  onPurgeUnverified,
+  onVerifyBundle,
   onSeedDefaults,
   onNavigateToTab,
   onSaveBundle,
@@ -76,6 +80,10 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const [testError, setTestError] = useState<string | null>(null);
   const [testLogLines, setTestLogLines] = useState<string[]>([]);
   const [bundleError, setBundleError] = useState<string | null>(null);
+
+  // --- Bundle verify state (Live Model Execution Sandbox) ---
+  const [verifyingBundleId, setVerifyingBundleId] = useState<string | null>(null);
+  const [bundleVerifyMsg, setBundleVerifyMsg] = useState<{ ok: boolean; message: string } | null>(null);
 
   // --- Bundle management state ---
   const [bundleModalOpen, setBundleModalOpen] = useState<boolean>(false);
@@ -210,6 +218,31 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
     }
   };
 
+  // --- Bundle verify handler (Live Model Execution Sandbox) ---
+  // Verifies the selected bundle's model through a fresh inference run. The
+  // App-level onVerifyBundle runs the verify + status polling + refresh; on a
+  // failed reverify the backend marks the model unverified and its bundles are
+  // forced inactive, so the operator sees which bundles need updating.
+  const handleVerifyBundle = async (bundle: ConfigBundle) => {
+    if (!bundle.model_id) {
+      setBundleVerifyMsg({ ok: false, message: 'This bundle has no model assigned.' });
+      return;
+    }
+    setVerifyingBundleId(bundle.id);
+    setBundleVerifyMsg(null);
+    try {
+      const res = await onVerifyBundle(bundle.id, bundle.model_id);
+      setBundleVerifyMsg({
+        ok: !!(res && (res.verified || res.alreadyVerified)),
+        message: res?.message || (res?.verified ? 'Bundle verified' : 'Verify finished — see model status'),
+      });
+    } catch (err: any) {
+      setBundleVerifyMsg({ ok: false, message: `Verify failed: ${err instanceof Error ? err.message : String(err)}` });
+    } finally {
+      setVerifyingBundleId(null);
+    }
+  };
+
   // --- Computed values ---
   const roleBundles = bundles
     .filter(b => b.role === selectedRole)
@@ -246,6 +279,18 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             >
               <RefreshCw className="w-3.5 h-3.5 text-[var(--accent-color)]" />
               <span>Validate Integrity</span>
+            </button>
+            <button
+              onClick={async () => {
+                if (await showConfirm('Remove all unverified models from the inference chain? This force-deactivates every config bundle (across all roles) whose model is not verified.')) {
+                  await onPurgeUnverified();
+                }
+              }}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
+              title="Force-deactivate every config bundle whose model is unverified, so no role's resolver queue selects them"
+            >
+              <Shield className="w-3.5 h-3.5 text-rose-400" />
+              <span>Purge Unverified</span>
             </button>
             <button
               onClick={onSeedDefaults}
@@ -481,14 +526,44 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             <div className="space-y-4 text-sm">
               <div>
                 <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Target Config Bundle</label>
-                <select
-                  value={testBundleId}
-                  onChange={e => { setTestBundleId(e.target.value); setTestResult(null); setTestError(null); setTestLogLines([]); stopLogPolling(); }}
-                  className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 font-mono text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-color)]"
-                >
-                  {roleBundles.length === 0 && (<option value="">No bundles for this role</option>)}
-                  {roleBundles.map(b => { const m = models.find(mm => mm.id === b.model_id); return (<option key={b.id} value={b.id}>#{b.priority} {b.name} — {m?.name || b.model_id} ({b.invocation_mode})</option>); })}
-                </select>
+                <div className="flex items-start gap-2">
+                  <select
+                    value={testBundleId}
+                    onChange={e => { setTestBundleId(e.target.value); setTestResult(null); setTestError(null); setTestLogLines([]); stopLogPolling(); setBundleVerifyMsg(null); }}
+                    className="flex-1 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 font-mono text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-color)]"
+                  >
+                    {roleBundles.length === 0 && (<option value="">No bundles for this role</option>)}
+                    {roleBundles.map(b => { const m = models.find(mm => mm.id === b.model_id); return (<option key={b.id} value={b.id}>#{b.priority} {b.name} — {m?.name || b.model_id} ({b.invocation_mode})</option>); })}
+                  </select>
+                  <button
+                    onClick={() => selectedTestBundle && handleVerifyBundle(selectedTestBundle)}
+                    disabled={!selectedTestBundle || !!verifyingBundleId || !testModelObj}
+                    title={!selectedTestBundle
+                      ? 'Select a config bundle to verify its model'
+                      : testModelObj
+                        ? `Verify this bundle's model (${testModelObj.name}) through a fresh inference run`
+                        : 'Bundle model not found'}
+                    className="shrink-0 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-bold bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent-color)] hover:text-[var(--accent-color)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {verifyingBundleId === selectedTestBundle?.id ? (
+                      <><Shield className="w-3.5 h-3.5 animate-pulse text-[var(--accent-color)]" /><span>Verifying…</span></>
+                    ) : (
+                      <><Shield className="w-3.5 h-3.5" /><span>Verify Bundle</span></>
+                    )}
+                  </button>
+                </div>
+                {bundleVerifyMsg && (
+                  <div className={`mt-1 text-[11px] font-mono px-2 py-1 rounded border flex items-start gap-1.5 ${
+                    bundleVerifyMsg.ok
+                      ? 'bg-emerald-950/30 border-emerald-800/40 text-emerald-300'
+                      : 'bg-rose-950/30 border-rose-800/40 text-rose-300'
+                  }`}>
+                    {bundleVerifyMsg.ok
+                      ? <CheckCircle2 className="w-3 h-3 shrink-0 mt-0.5" />
+                      : <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />}
+                    <span>{bundleVerifyMsg.message}</span>
+                  </div>
+                )}
                 {selectedTestBundle && (
                   <div className="text-[10px] font-mono text-[var(--text-muted)] mt-1 flex items-center gap-2">
                     <span>

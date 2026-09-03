@@ -404,6 +404,63 @@ export default function App() {
     return await res.json();
   };
 
+  // Purge unverified models from the inference chain: force-deactivate every
+  // config bundle (across all roles) whose model is unverified.
+  const handlePurgeUnverified = async () => {
+    try {
+      const res = await fetch('/config/ai/verify/purge-unverified', { method: 'POST' });
+      if (!res.ok) throw new Error(await extractErrorMessage(res));
+      const data = await res.json();
+      const roleCounts = (data.roles || []).map((r: any) => `${r.role}:${r.bundleIds.length}`).join(', ');
+      showToast(`Purged ${data.purged ?? 0} unverified bundle(s) from the inference chain${roleCounts ? ` — ${roleCounts}` : ''}`);
+      await fetchAllData();
+      handleValidateIntegrity();
+    } catch (e) {
+      showToast(`Purge error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
+  // Verify a specific config bundle's model through a fresh inference run,
+  // polling the verify session status until it settles, then refresh so the
+  // model's verified state + bundle re-arm reflect the outcome.
+  const handleVerifyBundle = async (bundleId: string, modelId: string) => {
+    let res: Response;
+    try {
+      res = await fetch('/config/ai/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model_id: modelId })
+      });
+    } catch (e) {
+      throw friendlyFetchError(e);
+    }
+    if (!res.ok) throw new Error(await extractErrorMessage(res));
+    const started = await res.json();
+
+    if (started?.alreadyVerified) return started;
+    if (!started?.sessionId) return started;
+
+    const deadline = Date.now() + 180_000;
+    let status: any = null;
+    do {
+      await new Promise(r => setTimeout(r, 1500));
+      status = await handleVerifyStatus(started.sessionId);
+    } while (status?.running && Date.now() < deadline);
+
+    if (status?.running) {
+      return { ...started, verified: false, message: 'Verification timed out after 180s — see session log' };
+    }
+    const ok = status?.exit_code === 0;
+    await fetchAllData();
+    return {
+      ...started,
+      verified: ok,
+      message: ok
+        ? 'Model verified — bundle re-armed'
+        : 'Verify failed — model marked UNVERIFIED; its bundles were forced inactive. Update the role(s) that referenced it.',
+    };
+  };
+
   const activeSessionsCount = sessions.filter(s => s.status === 'running').length;
 
   if (loadingInitial) {
@@ -456,6 +513,8 @@ export default function App() {
                 validationReport={validationReport}
                 onValidate={handleValidateIntegrity}
                 onRunTest={handleRunTest}
+                onPurgeUnverified={handlePurgeUnverified}
+                onVerifyBundle={handleVerifyBundle}
                 onSeedDefaults={handleSeedDefaults}
                 onNavigateToTab={setCurrentTab}
                 onSaveBundle={handleSaveBundle}
