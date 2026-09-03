@@ -1,3 +1,5 @@
+jenkins:
+  url: "http://192.168.1.209:8080/"
 unclassified:
   sonarGlobalConfiguration:
     buildWrapperEnabled: true
