@@ -50,6 +50,48 @@ pipeline {
             }
         }
 
+        // ── Build workspace deps ────────────────────────────────
+        // file: dependencies (e.g. heartbeat-client) resolve to source
+        // packages whose dist/ is gitignored; a fresh clone lacks them and
+        // typecheck fails with "Cannot find module". Build every package
+        // with a build script first (best-effort; real failures surface in
+        // the Typecheck stage).
+        // CPS-SAFE LOOPS: a Groovy IntRange (1..2) and for-in over it are
+        // NOT serializable — the pipeline dies at the first sh step with
+        // NotSerializableException (builds #9/#10). C-style int loops and
+        // indexed access survive CPS serialization. Two passes: pass 1
+        // builds leaf packages, pass 2 builds dependents (alphabetical
+        // order builds conduit-srv before heartbeat-client).
+        stage(&#x27;Build Workspace Deps&#x27;) {
+            steps {
+                script {
+                    def hostWs = env.WORKSPACE.replace(&#x27;/var/jenkins_home&#x27;, &#x27;/home/codex/vd-jenkins-home&#x27;)
+                    def tsconfigs = sh(
+                        script: &#x27;find typescript -maxdepth 2 -name tsconfig.json | sort&#x27;,
+                        returnStdout: true
+                    ).trim().split(&#x27;\n&#x27;).findAll { it }
+
+                    for (int pass = 1; pass &lt;= 2; pass++) {
+                        for (int i = 0; i &lt; tsconfigs.size(); i++) {
+                            def svc = tsconfigs[i].replace(&#x27;typescript/&#x27;, &#x27;&#x27;).replace(&#x27;/tsconfig.json&#x27;, &#x27;&#x27;)
+                            sh(
+                                script: """
+                                    set -o pipefail
+                                    docker run --rm \
+                                        -v "${hostWs}:/ws" -w /ws \
+                                        node:20-bookworm \
+                                        bash -c "cd &#x27;typescript/${svc}&#x27; &amp;&amp; grep -q &#x27;\"build\"&#x27; package.json &amp;&amp; npm install --ignore-scripts --no-audit --no-fund --silent 2&gt;/dev/null &amp;&amp; npm run build 2&gt;/dev/null" \
+                                        2&gt;&amp;1 | tail -5 || true
+                                """,
+                                returnStatus: true
+                            )
+                        }
+                    }
+                    echo "Workspace deps built."
+                }
+            }
+        }
+
         // ── TypeScript typecheck ────────────────────────────────────
         // Runs npx tsc --noEmit in each service that has a tsconfig.
         // One Node.js container per service; failures are collected,
