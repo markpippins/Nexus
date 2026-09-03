@@ -21,6 +21,7 @@ from .domain import (
 )
 from .hashing import PebHashService
 from .ports import ConduitMcpPort, LosmIrTransitionPort, PebStore, ResolutionExecutionClaimPort
+from .keychains import PebKeychainsAdapter
 
 log = logging.getLogger(__name__)
 
@@ -157,6 +158,7 @@ class PebGovernanceEngine:
         conduit_adapter: ConduitMcpPort | None = None,
         losm_adapter: LosmIrTransitionPort | None = None,
         resolution_claim_adapter: ResolutionExecutionClaimPort | None = None,
+        keychains_adapter: PebKeychainsAdapter | None = None,
     ) -> None:
         self.store = store
         self.validator = validator or InvariantValidator()
@@ -165,6 +167,9 @@ class PebGovernanceEngine:
         self.conduit_adapter = conduit_adapter
         self.losm_adapter = losm_adapter
         self.resolution_claim_adapter = resolution_claim_adapter
+        # The adapter is projection-side and harmless for InMemoryPebStore;
+        # PostgresPebStore exposes the active connection for the atomic write.
+        self.keychains_adapter = keychains_adapter or PebKeychainsAdapter()
 
     def process(self, request: PebTransaction) -> None:
         if self.validator.validate(request):
@@ -239,6 +244,14 @@ class PebGovernanceEngine:
             self.transaction_engine.commit_transaction(transaction)
             if bypass_validator:
                 self.violation_engine.ingest(transaction)
+            if self.keychains_adapter is not None:
+                # The outbox is a source-side durability boundary, not a
+                # best-effort Mongo notification. PostgreSQL callers expose
+                # their open connection here; an enqueue failure therefore
+                # rolls back the PEB transaction with the source decision.
+                connection = getattr(self.store, "_connection", lambda: None)()
+                if connection is not None:
+                    self.keychains_adapter.emit_transaction(connection, transaction)
 
         self._notify_adapters(transaction, path)
         if bypass_validator:
