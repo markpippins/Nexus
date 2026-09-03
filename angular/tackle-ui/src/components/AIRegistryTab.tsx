@@ -291,33 +291,93 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
     setBundleModalOpen(true);
   };
 
-  const openBundleModalForModel = (m: AIModel) => {
-    openBundleModal({
-      name: m.name,
-      model_id: m.id,
-      provider_id: m.provider_id,
-      harness_id: m.harness_id
-    });
-  };
+  // Prefill builders for the three "Add to Role" card types. A config bundle
+  // is identified by its model plus any provider/harness override, so these
+  // are reused both for the bulk "add to all roles" path and the modal.
+  const buildModelPrefill = (m: AIModel): Partial<ConfigBundle> => ({
+    name: m.name,
+    model_id: m.id,
+    provider_id: m.provider_id,
+    harness_id: m.harness_id
+  });
 
-  const openBundleModalForProvider = (p: Provider) => {
+  const buildProviderPrefill = (p: Provider): Partial<ConfigBundle> => {
     const modelForProv = models.find(m => m.provider_id === p.id) || models[0];
-    openBundleModal({
+    return {
       name: p.name,
       provider_id: p.id,
       model_id: modelForProv?.id || '',
       harness_id: modelForProv?.harness_id || ''
-    });
+    };
   };
 
-  const openBundleModalForHarness = (h: Harness) => {
+  const buildHarnessPrefill = (h: Harness): Partial<ConfigBundle> => {
     const modelForHarn = models.find(m => m.harness_id === h.id) || models[0];
-    openBundleModal({
+    return {
       name: h.name,
       harness_id: h.id,
       model_id: modelForHarn?.id || '',
       provider_id: modelForHarn?.provider_id
+    };
+  };
+
+  // Does a given role already hold a bundle matching this prefill identity?
+  // Provider/harness overrides are compared when present; otherwise a role
+  // "has it" when it has any bundle for the same model with no override.
+  const roleHasBundle = (roleName: string, prefill: Partial<ConfigBundle>): boolean =>
+    (bundles || []).some(b =>
+      b.role === roleName &&
+      b.model_id === prefill.model_id &&
+      (prefill.provider_id ? b.provider_id === prefill.provider_id : !b.provider_id) &&
+      (prefill.harness_id ? b.harness_id === prefill.harness_id : !b.harness_id)
+    );
+
+  // The "unmodified" config bundle payload — mirrors the BundleModal defaults
+  // (priority 1, CLI, 30s, active, production metadata) with only the role
+  // swapped per target.
+  const buildBundleForRole = (prefill: Partial<ConfigBundle>, role: string): Partial<ConfigBundle> => ({
+    name: prefill.name,
+    role,
+    model_id: prefill.model_id,
+    provider_id: prefill.provider_id,
+    harness_id: prefill.harness_id,
+    priority: 1,
+    invocation_mode: 'CLI',
+    timeout_ms: 30000,
+    is_active: true,
+    metadata: { environment: 'production' }
+  });
+
+  // Shared "Add to Role" entry point. Asks "Add to all roles?" first; on Yes,
+  // writes the unmodified bundle to every role that lacks it, on No it falls
+  // through to the normal new-config-bundle dialog.
+  const handleAddToRoleClick = async (prefill: Partial<ConfigBundle>): Promise<void> => {
+    const addToAll = await showConfirm({
+      title: 'Add to all roles?',
+      message: `Create this config bundle for every role that doesn't already have it, without opening the editor?`,
+      confirmLabel: 'Yes',
+      cancelLabel: 'No'
     });
+    if (!addToAll) {
+      openBundleModal(prefill);
+      return;
+    }
+
+    const rolesMissing = roles.filter(r => !roleHasBundle(r.name, prefill));
+    if (rolesMissing.length === 0) {
+      showToast('Every role already has this config bundle');
+      return;
+    }
+
+    try {
+      await Promise.all(rolesMissing.map(r => onSaveBundle(buildBundleForRole(prefill, r.name))));
+      showToast(
+        `Added config bundle to ${rolesMissing.length} role(s): ${rolesMissing.map(r => r.name).join(', ')}`
+      );
+      try { await onRefresh(); } catch { /* refresh is best-effort */ }
+    } catch (err) {
+      showToast(`Error adding bundle to roles: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
   const defaultBundleRole = roles.find(r => r.name === 'engineer')?.name || roles[0]?.name || '';
@@ -654,9 +714,9 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                   </button>
 
                   <button
-                    onClick={() => openBundleModalForModel(m)}
+                    onClick={() => handleAddToRoleClick(buildModelPrefill(m))}
                     className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--accent-color)] hover:text-[var(--accent-color)] transition cursor-pointer"
-                    title="Create a config bundle from this model and assign it to a role"
+                    title="Add to one role, or to every role that doesn't already have this config bundle"
                   >
                     <Package className="w-3.5 h-3.5 text-[var(--accent-color)]" />
                     <span>Add to Role</span>
@@ -785,12 +845,12 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                 </div>
 
                 <button
-                  onClick={() => openBundleModalForProvider(p)}
+                  onClick={() => handleAddToRoleClick(buildProviderPrefill(p))}
                   disabled={models.length === 0}
                   className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--accent-color)] hover:text-[var(--accent-color)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                   title={models.length === 0
                     ? 'Register a model first — a config bundle requires a model'
-                    : 'Create a config bundle using this provider and assign it to a role'}
+                    : 'Add to one role, or to every role that doesn\'t already have this config bundle'}
                 >
                   <Package className="w-3.5 h-3.5 text-[var(--accent-color)]" />
                   <span>Add to Role</span>
@@ -894,12 +954,12 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                 </div>
 
                 <button
-                  onClick={() => openBundleModalForHarness(h)}
+                  onClick={() => handleAddToRoleClick(buildHarnessPrefill(h))}
                   disabled={models.length === 0}
                   className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--accent-color)] hover:text-[var(--accent-color)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                   title={models.length === 0
                     ? 'Register a model first — a config bundle requires a model'
-                    : 'Create a config bundle using this harness and assign it to a role'}
+                    : 'Add to one role, or to every role that doesn\'t already have this config bundle'}
                 >
                   <Package className="w-3.5 h-3.5 text-[var(--accent-color)]" />
                   <span>Add to Role</span>
