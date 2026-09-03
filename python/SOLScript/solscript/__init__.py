@@ -16,6 +16,15 @@ from .candidate_state import (
     evaluate_candidate_state_members,
 )
 from .database_loader import DatabaseLoader
+from .events import (
+    KEYCHAIN_EVENT_SCHEMA_VERSION,
+    READ_SET_MANIFEST_SCHEMA_VERSION,
+    KeychainEvent,
+    ReadSetManifest,
+    build_evaluation_event,
+    build_transition_event,
+    stable_digest,
+)
 from .expression_compiler import ExpressionCompiler
 from .inference_engine import InferenceEngine, KnowledgeBase
 from .interpreter import ResolutionInterpreter
@@ -68,6 +77,13 @@ __all__ = [
     "Query",
     "TransactionContext",
     "DatabaseLoader",
+    "KEYCHAIN_EVENT_SCHEMA_VERSION",
+    "READ_SET_MANIFEST_SCHEMA_VERSION",
+    "KeychainEvent",
+    "ReadSetManifest",
+    "build_evaluation_event",
+    "build_transition_event",
+    "stable_digest",
     # Models
     "Concept",
     "ConceptAttribute",
