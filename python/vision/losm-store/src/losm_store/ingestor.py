@@ -7,6 +7,7 @@ from typing import Any, Dict
 from sqlalchemy.orm import Session
 
 from losm_store.models import GovernanceEvent, PlanningTask, ReceiptIngestRecord, WorkStatus
+from losm_store.governed_triggers import GovernedTriggerAdapter
 from losm_ir.execution_receipt import ExecutionReceipt
 from losm_ir.transition import validate_transition
 
@@ -19,6 +20,9 @@ _RESULT_TO_STATE = {
 
 
 class ExecutionReceiptIngestor:
+    def __init__(self, trigger_adapter: GovernedTriggerAdapter | None = None):
+        self.trigger_adapter = trigger_adapter or GovernedTriggerAdapter()
+
     def ingest(self, db: Session, receipt_payload: Dict[str, Any]) -> Dict[str, Any]:
         receipt = ExecutionReceipt.model_validate(receipt_payload)
         canonical = receipt.model_dump(mode="json", by_alias=True)
@@ -47,13 +51,23 @@ class ExecutionReceiptIngestor:
 
         planning_task = db.query(PlanningTask).filter_by(wr_id=receipt.work_request_id).first()
         if planning_task is None:
-            db.add(
-                GovernanceEvent(
+            governance = GovernanceEvent(
+                event_type="RECEIPT_ORPHANED",
+                work_request_id=receipt.work_request_id,
+                lineage_parent=receipt.lineage_parent,
+                payload={"reason": "planning_task_not_found", "executor_id": receipt.executor_id},
+            )
+            db.add(governance)
+            db.flush()
+            self.trigger_adapter.emit(
+                db,
+                self.trigger_adapter.receipt_outcome(
+                    event_id=str(governance.event_id),
+                    wr_id=receipt.work_request_id,
                     event_type="RECEIPT_ORPHANED",
-                    work_request_id=receipt.work_request_id,
-                    lineage_parent=receipt.lineage_parent,
-                    payload={"reason": "planning_task_not_found", "executor_id": receipt.executor_id},
-                )
+                    outcome="rejected",
+                    payload=governance.payload,
+                ),
             )
             db.commit()
             db.refresh(ingest_row)
@@ -86,17 +100,27 @@ class ExecutionReceiptIngestor:
 
         planning_task.status = WorkStatus(target_state)
 
-        db.add(
-            GovernanceEvent(
+        governance = GovernanceEvent(
+            event_type="RECEIPT_INGESTED",
+            work_request_id=receipt.work_request_id,
+            lineage_parent=receipt.lineage_parent,
+            payload={
+                "executor_id": receipt.executor_id,
+                "result": receipt.result,
+                "receipt_hash": receipt_hash,
+            },
+        )
+        db.add(governance)
+        db.flush()
+        self.trigger_adapter.emit(
+            db,
+            self.trigger_adapter.receipt_outcome(
+                event_id=str(governance.event_id),
+                wr_id=receipt.work_request_id,
                 event_type="RECEIPT_INGESTED",
-                work_request_id=receipt.work_request_id,
-                lineage_parent=receipt.lineage_parent,
-                payload={
-                    "executor_id": receipt.executor_id,
-                    "result": receipt.result,
-                    "receipt_hash": receipt_hash,
-                },
-            )
+                outcome="committed",
+                payload=governance.payload,
+            ),
         )
 
         db.commit()
@@ -110,7 +134,7 @@ class ExecutionReceiptIngestor:
 
     def _reject(self, db, ingest_row, receipt, planning_task, reason: str) -> dict:
         """Record a rejection governance event. Does NOT mutate task status."""
-        db.add(GovernanceEvent(
+        governance = GovernanceEvent(
             event_type="RECEIPT_REJECTED",
             work_request_id=receipt.work_request_id,
             lineage_parent=receipt.lineage_parent,
@@ -120,7 +144,19 @@ class ExecutionReceiptIngestor:
                 "receipt_result": receipt.result,
                 "current_status": planning_task.status.value if planning_task else None,
             },
-        ))
+        )
+        db.add(governance)
+        db.flush()
+        self.trigger_adapter.emit(
+            db,
+            self.trigger_adapter.receipt_outcome(
+                event_id=str(governance.event_id),
+                wr_id=receipt.work_request_id,
+                event_type="RECEIPT_REJECTED",
+                outcome="rejected",
+                payload=governance.payload,
+            ),
+        )
         db.commit()
         db.refresh(ingest_row)
         return {
