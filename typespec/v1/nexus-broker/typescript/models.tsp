@@ -83,12 +83,18 @@ namespace org.nexus.nexusbroker {
   }
 
   /**
-   * Normalized snapshot-trigger event (shared trigger contract,
-   * Analyst catalogue 332d6831). Idempotent on (kind, id).
+   * Normalized durable source event (shared trigger/checkpoint contract,
+   * Analyst catalogue 332d6831). Idempotent on source_namespace + source_event_id.
    */
   model KeychainTriggerEvent {
+    source_namespace?: string;
+    source_event_id?: string;
+    event_id?: string;
+    schema_version?: int32;
     kind: string;
-    id: string;
+    id?: string;
+    outcome?: string;
+    aggregate_id?: string;
     actor?: string;
     source?: string;
     correlation_id?: string;
@@ -96,6 +102,11 @@ namespace org.nexus.nexusbroker {
     evaluator_id?: string;
     law_id?: string;
     effective_at?: string;
+    recorded_at?: string;
+    read_set?: Record<unknown>;
+    payload?: Record<unknown>;
+    checkpoint_status?: string;
+    idempotency_key?: string;
     meta?: Record<unknown>;
   }
 
