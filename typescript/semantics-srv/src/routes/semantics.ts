@@ -22,6 +22,10 @@ function coerce(t: TableMeta, paramName: string, value: any): any {
   return value;
 }
 
+function schemaOf(t: TableMeta): string {
+  return t.schema ?? "semantics";
+}
+
 function buildAddCall(
   t: TableMeta,
   body: Record<string, any>,
@@ -37,6 +41,26 @@ function buildAddCall(
     const key = `p_${col}`;
     if (body[key] !== undefined) push(key, body[key]);
   }
+  const schema = schemaOf(t);
+  if (schema !== "semantics") {
+    // No add_<table> proc for resolution.* ontology tables — use direct INSERT
+    // (matching the epistemologist's write convention). body is already p_*-keyed.
+    const cols: string[] = [];
+    const vals: any[] = [];
+    const pushCol = (name: string, val: any) => {
+      vals.push(coerce(t, name, val));
+      cols.push(name);
+    };
+    if (body.p_id !== undefined) pushCol("id", body.p_id);
+    for (const col of t.writable) {
+      const key = `p_${col}`;
+      if (body[key] !== undefined && col !== "expired_at") pushCol(col, body[key]);
+    }
+    return {
+      sql: `INSERT INTO ${schema}.${t.table} (${cols.join(", ")}) VALUES (${vals.map((_, i) => `$${i + 1}`).join(", ")}) RETURNING *`,
+      values: vals,
+    };
+  }
   return { sql: `SELECT * FROM semantics.add_${t.table}(${parts.join(", ")})`, values };
 }
 
@@ -44,6 +68,30 @@ function buildUpdateCall(
   t: TableMeta,
   body: Record<string, any>,
 ): { sql: string; values: any[] } {
+  const schema = schemaOf(t);
+  if (schema !== "semantics") {
+    // Append-only replace for resolution.* ontology tables: expire the old
+    // row, then insert a new version with the supplied writable fields.
+    const id = body.id ?? body.p_id;
+    const values: any[] = [id];
+    const updatable = ["id", ...t.writable.filter((c) => c !== "expired_at")];
+    const setCols: string[] = [];
+    updatable.forEach((col, i) => {
+      const val = body[col] ?? body[`p_${col}`];
+      if (val === undefined) return;
+      setCols.push(col);
+      values.push(coerce(t, col, val));
+    });
+    if (setCols.length === 0) throw new Error("no writable fields provided for update");
+    const placeholders = setCols.map((_, i) => `$${i + 2}`).join(", ");
+    const sql =
+      `WITH expired AS (` +
+      `  UPDATE ${schema}.${t.table} SET expired_at = now() WHERE id = $1 AND expired_at IS NULL RETURNING id` +
+      `) INSERT INTO ${schema}.${t.table} (${setCols.join(", ")}) ` +
+      `SELECT ${placeholders} RETURNING *`;
+    return { sql, values };
+  }
+
   const values: any[] = [];
   const parts: string[] = [];
   const push = (name: string, val: any) => {
@@ -73,12 +121,13 @@ semanticsRouter.get("/meta", async (_req, res) => {
     const db = getDb();
     const items = [];
     for (const t of TABLES) {
+      const schema = schemaOf(t);
       const r = await db.query(
         `SELECT
-           (SELECT count(*)::int FROM semantics.${t.table} WHERE expired_at IS NULL) AS active,
-           (SELECT count(*)::int FROM semantics.${t.table}) AS total`,
+           (SELECT count(*)::int FROM ${schema}.${t.table} WHERE expired_at IS NULL) AS active,
+           (SELECT count(*)::int FROM ${schema}.${t.table}) AS total`,
       );
-      items.push({ table: t.table, label: t.label, idType: t.idType, idAuto: t.idAuto, ...r.rows[0] });
+      items.push({ table: t.table, label: t.label, idType: t.idType, idAuto: t.idAuto, schema, ...r.rows[0] });
     }
     const { rows: procRows } = await db.query(`
       SELECT count(*)::int AS procs
@@ -443,7 +492,7 @@ for (const t of TABLES) {
       const offset = Math.max(parseInt(String(req.query.offset || "0"), 10) || 0, 0);
       const where = includeExpired ? "" : "WHERE expired_at IS NULL";
       const { rows } = await getDb().query(
-        `SELECT * FROM semantics.${t.table} ${where} ORDER BY id LIMIT $1 OFFSET $2`,
+        `SELECT * FROM ${schemaOf(t)}.${t.table} ${where} ORDER BY id LIMIT $1 OFFSET $2`,
         [limit, offset],
       );
       res.json({ table: t.table, count: rows.length, items: rows });
@@ -464,7 +513,7 @@ for (const t of TABLES) {
       const match =
         idCol === "id" ? "id = $1" : "id::text = $1 OR " + idCol + " = $1";
       const { rows } = await getDb().query(
-        `SELECT * FROM semantics.${t.table} WHERE ${match} LIMIT 1`,
+        `SELECT * FROM ${schemaOf(t)}.${t.table} WHERE ${match} LIMIT 1`,
         [req.params.id],
       );
       if (!rows.length) {
@@ -518,11 +567,24 @@ for (const t of TABLES) {
   // DELETE /api/<table>/:id — soft-delete (expire-not-delete, idempotent)
   semanticsRouter.delete(`${base}/:id`, async (req, res) => {
     try {
-      const { rows } = await getDb().query(
-        `SELECT semantics.soft_delete_${t.table}(${t.idParam ?? "p_id"} => $1) AS deleted`,
-        [req.params.id],
-      );
-      res.json({ table: t.table, id: req.params.id, deleted: rows[0].deleted });
+      const schema = schemaOf(t);
+      let deleted = 0;
+      if (schema !== "semantics") {
+        // No soft_delete_<table> proc for resolution.* — expire-not-delete via
+        // direct SQL.
+        const { rows } = await getDb().query(
+          `UPDATE ${schema}.${t.table} SET expired_at = now() WHERE id = $1 AND expired_at IS NULL RETURNING id`,
+          [req.params.id],
+        );
+        deleted = rows.length;
+      } else {
+        const { rows } = await getDb().query(
+          `SELECT semantics.soft_delete_${t.table}(${t.idParam ?? "p_id"} => $1) AS deleted`,
+          [req.params.id],
+        );
+        deleted = rows[0].deleted;
+      }
+      res.json({ table: t.table, id: req.params.id, deleted });
     } catch (err: any) {
       res.status(500).json({ error: "soft_delete_failed", message: err.message });
     }
