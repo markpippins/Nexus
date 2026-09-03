@@ -28,6 +28,10 @@
 export interface TableMeta {
   /** Table name — also the REST path segment and the MCP tool suffix. */
   table: string;
+  /** Schema the table lives in. Default "semantics"; the 4 ontology tables
+   * (concept, concept_relationship, representation, representation_relationship)
+   * live in "resolution" after V134 moved them out of semantics.*. */
+  schema?: string;
   /** Human-readable label. */
   label: string;
   /** Primary key type. */
@@ -252,6 +256,59 @@ export const TABLES: TableMeta[] = [
     ],
     required: ["from_asset_id", "to_asset_id", "relation_type"],
     note: "T02 Phase 2. Self-loops forbidden (from_asset_id <> to_asset_id). Append-only with expired_at soft-delete; active edge uniqueness on (from, to, type).",
+  },
+  // ── Resolution ontology (graph explorer) — live in resolution.* after V134 ──
+  // These 4 tables were retired from semantics.* and consolidated into
+  // resolution.* (V134, nexus record 716362c7). The semantics-ui Graph
+  // Explorer renders them; the generic CRUD routes serve them from the
+  // resolution schema via the `schema` field.
+  {
+    table: "concept",
+    schema: "resolution",
+    label: "concept (ontology node — resolution.*)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: ["name", "description", "expired_at"],
+    required: ["name"],
+    note: "Resolution ontology concept. resolution.concept has a plain UNIQUE(name). Add via direct INSERT (no add_proc).",
+  },
+  {
+    table: "concept_relationship",
+    schema: "resolution",
+    label: "concept relationship (typed edge between concepts — resolution.*)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: ["from_concept_id", "to_concept_id", "relationship_type", "path", "notes", "expired_at"],
+    required: ["from_concept_id", "to_concept_id", "relationship_type"],
+    note: "Resolution ontology edge. relationship_type references resolution.relationship_type/defined vocabulary.",
+  },
+  {
+    table: "representation",
+    schema: "resolution",
+    label: "representation (entity table binding for a concept — resolution.*)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: ["raw_metadata"],
+    writable: ["concept_id", "label", "schema_name", "table_name", "owning_subsystem_id", "owner", "raw_metadata", "expired_at"],
+    required: ["concept_id", "label"],
+    note: "Resolution ontology representation. Maps a concept to its physical schema.table.",
+  },
+  {
+    table: "representation_relationship",
+    schema: "resolution",
+    label: "representation relationship (edge between representations — resolution.*)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: ["from_representation_id", "to_representation_id", "relationship_type", "notes", "expired_at"],
+    required: ["from_representation_id", "to_representation_id", "relationship_type"],
+    note: "Resolution ontology edge between representations.",
   },
 ];
 
