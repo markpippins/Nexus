@@ -26,7 +26,7 @@ export default class ApiService extends Service {
           {
             path: "/api",
 
-            whitelist: ["api.*", "worker.**", "sol-ir-snapshot.**", "keychain-snapshot.**"],
+            whitelist: ["api.*", "worker.**", "keychain-snapshot.**"],
 
             aliases: {
               "GET /health": "api.health",
@@ -39,9 +39,8 @@ export default class ApiService extends Service {
               "POST /workers/harness/run": "worker.harness.run",
               "POST /workers/harness/resolve-context": "worker.harness.resolveContext",
               "GET /workers/harness/sessions": "worker.harness.sessions",
-              "GET /sol-ir-snapshot/status": "sol-ir-snapshot.status",
-              "POST /sol-ir-snapshot/snapshot": "sol-ir-snapshot.snapshot",
               // Keychains — agent-record contextual layer (state vector + rewind)
+              // (sol-ir-snapshot retired 2026-09-02 — sol_ir was the retired name for keychains)
               "GET /keychain-snapshot/status": "keychain-snapshot.status",
               "POST /keychain-snapshot/snapshot": "keychain-snapshot.snapshot",
               "GET /keychain-snapshot/agent-records/status": "keychain-snapshot.agentRecordsStatus",

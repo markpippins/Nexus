@@ -150,7 +150,6 @@ const MONGO_URL = process.env.MONGO_URL || "mongodb://localhost:27017";
 export default class KeychainService extends Service {
   private pool: Pool | null = null;
   private mongo: MongoClient | null = null;
-  private timer: NodeJS.Timeout | null = null;
 
   constructor(broker: ServiceBroker) {
     super(broker);
@@ -270,15 +269,18 @@ export default class KeychainService extends Service {
         this.mongo = new MongoClient(MONGO_URL);
         await this.mongo.connect();
 
-        const intervalMs = Number(process.env.KEYCHAIN_SYNC_INTERVAL_MS || 60000);
-        this.logger.info(`keychain sync every ${intervalMs}ms`);
-        this.timer = setInterval(() => {
-          this.runSnapshot({}).catch((err: Error) => this.logger.error("keychain periodic sync failed", err));
-        }, intervalMs);
+        // D3 (keychains thread e267263c): snapshots are driven by decision
+        // points / state transitions (Vision transition() listener, future
+        // catalogue), NOT by a timer. The legacy timer produced the 37K
+        // decisionless sol_ir.snapshots / keychains.snapshots — removed. The
+        // legacy runSnapshot() action remains callable explicitly only.
+        this.logger.info(
+          "keychain snapshots are event-driven (D3) — no periodic timer; " +
+          "runSnapshot() is explicit-invocation only"
+        );
       },
 
       async stopped() {
-        if (this.timer) clearInterval(this.timer);
         if (this.pool) await this.pool.end();
         if (this.mongo) await this.mongo.close();
       },

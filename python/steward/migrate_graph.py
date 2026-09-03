@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
 """
+================================================================================
+SUPERSEDED / RETIRED (2026-09-02) — File → PostgreSQL graph ingest
+
+This script (and bin/import-knowledge-graph.sh) are RETIRED as the canonical
+path for populating the knowledge graph. Effective 2026-09-02 (Option B),
+the knowledge graph is written directly via the knowledge-srv REST API
+(typescript/knowledge-srv) / knowledge-mcp wrapper — not from a hand-edited
+JSON file. nexus/graph/nexus-knowledge-graph.json is frozen as a historical
+generation and is no longer pipeline input. The WR/plan evidence it held has
+been staged into the Mongo `legacy-audit` database.
+
+This file is retained only for historical reference / recovery review. Do NOT
+use it as the canonical ingest path.
+================================================================================
+
 Knowledge Graph Migration — File → PostgreSQL (JSONB + pgvector)
 
 Reads nexus/graph/nexus-knowledge-graph.json and upserts its contents into

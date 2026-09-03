@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 # ============================================================================
+# RETIRED (2026-09-02) — File → PostgreSQL graph ingest
+#
+# SUPERSEDED by the knowledge-srv write path (Option B). The knowledge graph is
+# now written via the knowledge-srv REST API / knowledge-mcp wrapper directly,
+# not from graph/nexus-knowledge-graph.json. That file is frozen as a
+# historical generation; its WR/plan evidence is staged in Mongo `legacy-audit`.
+# Retained for historical reference only — do NOT run as the canonical ingest.
+# ============================================================================
 # import-knowledge-graph.sh — Import the disk Knowledge Graph into PostgreSQL
 #
 # Full safe cycle for the disk-backed KG pipeline:
