@@ -91467,5 +91467,9 @@
         "reviewer-session:work-happened"
       ]
     }
-  ]
+  ],
+  "status": "frozen_historical_generation",
+  "retired_at": "2026-09-02T00:00:00Z",
+  "retired_by": "ontologist",
+  "retired_note": "FROZEN historical generation (version 2.4.1). Superseded 2026-09-02 by the knowledge-srv write path (Option B) + legacy-audit staging. This file is no longer the canonical source for the knowledge graph; it is retained as an immutable historical artifact per the analyst's rebuild-safety contract (e450a8a7). Its work_requests (1932) and plans (448) have been evicted from knowledge.graph_* (purged 2026-09-02) and staged into Mongo legacy-audit (work_requests:1890, plans:54). Do NOT use as pipeline input; the file->graph ingest (migrate_graph.py) is retired."
 }

@@ -133,6 +133,151 @@ export function registerTools(server: McpServer) {
     }
   );
 
+  // ── WRITE TOOLS ───────────────────────────────────────────────────
+  // The knowledge graph is the live store (Option B: no file-ingest for
+  // canonical writes). These proxy to knowledge-srv write endpoints.
+
+  server.tool(
+    "knowledge_upsert_entity",
+    "Create or update a knowledge graph entity (upsert on (section, entity_id)).",
+    {
+      section: z.string().describe("Section (e.g. 'concepts', 'entities', 'facts', 'state_machines')"),
+      entity_id: z.string().describe("Entity ID within the section"),
+      name: z.string().optional().describe("Entity name (defaults to entity_id)"),
+      entity_type: z.string().optional().describe("Entity type"),
+      status: z.string().optional().describe("Status"),
+      description: z.string().optional().describe("Description text"),
+      properties: z.record(z.any()).optional().describe("Arbitrary JSON payload"),
+      source_file: z.string().optional().describe("Optional source file provenance"),
+    },
+    async (args) => {
+      const data = await callKnowledgeJson(`/knowledge/entities`, {
+        method: "POST",
+        body: JSON.stringify(args),
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "knowledge_update_entity",
+    "Update selected fields of an existing knowledge graph entity (COALESCE semantics: null fields left unchanged).",
+    {
+      section: z.string().describe("Section"),
+      entity_id: z.string().describe("Entity ID"),
+      name: z.string().optional(),
+      entity_type: z.string().optional(),
+      status: z.string().optional(),
+      description: z.string().optional(),
+      properties: z.record(z.any()).optional(),
+    },
+    async (args) => {
+      const { section, entity_id, ...fields } = args;
+      const data = await callKnowledgeJson(`/knowledge/entities/${encodeURIComponent(section)}/${encodeURIComponent(entity_id)}`, {
+        method: "PUT",
+        body: JSON.stringify(fields),
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "knowledge_delete_entity",
+    "Delete a single knowledge graph entity by section + entity_id (cascades its edges).",
+    {
+      section: z.string().describe("Section"),
+      entity_id: z.string().describe("Entity ID"),
+    },
+    async (args) => {
+      const data = await callKnowledgeJson(`/knowledge/entities/${encodeURIComponent(args.section)}/${encodeURIComponent(args.entity_id)}`, {
+        method: "DELETE",
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "knowledge_purge_section",
+    "Delete an entire knowledge graph section (and its edges via cascade). The canonical eviction path for non-canonical sections.",
+    {
+      section: z.string().describe("Section to purge entirely (e.g. 'work_requests', 'plans')"),
+    },
+    async (args) => {
+      const data = await callKnowledgeJson(`/knowledge/entities?section=${encodeURIComponent(args.section)}`, {
+        method: "DELETE",
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "knowledge_upsert_edge",
+    "Create a graph edge (upsert on the 5-tuple endpoint key).",
+    {
+      source_section: z.string().describe("Source section"),
+      source_id: z.string().describe("Source entity ID"),
+      relation_type: z.string().describe("Relation type (e.g. 'implements', 'depends_on', 'derived_from')"),
+      target_section: z.string().optional().nullable().describe("Target section"),
+      target_id: z.string().describe("Target entity ID"),
+      properties: z.record(z.any()).optional(),
+    },
+    async (args) => {
+      const data = await callKnowledgeJson(`/knowledge/edges`, {
+        method: "POST",
+        body: JSON.stringify(args),
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "knowledge_delete_edge",
+    "Delete a graph edge by UUID.",
+    {
+      id: z.string().describe("Edge UUID"),
+    },
+    async (args) => {
+      const data = await callKnowledgeJson(`/knowledge/edges/${encodeURIComponent(args.id)}`, {
+        method: "DELETE",
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "knowledge_upsert_cross_reference",
+    "Create a cross-reference mapping entry.",
+    {
+      map_name: z.string().describe("Map name"),
+      source_section: z.string().optional().nullable(),
+      source_id: z.string().optional().nullable(),
+      target_section: z.string().optional().nullable(),
+      target_id: z.string().describe("Target ID"),
+      weight: z.number().optional(),
+    },
+    async (args) => {
+      const data = await callKnowledgeJson(`/knowledge/cross-references`, {
+        method: "POST",
+        body: JSON.stringify(args),
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "knowledge_delete_cross_reference",
+    "Delete a cross-reference by UUID.",
+    {
+      id: z.string().describe("Cross-reference UUID"),
+    },
+    async (args) => {
+      const data = await callKnowledgeJson(`/knowledge/cross-references/${encodeURIComponent(args.id)}`, {
+        method: "DELETE",
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
   // ── UNIFIED SEMANTIC SEARCH (still hits a Python subprocess) ───────
   // This tool does NOT run SQL; it shells out to bin/unified_semantic_search.py.
   // Keeping it in the MCP because it's a Python pipeline, not a Postgres query.
