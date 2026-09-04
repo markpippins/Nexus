@@ -12,10 +12,14 @@ WorkingDirectory=/home/codex/dev/nexus/python/conduit
 
 # ── Environment ────────────────────────────────────────────────────────
 Environment=PYTHONUNBUFFERED=1
+# Fallback only — the authoritative DSN lives in .env (EnvironmentFile
+# below, read after this line so it wins). Receipt-isolation option A:
+# flip dbname there (see DEPLOY_DB_CONFIG.md).
 Environment=CONDUIT_PG_DSN=postgres://pguser:pgpass@localhost:5432/nexus
 Environment=POLL_INTERVAL=30
 Environment=LOG_LEVEL=INFO
 Environment=PATH=/home/codex/opt/anaconda3/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-/home/codex/dev/nexus/python/conduit/.env
 
 # ── Executable ─────────────────────────────────────────────────────────
 ExecStart=/home/codex/opt/anaconda3/bin/python3 -m bridge.daemon

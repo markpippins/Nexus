@@ -27,7 +27,11 @@ services:
     ports:
       - "3103:3103"
     environment:
-      CONDUIT_PG_DSN: "host=kernel-pg port=5432 user=pguser password=pgpass dbname=nexus"
+      # DB target is env-driven (receipt-isolation option A: flip dbname
+      # in the host env / .env — see DEPLOY_DB_CONFIG.md). Required for
+      # kernel-api; no silent prod default.
+      CONDUIT_PG_DSN: "${CONDUIT_PG_DSN:?set CONDUIT_PG_DSN (see DEPLOY_DB_CONFIG.md)}"
+      CONDUIT_PG_SCHEMA: "${CONDUIT_PG_SCHEMA:-conduit}"
       KERNEL_HOST: "0.0.0.0"
       KERNEL_PORT: "3103"
     depends_on:
@@ -42,7 +46,8 @@ services:
       context: .
       dockerfile: Dockerfile.kernel
     environment:
-      CONDUIT_PG_DSN: "host=kernel-pg port=5432 user=pguser password=pgpass dbname=nexus"
+      CONDUIT_PG_DSN: "${CONDUIT_PG_DSN:?set CONDUIT_PG_DSN (see DEPLOY_DB_CONFIG.md)}"
+      CONDUIT_PG_SCHEMA: "${CONDUIT_PG_SCHEMA:-conduit}"
       KERNEL_API_URL: "http://kernel-api:3103"
       POLL_INTERVAL: "30"
       LOG_LEVEL: "INFO"
