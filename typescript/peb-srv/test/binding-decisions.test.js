@@ -27,7 +27,11 @@ describe('binding-decisions projection', () => {
     assert.deepEqual(rows.map((row) => row.disposition), ['allow', 'refused']);
   });
 
-  it('live projection exposes the bounded G1 sample', async () => {
+  // Live-system probe: requires peb-srv running on :3111 AND the G1
+  // ceremony data in the backing DB. Skipped unless PEB_LIVE_PROBE=1 so CI
+  // (no live services) runs the deterministic suites only. Run locally with:
+  //   PEB_LIVE_PROBE=1 node --test test/
+  it('live projection exposes the bounded G1 sample', { skip: !process.env.PEB_LIVE_PROBE }, async () => {
     const response = await fetch('http://localhost:3111/api/peb/binding-decisions?decision_class=deny_contract_promotion&limit=20');
     assert.equal(response.status, 200);
     const body = await response.json();

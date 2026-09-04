@@ -2839,6 +2839,19 @@ const migrations: Migration[] = [
       //    invocation_mode=INTERACTIVE + harness_id=harn-freebuff means:
       //    model resolution still works (role_lease accounting), but no
       //    launch path may spawn this role.
+      //    The role itself must exist first: fk_config_bundle_role
+      //    (v25) references tackle.roles(name), and 'leased-builder'
+      //    is not in v25's default role list. On a fresh DB this insert
+      //    otherwise violates the FK (found by the CI hermetic bootstrap).
+      await exec(`
+        INSERT INTO tackle.roles (name, description, created_at, updated_at)
+        VALUES (
+          'leased-builder',
+          'Interactive-hosted builder role — leased via role lease; never binary-launched',
+          NOW(), NOW()
+        )
+        ON CONFLICT (name) DO NOTHING
+      `);
       await exec(`
         INSERT INTO tackle.config_bundle
           (id, name, role, model_id, provider_id, harness_id, priority, invocation_mode, is_active, metadata, created_at, updated_at)
