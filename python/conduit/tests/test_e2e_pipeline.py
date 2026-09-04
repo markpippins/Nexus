@@ -65,6 +65,7 @@ class TestE2EPipeline(unittest.TestCase):
         try:
             self.schema_name = create_test_schema(self._raw_conn, "test_e2e")
 
+            self.plan_id = self.schema_name.split("_")[-1]  # collision-proof: never matches a real plan
             self._create_schema()
             self._seed_plan()
             self._raw_conn.commit()
@@ -189,24 +190,24 @@ class TestE2EPipeline(unittest.TestCase):
             SELECT p.*,
               CASE
                 WHEN EXISTS (
-                  SELECT 1 FROM receipts r
+                  SELECT 1 FROM vision.receipts r
                   WHERE r.plan_id = p.id AND r.type = 'REVIEW_PASS'
                 ) THEN 'REVIEW_PASS'
                 WHEN EXISTS (
-                  SELECT 1 FROM receipts r
+                  SELECT 1 FROM vision.receipts r
                   WHERE r.plan_id = p.id AND r.type = 'REVIEW_REJECT'
                 ) THEN COALESCE(
-                  (SELECT r.type FROM receipts r
+                  (SELECT r.type FROM vision.receipts r
                    WHERE r.plan_id = p.id AND r.type != 'BLOCK'
                    ORDER BY r.created_at DESC LIMIT 1),
                   'PLAN_CREATE'
                 )
                 ELSE COALESCE(
-                  (SELECT r.type FROM receipts r
+                  (SELECT r.type FROM vision.receipts r
                    WHERE r.plan_id = p.id
                    AND r.type NOT IN ('PROPOSED', 'PLANNING')
                    ORDER BY r.created_at DESC LIMIT 1),
-                  (SELECT r.type FROM receipts r
+                  (SELECT r.type FROM vision.receipts r
                    WHERE r.plan_id = p.id
                    ORDER BY r.created_at DESC LIMIT 1),
                   NULL
@@ -222,7 +223,7 @@ class TestE2EPipeline(unittest.TestCase):
                files_affected, acceptance_criteria, dependencies, prompt_ref,
                created_at, updated_at)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-            ("0001", "e2e-test-v0001.md", "E2E Pipeline Test",
+            (self.plan_id, "e2e-test-v0001.md", "E2E Pipeline Test",
              "conduit-test", "Verify full pipeline end-to-end",
              "Test the full pipeline flow from proposed to dispatch",
              json.dumps(["src/main.py"]),
@@ -240,12 +241,12 @@ class TestE2EPipeline(unittest.TestCase):
             "created_at, objective, owner, last_activity) "
             "VALUES (%s, %s, %s, 'completed', %s, %s, %s, %s, %s) "
             "ON CONFLICT (id) DO NOTHING",
-            (tid, "0001", agent_role, "test-e2e", now,
+            (tid, self.plan_id, agent_role, "test-e2e", now,
              f"Test {receipt_type}", agent_role, now),
         )
         self._raw_conn.commit()
         self.db.insert_receipt(
-            plan_id="0001", receipt_type=receipt_type,
+            plan_id=self.plan_id, receipt_type=receipt_type,
             agent_role=agent_role, session_id=session,
             ticket_id=tid, summary=f"Test {receipt_type}",
         )
@@ -260,7 +261,7 @@ class TestE2EPipeline(unittest.TestCase):
             "objective, owner, last_activity) "
             "VALUES (%s, %s, %s, 'open', %s, %s, %s, %s, %s) "
             "ON CONFLICT (id) DO NOTHING",
-            (ticket_id, "0001", role, "test-e2e", now,
+            (ticket_id, self.plan_id, role, "test-e2e", now,
              "E2E Pipeline Test", role, now),
         )
         self._raw_conn.commit()
@@ -282,22 +283,22 @@ class TestE2EPipeline(unittest.TestCase):
 
     def _get_derived_status(self) -> str | None:
         row = self._query_one(
-            "SELECT derived_status FROM plan_status WHERE id = '0001'"
+            "SELECT derived_status FROM plan_status WHERE id = %s", (self.plan_id,)
         )
         return row[0] if row else None
 
     def _count_open_tickets(self, role: str) -> int:
         row = self._query_one(
             "SELECT COUNT(*) FROM tickets "
-            "WHERE plan_id = '0001' AND role = %s AND status = 'open'",
-            (role,),
+            "WHERE plan_id = %s AND role = %s AND status = 'open'",
+            (self.plan_id, role),
         )
         return row[0] if row else 0
 
     def _count_receipts(self, receipt_type: str) -> int:
         row = self._query_one(
-            "SELECT COUNT(*) FROM receipts WHERE plan_id = '0001' AND type = %s",
-            (receipt_type,),
+            "SELECT COUNT(*) FROM vision.receipts WHERE plan_id = %s AND type = %s",
+            (self.plan_id, receipt_type),
         )
         return row[0] if row else 0
 
@@ -305,7 +306,7 @@ class TestE2EPipeline(unittest.TestCase):
         conn = psycopg2.connect(_DSN)
         cur = conn.cursor()
         cur.execute(f"SET search_path TO {self.schema_name}")
-        cur.execute("SELECT * FROM plans WHERE id = '0001'")
+        cur.execute("SELECT * FROM plans WHERE id = %s", (self.plan_id,))
         cols = [d.name for d in cur.description]
         row = cur.fetchone()
         cur.close()
@@ -351,7 +352,7 @@ class TestE2EPipeline(unittest.TestCase):
         self._seed_open_ticket("planner")
         plans = self.db.get_eligible_plans("planner")
         self.assertEqual(len(plans), 1)
-        self.assertEqual(plans[0]["id"], "0001")
+        self.assertEqual(plans[0]["id"], self.plan_id)
         self.assertEqual(plans[0]["derived_status"], "PROPOSED")
 
     def test_planner_eligible_with_planning_and_ticket(self):
@@ -381,7 +382,7 @@ class TestE2EPipeline(unittest.TestCase):
     def test_planner_completed_spawns_builder_and_critic(self):
         """Planner completing (PLAN_CREATE) spawns both builder and critic tickets."""
         self._issue_receipt("PLAN_CREATE", agent_role="planner")
-        count = self.db.create_next_tickets("0001", "planner", "completed")
+        count = self.db.create_next_tickets(self.plan_id, "planner", "completed")
         self.assertGreater(count, 1)
         self.assertGreater(self._count_open_tickets("builder"), 0)
         self.assertGreater(self._count_open_tickets("critic"), 0)
@@ -389,16 +390,16 @@ class TestE2EPipeline(unittest.TestCase):
     def test_builder_eligible_after_planner_completes(self):
         """Builder is eligible after planner completes (PLAN_CREATE + open ticket)."""
         self._issue_receipt("PLAN_CREATE", agent_role="planner")
-        self.db.create_next_tickets("0001", "planner", "completed")
+        self.db.create_next_tickets(self.plan_id, "planner", "completed")
         plans = self.db.get_eligible_plans("builder")
         self.assertEqual(len(plans), 1)
-        self.assertEqual(plans[0]["id"], "0001")
+        self.assertEqual(plans[0]["id"], self.plan_id)
         self.assertEqual(plans[0]["derived_status"], "PLAN_CREATE")
 
     def test_critic_eligible_after_planner_completes(self):
         """Critic is eligible after planner completes (PLAN_CREATE + open ticket)."""
         self._issue_receipt("PLAN_CREATE", agent_role="planner")
-        self.db.create_next_tickets("0001", "planner", "completed")
+        self.db.create_next_tickets(self.plan_id, "planner", "completed")
         plans = self.db.get_eligible_plans("critic")
         self.assertEqual(len(plans), 1)
         self.assertEqual(plans[0]["derived_status"], "PLAN_CREATE")

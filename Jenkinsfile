@@ -149,6 +149,25 @@ pipeline {
                     def total = pyPkgs.size()
                     def current = 0
 
+                    // conduit's DB-backed tests require PostgreSQL ("PG is
+                    // mandatory" there by design). Run a throwaway PG for the
+                    // stage on the host network; each pytest container gets
+                    // its DSN via CONDUIT_PG_DSN. Tests isolate themselves in
+                    // per-run schemas and clean up after.
+                    sh 'docker rm -f ci-conduit-pg >/dev/null 2>&1 || true'
+                    sh '''
+                        docker run --rm -d --name ci-conduit-pg \
+                            -e POSTGRES_USER=pguser -e POSTGRES_PASSWORD=pgpass \
+                            -e POSTGRES_DB=nexus postgres:17-alpine
+                        for i in $(seq 1 30); do
+                            docker exec ci-conduit-pg pg_isready -U pguser >/dev/null 2>&1 && break
+                            sleep 1
+                        done
+                        docker exec -i ci-conduit-pg psql -U pguser -d nexus -v ON_ERROR_STOP=1 -q \
+                            < sql/ci-bootstrap/nexus-ci-bootstrap.sql
+                        echo "hermetic test PG ready (bootstrapped)"
+                    '''
+
                     for (pkg in pyPkgs) {
                         current++
                         def pkgName = pkg.replace('python/', '')
@@ -156,7 +175,8 @@ pipeline {
                         def rc = sh(
                             script: """
                                 set -o pipefail
-                                docker run --rm \
+                                docker run --rm --network host \
+                                    -e "CONDUIT_PG_DSN=host=127.0.0.1 port=5432 user=pguser password=pgpass dbname=nexus" \
                                     -v "${hostWs}:/ws" -w /ws \
                                     python:3.12-slim \
                                     bash -c "set -o pipefail; cd 'python/${pkgName}' && \
@@ -174,6 +194,8 @@ pipeline {
                             echo "  ✓ ${pkgName} OK"
                         }
                     }
+
+                    sh 'docker rm -f ci-conduit-pg >/dev/null 2>&1 || true'
 
                     if (failures) {
                         error("Python tests failed: ${failures.join(', ')}")
