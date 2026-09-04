@@ -11,6 +11,9 @@ Group=codex
 WorkingDirectory=/home/codex/dev/nexus/python/conduit
 
 # ── Environment ────────────────────────────────────────────────────────
+# Fallback only — the authoritative DSN lives in .env (EnvironmentFile
+# below, read after this line so it wins). Receipt-isolation option A:
+# flip dbname there (see DEPLOY_DB_CONFIG.md).
 Environment=CONDUIT_PG_DSN=host=localhost port=5432 user=pguser password=pgpass dbname=nexus
 Environment=POLL_INTERVAL=30
 Environment=LOG_LEVEL=INFO
@@ -19,6 +22,7 @@ Environment=LOG_LEVEL=INFO
 # bridge daemon (see python/conduit/wrp_kernel/engine.py). There is no
 # KERNEL_API_URL or HTTP endpoint on port 3103.
 Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/home/codex/dev/nexus/python/conduit/.env
 
 # ── Executable ─────────────────────────────────────────────────────────
 ExecStart=/usr/bin/python3 -m bridge.daemon
