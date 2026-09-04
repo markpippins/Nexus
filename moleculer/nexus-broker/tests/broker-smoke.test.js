@@ -12,7 +12,11 @@ const assert = require('node:assert/strict')
 const { randomUUID } = require('node:crypto')
 const { spawn } = require('node:child_process')
 const path = require('node:path')
+const dotenv = require('dotenv')
 const { Pool } = require('pg')
+const { MongoClient } = require('mongodb')
+
+dotenv.config({ path: path.join(__dirname, '..', '.env') })
 
 const BROKER_DIR = path.resolve(__dirname, '..')
 const TEST_PORT = process.env.TEST_SERVICE_PORT || '4098'
@@ -27,7 +31,9 @@ async function startBroker() {
     {
       cwd: BROKER_DIR,
       env: { ...process.env, SERVICE_PORT: TEST_PORT, NODE_ENV: 'test' },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      // Drain output so a large projection cannot block the child on a full
+      // pipe before the test reaches its assertions.
+      stdio: ['ignore', 'ignore', 'ignore'],
     }
   )
 
@@ -167,6 +173,130 @@ test('rewind returns a committed state vector and rejects invalid versions', asy
 
   const invalid = await (await fetch(`${BASE}/keychain-snapshot/agent-records/rewind?at=0`)).json()
   assert.equal(invalid.ok, false)
+})
+
+test('decision checkpoint preserves owner, authorization, and evaluator read-set provenance', async () => {
+  const sourceNamespace = `keychains-read-set-${process.pid}-${Date.now()}`
+  const sourceEventId = randomUUID()
+  const triggerEvent = {
+    source_namespace: sourceNamespace,
+    source_event_id: sourceEventId,
+    kind: 'peb.deny_contract_promotion.committed',
+    outcome: 'committed',
+    actor: 'peb-kernel',
+    decision_class: 'deny_contract_promotion',
+    binding_owner: 'resolution',
+    authority_level: 'narrowly_binding',
+    authorization_ref: '986ec482',
+    evaluator_id: 'peb-evaluator',
+    evaluator_version: 'peb-evaluator-v1',
+    contract_id: 'governed-trigger.v1',
+    contract_version: 1,
+    law_id: 'deny-contract-promotion-law',
+    law_version: '2026-09-02',
+    bridge_id: 'resolution-keychains-bridge',
+    bridge_version: '1',
+    read_set: {
+      manifest_id: 'keychains-read-set-manifest-v1',
+      digest: 'sha256:keychains-read-set-test',
+      source_revision: 'test-revision-1',
+    },
+    payload: { decision: 'committed' },
+  }
+  const mongo = new MongoClient(process.env.MONGO_URL || 'mongodb://localhost:27017')
+  let checkpointId = null
+  let previousActive = null
+  let previousEntries = null
+  let previousRecordTypeState = null
+
+  try {
+    await mongo.connect()
+    const db = mongo.db('keychains')
+    previousActive = await db.collection('active_checkpoints').findOne({ _id: 'agent-records' })
+    previousEntries = await db.collection('entries').find({}).toArray()
+    previousRecordTypeState = await db.collection('record_type_state').find({}).toArray()
+
+    const res = await fetch(`${BASE}/keychain-snapshot/agent-records/snapshot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ triggerEvent }),
+    })
+    assert.equal(res.status, 200)
+    const body = await res.json()
+    assert.equal(body.ok, true)
+    assert.equal(body.deduplicated, false)
+    assert.deepEqual(body.decision_context, {
+      schema_version: 1,
+      checkpoint_class: 'decision',
+      decision_class: 'deny_contract_promotion',
+      source_namespace: sourceNamespace,
+      source_event_id: sourceEventId,
+      binding_decision_owner: {
+        role: 'resolution',
+        authority_level: 'narrowly_binding',
+        authorization_ref: '986ec482',
+      },
+      evaluator: { id: 'peb-evaluator', version: 'peb-evaluator-v1' },
+      contract: { id: 'governed-trigger.v1', version: 1 },
+      law: { id: 'deny-contract-promotion-law', version: '2026-09-02' },
+      bridge: { id: 'resolution-keychains-bridge', version: '1' },
+      source_read_set: triggerEvent.read_set,
+      read_set_manifest: {
+        manifest_id: 'keychains-read-set-manifest-v1',
+        digest: 'sha256:keychains-read-set-test',
+      },
+    })
+
+    checkpointId = body.trigger && body.trigger.checkpoint_id
+    const rewind = await (await fetch(`${BASE}/keychain-snapshot/agent-records/rewind?at=${body.version}`)).json()
+    assert.equal(rewind.ok, true)
+    assert.deepEqual(rewind.decision_context, body.decision_context)
+
+    const transitions = await (await fetch(`${BASE}/keychain-snapshot/agent-records/transitions?limit=200`)).json()
+    const transition = transitions.items.find((item) => item.source_namespace === sourceNamespace)
+    assert.ok(transition)
+    assert.deepEqual(transition.read_set, triggerEvent.read_set)
+    assert.equal(transition.checkpoint_status, 'delivered')
+  } finally {
+    const db = mongo.db('keychains')
+    if (!checkpointId) {
+      const checkpoint = await db.collection('ar_snapshots').findOne({
+        source_namespace: sourceNamespace,
+        source_event_id: sourceEventId,
+      })
+      checkpointId = checkpoint?.checkpoint_id || null
+    }
+    await db.collection('transitions').deleteMany({
+      $or: [
+        { source_namespace: sourceNamespace },
+        { keychain_event_id: `${sourceNamespace}:${sourceEventId}` },
+      ],
+    })
+    await db.collection('ar_drift_findings').deleteMany({ checkpoint_id: checkpointId })
+    await db.collection('checkpoint_entries').deleteMany({ checkpoint_id: checkpointId })
+    await db.collection('ar_snapshots').deleteMany({
+      source_namespace: sourceNamespace,
+      source_event_id: sourceEventId,
+    })
+    if (previousActive) {
+      await db.collection('active_checkpoints').replaceOne(
+        { _id: 'agent-records' },
+        previousActive,
+        { upsert: true },
+      )
+    } else {
+      await db.collection('active_checkpoints').deleteOne({ _id: 'agent-records' })
+    }
+    if (previousEntries) {
+      await db.collection('entries').deleteMany({})
+      if (previousEntries.length > 0) await db.collection('entries').insertMany(previousEntries)
+    }
+    if (previousRecordTypeState) {
+      await db.collection('record_type_state').deleteMany({})
+      if (previousRecordTypeState.length > 0) await db.collection('record_type_state').insertMany(previousRecordTypeState)
+    }
+    await mongo.close()
+  }
 })
 
 test('SOL outbox events are delivered into Keychains and replayed idempotently', async () => {

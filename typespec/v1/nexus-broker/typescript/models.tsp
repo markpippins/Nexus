@@ -82,6 +82,35 @@ namespace org.nexus.nexusbroker {
     asset_id: string | null;
   }
 
+  /** Stable evaluator context attached to a decision checkpoint. */
+  model KeychainDecisionContext {
+    schema_version: int32;
+    checkpoint_class: string;
+    decision_class: string | null;
+    source_namespace: string;
+    source_event_id: string | null;
+    binding_decision_owner: KeychainBindingDecisionOwner;
+    evaluator: KeychainVersionedReference;
+    contract: KeychainVersionedReference;
+    law: KeychainVersionedReference;
+    bridge: KeychainVersionedReference;
+    source_read_set: Record<unknown>;
+    read_set_manifest: Record<unknown> | null;
+  }
+
+  /** Binding authority provenance recorded by a decision checkpoint. */
+  model KeychainBindingDecisionOwner {
+    role: string | null;
+    authority_level: string | null;
+    authorization_ref: string | null;
+  }
+
+  /** Identity and exact version consumed by a governed decision. */
+  model KeychainVersionedReference {
+    id: string | null;
+    version: string | int32 | null;
+  }
+
   /**
    * Normalized durable source event (shared trigger/checkpoint contract,
    * Analyst catalogue 332d6831). Idempotent on source_namespace + source_event_id.
@@ -99,11 +128,21 @@ namespace org.nexus.nexusbroker {
     source?: string;
     correlation_id?: string;
     contract_id?: string;
+    contract_version?: string | int32;
     evaluator_id?: string;
+    evaluator_version?: string | int32;
     law_id?: string;
+    law_version?: string | int32;
+    bridge_id?: string;
+    bridge_version?: string | int32;
+    decision_class?: string;
+    binding_owner?: string;
+    authorization_ref?: string;
+    authority_level?: string;
     effective_at?: string;
     recorded_at?: string;
     read_set?: Record<unknown>;
+    read_set_manifest?: Record<unknown>;
     payload?: Record<unknown>;
     checkpoint_status?: string;
     idempotency_key?: string;
@@ -140,6 +179,7 @@ namespace org.nexus.nexusbroker {
     driftFindings: int32;
     recordTypeCount: int32;
     trigger: KeychainTriggerEvent | null;
+    decision_context: KeychainDecisionContext | null;
     deduplicated: boolean;
     prevVersion: int32;
   }
@@ -161,6 +201,7 @@ namespace org.nexus.nexusbroker {
     entryCount: int32 | null;
     recordTypeCount: int32 | null;
     state_vector: Record<unknown> | null;
+    decision_context?: KeychainDecisionContext | null;
     note?: string;
     error?: string;
   }

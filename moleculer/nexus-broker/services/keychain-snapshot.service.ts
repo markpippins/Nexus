@@ -125,17 +125,51 @@ interface TriggerEventContract {
   source?: string | null;
   correlation_id?: string | null;
   contract_id?: string | null;
+  contract_version?: string | number | null;
   evaluator_id?: string | null;
+  evaluator_version?: string | number | null;
   law_id?: string | null;
+  law_version?: string | number | null;
+  bridge_id?: string | null;
+  bridge_version?: string | number | null;
+  decision_class?: string | null;
+  binding_owner?: string | null;
+  authorization_ref?: string | null;
+  authority_level?: string | null;
   effective_at?: string | null;
   recorded_at?: string | null;
   meta?: any;
   read_set?: any;
+  read_set_manifest?: any;
   payload?: any;
   checkpoint_status?: string;
   /** Raw legacy trigger string (backward compat only). */
   raw?: string;
   idempotency_key?: string;
+}
+
+/**
+ * Immutable decision context attached to a checkpoint. It contains stable
+ * identities, versions, and the exact source read-set, never source content.
+ * Keychains records this context; Resolution/PEB/SOL remain authoritative.
+ */
+interface DecisionContextManifest {
+  schema_version: 1;
+  checkpoint_class: "decision";
+  decision_class: string | null;
+  source_namespace: string;
+  source_event_id: string | null;
+  binding_decision_owner: {
+    role: string | null;
+    authority_level: string | null;
+    authorization_ref: string | null;
+  };
+  evaluator: { id: string | null; version: string | number | null };
+  contract: { id: string | null; version: string | number | null };
+  law: { id: string | null; version: string | number | null };
+  bridge: { id: string | null; version: string | number | null };
+  source_read_set: any;
+  read_set_manifest: any;
 }
 
 /** A resolved keychain entry — one per logical record instance. */
@@ -282,6 +316,7 @@ export default class KeychainService extends Service {
               entryCount: (snap as any).entryCount || null,
               recordTypeCount: Object.keys(stateVector).length,
               state_vector: stateVector,
+              decision_context: (snap as any).decision_context || null,
             };
           },
         },
@@ -1111,6 +1146,87 @@ export default class KeychainService extends Service {
     }
   }
 
+  private buildDecisionContextManifest(triggerEvent: TriggerEventContract): DecisionContextManifest {
+    const readSet = triggerEvent.read_set && typeof triggerEvent.read_set === "object"
+      ? triggerEvent.read_set
+      : {};
+    const payload = triggerEvent.payload && typeof triggerEvent.payload === "object"
+      ? triggerEvent.payload
+      : {};
+    const meta = triggerEvent.meta && typeof triggerEvent.meta === "object"
+      ? triggerEvent.meta
+      : {};
+    const value = (...values: any[]): any => values.find((candidate) => candidate !== undefined && candidate !== null) ?? null;
+    const decisionClass = value(
+      triggerEvent.decision_class,
+      meta.decision_class,
+      readSet.decision_class,
+      payload.decision_class,
+      payload.class,
+      null,
+    );
+    const authorityLevel = value(
+      triggerEvent.authority_level,
+      meta.authority_level,
+      readSet.authority_level,
+      payload.authority_level,
+      null,
+    );
+    const owner = value(
+      triggerEvent.binding_owner,
+      meta.binding_owner,
+      readSet.binding_owner,
+      payload.binding_owner,
+      null,
+    );
+    const authorizationRef = value(
+      triggerEvent.authorization_ref,
+      meta.authorization_ref,
+      readSet.authorization_ref,
+      payload.authorization_ref,
+      null,
+    );
+    return {
+      schema_version: 1,
+      checkpoint_class: "decision",
+      decision_class: decisionClass,
+      source_namespace: triggerEvent.source_namespace || "unknown",
+      source_event_id: triggerEvent.source_event_id || null,
+      binding_decision_owner: {
+        role: owner,
+        authority_level: authorityLevel,
+        authorization_ref: authorizationRef,
+      },
+      evaluator: {
+        id: value(triggerEvent.evaluator_id, meta.evaluator_id, readSet.evaluator_id, payload.evaluator_id),
+        version: value(triggerEvent.evaluator_version, meta.evaluator_version, readSet.evaluator_version, payload.evaluator_version),
+      },
+      contract: {
+        id: value(triggerEvent.contract_id, meta.contract_id, readSet.contract_id, payload.contract_id),
+        version: value(triggerEvent.contract_version, meta.contract_version, readSet.contract_version, payload.contract_version),
+      },
+      law: {
+        id: value(triggerEvent.law_id, meta.law_id, readSet.law_id, payload.law_id),
+        version: value(triggerEvent.law_version, meta.law_version, readSet.law_version, payload.law_version),
+      },
+      bridge: {
+        id: value(triggerEvent.bridge_id, meta.bridge_id, readSet.bridge_id, payload.bridge_id),
+        version: value(triggerEvent.bridge_version, meta.bridge_version, readSet.bridge_version, payload.bridge_version),
+      },
+      source_read_set: triggerEvent.read_set ?? {},
+      read_set_manifest: triggerEvent.read_set_manifest
+        ?? meta.read_set_manifest
+        ?? readSet.manifest
+        ?? ((readSet.manifest_id || readSet.digest || readSet.manifest_digest)
+          ? {
+              ...(readSet.manifest_id ? { manifest_id: readSet.manifest_id } : {}),
+              ...(readSet.digest ? { digest: readSet.digest } : {}),
+              ...(readSet.manifest_digest ? { manifest_digest: readSet.manifest_digest } : {}),
+            }
+          : null),
+    };
+  }
+
   private async projectAgentRecords(params: {
     label?: string;
     trigger?: string;
@@ -1418,6 +1534,7 @@ export default class KeychainService extends Service {
       typeBreakdown,
       roleBreakdown,
       state_vector: stateVector, // D1: current set of records per record type
+      decision_context: triggerEvent ? this.buildDecisionContextManifest(triggerEvent) : null,
       ...(triggerEvent?.source_namespace && triggerEvent?.source_event_id
         ? {
             source_namespace: triggerEvent.source_namespace,
@@ -1512,6 +1629,7 @@ export default class KeychainService extends Service {
       roleBreakdown,
       recordTypeCount: Object.keys(stateVector).length,
       trigger: triggerEvent || null,
+      decision_context: triggerEvent ? this.buildDecisionContextManifest(triggerEvent) : null,
       deduplicated: false,
       prevVersion,
     };
