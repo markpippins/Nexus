@@ -6,8 +6,10 @@
 //   SONAR_TOKEN     user token; sent as HTTP Basic "<token>:" (same
 //                   scheme as ballerina sonar-sync / ci-gateway)
 
-const BASE_URL = process.env.SONAR_BASE_URL ?? "http://vanadium:9000";
-const TOKEN = process.env.SONAR_TOKEN ?? "";
+// Env is read LAZILY (inside the request helpers), not at module load:
+// index.ts's .env loader runs in the entry module body, which executes
+// after this module's top-level statements — an eager const would
+// capture an empty token.
 
 export class SonarError extends Error {
   constructor(
@@ -21,14 +23,15 @@ export class SonarError extends Error {
 }
 
 function authHeader(): string {
-  if (!TOKEN) {
+  const token = process.env.SONAR_TOKEN ?? "";
+  if (!token) {
     throw new SonarError(
       0,
       "(client init)",
-      "SONAR_TOKEN not set — create a SonarQube user token and export it",
+      "SONAR_TOKEN not set — create a SonarQube user token and export it (or put it in the checkout's gitignored .env)",
     );
   }
-  return "Basic " + Buffer.from(`${TOKEN}:`).toString("base64");
+  return "Basic " + Buffer.from(`${token}:`).toString("base64");
 }
 
 async function request(
@@ -37,7 +40,7 @@ async function request(
   params?: Record<string, string | number | undefined>,
   form?: Record<string, string>,
 ): Promise<any> {
-  const url = new URL(endpoint, BASE_URL);
+  const url = new URL(endpoint, process.env.SONAR_BASE_URL ?? "http://vanadium:9000");
   if (params) {
     for (const [k, v] of Object.entries(params)) {
       if (v !== undefined && v !== "") url.searchParams.set(k, String(v));

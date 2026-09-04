@@ -30,6 +30,23 @@ SONAR_TOKEN      # SonarQube user token; sent as Basic "<token>:" (same
                  # scheme as sonar-sync / ci-gateway). NEVER commit it.
 ```
 
+The server **loads `.env` from its own checkout at startup** (minimal
+loader, never overrides real env). This is the credential surface for
+the bridge deployment: `mcp-bridge` spawns this server as a child with
+no caller to export secrets, so put `SONAR_TOKEN=...` in
+`typescript/sonar-mcp/.env` (gitignored, per-checkout).
+
+## Fleet wiring (mcp-bridge + aggregator)
+
+- Bridge target `MCP_BRIDGE_SONAR_*` on **port 3137** (spawns
+  `node_modules/.bin/tsx src/index.ts`, like tackle-prompt-bridge — no
+  compile step needed at runtime).
+- Aggregator `DEFAULT_SERVICES` entry `sonar-mcp` → `http://localhost:3137`
+  (protocol `sse`, same as the other bridge-wrapped MCPs).
+- After deploy: restart mcp-bridge + tools-aggregator, run the
+  mcp-registry-seeder (upserts `mcp.command_registry`), then the
+  slash/ projector.
+
 ## Build & run
 
 ```bash
