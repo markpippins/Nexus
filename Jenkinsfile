@@ -159,10 +159,21 @@ pipeline {
                         docker run --rm -d --name ci-conduit-pg \
                             -e POSTGRES_USER=pguser -e POSTGRES_PASSWORD=pgpass \
                             -e POSTGRES_DB=nexus postgres:17-alpine
-                        for i in $(seq 1 30); do
-                            docker exec ci-conduit-pg pg_isready -U pguser >/dev/null 2>&1 && break
+                        # pg_isready answers OK against initdb's temporary
+                        # server, which then restarts before the real one
+                        # listens. Require a real SQL connection to succeed
+                        # 3 consecutive times before bootstrapping.
+                        ok=0
+                        for i in $(seq 1 60); do
+                            if docker exec ci-conduit-pg psql -U pguser -d nexus -tAc 'SELECT 1' >/dev/null 2>&1; then
+                                ok=$((ok+1))
+                                [ "$ok" -ge 3 ] && break
+                            else
+                                ok=0
+                            fi
                             sleep 1
                         done
+                        [ "$ok" -ge 3 ] || { echo "test PG never became stably ready"; exit 1; }
                         docker exec -i ci-conduit-pg psql -U pguser -d nexus -v ON_ERROR_STOP=1 -q \
                             < sql/ci-bootstrap/nexus-ci-bootstrap.sql
                         echo "hermetic test PG ready (bootstrapped)"
