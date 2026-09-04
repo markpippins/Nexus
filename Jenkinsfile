@@ -156,7 +156,8 @@ pipeline {
                     // per-run schemas and clean up after.
                     sh 'docker rm -f ci-conduit-pg >/dev/null 2>&1 || true'
                     sh '''
-                        docker run --rm -d --name ci-conduit-pg \
+                        docker network create ci-pg-net >/dev/null 2>&1 || true
+                        docker run --rm -d --name ci-conduit-pg --network ci-pg-net \
                             -e POSTGRES_USER=pguser -e POSTGRES_PASSWORD=pgpass \
                             -e POSTGRES_DB=nexus postgres:17-alpine
                         # pg_isready answers OK against initdb's temporary
@@ -186,8 +187,8 @@ pipeline {
                         def rc = sh(
                             script: """
                                 set -o pipefail
-                                docker run --rm --network host \
-                                    -e "CONDUIT_PG_DSN=host=127.0.0.1 port=5432 user=pguser password=pgpass dbname=nexus" \
+                                docker run --rm --network ci-pg-net \
+                                    -e "CONDUIT_PG_DSN=host=ci-conduit-pg port=5432 user=pguser password=pgpass dbname=nexus" \
                                     -v "${hostWs}:/ws" -w /ws \
                                     python:3.12-slim \
                                     bash -c "set -o pipefail; cd 'python/${pkgName}' && \
@@ -207,6 +208,7 @@ pipeline {
                     }
 
                     sh 'docker rm -f ci-conduit-pg >/dev/null 2>&1 || true'
+                    sh 'docker network rm ci-pg-net >/dev/null 2>&1 || true'
 
                     if (failures) {
                         error("Python tests failed: ${failures.join(', ')}")
