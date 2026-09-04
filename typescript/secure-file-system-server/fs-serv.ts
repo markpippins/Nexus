@@ -151,6 +151,9 @@ const server = http.createServer(async (req, res) => {
             }
             logger.debug('Request body received', { bodySize: body.length });
             requestData = JSON.parse(body);
+            if (!requestData?.operation) {
+                throw new SyntaxError('Invalid request body: missing operation');
+            }
             logger.info(`Processing ${requestData.operation} operation`, {
                 operation: requestData.operation,
                 path: requestData.path,

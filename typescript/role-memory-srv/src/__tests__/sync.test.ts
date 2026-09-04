@@ -34,6 +34,7 @@ function mockPipeline(shouldSucceed = true) {
 function makeMemoryRow(slug: string, title: string, roles: string[]) {
   return {
     procedure: {
+      id: `row-${slug}`,
       slug,
       title,
       summary: `Summary for ${slug}`,
@@ -41,6 +42,7 @@ function makeMemoryRow(slug: string, title: string, roles: string[]) {
       tags: ["test"],
       triggers: ["on:deploy"],
       mcp_tools: ["tool_1"],
+      created_at: "2026-07-25T00:00:00.000Z",
       updated_at: "2026-07-25T00:00:00.000Z",
     },
     roles,
@@ -90,7 +92,7 @@ describe("syncAll", () => {
       // Check that proc key was set with JSON card
       const procCall = set.mock.calls.find((c: any) => c[0] === "mem:proc:test-proc");
       expect(procCall).toBeTruthy();
-      const card = JSON.parse(procCall[1]);
+      const card = JSON.parse(procCall![1]);
       expect(card.slug).toBe("test-proc");
       expect(card.title).toBe("Test Proc");
       expect(card.body_md).toBeTruthy();
@@ -109,13 +111,13 @@ describe("syncAll", () => {
 
       // Architect index should have only "a"
       const archCall = set.mock.calls.find((c: any) => c[0] === "mem:idx:architect");
-      const archIdx = JSON.parse(archCall[1]);
+      const archIdx = JSON.parse(archCall![1]);
       expect(archIdx).toHaveLength(1);
       expect(archIdx[0].slug).toBe("a");
 
       // Engineer index should have both "a" and "b"
       const engCall = set.mock.calls.find((c: any) => c[0] === "mem:idx:engineer");
-      const engIdx = JSON.parse(engCall[1]);
+      const engIdx = JSON.parse(engCall![1]);
       expect(engIdx).toHaveLength(2);
     });
 
@@ -194,7 +196,7 @@ describe("syncAll", () => {
     });
 
     it("throws when Redis pipeline has write failures", async () => {
-      const results: [Error | null, string][] = [
+      const results: [Error | null, string | null][] = [
         [null, "OK"],
         [new Error("WRITE failure"), null],
         [null, "OK"],
@@ -236,7 +238,7 @@ describe("syncAll", () => {
       await syncAll();
 
       const procCall = set.mock.calls.find((c: any) => c[0] === "mem:proc:minimal");
-      const card = JSON.parse(procCall[1]);
+      const card = JSON.parse(procCall![1]);
       expect(card.tags).toEqual([]);
       expect(card.summary).toBe("");
     });
@@ -256,7 +258,7 @@ describe("syncAll", () => {
       // Actually, the sync code pushes to array for each role in the roles array,
       // so duplicates would NOT be deduplicated. This IS a silent-failure GAP.
       const archCall = set.mock.calls.find((c: any) => c[0] === "mem:idx:architect");
-      const archIdx = JSON.parse(archCall[1]);
+      const archIdx = JSON.parse(archCall![1]);
       // Current behavior: duplicates are included — documents the GAP
       expect(archIdx.length).toBeGreaterThanOrEqual(1);
     });

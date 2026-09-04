@@ -100,11 +100,11 @@ forumsRouter.get('/:slug/threads', async (req, res, next) => {
     // forum (by post_created) on any page — large forums like transcripts get
     // recent previews without shipping every body. Independent of includeBody
     // (which returns all bodies when true). Clamped to [0, 100].
-    const bodyWindowParam = parseInt(req.query.bodyWindow, 10);
+    const bodyWindowParam = parseInt(/** @type {string} */ (req.query.bodyWindow), 10);
     const bodyWindow = Number.isFinite(bodyWindowParam) && bodyWindowParam > 0
       ? Math.min(bodyWindowParam, 100) : 0;
-    const pageParam = parseInt(req.query.page, 10);
-    const sizeParam = parseInt(req.query.pageSize ?? req.query.perPage, 10);
+    const pageParam = parseInt(/** @type {string} */ (req.query.page), 10);
+    const sizeParam = parseInt(/** @type {string} */ (req.query.pageSize ?? req.query.perPage), 10);
     const paginate = Number.isFinite(pageParam) || Number.isFinite(sizeParam);
     const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
     const pageSize = Number.isFinite(sizeParam) && sizeParam > 0 ? Math.min(sizeParam, 500) : 100;
