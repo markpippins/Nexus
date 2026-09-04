@@ -47,6 +47,7 @@ as a target spec.
 | peb-mcp | 3133 | `peb-mcp` |
 | terrain-mcp | 3134 | `terrain-mcp` |
 | tackle-prompt-bridge | 3135 | `tackle-prompt-bridge` |
+| sonar-mcp | 3137 | `sonar-mcp` |
 
 Operators can re-target a single bridge-wrapped MCP without editing the
 aggregator's `DEFAULT_SERVICES` by overriding the matching

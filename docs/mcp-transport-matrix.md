@@ -32,6 +32,7 @@ reached over the wire. Source of truth for Gap 2 of to-do `8e09a57f`
 | assembly-mcp | 3113 | streamable HTTP (stateless POST /) | ❌ none | 25 | `POST /` |
 | command-router (in tools-aggregator) | 3210 | native in-process (REST `/tools/call` + `/commands/*`) | ❌ none | 3 | `POST /tools/call` — `command_lookup` / `command_execute` / `command_completions` folded in from slash-command-mcp (D-2026-08-16-002; :3220 retired) |
 | tackle-mcp | 3400 | streamable HTTP (stateless POST /) | ❌ none | 42 | `POST /` |
+| sonar-mcp | 3137 (via mcp-bridge) | stdio child → SSE bridge (aggregator-discovered, like terrain-mcp) | bridge-managed | 6 | via bridge; direct: spawn `node dist/index.js` (stdio) |
 
 ### Other registered services (in `mcp.command_registry`, ports per config)
 

@@ -77,6 +77,15 @@ const DEFAULT_SERVICES: MCPServiceConfig[] = [
     protocol: "sse",
   },
   {
+    // SonarQube web-API tools (night-shift flow: Planner grouping, FP
+    // closure, Reviewer gate check). stdio-only child surfaced through the
+    // mcp-bridge on 3137 — same pattern as knowledge/vision/peb/terrain.
+    name: "sonar-mcp",
+    baseUrl: process.env.MCP_BRIDGE_SONAR_URL || "http://localhost:3137",
+    required: false,
+    protocol: "sse",
+  },
+  {
     // TTS (text-to-speech) synthesis. Direct HTTP MCP — not stdio, not bridge.
     name: "address-tts-mcp",
     baseUrl: process.env.ADDRESS_TTS_MCP_URL || "http://localhost:3105",

@@ -56,6 +56,17 @@ Environment=MCP_BRIDGE_PROMPT_ARGS=src/index.ts
 Environment=MCP_BRIDGE_PROMPT_CWD=/home/codex/dev/nexus/typescript/tackle-prompt-bridge
 Environment=MCP_BRIDGE_PROMPT_ENV_PROMPT_REDIS_URL=redis://localhost:6379
 
+# sonar-mcp: SonarQube web-API tools for the night-shift flow — issue
+# search/hotspots/FP-marking/comments/tags/quality-gate. Port 3137 (next
+# free bridge slot after 3135). Uses tsx from the child's own node_modules
+# (no compile step), like tackle-prompt-bridge. SONAR_TOKEN is never in
+# this unit: the child loads its own gitignored .env (see
+# typescript/sonar-mcp/README.md).
+Environment=MCP_BRIDGE_SONAR_PORT=3137
+Environment=MCP_BRIDGE_SONAR_CMD=/home/codex/dev/nexus/typescript/sonar-mcp/node_modules/.bin/tsx
+Environment=MCP_BRIDGE_SONAR_ARGS=src/index.ts
+Environment=MCP_BRIDGE_SONAR_CWD=/home/codex/dev/nexus/typescript/sonar-mcp
+
 # ── Executable ─────────────────────────────────────────────────────────
 ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/node dist/index.js
 ExecReload=/bin/kill -HUP $MAINPID
