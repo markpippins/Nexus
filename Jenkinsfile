@@ -14,7 +14,7 @@ pipeline {
     agent any
 
     options {
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 60, unit: 'MINUTES')
         disableConcurrentBuilds()
     }
     triggers {
@@ -72,7 +72,7 @@ pipeline {
                             sh(
                                 script: """
                                     set -o pipefail
-                                    docker run --rm \
+                                docker run --rm \
                                         -v "${hostWs}:/ws" -w /ws \
                                         node:20-bookworm \
                                         bash -c "cd 'typescript/${svc}' && grep -q '\"build\"' package.json && npm install --ignore-scripts --no-audit --no-fund --silent 2>/dev/null && npm run build 2>/dev/null" \
@@ -110,6 +110,7 @@ pipeline {
                         echo "[Typecheck ${current}/${total}] ${svc}..."
                         def rc = sh(
                             script: """
+                                set -o pipefail
                                 docker run --rm \
                                     -v "${hostWs}:/ws" -w /ws \
                                     node:20-bookworm \
@@ -154,12 +155,13 @@ pipeline {
                         echo "[Pytest ${current}/${total}] ${pkgName}..."
                         def rc = sh(
                             script: """
+                                set -o pipefail
                                 docker run --rm \
                                     -v "${hostWs}:/ws" -w /ws \
                                     python:3.12-slim \
                                     bash -c "set -o pipefail; cd 'python/${pkgName}' && \
                                         pip install -q -e '.[test]' 2>/dev/null || pip install -q -e . 2>/dev/null || true && \
-                                        pip install -q pytest 2>/dev/null && \
+                                        pip install -q pytest psycopg2-binary pydantic 2>/dev/null && \
                                         python -m pytest tests/ -x -q --tb=short 2>&1 | tail -30" \
                                     2>&1 | tail -30
                             """,
@@ -204,6 +206,7 @@ pipeline {
                         echo "[TS Test ${current}/${total}] ${svc}..."
                         def rc = sh(
                             script: """
+                                set -o pipefail
                                 docker run --rm \
                                     -v "${hostWs}:/ws" -w /ws \
                                     node:20-bookworm \
