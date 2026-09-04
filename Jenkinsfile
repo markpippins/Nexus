@@ -14,7 +14,7 @@ pipeline {
     agent any
 
     options {
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 60, unit: 'MINUTES')
         disableConcurrentBuilds()
     }
     triggers {
@@ -45,6 +45,48 @@ pipeline {
             }
         }
 
+        // ── Build workspace deps ────────────────────────────────
+        // file: dependencies (e.g. heartbeat-client) resolve to source
+        // packages whose dist/ is gitignored; a fresh clone lacks them and
+        // typecheck fails with "Cannot find module". Build every package
+        // with a build script first (best-effort; real failures surface in
+        // the Typecheck stage).
+        // CPS-SAFE LOOPS: a Groovy IntRange (1..2) and for-in over it are
+        // NOT serializable — the pipeline dies at the first sh step with
+        // NotSerializableException (builds #9/#10). C-style int loops and
+        // indexed access survive CPS serialization. Two passes: pass 1
+        // builds leaf packages, pass 2 builds dependents (alphabetical
+        // order builds conduit-srv before heartbeat-client).
+        stage('Build Workspace Deps') {
+            steps {
+                script {
+                    def hostWs = env.WORKSPACE.replace('/var/jenkins_home', '/home/codex/vd-jenkins-home')
+                    def tsconfigs = sh(
+                        script: 'find typescript -maxdepth 2 -name tsconfig.json | sort',
+                        returnStdout: true
+                    ).trim().split('\n').findAll { it }
+
+                    for (int pass = 1; pass <= 2; pass++) {
+                        for (int i = 0; i < tsconfigs.size(); i++) {
+                            def svc = tsconfigs[i].replace('typescript/', '').replace('/tsconfig.json', '')
+                            sh(
+                                script: """
+                                    set -o pipefail
+                                docker run --rm \
+                                        -v "${hostWs}:/ws" -w /ws \
+                                        node:20-bookworm \
+                                        bash -c "cd 'typescript/${svc}' && grep -q '\"build\"' package.json && npm install --ignore-scripts --no-audit --no-fund --silent 2>/dev/null && npm run build 2>/dev/null" \
+                                        2>&1 | tail -5 || true
+                                """,
+                                returnStatus: true
+                            )
+                        }
+                    }
+                    echo "Workspace deps built."
+                }
+            }
+        }
+
         // ── TypeScript typecheck ────────────────────────────────────
         // Runs npx tsc --noEmit in each service that has a tsconfig.
         // One Node.js container per service; failures are collected,
@@ -68,6 +110,7 @@ pipeline {
                         echo "[Typecheck ${current}/${total}] ${svc}..."
                         def rc = sh(
                             script: """
+                                set -o pipefail
                                 docker run --rm \
                                     -v "${hostWs}:/ws" -w /ws \
                                     node:20-bookworm \
@@ -112,12 +155,13 @@ pipeline {
                         echo "[Pytest ${current}/${total}] ${pkgName}..."
                         def rc = sh(
                             script: """
+                                set -o pipefail
                                 docker run --rm \
                                     -v "${hostWs}:/ws" -w /ws \
                                     python:3.12-slim \
                                     bash -c "set -o pipefail; cd 'python/${pkgName}' && \
                                         pip install -q -e '.[test]' 2>/dev/null || pip install -q -e . 2>/dev/null || true && \
-                                        pip install -q pytest 2>/dev/null && \
+                                        pip install -q pytest psycopg2-binary pydantic 2>/dev/null && \
                                         python -m pytest tests/ -x -q --tb=short 2>&1 | tail -30" \
                                     2>&1 | tail -30
                             """,
@@ -143,6 +187,7 @@ pipeline {
         stage('TS Tests') {
             steps {
                 script {
+                    def hostWs = env.WORKSPACE.replace('/var/jenkins_home', '/home/codex/vd-jenkins-home')
                     def tsPkgs = sh(
                         script: """
                             grep -rl '"test"' typescript/*/package.json 2>/dev/null \
@@ -161,6 +206,7 @@ pipeline {
                         echo "[TS Test ${current}/${total}] ${svc}..."
                         def rc = sh(
                             script: """
+                                set -o pipefail
                                 docker run --rm \
                                     -v "${hostWs}:/ws" -w /ws \
                                     node:20-bookworm \

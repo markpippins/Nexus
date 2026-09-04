@@ -35,7 +35,7 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
 // ── Process-level safety net ─────────────────────────────────────
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', (/** @type {NodeJS.ErrnoException} */ err) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`assembly-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
     process.exit(1);
@@ -78,8 +78,8 @@ app.use((req, res, next) => {
     }
     return origWrite(chunk);
   };
-  res.write = (chunk, encoding, cb) => gzip.write(chunk, encoding, cb);
-  res.end = (chunk, encoding, cb) => {
+  /** @type {any} */ (res).write = (chunk, encoding, cb) => gzip.write(chunk, encoding, cb);
+  /** @type {any} */ (res).end = (chunk, encoding, cb) => {
     if (chunk) gzip.write(chunk, encoding);
     gzip.end(cb);
   };
@@ -108,7 +108,7 @@ async function main() {
     });
   });
 
-  server.on('error', (err) => {
+  server.on('error', (/** @type {NodeJS.ErrnoException} */ err) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`assembly-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
     } else {

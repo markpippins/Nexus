@@ -34,7 +34,7 @@ export class MysqlDriver implements DbDriver {
     throw err;
   }
 
-  async testConnection(_spec: ConnSpec) {
+  async testConnection(_spec: ConnSpec): Promise<never> {
     this.unavailable();
   }
 

@@ -50,11 +50,14 @@ function makePromptRow(overrides: Partial<any> = {}) {
 
 function makeTaskRow(overrides: Partial<any> = {}) {
   return {
+    id: overrides.id || "t-001",
     task_slug: overrides.task_slug || "test-task",
     role: overrides.role || "architect",
     scope: overrides.scope || "Test task scope",
     acceptance_criteria: overrides.acceptance_criteria || ["criterion 1", "criterion 2"],
     prompt_id: overrides.prompt_id || "p-001",
+    active: overrides.active ?? true,
+    created_at: overrides.created_at || "2026-07-25T00:00:00.000Z",
     updated_at: overrides.updated_at || "2026-07-25T00:00:00.000Z",
   };
 }
@@ -105,7 +108,7 @@ describe("syncAll", () => {
 
       const procCall = set.mock.calls.find((c: any) => c[0] === "prompt:proc:architect::boot");
       expect(procCall).toBeTruthy();
-      const card = JSON.parse(procCall[1]);
+      const card = JSON.parse(procCall![1]);
       expect(card.slug).toBe("boot");
       expect(card.body_md).toBeTruthy();
       expect(card.parameter_schema).toEqual({ temperature: 0.7 });
@@ -124,7 +127,7 @@ describe("syncAll", () => {
       await syncAll();
 
       const taskCall = set.mock.calls.find((c: any) => c[0] === "prompt:task:idx:builder");
-      const taskIdx = JSON.parse(taskCall[1]);
+      const taskIdx = JSON.parse(taskCall![1]);
       expect(taskIdx[0].prompt_slug).toBe("greeting");
     });
   });
@@ -198,7 +201,7 @@ describe("syncAll", () => {
     });
 
     it("throws when Redis pipeline has write failures", async () => {
-      const results: [Error | null, string][] = [
+      const results: [Error | null, string | null][] = [
         [new Error("OOM"), null],
       ];
       const set = vi.fn().mockReturnValue({});
@@ -228,7 +231,7 @@ describe("syncAll", () => {
       const procCall = set.mock.calls.find((c: any) =>
         c[0]?.startsWith("prompt:proc:")
       );
-      const card = JSON.parse(procCall[1]);
+      const card = JSON.parse(procCall![1]);
       expect(card.tags).toBeNull();
     });
 
@@ -245,7 +248,7 @@ describe("syncAll", () => {
       const procCall = set.mock.calls.find((c: any) =>
         c[0]?.startsWith("prompt:proc:")
       );
-      const card = JSON.parse(procCall[1]);
+      const card = JSON.parse(procCall![1]);
       expect(card.parameter_schema).toEqual({});
     });
   });

@@ -385,7 +385,7 @@ async function runErrorTests() {
             await tester.listDirectory(['nonexistent_dir']);
             console.log('✗ Expected error for non-existent directory');
         } catch (error) {
-            console.log('✓ Correctly handled non-existent directory:', error.statusCode);
+            console.log('✓ Correctly handled non-existent directory:', (error as { statusCode?: number }).statusCode);
         }
         
         // Test file operations on non-existent files
@@ -393,7 +393,7 @@ async function runErrorTests() {
             await tester.deleteFile(['nonexistent_dir'], 'nonexistent_file.txt');
             console.log('✗ Expected error for non-existent file');
         } catch (error) {
-            console.log('✓ Correctly handled non-existent file:', error.statusCode);
+            console.log('✓ Correctly handled non-existent file:', (error as { statusCode?: number }).statusCode);
         }
         
         console.log('Error condition tests completed successfully!');
