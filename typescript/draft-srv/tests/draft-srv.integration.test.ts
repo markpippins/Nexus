@@ -32,9 +32,16 @@ function assert(cond: boolean, msg: string): void {
 }
 
 async function api(method: string, path: string, body?: any): Promise<{ status: number; body: any }> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  // NEXUS_INTERNAL_SECRET is fail-closed on the server (index.ts); tests that
+  // run against a server with the secret set must present it. When unset
+  // (local dev server without auth), behave as before.
+  if (process.env.NEXUS_INTERNAL_SECRET) {
+    headers['X-Nexus-Internal'] = process.env.NEXUS_INTERNAL_SECRET;
+  }
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
   let parsed: any = null;

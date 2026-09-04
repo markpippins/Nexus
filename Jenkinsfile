@@ -207,8 +207,9 @@ pipeline {
                         }
                     }
 
-                    sh 'docker rm -f ci-conduit-pg >/dev/null 2>&1 || true'
-                    sh 'docker network rm ci-pg-net >/dev/null 2>&1 || true'
+                    // PG + ci-pg-net stay up: the TS Tests stage reuses the
+                    // same bootstrapped PG (conduit-mcp, draft-srv). Teardown
+                    // happens at the end of TS Tests and in post{}.
 
                     if (failures) {
                         error("Python tests failed: ${failures.join(', ')}")
@@ -235,17 +236,51 @@ pipeline {
                     def total = tsPkgs.size()
                     def current = 0
 
+                    // Service-specific runners live in docker/ci/ (committed,
+                    // so CI and local runs share one definition):
+                    //   ts-test.sh             - plain npm test
+                    //   ts-test-pg.sh          - needs the hermetic PG (conduit-mcp)
+                    //   ts-test-draft-srv.sh   - spawns the live server its test drives
+                    //   ts-test-bun.sh         - bun-harness services (fs-server pair)
+                    //   ts-test-node-runner.sh - node --test dir-glob services
+                    def runnerFor = [
+                        'conduit-mcp'              : 'ts-test-pg.sh',
+                        'draft-srv'                : 'ts-test-draft-srv.sh',
+                        'file-system-server'       : 'ts-test-bun.sh',
+                        'secure-file-system-server': 'ts-test-bun.sh',
+                        'peb-srv'                  : 'ts-test-node-runner.sh',
+                        'shrapnel'                 : 'ts-test-node-runner.sh',
+                    ]
+
                     for (pkg in tsPkgs) {
                         current++
                         def svc = pkg.replace('typescript/', '')
+
+                        // Discovery guard: no test files anywhere => the
+                        // declared test script is a stub (e.g. npm's
+                        // "no test specified"). Honest skip, not a masked fail.
+                        def hasTests = sh(
+                            script: "find typescript/${svc} -not -path '*/node_modules/*' \\( -name '*.test.*' -o -name '*.spec.*' \\) -print 2>/dev/null | head -1",
+                            returnStdout: true
+                        ).trim()
+                        if (!hasTests) {
+                            echo "  - ${svc} SKIPPED (no test files)"
+                            continue
+                        }
+
                         echo "[TS Test ${current}/${total}] ${svc}..."
+                        def runner = runnerFor.getOrDefault(svc, 'ts-test.sh')
+                        def extraArgs = ''
+                        if (runner == 'ts-test-pg.sh' || runner == 'ts-test-draft-srv.sh') {
+                            extraArgs = '--network ci-pg-net'
+                        }
                         def rc = sh(
                             script: """
                                 set -o pipefail
-                                docker run --rm \
+                                docker run --rm ${extraArgs} \
                                     -v "${hostWs}:/ws" -w /ws \
                                     node:20-bookworm \
-                                    bash -c "set -o pipefail; cd 'typescript/${svc}' && npm install --ignore-scripts --no-audit --no-fund --silent 2>/dev/null && npm test" \
+                                    bash /ws/docker/ci/${runner} ${svc} \
                                     2>&1 | tail -30
                             """,
                             returnStatus: true
@@ -257,6 +292,9 @@ pipeline {
                             echo "  ✓ ${svc} OK"
                         }
                     }
+
+                    sh 'docker rm -f ci-conduit-pg >/dev/null 2>&1 || true'
+                    sh 'docker network rm ci-pg-net >/dev/null 2>&1 || true'
 
                     if (failures) {
                         error("TS tests failed: ${failures.join(', ')}")
@@ -296,6 +334,8 @@ pipeline {
     post {
         always {
             // Clean up Docker containers used by typecheck/test stages
+            sh 'docker rm -f ci-conduit-pg >/dev/null 2>&1 || true'
+            sh 'docker network rm ci-pg-net >/dev/null 2>&1 || true'
             sh 'docker container prune -f 2>/dev/null || true'
         }
         success {
