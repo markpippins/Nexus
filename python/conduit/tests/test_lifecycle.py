@@ -51,6 +51,7 @@ class TestPlanLifecycle(unittest.TestCase):
         try:
             self.schema_name = create_test_schema(self._raw_conn, "test_lifecycle")
 
+            self.plan_id = self.schema_name.split("_")[-1]  # collision-proof: never matches a real plan
             self._create_schema()
             self._seed_plan()
             self._raw_conn.commit()
@@ -176,24 +177,24 @@ class TestPlanLifecycle(unittest.TestCase):
             SELECT p.*,
               CASE
                 WHEN EXISTS (
-                  SELECT 1 FROM receipts r
+                  SELECT 1 FROM vision.receipts r
                   WHERE r.plan_id = p.id AND r.type = 'REVIEW_PASS'
                 ) THEN 'REVIEW_PASS'
                 WHEN EXISTS (
-                  SELECT 1 FROM receipts r
+                  SELECT 1 FROM vision.receipts r
                   WHERE r.plan_id = p.id AND r.type = 'REVIEW_REJECT'
                 ) THEN COALESCE(
-                  (SELECT r.type FROM receipts r
+                  (SELECT r.type FROM vision.receipts r
                    WHERE r.plan_id = p.id AND r.type != 'BLOCK'
                    ORDER BY r.created_at DESC LIMIT 1),
                   'PLAN_CREATE'
                 )
                 ELSE COALESCE(
-                  (SELECT r.type FROM receipts r
+                  (SELECT r.type FROM vision.receipts r
                    WHERE r.plan_id = p.id
                    AND r.type NOT IN ('PROPOSED', 'PLANNING')
                    ORDER BY r.created_at DESC LIMIT 1),
-                  (SELECT r.type FROM receipts r
+                  (SELECT r.type FROM vision.receipts r
                    WHERE r.plan_id = p.id
                    ORDER BY r.created_at DESC LIMIT 1),
                   NULL
@@ -207,7 +208,7 @@ class TestPlanLifecycle(unittest.TestCase):
         self._raw_cur.execute(
             "INSERT INTO plans (id, file_name, title, created_at, updated_at) "
             "VALUES (%s, %s, %s, %s, %s)",
-            ("0001", "test-plan-v0001.md", "Test Plan", now, now),
+            (self.plan_id, "test-plan-v0001.md", "Test Plan", now, now),
         )
 
     def _issue_receipt(self, receipt_type: str, agent_role: str = "builder",
@@ -224,12 +225,12 @@ class TestPlanLifecycle(unittest.TestCase):
             "created_at, objective, owner, last_activity) "
             "VALUES (%s, %s, %s, 'completed', %s, %s, %s, %s, %s) "
             "ON CONFLICT (id) DO NOTHING",
-            (tid, "0001", agent_role, "test-lifecycle", now,
+            (tid, self.plan_id, agent_role, "test-lifecycle", now,
              f"Test {receipt_type}", agent_role, now),
         )
         self._raw_conn.commit()
         self.db.insert_receipt(
-            plan_id="0001", receipt_type=receipt_type,
+            plan_id=self.plan_id, receipt_type=receipt_type,
             agent_role=agent_role, session_id=session,
             ticket_id=tid, summary=f"Test {receipt_type}",
         )
@@ -252,15 +253,15 @@ class TestPlanLifecycle(unittest.TestCase):
 
     def _get_derived_status(self) -> str | None:
         row = self._query_one(
-            "SELECT derived_status FROM plan_status WHERE id = '0001'"
+            "SELECT derived_status FROM plan_status WHERE id = %s", (self.plan_id,)
         )
         return row[0] if row else None
 
     def _count_open_tickets(self, role: str) -> int:
         row = self._query_one(
             "SELECT COUNT(*) FROM tickets "
-            "WHERE plan_id = '0001' AND role = %s AND status = 'open'",
-            (role,),
+            "WHERE plan_id = %s AND role = %s AND status = 'open'",
+            (self.plan_id, role),
         )
         return row[0] if row else 0
 
@@ -286,7 +287,7 @@ class TestPlanLifecycle(unittest.TestCase):
     def test_builder_completed_spawns_reviewer_ticket(self):
         self._issue_receipt("PLAN_CREATE", agent_role="planner")
         self._issue_receipt("IMPLEMENTATION", agent_role="builder")
-        count = self.db.create_next_tickets("0001", "builder", "completed")
+        count = self.db.create_next_tickets(self.plan_id, "builder", "completed")
         self.assertGreater(count, 0)
         self.assertGreater(self._count_open_tickets("reviewer"), 0)
 
@@ -294,7 +295,7 @@ class TestPlanLifecycle(unittest.TestCase):
         self._issue_receipt("PLAN_CREATE", agent_role="planner")
         self._issue_receipt("IMPLEMENTATION", agent_role="builder")
         self._issue_receipt("REVIEW_PASS", agent_role="reviewer")
-        count = self.db.create_next_tickets("0001", "reviewer", "completed")
+        count = self.db.create_next_tickets(self.plan_id, "reviewer", "completed")
         self.assertEqual(count, 0)
 
     # ── Guard: REVIEW_PASS blocks further ticket creation ─────────
@@ -303,14 +304,14 @@ class TestPlanLifecycle(unittest.TestCase):
         self._issue_receipt("PLAN_CREATE", agent_role="planner")
         self._issue_receipt("IMPLEMENTATION", agent_role="builder")
         self._issue_receipt("REVIEW_PASS", agent_role="reviewer")
-        count = self.db.create_next_tickets("0001", "builder", "completed")
+        count = self.db.create_next_tickets(self.plan_id, "builder", "completed")
         self.assertEqual(count, 0)
 
     def test_guard_blocks_critic_after_review_pass(self):
         self._issue_receipt("PLAN_CREATE", agent_role="planner")
         self._issue_receipt("IMPLEMENTATION", agent_role="builder")
         self._issue_receipt("REVIEW_PASS", agent_role="reviewer")
-        count = self.db.create_next_tickets("0001", "critic", "completed")
+        count = self.db.create_next_tickets(self.plan_id, "critic", "completed")
         self.assertEqual(count, 0)
 
     # ── REVIEW_REJECT flow ────────────────────────────────────────
@@ -331,7 +332,7 @@ class TestPlanLifecycle(unittest.TestCase):
     def test_reviewer_failed_spawns_builder_for_reimplementation(self):
         self._issue_receipt("PLAN_CREATE", agent_role="planner")
         self._issue_receipt("IMPLEMENTATION", agent_role="builder")
-        count = self.db.create_next_tickets("0001", "reviewer", "failed")
+        count = self.db.create_next_tickets(self.plan_id, "reviewer", "failed")
         self.assertGreater(count, 0)
         self.assertGreater(self._count_open_tickets("builder"), 0)
 
@@ -345,7 +346,7 @@ class TestPlanLifecycle(unittest.TestCase):
     def test_guard_blocks_after_block(self):
         self._issue_receipt("PLAN_CREATE", agent_role="planner")
         self._issue_receipt("BLOCK", agent_role="watchdog")
-        count = self.db.create_next_tickets("0001", "builder", "completed")
+        count = self.db.create_next_tickets(self.plan_id, "builder", "completed")
         self.assertEqual(count, 0)
 
     # ── PROPOSED / PLANNING are visible in derived_status ─────────
@@ -363,14 +364,14 @@ class TestPlanLifecycle(unittest.TestCase):
 
     def test_planner_completed_spawns_builder_and_critic(self):
         self._issue_receipt("PLAN_CREATE", agent_role="planner")
-        count = self.db.create_next_tickets("0001", "planner", "completed")
+        count = self.db.create_next_tickets(self.plan_id, "planner", "completed")
         self.assertGreater(count, 1)
         self.assertGreater(self._count_open_tickets("builder"), 0)
         self.assertGreater(self._count_open_tickets("critic"), 0)
 
     def test_critic_completed_spawns_builder(self):
         self._issue_receipt("PLAN_CREATE", agent_role="planner")
-        count = self.db.create_next_tickets("0001", "critic", "completed")
+        count = self.db.create_next_tickets(self.plan_id, "critic", "completed")
         self.assertGreater(count, 0)
         self.assertGreater(self._count_open_tickets("builder"), 0)
 
@@ -380,7 +381,7 @@ class TestPlanLifecycle(unittest.TestCase):
         """G-3: After critic fails (CRITIQUE_REJECT), a planner ticket must
         be spawned so the plan can be revised instead of stuck forever."""
         self._issue_receipt("PLAN_CREATE", agent_role="planner")
-        count = self.db.create_next_tickets("0001", "critic", "failed")
+        count = self.db.create_next_tickets(self.plan_id, "critic", "failed")
         self.assertGreater(count, 0)
         self.assertGreater(self._count_open_tickets("planner"), 0)
 
@@ -388,12 +389,12 @@ class TestPlanLifecycle(unittest.TestCase):
         """G-3: Full lifecycle — planner → builder → critic rejects →
         planner picks up for revision."""
         self._issue_receipt("PLAN_CREATE", agent_role="planner")
-        self.db.create_next_tickets("0001", "planner", "completed")
+        self.db.create_next_tickets(self.plan_id, "planner", "completed")
         # builder ticket created, mark it completed
-        self.db.create_next_tickets("0001", "builder", "completed")
+        self.db.create_next_tickets(self.plan_id, "builder", "completed")
         # critic rejects
         self._issue_receipt("CRITIQUE_REJECT", agent_role="critic")
-        count = self.db.create_next_tickets("0001", "critic", "failed")
+        count = self.db.create_next_tickets(self.plan_id, "critic", "failed")
         self.assertGreater(count, 0)
         self.assertGreater(self._count_open_tickets("planner"), 0)
         # plan is not stuck — derived_status reflects the latest receipt
@@ -402,8 +403,18 @@ class TestPlanLifecycle(unittest.TestCase):
     # ── Plan number allocation (DB-authoritative) ─────────────────
 
     def test_plan_number_allocated_from_db(self):
+        # Seed an explicitly numeric plan — the setUp plan id is a random hex
+        # string (collision-proof), so MAX over numeric ids starts at 0001.
+        now = _iso_now()
+        self._raw_cur.execute(
+            "INSERT INTO plans (id, file_name, title, created_at, updated_at) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ("0001", "num-test-v0001.md", "Numeric Plan", now, now),
+        )
+        self._raw_conn.commit()
         row = self._query_one(
-            "SELECT MAX(CAST(id AS INTEGER)) as max_id FROM plans"
+            "SELECT MAX(CAST(id AS INTEGER)) as max_id FROM plans "
+            "WHERE id ~ '^[0-9]+$'"
         )
         max_id = row[0] if row[0] else 0
         next_num = str(max_id + 1).zfill(4)
@@ -418,7 +429,8 @@ class TestPlanLifecycle(unittest.TestCase):
         )
         self._raw_conn.commit()
         row = self._query_one(
-            "SELECT MAX(CAST(id AS INTEGER)) as max_id FROM plans"
+            "SELECT MAX(CAST(id AS INTEGER)) as max_id FROM plans "
+            "WHERE id ~ '^[0-9]+$'"
         )
         max_id = row[0] if row[0] else 0
         next_num = str(max_id + 1).zfill(4)
@@ -429,7 +441,8 @@ class TestPlanLifecycle(unittest.TestCase):
         self._raw_cur.execute("DELETE FROM plans")
         self._raw_conn.commit()
         row = self._query_one(
-            "SELECT MAX(CAST(id AS INTEGER)) as max_id FROM plans"
+            "SELECT MAX(CAST(id AS INTEGER)) as max_id FROM plans "
+            "WHERE id ~ '^[0-9]+$'"
         )
         max_id = row[0] if row[0] else 0
         next_num = str(max_id + 1).zfill(4)
@@ -440,12 +453,12 @@ class TestPlanLifecycle(unittest.TestCase):
     def test_update_plan_persists_to_db_independent_of_filesystem(self):
         now = _iso_now()
         self._raw_cur.execute(
-            "UPDATE plans SET goal = %s, updated_at = %s WHERE id = '0001'",
-            ("Original goal", now),
+            "UPDATE plans SET goal = %s, updated_at = %s WHERE id = %s",
+            ("Original goal", now, self.plan_id),
         )
         self._raw_conn.commit()
 
-        row = self._query_one("SELECT goal FROM plans WHERE id = '0001'")
+        row = self._query_one("SELECT goal FROM plans WHERE id = %s", (self.plan_id,))
         self.assertEqual(row[0], "Original goal")
 
         now2 = _iso_now()
@@ -456,12 +469,12 @@ class TestPlanLifecycle(unittest.TestCase):
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, %s, %s)
                ON CONFLICT(id) DO UPDATE SET
                goal = excluded.goal, updated_at = excluded.updated_at""",
-            ("0001", "test-plan-v0001.md", "Test Plan", "", "Updated via DB",
+            (self.plan_id, "test-plan-v0001.md", "Test Plan", "", "Updated via DB",
              "", "[]", "[]", "[]", "", now, now2),
         )
         self._raw_conn.commit()
 
-        row = self._query_one("SELECT goal FROM plans WHERE id = '0001'")
+        row = self._query_one("SELECT goal FROM plans WHERE id = %s", (self.plan_id,))
         self.assertEqual(row[0], "Updated via DB")
 
     def test_update_plan_deps_and_criteria_survive_db_reopen(self):
@@ -480,7 +493,7 @@ class TestPlanLifecycle(unittest.TestCase):
                dependencies = excluded.dependencies,
                files_affected = excluded.files_affected,
                updated_at = excluded.updated_at""",
-            ("0001", "test-plan-v0001.md", "Test Plan", "", "",
+            (self.plan_id, "test-plan-v0001.md", "Test Plan", "", "",
              "", json.dumps(files), json.dumps(criteria), json.dumps(deps),
              "", now, now),
         )
@@ -488,7 +501,7 @@ class TestPlanLifecycle(unittest.TestCase):
 
         row = self._query_one(
             "SELECT acceptance_criteria, dependencies, files_affected "
-            "FROM plans WHERE id = '0001'"
+            "FROM plans WHERE id = %s", (self.plan_id,)
         )
         self.assertEqual(json.loads(row[0]), criteria)
         self.assertEqual(json.loads(row[1]), deps)
@@ -505,13 +518,13 @@ class TestPlanLifecycle(unittest.TestCase):
         self.assertEqual(self._get_derived_status(), "PLAN_CREATE")
 
         # Step 2: Planner completes → builder + critic tickets spawned
-        count = self.db.create_next_tickets("0001", "planner", "completed")
+        count = self.db.create_next_tickets(self.plan_id, "planner", "completed")
         self.assertGreater(count, 1)
         self.assertEqual(self._count_open_tickets("builder"), 1)
         self.assertEqual(self._count_open_tickets("critic"), 1)
 
         # Step 3: Builder completes → reviewer ticket spawned
-        count = self.db.create_next_tickets("0001", "builder", "completed")
+        count = self.db.create_next_tickets(self.plan_id, "builder", "completed")
         self.assertGreater(count, 0)
         self.assertEqual(self._count_open_tickets("reviewer"), 1)
         self._issue_receipt("IMPLEMENTATION", agent_role="builder")
@@ -520,7 +533,7 @@ class TestPlanLifecycle(unittest.TestCase):
         # Step 4: Reviewer passes → terminal state, no more tickets
         self._issue_receipt("REVIEW_PASS", agent_role="reviewer")
         self.assertEqual(self._get_derived_status(), "REVIEW_PASS")
-        count = self.db.create_next_tickets("0001", "reviewer", "completed")
+        count = self.db.create_next_tickets(self.plan_id, "reviewer", "completed")
         self.assertEqual(count, 0)
         # No new tickets for any role after review pass
         self.assertEqual(self._count_open_tickets("builder"), 0)
@@ -531,14 +544,14 @@ class TestPlanLifecycle(unittest.TestCase):
 
         # Create plan
         self._issue_receipt("PLAN_CREATE", agent_role="planner")
-        self.db.create_next_tickets("0001", "planner", "completed")
+        self.db.create_next_tickets(self.plan_id, "planner", "completed")
         # Planner completed → builder + critic tickets spawned
         self.assertGreater(self._count_open_tickets("builder"), 0)
         self.assertGreater(self._count_open_tickets("critic"), 0)
 
         # Builder implements
         self._issue_receipt("IMPLEMENTATION", agent_role="builder")
-        self.db.create_next_tickets("0001", "builder", "completed")
+        self.db.create_next_tickets(self.plan_id, "builder", "completed")
         # Builder completed → reviewer ticket spawned
         # close_orphaned_tickets closed builder ticket (not valid for IMPLEMENTATION)
         self.assertEqual(self._count_open_tickets("builder"), 0)
@@ -549,19 +562,19 @@ class TestPlanLifecycle(unittest.TestCase):
         self.assertEqual(self._get_derived_status(), "REVIEW_REJECT")
 
         # Reviewer failed → builder ticket spawned for rework
-        count = self.db.create_next_tickets("0001", "reviewer", "failed")
+        count = self.db.create_next_tickets(self.plan_id, "reviewer", "failed")
         self.assertGreater(count, 0)
         self.assertGreater(self._count_open_tickets("builder"), 0)
 
         # Builder re-implements
         self._issue_receipt("IMPLEMENTATION", agent_role="builder")
-        self.db.create_next_tickets("0001", "builder", "completed")
+        self.db.create_next_tickets(self.plan_id, "builder", "completed")
         self.assertEqual(self._get_derived_status(), "IMPLEMENTATION")
 
         # Reviewer passes on rework → terminal
         self._issue_receipt("REVIEW_PASS", agent_role="reviewer")
         self.assertEqual(self._get_derived_status(), "REVIEW_PASS")
-        count = self.db.create_next_tickets("0001", "reviewer", "completed")
+        count = self.db.create_next_tickets(self.plan_id, "reviewer", "completed")
         self.assertEqual(count, 0)
 
 
