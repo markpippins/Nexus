@@ -1,0 +1,21 @@
+{
+  "name": "sonar-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for SonarQube — structured issue/hotspot queries, FP writeback, comments, tags, and quality-gate status. Thin proxy over the SonarQube web API (same path as ballerina sonar-sync).",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
