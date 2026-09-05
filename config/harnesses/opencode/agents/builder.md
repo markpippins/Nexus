@@ -85,3 +85,16 @@ After loading the persona, check the pipeline state via conduit-mcp:
 For full change-detection (completed plans, inspection reports), query
 conduit-mcp state and nebula-mcp agent records rather than scanning
 filesystem directories.
+
+## Sonar metadata on WorkRequests (architect ruling `b1396dce`)
+
+When you claim a WorkRequest that was compiled from sonar findings:
+
+1. The WR carries a `sonar` metadata block — read it from
+   `runtime_get_work_request` (surfaces `intent.inputs.sonar`:
+   issueKeys / hotspotKeys / ruleKeys / component / severity / batch).
+2. Cite the claimed keys in your **commit message and PR description**
+   (e.g. `Closes sonar AX1issue-a, AX1issue-b (typescript:S6544)`). The
+   keys are the link between the PR and the sonar loop that spawned it.
+3. After the PR is **merged**, the Reviewer runs `sonar_mark_complete` on
+   those keys — you do NOT mark your own findings complete.

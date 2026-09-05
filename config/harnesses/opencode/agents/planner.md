@@ -86,3 +86,16 @@ After loading the persona, check the pipeline state via conduit-mcp:
 For full change-detection (completed plans, inspection reports), query
 conduit-mcp state and nebula-mcp agent records rather than scanning
 filesystem directories.
+
+## Sonar grouping — completed items drop out structurally (ruling `b1396dce`)
+
+1. `sonar_search_issues` defaults to `resolved:"false"` (open issues
+   only) — completed findings (RESOLVED/FIXED, or hotspot REVIEWED)
+   automatically disappear from the grouping surface. **No skip-list or
+   manual "already done" filter is needed** — the query itself excludes
+   them.
+2. When batching sonar findings into a conduit plan / WorkRequest, embed
+   the claimed sonar keys into the WR's intent inputs as
+   `inputs.sonar = { issueKeys, hotspotKeys, ruleKeys, component,
+   severity, batch }` so the Builder can cite them in commits/PRs and the
+   Reviewer can close them post-merge.
