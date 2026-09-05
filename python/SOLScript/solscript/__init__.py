@@ -15,12 +15,17 @@ from .bridge import (
     ShrapnelResolutionBridge,
     read_bridge,
 )
-from .candidate_state import (
+from .state_bridge import (
     CANDIDATE_STATE_MEMBERS,
+    DEFAULT_STATE_BRIDGE_MODEL,
+    StateBridgeModel,
     build_member_exists_expression,
     deterministic_seed_members,
+    deterministic_state_members,
     ensure_candidate_state_model,
+    ensure_state_bridge_model,
     evaluate_candidate_state_members,
+    evaluate_state_members,
 )
 from .database_loader import DatabaseLoader
 from .events import (
@@ -121,11 +126,16 @@ __all__ = [
     "RepresentationIdentity",
     "RepresentationComparison",
     "FunctionBinding",
-    # Candidate state (SOL wiring, directive 96b22ed4)
+    # Generic state bridge (legacy candidate-state exports retained)
     "CANDIDATE_STATE_MEMBERS",
+    "StateBridgeModel",
+    "DEFAULT_STATE_BRIDGE_MODEL",
     "build_member_exists_expression",
     "deterministic_seed_members",
+    "deterministic_state_members",
+    "evaluate_state_members",
     "ensure_candidate_state_model",
+    "ensure_state_bridge_model",
     "evaluate_candidate_state_members",
     # Reasoning
     "DeterministicReasoner",

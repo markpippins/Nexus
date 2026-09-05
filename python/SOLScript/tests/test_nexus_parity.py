@@ -40,7 +40,7 @@ _NEXUS_SUBJECT_SCRIPT = [
 
 _NEXUS_SHRAPNEL_SCRIPT = [
     [
-        _row(object_id=1, field_name="tire_clearance", field_type_code=3,
+        _row(object_id=1, created_at=None, field_name="tire_clearance", field_type_code=3,
              value_type_code=3, value_id=10),
     ],
     [_row(value=2.4)],

@@ -61,9 +61,9 @@ def test_list_shrapnel_facts_reads_eav() -> None:
     conn = FakeConn(
         [
             [
-                _row(object_id=1, field_name="tire_clearance", field_type_code=3,
+                _row(object_id=1, created_at=None, field_name="tire_clearance", field_type_code=3,
                      value_type_code=3, value_id=10),
-                _row(object_id=1, field_name="is_steel", field_type_code=4,
+                _row(object_id=1, created_at=None, field_name="is_steel", field_type_code=4,
                      value_type_code=4, value_id=11),
             ],
             [_row(value=2.4)],  # value_double for id 10
