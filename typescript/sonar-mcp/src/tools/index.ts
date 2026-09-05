@@ -1,17 +1,25 @@
-// The six core sonar-mcp tools (night-shift flow: Planner grouping input,
-// Builder closure loop, Reviewer merge check).
+// The seven sonar-mcp tools (post-merge completion flow: Planner grouping input,
+// Builder closure loop, Reviewer merge check + completion writeback).
 //
 //  1. sonar_search_issues   — filter by severity/rule/component/new-code/resolution
 //  2. sonar_get_hotspot     — security hotspot detail
 //  3. sonar_mark_fp         — false-positive writeback (issue transition or hotspot review)
-//  4. sonar_add_comment     — issue comment writeback
-//  5. sonar_set_tags        — issue tag writeback
-//  6. sonar_quality_gate    — project quality-gate status (Reviewer merge check)
+//  4. sonar_mark_complete   — completion writeback: issue → RESOLVED/FIXED, hotspot → REVIEWED+FIXED
+//  5. sonar_add_comment     — issue comment writeback
+//  6. sonar_set_tags        — issue tag writeback
+//  7. sonar_quality_gate    — project quality-gate status (Reviewer merge check)
 //
 // Endpoints mirror ballerina sonar-sync's proven paths:
 //   /api/issues/search, /api/hotspots/search, /api/issues/do_transition,
 //   /api/hotspots/change_status, /api/issues/add_comment, /api/issues/set_tags,
 //   /api/qualitygates/project_status
+//
+// Writeback is SonarQube-side only (like sonar_mark_fp). Propagation of
+// status/resolution into the canonical sonar.issues / sonar.hotspots ledger
+// happens via sonar-sync's scheduled pull (that pull has NO `resolved`
+// filter and upserts status + resolution), so a completed item becomes
+// renderable as "complete" in Assembly on the next sync tick without any
+// skip-list maintenance.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -25,6 +33,55 @@ function err(e: unknown) {
     return json({ error: e.message, status: e.status, endpoint: e.endpoint });
   }
   return json({ error: String(e) });
+}
+
+/** Auto-detect whether a key is a hotspot (probe /api/hotspots/show like
+ * sonar_mark_fp) unless the caller declared the kind explicitly. */
+async function detectKind(
+  key: string,
+  declared?: "issue" | "hotspot",
+): Promise<"issue" | "hotspot"> {
+  if (declared) return declared;
+  try {
+    await sonarGet("/api/hotspots/show", { hotspot: key });
+    return "hotspot";
+  } catch {
+    return "issue";
+  }
+}
+
+/**
+ * Completion writeback — Reviewer post-merge action (ruling b1396dce).
+ * Issue: transition `resolve` → status RESOLVED, resolution FIXED.
+ * Hotspot: change_status REVIEWED + resolution FIXED.
+ * Optional message is attached as an issue comment (e.g. merge ref / PR #).
+ * sonar-sync's scheduled pull propagates status/resolution into the ledger.
+ */
+export async function markComplete(args: {
+  key: string;
+  kind?: "issue" | "hotspot";
+  message?: string;
+}) {
+  const kind = await detectKind(args.key, args.kind);
+  if (kind === "hotspot") {
+    await sonarPostForm("/api/hotspots/change_status", {
+      hotspot: args.key,
+      status: "REVIEWED",
+      resolution: "FIXED",
+    });
+    return { key: args.key, kind: "hotspot", marked: "REVIEWED+FIXED" };
+  }
+  await sonarPostForm("/api/issues/do_transition", {
+    issue: args.key,
+    transition: "resolve",
+  });
+  if (args.message) {
+    await sonarPostForm("/api/issues/add_comment", {
+      issue: args.key,
+      text: args.message,
+    });
+  }
+  return { key: args.key, kind: "issue", marked: "RESOLVED+FIXED" };
 }
 
 export function registerTools(server: McpServer) {
@@ -140,7 +197,25 @@ export function registerTools(server: McpServer) {
     },
   );
 
-  // ── 4. sonar_add_comment ───────────────────────────────────────────
+  // ── 4. sonar_mark_complete ────────────────────────────────────────
+  server.tool(
+    "sonar_mark_complete",
+    "Mark a finding as completed/fixed (Reviewer post-merge action). For an issue: transition it to RESOLVED/FIXED. For a hotspot key (detected by prefix or explicit kind param): review it as REVIEWED+FIXED. Use after the fix's PR is merged. sonar-sync's next pull propagates the completion into the ledger for Assembly rendering.",
+    {
+      key: z.string().describe("Issue or hotspot key"),
+      kind: z.enum(["issue", "hotspot"]).optional().describe("Explicit kind; auto-detected from key prefix when omitted"),
+      message: z.string().optional().describe("Optional justification comment added when marking an issue (e.g. merge ref / PR #)"),
+    },
+    async (args) => {
+      try {
+        return json(await markComplete(args));
+      } catch (e) {
+        return err(e);
+      }
+    },
+  );
+
+  // ── 5. sonar_add_comment ───────────────────────────────────────────
   server.tool(
     "sonar_add_comment",
     "Add a comment to an issue (Builder closure notes, triage rationale).",
@@ -158,7 +233,7 @@ export function registerTools(server: McpServer) {
     },
   );
 
-  // ── 5. sonar_set_tags ──────────────────────────────────────────────
+  // ── 6. sonar_set_tags ──────────────────────────────────────────────
   server.tool(
     "sonar_set_tags",
     "Replace the tags on an issue. Use for Planner triage vocabulary (e.g. night-shift, fp-candidate, batch-3).",
@@ -176,7 +251,7 @@ export function registerTools(server: McpServer) {
     },
   );
 
-  // ── 6. sonar_quality_gate ──────────────────────────────────────────
+  // ── 7. sonar_quality_gate ──────────────────────────────────────────
   server.tool(
     "sonar_quality_gate",
     "Get the quality-gate status for the nexus project (Reviewer merge check — gate must be PASSED).",

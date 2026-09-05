@@ -95,3 +95,16 @@ definition of done is code fixed + local verification + **branch pushed
 with an open PR**; treat PR checks (typecheck, hermetic-PG tests, Sonar
 scan) as your own loop — fix-forward on CI failure; commit+push+raise the
 PR without asking (R8); PRs without passing tests are raised as **draft**.
+
+## Sonar metadata on WorkRequests (architect ruling `b1396dce`)
+
+When you claim a WorkRequest that was compiled from sonar findings:
+
+1. The WR carries a `sonar` metadata block — read it from
+   `runtime_get_work_request` (surfaces `intent.inputs.sonar`:
+   issueKeys / hotspotKeys / ruleKeys / component / severity / batch).
+2. Cite the claimed keys in your **commit message and PR description**
+   (e.g. `Closes sonar AX1issue-a, AX1issue-b (typescript:S6544)`). The
+   keys are the link between the PR and the sonar loop that spawned it.
+3. After the PR is **merged**, the Reviewer runs `sonar_mark_complete` on
+   those keys — you do NOT mark your own findings complete.

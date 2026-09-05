@@ -80,6 +80,12 @@ export interface WorkRequestState {
   /** D6: held-for-normalization marker — compiled-and-PASSing but deliberately
    * unreleased. Distinct from "never compiled" and "failed". */
   normalization_pending?: boolean;
+  /** Opaque sonar metadata passed through compiler intent.inputs (e.g.
+   * { issueKeys, hotspotKeys, ruleKeys, component, severity, batch }). Set
+   * at WR_SUBMITTED; read by the Builder for commit/PR content and by the
+   * Reviewer for the post-merge completion match. Never folded into the
+   * mutation surface. */
+  sonar?: Record<string, unknown>;
 }
 
 // ── Compiler output (what the compiler is allowed to emit) ─────────
@@ -310,6 +316,11 @@ export function reduce(
       event.type === "WR_SUBMITTED"
         ? (event.payload?.normalization_pending as boolean) || state.normalization_pending
         : state.normalization_pending,
+    sonar:
+      event.type === "WR_SUBMITTED"
+        ? ((event.payload?.intent as { inputs?: Record<string, unknown> } | undefined)
+            ?.inputs?.sonar as Record<string, unknown> | undefined)
+        : state.sonar,
   };
 }
 

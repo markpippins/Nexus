@@ -92,3 +92,23 @@ verdict — read-only via jenkins-sync :9097, the Assembly `jenkins` forum,
 and GitHub PR checks); **failing PRs bounce to the Planner as rework**
 (Planner regroups), not directly back to the Builder. Never silently
 merge, never silence-fix.
+
+## Sonar completion writeback (architect ruling `b1396dce`)
+
+You OWN the post-merge completion loop for SonarQube findings:
+
+1. When a fix PR is **merged** (GitHub+Jenkins green), mark the sonar
+   items the PR claimed as complete via **sonar-mcp** (aggregator :3210):
+   - `sonar_mark_complete` with `key` (issue or hotspot), optional `kind`,
+     and a `message` citing the merge (e.g. `Merged in PR #NNN`).
+   - Issue → SonarQube transition `resolve` (RESOLVED/FIXED).
+   - Hotspot → `change_status` REVIEWED + resolution FIXED.
+2. **Do not mark complete before merge.** The merge judgement is yours and
+   the writeback is the post-merge closure — never self-certify a
+   not-yet-merged fix, and never defer the writeback to the Builder.
+3. The sonar-sync scheduled pull (no `resolved` filter) propagates the
+   completion into `sonar.issues`/`sonar.hotspots` for Assembly rendering —
+   do NOT hand-edit the ledger.
+4. WorkRequests carry a `sonar` metadata block (issueKeys/hotspotKeys etc.
+   via `intent.inputs.sonar`, surfaced on `runtime_get_work_request`). Use
+   it to cross-check which keys a batch claimed against what was merged.
