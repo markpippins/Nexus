@@ -8,7 +8,13 @@ from typing import Any, List
 
 from solscript import (
     BridgeFieldSlice,
+    DEFAULT_STATE_BRIDGE_MODEL,
+    Entity,
+    ResolutionInterpreter,
     ShrapnelResolutionBridge,
+    StateBridgeModel,
+    ensure_state_bridge_model,
+    evaluate_state_members,
     read_bridge,
 )
 from solscript.adapters import ContractShrapnelFact, ContractSubject
@@ -170,6 +176,34 @@ def test_bridge_fails_closed_on_ambiguity_and_type_mismatch() -> None:
     )
     assert mismatch.status == "unavailable"
     assert mismatch.reason == "field_type_mismatch: shrapnel.partial_implementation"
+
+
+def test_generic_state_model_uses_the_same_sol_navigation() -> None:
+    """A domain-specific state model does not depend on candidate names."""
+    interpreter = ResolutionInterpreter()
+    model = StateBridgeModel(
+        resolution_concept_name="Deployment",
+        state_concept_name="DeploymentState",
+        relationship_type="deployment_has_state",
+        relationship_name="deployment-state",
+        identity_attribute="deployment_key",
+        members=("healthy",),
+    )
+    relation = ensure_state_bridge_model(interpreter, model)
+    deployment = interpreter.add_entity_by_concept_name(
+        "Deployment",
+        {"deployment_key": "deploy:1"},
+    )
+    state = Entity(
+        id="state:1",
+        concept_id=interpreter.get_concept_by_name("DeploymentState").id,
+        attributes={"deployment_key": "deploy:1", "healthy": True},
+    )
+    interpreter.add_entity(state)
+
+    assert relation.relationship_type == "deployment_has_state"
+    assert evaluate_state_members(interpreter, deployment, model=model) == {"healthy": True}
+    assert DEFAULT_STATE_BRIDGE_MODEL.resolution_concept_name == "PromotionCandidate"
 
 
 def test_bridge_contract_is_deterministic_and_versioned() -> None:

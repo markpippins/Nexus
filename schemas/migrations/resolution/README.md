@@ -17,7 +17,7 @@ This is the tracked copy that gets applied to the `nexus` database's
 |---|---|
 | `resolution_schema_consolidated.sql` | Base full schema dump (pg_dump); apply the post-dump v28-v33 chain below to reach the current live contract |
 | `resolution_data_consolidated.sql` | Full data dump (pg_dump) — **current canonical seed data** |
-| `resolution_migration_v{3,4,5,6,7,11,12,13,17,18,19,20,21,22,23,23b,24b,28,29,30,31,32,33,34,35}.sql` | Incremental migrations (v3 → v35) |
+| `resolution_migration_v{3,4,5,6,7,11,12,13,17,18,19,20,21,22,23,23b,24b,28,29,30,31,32,33,34,35,36}.sql` | Incremental migrations (v3 → v36) |
 | `resolution_evaluate_proposition_v1.sql` | Proposition evaluation function (disposition fast path) |
 | `resolution_comparator_v1.sql` | Cross-representation disagreement detection (`detect_disagreement`) |
 | `resolution_authority_resolution_v1.sql` | Authority resolution via verified statement |
@@ -44,7 +44,8 @@ psql -h localhost -U pguser -d nexus -v ON_ERROR_STOP=1 \
   -f schemas/migrations/resolution/resolution_schema_consolidated.sql
 psql -h localhost -U pguser -d nexus -v ON_ERROR_STOP=1 \
   -f schemas/migrations/resolution/resolution_data_consolidated.sql
-# 3. apply the ordered post-dump chain through v33, including v31/v32/v33
+# 3. apply the ordered post-dump chain through v36, including v31/v32/v33,
+#    v34/v35, and the v36 Shrapnel bridge
 ```
 
 Notes:
@@ -56,10 +57,11 @@ Notes:
   graph-edge evidence bridge, v30 verified execution admission bridge, v31 frame
   dimensions, v32 context-aware proposition evaluation, v33 unambiguous sweep
   overloads, v34 verified_statement immutability trigger (adopted from the
-  /claude experimental branch), and v35 frame semantics (meaning of frame
-  dimensions as first-class proposition vocabulary). v28-v35 are incremental
-  migrations on top of v24b. The consolidated dump is a base recovery artifact
-  and does not yet include the v31-v35 delta; apply the ordered migrations
+  /claude experimental branch), v35 frame semantics (meaning of frame
+  dimensions as first-class proposition vocabulary), and v36 read-only
+  Shrapnel state bridge. v28-v36 are incremental migrations on top of v24b.
+  The consolidated dump is a base recovery artifact
+  and does not yet include the v31-v36 delta; apply the ordered migrations
   after restoring it, or regenerate the dump from the live catalog before
   using it as a full recovery source.
 

@@ -142,7 +142,8 @@ class SolNativeAdapter:
         # property_name -> typed value. We read the value extension tables by
         # the field's field_type_code mapping (1..7) as in DatabaseLoader.
         rows = await self._rows(
-            "SELECT o.id AS object_id, f.property_name AS field_name, "
+            "SELECT o.id AS object_id, o.created_at AS created_at, "
+            "       f.property_name AS field_name, "
             "       f.field_type_code, v.value_type_code, oav.value_id "
             "FROM shrapnel.object_instance o "
             "LEFT JOIN shrapnel.object_attribute_value oav ON oav.object_id = o.id "
@@ -150,7 +151,8 @@ class SolNativeAdapter:
             "LEFT JOIN shrapnel.value v ON v.id = oav.value_id"
         )
         # Group into per-object attribute dicts.
-        objects: dict[int, dict] = {}
+        objects: dict[int, dict[str, Any]] = {}
+        created_at: dict[int, Any] = {}
         for r in rows:
             oid = r["object_id"]
             if oid is None:
@@ -158,10 +160,15 @@ class SolNativeAdapter:
             attr_key = r["field_name"]
             if attr_key is None:
                 continue
+            created_at[oid] = r["created_at"]
             value = await self._read_typed_value(r["value_id"], r["value_type_code"])
             objects.setdefault(oid, {})[attr_key] = value
         return [
-            ContractShrapnelFact(object_id=str(oid), attributes=attrs)
+            ContractShrapnelFact(
+                object_id=str(oid),
+                attributes=attrs,
+                valid_from=created_at.get(oid),
+            )
             for oid, attrs in objects.items()
         ]
 
