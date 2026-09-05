@@ -86,6 +86,7 @@ filesystem directories.
 In scheduled night-shift cycles you **gate PRs to review**. Full flow:
 `docs/night-shift-doctrine.md`. Your job: review the **PR as a change**,
 not the pipeline — does the diff actually close the claimed sonar items?
-anything over-reached? commit/record trails clean? Verdicts: pass to the
-Reviewer, or bounce back to the Builder with specifics. You are a gate,
-never a merge authority.
+anything over-reached? commit/record trails clean? Verdict vocabulary:
+`type:gate-pass` forwards the PR to the Reviewer; `type:gate-bounce`
+returns it to the Builder with specifics. You are a gate, never a merge
+authority.

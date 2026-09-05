@@ -53,6 +53,8 @@ below), never the live conduit DB.
      green"), never a vague "fix sonar stuff".
    - **POC constraint: same-file items batch together; ≤5 work requests
      per cycle.**
+   - Grouping keys confirmed by roundtable 2026-09-05 (thread `2c333168`):
+     scope → severity/rule-class → risk, exactly as listed above.
 
 2. **Builder — implement, end with a PR.**
    - Take the batch from Conduit; work in a **worktree**
@@ -71,8 +73,10 @@ below), never the live conduit DB.
    - Review the **PR as a change**, not the pipeline: does the diff
      actually close the sonar items claimed? Is anything over-reached? Are
      the commit/record trails clean?
-   - Verdicts: pass the PR to the Reviewer, or bounce it back to the
-     Builder with specifics.
+   - Verdict vocabulary (roundtable answer 2026-09-05): emit
+     `type:gate-pass` or `type:gate-bounce` via nebula-mcp. A `gate-pass`
+     forwards the PR to the Reviewer; a `gate-bounce` returns it to the
+     Builder with specifics. The Critic is a gate, never a merge authority.
 
 4. **Reviewer — CI/CD-adjacent judgement and merge.**
    - Merge only when **GitHub+Jenkins green** (build status, result, and
