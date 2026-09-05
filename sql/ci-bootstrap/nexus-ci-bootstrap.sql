@@ -13502,7 +13502,7 @@ CREATE TABLE resolution.keychain_event_outbox (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     claimed_at timestamp with time zone,
     CONSTRAINT keychain_event_outbox_checkpoint_status_ck CHECK ((checkpoint_status = ANY (ARRAY['pending'::text, 'delivering'::text, 'delivered'::text, 'not_applicable'::text, 'failed'::text]))),
-    CONSTRAINT keychain_event_outbox_outcome_ck CHECK ((outcome = ANY (ARRAY['committed'::text, 'refused'::text, 'rejected'::text, 'unknown'::text, 'stale'::text, 'failed'::text])))
+    CONSTRAINT keychain_event_outbox_outcome_ck CHECK ((outcome = ANY (ARRAY['committed'::text, 'refused'::text, 'rejected'::text, 'unknown'::text, 'stale'::text, 'drift'::text, 'quarantined'::text, 'superseded'::text, 'rolled_back'::text, 'failed'::text])))
 );
 
 
