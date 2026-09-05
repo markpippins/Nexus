@@ -1,0 +1,2536 @@
+openapi: 3.0.3
+info:
+  title: aegis-srv — Aegis State-Machine Registry API
+  version: 1.0.9728dd0a
+  description: 'REST API for the aegis schema: TLA+ state-machine registries (constants, variables, states, transitions, invariants,
+    properties, temporal properties, resolution-schema mappings), validation and model-check results, and audited execution
+    logs.
+
+
+    Endpoint inventory generated from source route registrations by `nexus/tools/api-docs/`. Request/response bodies are generic;
+    field-level contracts live in the service code and its README.'
+servers:
+- url: http://localhost:3116
+tags:
+- name: health
+- name: registries
+paths:
+  /api/registries:
+    get:
+      tags:
+      - registries
+      operationId: get_registries
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - registries
+      operationId: post_registries
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/registries/{id}:
+    delete:
+      tags:
+      - registries
+      operationId: delete_registries_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'Soft delete: is_active = false (schema partial unique index on active name)'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags:
+      - registries
+      operationId: patch_registries_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/attribute-mappings:
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_attribute_mappings
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: attribute-mappings
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+      - registries
+      operationId: post_registries_id_attribute_mappings
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/attribute-mappings/{cid}:
+    delete:
+      tags:
+      - registries
+      operationId: delete_registries_id_attribute_mappings_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_attribute_mappings_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags:
+      - registries
+      operationId: patch_registries_id_attribute_mappings_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/concept-mappings:
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_concept_mappings
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: concept-mappings
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+      - registries
+      operationId: post_registries_id_concept_mappings
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/concept-mappings/{cid}:
+    delete:
+      tags:
+      - registries
+      operationId: delete_registries_id_concept_mappings_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_concept_mappings_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags:
+      - registries
+      operationId: patch_registries_id_concept_mappings_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/constants:
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_constants
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: constants
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+      - registries
+      operationId: post_registries_id_constants
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/constants/{cid}:
+    delete:
+      tags:
+      - registries
+      operationId: delete_registries_id_constants_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_constants_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags:
+      - registries
+      operationId: patch_registries_id_constants_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/execution-log:
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_execution_log
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: execution-log
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+      - registries
+      operationId: post_registries_id_execution_log
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/execution-log/{cid}:
+    delete:
+      tags:
+      - registries
+      operationId: delete_registries_id_execution_log_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_execution_log_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags:
+      - registries
+      operationId: patch_registries_id_execution_log_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/invariants:
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_invariants
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: invariants
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+      - registries
+      operationId: post_registries_id_invariants
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/invariants/{cid}:
+    delete:
+      tags:
+      - registries
+      operationId: delete_registries_id_invariants_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_invariants_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags:
+      - registries
+      operationId: patch_registries_id_invariants_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/model-check:
+    post:
+      tags:
+      - registries
+      operationId: post_registries_id_model_check
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'Model-check: deterministic state-space model check over the structured aegis graph (reachability, deadlock,
+        invariant/property/temporal verd'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/model-check-results:
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_model_check_results
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/properties:
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_properties
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: properties
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+      - registries
+      operationId: post_registries_id_properties
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/properties/{cid}:
+    delete:
+      tags:
+      - registries
+      operationId: delete_registries_id_properties_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_properties_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags:
+      - registries
+      operationId: patch_registries_id_properties_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/relationship-mappings:
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_relationship_mappings
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: relationship-mappings
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+      - registries
+      operationId: post_registries_id_relationship_mappings
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/relationship-mappings/{cid}:
+    delete:
+      tags:
+      - registries
+      operationId: delete_registries_id_relationship_mappings_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_relationship_mappings_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags:
+      - registries
+      operationId: patch_registries_id_relationship_mappings_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/states:
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_states
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: states
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+      - registries
+      operationId: post_registries_id_states
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/states/{cid}:
+    delete:
+      tags:
+      - registries
+      operationId: delete_registries_id_states_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_states_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags:
+      - registries
+      operationId: patch_registries_id_states_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/temporal-properties:
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_temporal_properties
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: temporal-properties
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+      - registries
+      operationId: post_registries_id_temporal_properties
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/temporal-properties/{cid}:
+    delete:
+      tags:
+      - registries
+      operationId: delete_registries_id_temporal_properties_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_temporal_properties_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags:
+      - registries
+      operationId: patch_registries_id_temporal_properties_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/transitions:
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_transitions
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: transitions
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+      - registries
+      operationId: post_registries_id_transitions
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/transitions/{cid}:
+    delete:
+      tags:
+      - registries
+      operationId: delete_registries_id_transitions_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_transitions_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags:
+      - registries
+      operationId: patch_registries_id_transitions_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/validate:
+    post:
+      tags:
+      - registries
+      operationId: post_registries_id_validate
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: Action endpoints
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/validation-results:
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_validation_results
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/variables:
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_variables
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: variables
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+      - registries
+      operationId: post_registries_id_variables
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/{id}/variables/{cid}:
+    delete:
+      tags:
+      - registries
+      operationId: delete_registries_id_variables_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+      - registries
+      operationId: get_registries_id_variables_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags:
+      - registries
+      operationId: patch_registries_id_variables_cid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/registries/name/{name}:
+    get:
+      tags:
+      - registries
+      operationId: get_registries_name_name
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+  /health:
+    get:
+      tags:
+      - health
+      operationId: get_health
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    JsonBody:
+      type: object
+      additionalProperties: true
+      description: Generic JSON body (fields are service-specific).
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code (e.g. not_found, validation_failed).
+        message:
+          type: string
+          description: Human-readable error detail.
+      additionalProperties: true
+x-generated-by: nexus/tools/api-docs/gen_openapi.py

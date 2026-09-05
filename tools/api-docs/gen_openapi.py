@@ -150,6 +150,14 @@ SERVICES = {
         "desc": "REST API for the wind workflow schema: offices, titles, tasks, workflow "
                 "graphs, runtime instances, tickets, and receipts.",
     },
+    "typescript/aegis-srv": {
+        "title": "aegis-srv — Aegis State-Machine Registry API",
+        "port": 3116,
+        "desc": "REST API for the aegis schema: TLA+ state-machine registries "
+                "(constants, variables, states, transitions, invariants, properties, "
+                "temporal properties, resolution-schema mappings), validation and "
+                "model-check results, and audited execution logs.",
+    },
     "python/vision-srv": {
         "title": "vision-srv — LOSM REST API",
         "port": 8003,
