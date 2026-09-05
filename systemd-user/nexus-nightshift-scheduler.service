@@ -1,0 +1,33 @@
+[Unit]
+# Night-shift scheduler evaluator — dedicated Option-A isolation target.
+# Same canonical tackle runner as the day evaluator (nexus-agent-scheduler),
+# but pointed at nexus_nightshift so night-shift receipts/tickets never touch
+# the live conduit DB (night-shift-doctrine.md, receipt isolation option A).
+#
+# The isolation flip drill (DEPLOY_DB_CONFIG.md) must be applied to the
+# conduit/nebula service surface BEFORE this unit becomes live: conduit-mcp,
+# nebula-srv and wrp-bridge-daemon all need their CONDUIT_PG_DSN / PG_DB_NAME
+# flipped to nexus_nightshift for the night window, then flipped back at dawn.
+# This unit ONLY drives the scheduler entries that live in the test DB.
+#
+# Day/night boundary: this evaluator runs the nightshift task_slug entries at
+# staggered intervals (1800s). Builder/Reviewer launches stay gated by
+# _has_eligible_work (1285 remediation, incident e6d854da) — a fresh test DB
+# has no READY requests/open tickets, so only Planner/Critic become due until
+# the flipped pipeline bootstraps work inside the test DB.
+Description=Nexus Night-Shift Agent Scheduler Evaluator (tackle, nexus_nightshift)
+After=network.target postgresql.service
+Wants=network.target
+# Launch gate: only run while the Option-A flip is active. bin/nightshift-flip.sh
+# `on` creates this marker (and flips the MCP surface); `off` removes it. An
+# enabled timer therefore does NOT launch agents against the live pipeline.
+ConditionPathExists=%h/.cache/nightshift-flip.active
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/codex/dev/nexus/python
+Environment=PYTHONPATH=/home/codex/dev/nexus/python
+Environment=CONDUIT_PG_DSN=postgresql://pguser:pgpass@localhost:5432/nexus_nightshift
+ExecStart=/home/codex/opt/anaconda3/bin/python3 -m tackle.agent_scheduler_runner
+StandardOutput=append:/tmp/nightshift-scheduler-evaluator.log
+StandardError=append:/tmp/nightshift-scheduler-evaluator.log

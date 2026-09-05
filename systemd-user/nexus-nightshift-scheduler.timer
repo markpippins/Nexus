@@ -1,0 +1,19 @@
+[Unit]
+# Night-shift scheduler evaluator tick — same 1-minute cadence as the day
+# evaluator, driving only the nightshift entries in nexus_nightshift.
+# Kept as a SEPARATE timer from nexus-agent-scheduler.timer so the night-shift
+# DB target is explicit and the operator can start/stop the night pipeline
+# independently of the day evaluator. Enabled only while the Option-A flip is
+# in place (see nexus-nightshift-scheduler.service).
+Description=Night-Shift agent scheduler evaluator tick (every 1 min)
+RefuseManualStart=no
+
+[Timer]
+OnCalendar=*:0/1
+OnBootSec=30s
+OnUnitActiveSec=1min
+Persistent=true
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target
