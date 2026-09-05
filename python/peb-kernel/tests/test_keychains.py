@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from uuid import uuid4
 
@@ -69,6 +70,104 @@ def test_rejected_transaction_is_archived_without_checkpoint():
     assert params[2] == "peb.admission.rejected"
     assert params[3] == "rejected"
     assert params[-1] == "not_applicable"
+
+
+def _binding_transaction(disposition: str = "allow") -> _Transaction:
+    return _Transaction(
+        id=uuid4(),
+        idempotency_key=f"binding-{disposition}",
+        entity_id="candidate-1",
+        tool_name="peb_record_decision",
+        admission_result=AdmissionResult.ALLOWED,
+        before_hash="before",
+        after_hash="after",
+    )
+
+
+def _attach_binding(transaction: _Transaction, disposition: str = "allow") -> _Transaction:
+    transaction.input = {
+        "binding_decision": {
+            "binding_contract_version": 1,
+            "decision_class": "deny_contract_promotion",
+            "contract": {"id": "promotion-contract", "version": "1"},
+            "proposition_id": "pg:ready",
+            "doctrine_ids": ["law-1"],
+            "evaluator": {"id": "sol", "version": "w8.08"},
+            "evidence_ids": ["evidence-1"],
+            "subject_id": "candidate-1",
+            "work_item_id": "work-1",
+            "as_of": "2026-09-04T12:00:00Z",
+            "disposition": disposition,
+            "authority_level": "narrowly_binding",
+            "authorization_ref": "986ec482",
+            "evaluation_fingerprint": "sha256:" + "ab" * 32,
+            "decision_id": f"decision-{disposition}",
+            "evidence_fresh": True,
+            "replay_context": "attempt-1",
+            "lineage_fingerprint": "sha256:" + "cd" * 32,
+            "law_version": "w8.08",
+            "bridge_id": "peb-keychains-outbox",
+            "bridge_version": "1",
+        },
+    }
+    return transaction
+
+
+def test_binding_decision_emits_complete_keychains_provenance():
+    conn = _Connection()
+    tx = _attach_binding(_binding_transaction(), "allow")
+    PebKeychainsAdapter().emit_transaction(conn, tx)
+
+    statement, params = conn._cursor.calls[0]
+    assert params[1] == "binding:decision-allow:sha256:" + "ab" * 32
+    assert params[2] == "peb.deny_contract_promotion.committed"
+    assert params[3] == "committed"
+    assert params[9] == "promotion-contract"
+    assert params[10] == "sol"
+    assert params[11] == "law-1"
+    assert params[-1] == "pending"
+    read_set = json.loads(params[14])
+    payload = json.loads(params[15])
+    assert read_set["decision_class"] == "deny_contract_promotion"
+    assert read_set["authorization_ref"] == "986ec482"
+    assert read_set["evaluation_fingerprint"] == "sha256:" + "ab" * 32
+    assert payload["decision_id"] == "decision-allow"
+    assert payload["outcome"] == "committed"
+    assert "evaluator_version" in read_set
+    assert "ON CONFLICT (source_namespace, source_event_id) DO NOTHING" in statement
+
+
+def test_all_binding_negative_dispositions_archive_without_checkpoint():
+    dispositions = ("refused", "unknown", "stale", "drift", "quarantined", "superseded", "rolled_back")
+    for disposition in dispositions:
+        conn = _Connection()
+        tx = _attach_binding(_binding_transaction(disposition), disposition)
+        PebKeychainsAdapter().emit_transaction(conn, tx)
+        _, params = conn._cursor.calls[0]
+        assert params[2] == f"peb.deny_contract_promotion.{disposition}"
+        assert params[3] == disposition
+        assert params[-1] == "not_applicable"
+        assert json.loads(params[15])["disposition"] == disposition
+
+
+def test_unauthorized_binding_class_fails_closed_before_outbox_write():
+    conn = _Connection()
+    tx = _attach_binding(_binding_transaction(), "allow")
+    tx.input["binding_decision"]["decision_class"] = "other-class"
+    import pytest
+    with pytest.raises(ValueError, match="unauthorized Keychains decision class"):
+        PebKeychainsAdapter().emit_transaction(conn, tx)
+    assert conn._cursor.calls == []
+
+
+def test_incomplete_binding_provenance_fails_closed_before_outbox_write():
+    conn = _Connection()
+    tx = _attach_binding(_binding_transaction(), "allow")
+    del tx.input["binding_decision"]["evidence_ids"]
+    import pytest
+    with pytest.raises(ValueError, match="missing provenance"):
+        PebKeychainsAdapter().emit_transaction(conn, tx)
+    assert conn._cursor.calls == []
 
 
 def test_routed_or_missing_outcome_is_explicitly_unknown():
