@@ -163,6 +163,125 @@ test('negative outcomes are archived without advancing the checkpoint', async ()
   assert.equal(after.checkpointId, before.checkpointId)
 })
 
+test('deny_contract_promotion negative outcomes create immutable decision checkpoints', async () => {
+  const sourceNamespace = `keychains-negative-${process.pid}-${Date.now()}`
+  const sourceEventId = randomUUID()
+  const before = await (await fetch(`${BASE}/keychain-snapshot/agent-records/status`)).json()
+  const mongo = new MongoClient(process.env.MONGO_URL || 'mongodb://localhost:27017')
+  let previousActive = null
+  let previousEntries = null
+  let previousRecordTypeState = null
+  await mongo.connect()
+  {
+    const db = mongo.db('keychains')
+    previousActive = await db.collection('active_checkpoints').findOne({ _id: 'agent-records' })
+    previousEntries = await db.collection('entries').find({}).toArray()
+    previousRecordTypeState = await db.collection('record_type_state').find({}).toArray()
+  }
+  const triggerEvent = {
+    source_namespace: sourceNamespace,
+    source_event_id: sourceEventId,
+    kind: 'peb.deny_contract_promotion.refused',
+    outcome: 'refused',
+    actor: 'peb-kernel',
+    decision_class: 'deny_contract_promotion',
+    binding_owner: 'resolution',
+    authority_level: 'narrowly_binding',
+    authorization_ref: '986ec482',
+    decision_id: 'decision-negative-w9',
+    proposition_id: 'pg:ready',
+    subject_id: 'candidate-1',
+    work_item_id: 'work-1',
+    disposition: 'refused',
+    evidence_ids: ['evidence-negative-1'],
+    replay_context: 'attempt-negative-1',
+    as_of: '2026-09-05T12:00:00Z',
+    evaluation_fingerprint: 'sha256:' + 'ef'.repeat(32),
+    lineage_fingerprint: 'sha256:' + '12'.repeat(32),
+    evaluator_id: 'peb-evaluator',
+    evaluator_version: 'peb-evaluator-v1',
+    contract_id: 'governed-trigger.v1',
+    contract_version: 1,
+    law_id: 'deny-contract-promotion-law',
+    law_version: '2026-09-02',
+    bridge_id: 'resolution-keychains-bridge',
+    bridge_version: '1',
+    read_set: { manifest_id: 'negative-manifest-v1', digest: 'sha256:negative' },
+  }
+
+  const res = await fetch(`${BASE}/keychain-snapshot/agent-records/snapshot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ triggerEvent }),
+  })
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.equal(body.ok, true)
+  assert.equal(body.deduplicated, false)
+  assert.equal(body.trigger.outcome, 'refused')
+  assert.equal(body.decision_context.decision_class, 'deny_contract_promotion')
+  assert.equal(body.decision_context.decision.outcome, 'refused')
+  assert.equal(body.decision_context.decision.disposition, 'refused')
+  assert.deepEqual(body.decision_context.source_read_set, triggerEvent.read_set)
+
+  const after = await (await fetch(`${BASE}/keychain-snapshot/agent-records/status`)).json()
+  assert.ok(after.latestSnapshot > before.latestSnapshot)
+  const replay = await fetch(`${BASE}/keychain-snapshot/agent-records/snapshot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ triggerEvent }),
+  })
+  assert.equal(replay.status, 200)
+  const replayBody = await replay.json()
+  assert.equal(replayBody.deduplicated, true)
+  assert.equal(replayBody.version, body.version)
+
+  const rewind = await (await fetch(`${BASE}/keychain-snapshot/agent-records/rewind?at=${body.version}`)).json()
+  assert.equal(rewind.ok, true)
+  assert.deepEqual(rewind.decision_context, body.decision_context)
+
+  const transitions = await (await fetch(`${BASE}/keychain-snapshot/agent-records/transitions?limit=200`)).json()
+  const transition = transitions.items.find((item) => item.source_namespace === sourceNamespace)
+  assert.ok(transition)
+  assert.equal(transition.checkpoint_status, 'delivered')
+  assert.equal(transition.snapshot_version, body.version)
+  assert.deepEqual(transition.read_set, triggerEvent.read_set)
+
+  try {
+    const db = mongo.db('keychains')
+    assert.equal(await db.collection('ar_snapshots').countDocuments({
+      source_namespace: sourceNamespace,
+      source_event_id: sourceEventId,
+    }), 1)
+  } finally {
+    const db = mongo.db('keychains')
+    const checkpoint = await db.collection('ar_snapshots').findOne({
+      source_namespace: sourceNamespace,
+      source_event_id: sourceEventId,
+    })
+    await db.collection('transitions').deleteMany({ source_namespace: sourceNamespace })
+    await db.collection('ar_drift_findings').deleteMany({ checkpoint_id: checkpoint?.checkpoint_id })
+    await db.collection('checkpoint_entries').deleteMany({ checkpoint_id: checkpoint?.checkpoint_id })
+    await db.collection('ar_snapshots').deleteMany({ source_namespace: sourceNamespace })
+    if (previousActive) {
+      await db.collection('active_checkpoints').replaceOne(
+        { _id: 'agent-records' },
+        previousActive,
+        { upsert: true },
+      )
+    } else {
+      await db.collection('active_checkpoints').deleteOne({ _id: 'agent-records' })
+    }
+    await db.collection('entries').deleteMany({})
+    if (previousEntries.length > 0) await db.collection('entries').insertMany(previousEntries)
+    await db.collection('record_type_state').deleteMany({})
+    if (previousRecordTypeState.length > 0) {
+      await db.collection('record_type_state').insertMany(previousRecordTypeState)
+    }
+    await mongo.close()
+  }
+})
+
 test('rewind returns a committed state vector and rejects invalid versions', async () => {
   const status = await (await fetch(`${BASE}/keychain-snapshot/agent-records/status`)).json()
   const rewind = await (await fetch(`${BASE}/keychain-snapshot/agent-records/rewind?at=${status.latestSnapshot}`)).json()

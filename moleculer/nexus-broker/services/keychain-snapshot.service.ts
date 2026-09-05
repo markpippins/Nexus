@@ -1191,6 +1191,18 @@ export default class KeychainService extends Service {
     }
   }
 
+  private isBindingDecisionEvent(
+    triggerEvent: TriggerEventContract,
+    readSet: Record<string, any>,
+    payload: Record<string, any>,
+  ): boolean {
+    const decisionClass = triggerEvent.decision_class
+      || readSet.decision_class
+      || payload.decision_class;
+    return decisionClass === "deny_contract_promotion"
+      && triggerEvent.kind.startsWith("peb.deny_contract_promotion.");
+  }
+
   private buildDecisionContextManifest(triggerEvent: TriggerEventContract): DecisionContextManifest {
     const readSet = triggerEvent.read_set && typeof triggerEvent.read_set === "object"
       ? triggerEvent.read_set
@@ -1331,6 +1343,13 @@ export default class KeychainService extends Service {
 
     if (triggerEvent) {
       triggerEvent.recorded_at = triggerEvent.recorded_at || new Date().toISOString();
+      const readSet = triggerEvent.read_set && typeof triggerEvent.read_set === "object"
+        ? triggerEvent.read_set
+        : {};
+      const payload = triggerEvent.payload && typeof triggerEvent.payload === "object"
+        ? triggerEvent.payload
+        : {};
+      const isBindingDecision = this.isBindingDecisionEvent(triggerEvent, readSet, payload);
       const existing = await db.collection("transitions").findOne({
         $or: [
           { keychain_event_id: triggerEvent.idempotency_key },
@@ -1385,9 +1404,12 @@ export default class KeychainService extends Service {
         }
       }
 
-      // Refused/rejected/unknown outcomes are durable evidence, but do not
-      // fabricate a global state-vector checkpoint.
-      if (triggerEvent.outcome && triggerEvent.outcome !== "committed") {
+      // Negative outcomes from the ratified deny_contract_promotion class are
+      // decision evidence, not merely archive-only events. They receive a
+      // checkpoint carrying the exact read-set so rewind can explain the
+      // refusal/stale/rollback boundary. Other source events keep the
+      // existing archive-only behavior unless they are committed.
+      if (triggerEvent.outcome && triggerEvent.outcome !== "committed" && !isBindingDecision) {
         await db.collection("transitions").updateOne(
           { keychain_event_id: triggerEvent.idempotency_key },
           {

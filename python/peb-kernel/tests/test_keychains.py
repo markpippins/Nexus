@@ -192,7 +192,7 @@ def test_all_binding_negative_dispositions_archive_without_checkpoint():
         _, params = conn._cursor.calls[0]
         assert params[2] == f"peb.deny_contract_promotion.{disposition}"
         assert params[3] == disposition
-        assert params[-1] == "not_applicable"
+        assert params[-1] == "pending"
         assert json.loads(params[15])["disposition"] == disposition
 
 
