@@ -69,7 +69,12 @@ class PebKeychainsAdapter:
                 now,
                 json.dumps(read_set, sort_keys=True, default=str),
                 json.dumps(payload, sort_keys=True, default=str),
-                "pending" if outcome == "committed" else "not_applicable",
+                # Every ratified deny_contract_promotion disposition is a
+                # governed decision point, including negative outcomes. The
+                # broker must consume those rows to create an immutable
+                # checkpoint/read-set record. Generic PEB outcomes remain
+                # archive-only unless they are committed.
+                "pending" if binding is not None or outcome == "committed" else "not_applicable",
             ),
         )
 
