@@ -8,6 +8,13 @@ Usage::
     result = interp.evaluate_proposition(prop)
 """
 
+from .bridge import (
+    BRIDGE_SCHEMA_VERSION,
+    BridgeFieldSlice,
+    BridgeReadResult,
+    ShrapnelResolutionBridge,
+    read_bridge,
+)
 from .candidate_state import (
     CANDIDATE_STATE_MEMBERS,
     build_member_exists_expression,
@@ -77,6 +84,11 @@ __all__ = [
     "Query",
     "TransactionContext",
     "DatabaseLoader",
+    "BRIDGE_SCHEMA_VERSION",
+    "BridgeFieldSlice",
+    "BridgeReadResult",
+    "ShrapnelResolutionBridge",
+    "read_bridge",
     "KEYCHAIN_EVENT_SCHEMA_VERSION",
     "READ_SET_MANIFEST_SCHEMA_VERSION",
     "KeychainEvent",

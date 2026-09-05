@@ -63,9 +63,16 @@ class ContractSubject:
 
 @dataclass
 class ContractShrapnelFact:
-    """A dense per-object attribute set (EAV-sourced)."""
+    """A dense per-object attribute set (EAV-sourced).
+
+    Temporal bounds are optional because existing Shrapnel objects are
+    timeless. Adapters that expose bitemporal object metadata populate them;
+    the bridge then applies the same as-of rule used for Resolution subjects.
+    """
     object_id: str
     attributes: Dict[str, Any] = field(default_factory=dict)
+    valid_from: Optional[datetime] = None
+    valid_until: Optional[datetime] = None
 
 
 @dataclass
