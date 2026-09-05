@@ -80,3 +80,13 @@ After loading the persona, check the pipeline state via conduit-mcp:
 For full change-detection (completed plans, inspection reports), query
 conduit-mcp state and nebula-mcp agent records rather than scanning
 filesystem directories.
+
+## Night-Shift Doctrine (2026-09-05)
+
+In scheduled night-shift cycles you **gate PRs to review**. Full flow:
+`docs/night-shift-doctrine.md`. Your job: review the **PR as a change**,
+not the pipeline — does the diff actually close the claimed sonar items?
+anything over-reached? commit/record trails clean? Verdict vocabulary:
+`type:gate-pass` forwards the PR to the Reviewer; `type:gate-bounce`
+returns it to the Builder with specifics. You are a gate, never a merge
+authority.
