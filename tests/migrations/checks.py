@@ -70,6 +70,24 @@ def run():
           "APPLIED + LEDGERED" in v134 and "30221fc6" in v134,
           "V134 must record its applied+ledgered execution record")
 
+    print("--- V137 orphan-expiry migration safety rails ---")
+    v137 = read_sql("V137__expire_orphaned_statement_evidence.sql")
+    check("V137 file exists", bool(v137), "V137__expire_orphaned_statement_evidence.sql not found")
+    check("V137 wraps in a transaction (BEGIN/COMMIT)",
+          "BEGIN;" in v137 and "COMMIT;" in v137, "V137 must be transactional")
+    check("V137 disables the polymorphic trigger around the UPDATE",
+          "DISABLE TRIGGER trg_statement_evidence_check_statement" in v137
+          and "ENABLE TRIGGER trg_statement_evidence_check_statement" in v137,
+          "trigger must be disabled before and re-enabled after the UPDATE")
+    check("V137 expires only via soft-delete (expired_at = now())",
+          "SET expired_at = now()" in v137,
+          "must be a soft delete, never a hard DELETE FROM statement_evidence")
+    check("V137 guards expiry with the orphan predicate (no resolvable preserved)",
+          "NOT EXISTS (SELECT 1 FROM resolution.representation_relationship" in v137
+          and "NOT EXISTS (SELECT 1 FROM resolution.concept_relationship" in v137
+          and "NOT EXISTS (SELECT 1 FROM resolution.execution_claim" in v137,
+          "must not expire resolvable rows")
+
     print(f"\n{'='*60}\n  migrations suite: {passed} passed, {failed} failed, {skipped} skipped")
     return passed, failed, skipped
 
