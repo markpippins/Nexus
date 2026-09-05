@@ -1,5 +1,6 @@
 import { Request, Response, Router } from 'express';
 import { query, withTransaction } from './db';
+import { checkModel, MCModel } from './model-checker';
 
 const router = Router();
 
@@ -263,22 +264,75 @@ router.post('/registries/:id/validate', async (req, res) => {
   } catch (e) { pgError(res, e); }
 });
 
-// Model-check: bookkeeping stub for a TLA+ checker run (TLC integration is a follow-up).
+// Model-check: deterministic state-space model check over the structured
+// aegis graph (reachability, deadlock, invariant/property/temporal verdicts).
+// Runs the pure checker in model-checker.ts, then persists the result to
+// aegis.model_check_result. Optional request body: { property_id, checked_by }.
 router.post('/registries/:id/model-check', async (req, res) => {
   try {
     const registryId = await requireRegistry(req.params.id, res);
     if (!registryId) return;
-    const body = pick(req.body, ['property_id', 'status', 'trace', 'checked_properties', 'execution_time_ms', 'checked_by']);
-    const status = body.status || 'unknown';
+    const started = Date.now();
+    const body = pick(req.body, ['property_id', 'checked_by']);
+
+    const model: MCModel = await loadModel(registryId);
+    const report = checkModel(model);
+
+    const checked_properties: string[] = [];
+    for (const v of report.verdicts) {
+      checked_properties.push(`${v.kind}:${v.name}=${v.result}${v.type ? `(${v.type})` : ''}: ${v.detail}`);
+    }
+    if (report.unreachableStates.length > 0) {
+      checked_properties.push(`unreachable:${report.unreachableStates.join(',')}`);
+    }
+
+    const trace = report.deadlockTrace ? { deadlock: report.deadlockTrace, errors: report.errors } : null;
+
     const { rows } = await query(
       `INSERT INTO aegis.model_check_result
          (registry_id, property_id, status, trace, checked_properties, execution_time_ms, checked_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [registryId, body.property_id || null, status, body.trace ? JSON.stringify(body.trace) : null, body.checked_properties || [], body.execution_time_ms || null, body.checked_by || null],
+      [
+        registryId,
+        body.property_id || null,
+        report.status,
+        trace ? JSON.stringify(trace) : null,
+        checked_properties,
+        Date.now() - started,
+        body.checked_by || null,
+      ],
     );
     res.status(201).json(rows[0]);
   } catch (e) { pgError(res, e); }
 });
+
+/** Load the structured aegis model (states/transitions/invariants/properties/temporals + names) for a registry. */
+async function loadModel(registryId: string): Promise<MCModel> {
+  const [states, transitions, invariants, properties, temporalProps] = await Promise.all([
+    query('SELECT id, name, is_initial, is_terminal, variable_assignments FROM aegis.state WHERE registry_id = $1', [registryId]),
+    query('SELECT id, name, from_state_id, to_state_id, guard_expression, action, weak_fairness, strong_fairness, priority FROM aegis.transition WHERE registry_id = $1', [registryId]),
+    query('SELECT id, name, expression, is_type_invariant FROM aegis.invariant WHERE registry_id = $1', [registryId]),
+    query('SELECT id, name, type, expression FROM aegis.property WHERE registry_id = $1', [registryId]),
+    query('SELECT id, name, operator, expression FROM aegis.temporal_property WHERE registry_id = $1', [registryId]),
+  ]);
+  const vars = await query('SELECT name FROM aegis.variable WHERE registry_id = $1', [registryId]);
+  const consts = await query('SELECT name FROM aegis.constant WHERE registry_id = $1', [registryId]);
+
+  return {
+    states: states.rows,
+    transitions: transitions.rows.map((t) => ({
+      ...t,
+      from_state_id: t.from_state_id || null,
+      to_state_id: t.to_state_id || null,
+      guard_expression: t.guard_expression || null,
+    })),
+    invariants: invariants.rows,
+    properties: properties.rows,
+    temporal_properties: temporalProps.rows,
+    variables: vars.rows.map((r) => r.name),
+    constants: consts.rows.map((r) => r.name),
+  };
+}
 
 router.get('/registries/:id/validation-results', async (req, res) => {
   try {
@@ -397,4 +451,4 @@ router.get('/registries/:id/execution-log/:cid', C.executionLog.get);
 router.patch('/registries/:id/execution-log/:cid', C.executionLog.update);
 router.delete('/registries/:id/execution-log/:cid', C.executionLog.remove);
 
-export const routes = router;
+export default router;
