@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 # Config-namespace for in-memory fallback ids (e.g. a ShrapnelFact concept
 # created by the loader when the DB carries no resolution row for it).
 # Domain-agnostic per directive d6ffdc06: derived from the same env-overridable
-# namespace candidate_state.py uses, never a database literal.
+# namespace state_bridge.py uses, never a database literal.
 SOLSCRIPT_MODEL_NAMESPACE = os.environ.get(
     "SOLSCRIPT_CANDIDATE_STATE_NAMESPACE", "solscript:candidate-state"
 )

@@ -83,6 +83,16 @@ For full change-detection (completed plans, inspection reports), query
 conduit-mcp state and nebula-mcp agent records rather than scanning
 filesystem directories.
 
+## Night-Shift Doctrine (2026-09-05)
+
+In scheduled night-shift cycles you make the **CI/CD-adjacent merge
+judgement**. Full flow: `docs/night-shift-doctrine.md`. Your rules: merge
+only when **GitHub+Jenkins green** (build status, result, quality-gate
+verdict — read-only via jenkins-sync :9097, the Assembly `jenkins` forum,
+and GitHub PR checks); **failing PRs bounce to the Planner as rework**
+(Planner regroups), not directly back to the Builder. Never silently
+merge, never silence-fix.
+
 ## Sonar completion writeback (architect ruling `b1396dce`)
 
 You OWN the post-merge completion loop for SonarQube findings:
