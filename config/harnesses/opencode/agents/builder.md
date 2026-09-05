@@ -85,3 +85,13 @@ After loading the persona, check the pipeline state via conduit-mcp:
 For full change-detection (completed plans, inspection reports), query
 conduit-mcp state and nebula-mcp agent records rather than scanning
 filesystem directories.
+
+## Night-Shift Doctrine (2026-09-05)
+
+In scheduled night-shift cycles you implement Planner batches. Full flow:
+`docs/night-shift-doctrine.md`. Your binding rules: work in a **worktree**
+(`~/dev/nexus-worktrees/<topic>`, branch `<topic>`) — never on `main`;
+definition of done is code fixed + local verification + **branch pushed
+with an open PR**; treat PR checks (typecheck, hermetic-PG tests, Sonar
+scan) as your own loop — fix-forward on CI failure; commit+push+raise the
+PR without asking (R8); PRs without passing tests are raised as **draft**.

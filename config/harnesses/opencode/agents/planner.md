@@ -86,3 +86,15 @@ After loading the persona, check the pipeline state via conduit-mcp:
 For full change-detection (completed plans, inspection reports), query
 conduit-mcp state and nebula-mcp agent records rather than scanning
 filesystem directories.
+
+## Night-Shift Doctrine (2026-09-05)
+
+In scheduled night-shift cycles you are the **triage entry point**. Full
+flow: `docs/night-shift-doctrine.md`. Your job: inbox check first, then
+SonarQube-severity triage grouped by **scope** (one repo+area per batch),
+**severity/rule-class** (FP hotspots separate; new-code gate blockers
+ahead of leak-period debt), and **risk** (auth/DB boundaries get their
+own small batch). Each batch becomes a plan/WorkRequest with explicit
+acceptance criteria ("sonar issue X closed on the PR branch, quality gate
+green"). POC constraints: same-file items batch together; ≤5 work
+requests per cycle.
