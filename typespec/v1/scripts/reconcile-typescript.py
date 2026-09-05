@@ -61,6 +61,7 @@ MANIFEST = [
     {"name": "wind-srv", "type": "rest"},
     {"name": "tackle-srv", "type": "rest"},
     {"name": "nebula-srv", "type": "rest"},
+    {"name": "aegis-srv", "type": "rest"},
     # mcp-bridge is an MCP-over-SSE transport proxy: it exposes raw HTTP
     # routes (/sse, /messages, /health), not a static tool catalog.
     {"name": "mcp-bridge", "type": "rest"},
