@@ -46,6 +46,26 @@ All routes are mounted under `/api`. Auth posture: **LAN-bound, no authenticatio
 `DELETE /api/registries/{id}` is a **soft delete** (`is_active = false`); the schema's
 partial unique index on `(name) WHERE is_active = true` permits re-using an active name.
 
+## Model-checking
+
+`POST /api/registries/{id}/model-check` runs the **authoritative** model check:
+
+- **Real TLC** (the TLA+ model checker, `tla2tools.jar` vendored at
+  `tla/tla2tools.jar`) when the registry has a `tla_plus_source`. The module is
+  staged to a temp dir with a generated `.cfg` (registry invariants →
+  `INVARIANT`, properties → `PROPERTY`, plus `INIT`/`NEXT`), TLC runs with a
+  30s timeout, and its `-tool` output (exit codes + `@!@!@STARTMSG` protocol) is
+  parsed into a status and counterexample trace. Status: `success` (exit 0),
+  `failure` (exit 11 deadlock / 12 invariant-or-property violation, with the
+  counterexample trace), `error` (parse error 150, timeout, or missing jar).
+  TLC failures are isolated — they never fail the HTTP request.
+- **Structural fallback** when there is no `tla_plus_source`: a deterministic
+  state-space check over the structured aegis graph (reachability, deadlock,
+  invariant/property/temporal verdicts) in `src/model-checker.ts`.
+
+The result row's `checked_properties` records `engine:tlc` or `engine:structural`
+so callers can distinguish the engine. Requires `java` on the PATH.
+
 ## Develop
 
 ```bash
