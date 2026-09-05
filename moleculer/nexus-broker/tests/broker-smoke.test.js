@@ -207,6 +207,13 @@ test('deny_contract_promotion negative outcomes create immutable decision checkp
     bridge_id: 'resolution-keychains-bridge',
     bridge_version: '1',
     read_set: { manifest_id: 'negative-manifest-v1', digest: 'sha256:negative' },
+    observation_window: {
+      activation_ref: 'w9-activation-1',
+      activated_at: '2026-09-05T12:00:00Z',
+      window_start: '2026-09-05T12:00:00Z',
+      window_end: '2026-09-05T14:00:00Z',
+      observed_at: '2026-09-05T12:45:00Z',
+    },
   }
 
   const res = await fetch(`${BASE}/keychain-snapshot/agent-records/snapshot`, {
@@ -223,6 +230,9 @@ test('deny_contract_promotion negative outcomes create immutable decision checkp
   assert.equal(body.decision_context.decision.outcome, 'refused')
   assert.equal(body.decision_context.decision.disposition, 'refused')
   assert.deepEqual(body.decision_context.source_read_set, triggerEvent.read_set)
+  assert.equal(body.decision_context.observation_window.phase, 'post_activation')
+  assert.equal(body.decision_context.observation_window.in_window, true)
+  assert.equal(body.decision_context.rollback.status, null)
 
   const after = await (await fetch(`${BASE}/keychain-snapshot/agent-records/status`)).json()
   assert.ok(after.latestSnapshot > before.latestSnapshot)
@@ -282,6 +292,131 @@ test('deny_contract_promotion negative outcomes create immutable decision checkp
   }
 })
 
+
+test('observation window classifies pre-activation and outside-window evidence without rewriting history', async () => {
+  const sourceNamespace = `keychains-window-${process.pid}-${Date.now()}`
+  const mongo = new MongoClient(process.env.MONGO_URL || 'mongodb://localhost:27017')
+  const events = [
+    {
+      source_event_id: 'pre-activation',
+      observed_at: '2026-09-04T23:00:00Z',
+      expectedPhase: 'pre_activation',
+      expectedInWindow: false,
+      outcome: 'committed',
+    },
+    {
+      source_event_id: 'outside-window',
+      observed_at: '2026-09-05T15:00:00Z',
+      expectedPhase: 'outside_window',
+      expectedInWindow: false,
+      outcome: 'rolled_back',
+    },
+  ]
+  let previousActive = null
+  let previousEntries = null
+  let previousRecordTypeState = null
+  const checkpointIds = []
+  try {
+    await mongo.connect()
+    const db = mongo.db('keychains')
+    previousActive = await db.collection('active_checkpoints').findOne({ _id: 'agent-records' })
+    previousEntries = await db.collection('entries').find({}).toArray()
+    previousRecordTypeState = await db.collection('record_type_state').find({}).toArray()
+
+    for (const item of events) {
+      const triggerEvent = {
+        source_namespace: sourceNamespace,
+        source_event_id: item.source_event_id,
+        kind: `peb.deny_contract_promotion.${item.outcome}`,
+        outcome: item.outcome,
+        actor: 'broker-smoke',
+        decision_class: 'deny_contract_promotion',
+        binding_owner: 'resolution',
+        authority_level: 'narrowly_binding',
+        authorization_ref: '986ec482',
+        activation_ref: 'w9-activation-1',
+        activated_at: '2026-09-05T12:00:00Z',
+        decision_id: `decision-${item.source_event_id}`,
+        disposition: item.outcome === 'committed' ? 'allow' : item.outcome,
+        evidence_ids: [`evidence-${item.source_event_id}`],
+        replay_context: `replay-${item.source_event_id}`,
+        as_of: item.observed_at,
+        evaluation_fingerprint: `sha256:${item.source_event_id === 'pre-activation' ? 'aa' : 'bb'}`.repeat(32),
+        lineage_fingerprint: 'sha256:' + 'cc'.repeat(32),
+        evaluator_id: 'peb-evaluator',
+        evaluator_version: 'peb-evaluator-v1',
+        contract_id: 'governed-trigger.v1',
+        contract_version: 1,
+        law_id: 'deny-contract-promotion-law',
+        law_version: '2026-09-02',
+        bridge_id: 'resolution-keychains-bridge',
+        bridge_version: '1',
+        rollback_ref: item.outcome === 'rolled_back' ? 'rollback-w9' : null,
+        rollback_status: item.outcome === 'rolled_back' ? 'executed' : null,
+        rollback_evidence_ids: item.outcome === 'rolled_back' ? ['rollback-evidence-w9'] : null,
+        observation_window: {
+          activation_ref: 'w9-activation-1',
+          activated_at: '2026-09-05T12:00:00Z',
+          window_start: '2026-09-05T12:00:00Z',
+          window_end: '2026-09-05T14:00:00Z',
+          observed_at: item.observed_at,
+        },
+        read_set: { manifest_id: `window-${item.source_event_id}`, digest: 'sha256:window' },
+      }
+      const response = await fetch(`${BASE}/keychain-snapshot/agent-records/snapshot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ triggerEvent }),
+      })
+      assert.equal(response.status, 200)
+      const body = await response.json()
+      assert.equal(body.ok, true)
+      assert.equal(body.decision_context.observation_window.phase, item.expectedPhase)
+      assert.equal(body.decision_context.observation_window.in_window, item.expectedInWindow)
+      if (item.outcome === 'rolled_back') {
+        assert.equal(body.decision_context.rollback.reference, 'rollback-w9')
+        assert.equal(body.decision_context.rollback.status, 'executed')
+      }
+      checkpointIds.push(body.decision_context.checkpoint_reference.checkpoint_id)
+
+      const replay = await fetch(`${BASE}/keychain-snapshot/agent-records/snapshot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ triggerEvent }),
+      })
+      assert.equal(replay.status, 200)
+      const replayBody = await replay.json()
+      assert.equal(replayBody.deduplicated, true)
+      assert.equal(replayBody.version, body.version)
+    }
+
+    const filtered = await (await fetch(
+      `${BASE}/keychain-snapshot/agent-records/transitions?activation_ref=w9-activation-1&observation_status=outside_window&outcome=rolled_back`,
+    )).json()
+    assert.equal(filtered.items.length, 1)
+    assert.equal(filtered.items[0].source_namespace, sourceNamespace)
+    assert.equal(filtered.items[0].observation_window.phase, 'outside_window')
+  } finally {
+    const db = mongo.db('keychains')
+    await db.collection('transitions').deleteMany({ source_namespace: sourceNamespace })
+    if (checkpointIds.length) {
+      await db.collection('ar_drift_findings').deleteMany({ checkpoint_id: { $in: checkpointIds } })
+      await db.collection('checkpoint_entries').deleteMany({ checkpoint_id: { $in: checkpointIds } })
+      await db.collection('ar_snapshots').deleteMany({ checkpoint_id: { $in: checkpointIds } })
+    }
+    if (previousActive) {
+      await db.collection('active_checkpoints').replaceOne({ _id: 'agent-records' }, previousActive, { upsert: true })
+    } else {
+      await db.collection('active_checkpoints').deleteOne({ _id: 'agent-records' })
+    }
+    await db.collection('entries').deleteMany({})
+    if (previousEntries.length) await db.collection('entries').insertMany(previousEntries)
+    await db.collection('record_type_state').deleteMany({})
+    if (previousRecordTypeState.length) await db.collection('record_type_state').insertMany(previousRecordTypeState)
+    await mongo.close()
+  }
+})
+
 test('rewind returns a committed state vector and rejects invalid versions', async () => {
   const status = await (await fetch(`${BASE}/keychain-snapshot/agent-records/status`)).json()
   const rewind = await (await fetch(`${BASE}/keychain-snapshot/agent-records/rewind?at=${status.latestSnapshot}`)).json()
@@ -324,6 +459,13 @@ test('decision checkpoint preserves owner, authorization, and evaluator read-set
     rollback_ref: 'rollback-plan-w9',
     rollback_status: 'armed',
     rollback_evidence_ids: ['rollback-evidence-1'],
+    observation_window: {
+      activation_ref: 'w9-activation-1',
+      activated_at: '2026-09-05T12:00:00Z',
+      window_start: '2026-09-05T12:00:00Z',
+      window_end: '2026-09-05T14:00:00Z',
+      observed_at: '2026-09-05T12:30:00Z',
+    },
     evaluator_id: 'peb-evaluator',
     evaluator_version: 'peb-evaluator-v1',
     contract_id: 'governed-trigger.v1',
@@ -356,6 +498,13 @@ test('decision checkpoint preserves owner, authorization, and evaluator read-set
       rollback_ref: 'rollback-plan-w9',
       rollback_status: 'armed',
       rollback_evidence_ids: ['rollback-evidence-1'],
+      observation_window: {
+        activation_ref: 'w9-activation-1',
+        activated_at: '2026-09-05T12:00:00Z',
+        window_start: '2026-09-05T12:00:00Z',
+        window_end: '2026-09-05T14:00:00Z',
+        observed_at: '2026-09-05T12:30:00Z',
+      },
     },
   }
   const mongo = new MongoClient(process.env.MONGO_URL || 'mongodb://localhost:27017')
@@ -380,7 +529,7 @@ test('decision checkpoint preserves owner, authorization, and evaluator read-set
     const body = await res.json()
     assert.equal(body.ok, true)
     assert.equal(body.deduplicated, false)
-    assert.deepEqual(body.decision_context, {
+    const expectedDecisionContext = {
       schema_version: 1,
       checkpoint_class: 'decision',
       decision_class: 'deny_contract_promotion',
@@ -416,6 +565,15 @@ test('decision checkpoint preserves owner, authorization, and evaluator read-set
         status: 'armed',
         evidence_ids: ['rollback-evidence-1'],
       },
+      observation_window: {
+        activation_ref: 'w9-activation-1',
+        activated_at: '2026-09-05T12:00:00Z',
+        window_start: '2026-09-05T12:00:00Z',
+        window_end: '2026-09-05T14:00:00Z',
+        observed_at: '2026-09-05T12:30:00Z',
+        in_window: true,
+        phase: 'post_activation',
+      },
       evaluator: { id: 'peb-evaluator', version: 'peb-evaluator-v1' },
       contract: { id: 'governed-trigger.v1', version: 1 },
       law: { id: 'deny-contract-promotion-law', version: '2026-09-02' },
@@ -425,7 +583,13 @@ test('decision checkpoint preserves owner, authorization, and evaluator read-set
         manifest_id: 'keychains-read-set-manifest-v1',
         digest: 'sha256:keychains-read-set-test',
       },
+    }
+    assert.deepEqual(body.decision_context, {
+      ...expectedDecisionContext,
+      checkpoint_reference: body.decision_context.checkpoint_reference,
     })
+    assert.match(body.decision_context.checkpoint_reference.checkpoint_id, /.+/)
+    assert.equal(body.decision_context.checkpoint_reference.version, body.version)
 
     checkpointId = body.trigger && body.trigger.checkpoint_id
     const rewind = await (await fetch(`${BASE}/keychain-snapshot/agent-records/rewind?at=${body.version}`)).json()

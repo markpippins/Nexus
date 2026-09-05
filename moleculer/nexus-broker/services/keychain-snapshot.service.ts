@@ -155,7 +155,18 @@ interface TriggerEventContract {
   rollback_reference?: string | null;
   rollback_status?: string | null;
   rollback_evidence_ids?: any;
-  observation_window?: any;
+  observation_window?: {
+    activation_ref?: string | null;
+    activated_at?: string | null;
+    window_start?: string | null;
+    window_end?: string | null;
+    observed_at?: string | null;
+    status?: string | null;
+    [key: string]: any;
+  } | null;
+  window_start?: string | null;
+  window_end?: string | null;
+  observed_at?: string | null;
   effective_at?: string | null;
   recorded_at?: string | null;
   meta?: any;
@@ -215,6 +226,16 @@ interface DecisionContextManifest {
   bridge: { id: string | null; version: string | number | null };
   source_read_set: any;
   read_set_manifest: any;
+  observation_window?: {
+    activation_ref: string | null;
+    activated_at: string | null;
+    window_start: string | null;
+    window_end: string | null;
+    observed_at: string | null;
+    in_window: boolean | null;
+    phase: "post_activation" | "pre_activation" | "outside_window" | "unbounded";
+  };
+  checkpoint_reference?: { checkpoint_id: string; version: number };
 }
 
 /** A resolved keychain entry — one per logical record instance. */
@@ -305,9 +326,19 @@ export default class KeychainService extends Service {
             const client = await this.getMongo();
             const db = client.db("keychains");
             const limit = Math.min(Number((ctx.params as any)?.limit || 50), 200);
+            const filter: Record<string, any> = {};
+            const activationRef = (ctx.params as any)?.activation_ref;
+            const observationStatus = (ctx.params as any)?.observation_status;
+            const outcome = (ctx.params as any)?.outcome;
+            if (activationRef) filter["$or"] = [
+              { "observation_window.activation_ref": activationRef },
+              { "decision_context.activation.activation_ref": activationRef },
+            ];
+            if (observationStatus) filter["observation_window.phase"] = observationStatus;
+            if (outcome) filter.outcome = outcome;
             const items = await db
               .collection("transitions")
-              .find({})
+              .find(filter)
               .sort({ created_at: -1 })
               .limit(limit)
               .toArray();
@@ -1203,7 +1234,96 @@ export default class KeychainService extends Service {
       && triggerEvent.kind.startsWith("peb.deny_contract_promotion.");
   }
 
-  private buildDecisionContextManifest(triggerEvent: TriggerEventContract): DecisionContextManifest {
+  private observationWindow(triggerEvent: TriggerEventContract): NonNullable<DecisionContextManifest["observation_window"]> | undefined {
+    const readSet = triggerEvent.read_set && typeof triggerEvent.read_set === "object"
+      ? triggerEvent.read_set
+      : {};
+    const payload = triggerEvent.payload && typeof triggerEvent.payload === "object"
+      ? triggerEvent.payload
+      : {};
+    const meta = triggerEvent.meta && typeof triggerEvent.meta === "object"
+      ? triggerEvent.meta
+      : {};
+    const nestedCandidate = [
+      triggerEvent.observation_window,
+      meta.observation_window,
+      readSet.observation_window,
+      payload.observation_window,
+    ].find((candidate) => candidate && typeof candidate === "object") as Record<string, any> | undefined;
+    const nested = nestedCandidate || {
+      activation_ref: triggerEvent.activation_ref,
+      activated_at: triggerEvent.activated_at,
+      window_start: triggerEvent.window_start,
+      window_end: triggerEvent.window_end,
+      observed_at: triggerEvent.observed_at,
+    };
+    const hasWindowBounds = nested.window_start != null || nested.window_end != null;
+    if (!nestedCandidate && !hasWindowBounds) return undefined;
+    const value = (...values: any[]): any => values.find((candidate) => candidate !== undefined && candidate !== null) ?? null;
+    const activationRef = value(nested.activation_ref, triggerEvent.activation_ref, meta.activation_ref, readSet.activation_ref, payload.activation_ref);
+    const activatedAt = value(nested.activated_at, triggerEvent.activated_at, meta.activated_at, readSet.activated_at, payload.activated_at);
+    const windowStart = value(
+      nested.window_start,
+      nested.starts_at,
+      nested.start_at,
+      triggerEvent.window_start,
+    );
+    const windowEnd = value(
+      nested.window_end,
+      nested.ends_at,
+      nested.end_at,
+      triggerEvent.window_end,
+    );
+    const observedAt = value(
+      nested.observed_at,
+      triggerEvent.observed_at,
+      triggerEvent.effective_at,
+      triggerEvent.recorded_at,
+    );
+    if (!activationRef || !activatedAt || !windowStart || !windowEnd) {
+      throw new Error("bounded observation window requires activation_ref, activated_at, window_start, and window_end");
+    }
+    const activated = new Date(activatedAt);
+    const start = new Date(windowStart);
+    const end = new Date(windowEnd);
+    if (
+      Number.isNaN(activated.getTime())
+      || Number.isNaN(start.getTime())
+      || Number.isNaN(end.getTime())
+      || activated.getTime() > start.getTime()
+      || start.getTime() > end.getTime()
+    ) {
+      throw new Error("bounded observation window has invalid bounds");
+    }
+    const observed = observedAt ? new Date(observedAt) : null;
+    if (observedAt && (!observed || Number.isNaN(observed.getTime()))) {
+      throw new Error("bounded observation window has invalid observed_at");
+    }
+    const inWindow = observed && !Number.isNaN(observed.getTime())
+      ? observed.getTime() >= start.getTime() && observed.getTime() <= end.getTime()
+      : null;
+    const phase = observed && !Number.isNaN(observed.getTime())
+      ? observed.getTime() < activated.getTime()
+        ? "pre_activation"
+        : inWindow === false
+          ? "outside_window"
+          : "post_activation"
+      : "post_activation";
+    return {
+      activation_ref: String(activationRef),
+      activated_at: String(activatedAt),
+      window_start: String(windowStart),
+      window_end: String(windowEnd),
+      observed_at: observedAt ? String(observedAt) : null,
+      in_window: inWindow,
+      phase,
+    };
+  }
+
+  private buildDecisionContextManifest(
+    triggerEvent: TriggerEventContract,
+    checkpointReference?: { checkpoint_id: string; version: number },
+  ): DecisionContextManifest {
     const readSet = triggerEvent.read_set && typeof triggerEvent.read_set === "object"
       ? triggerEvent.read_set
       : {};
@@ -1257,6 +1377,7 @@ export default class KeychainService extends Service {
       field("rollback_reference"),
       null,
     );
+    const observationWindow = this.observationWindow(triggerEvent);
     return {
       schema_version: 1,
       checkpoint_class: "decision",
@@ -1320,6 +1441,8 @@ export default class KeychainService extends Service {
               ...(readSet.manifest_digest ? { manifest_digest: readSet.manifest_digest } : {}),
             }
           : null),
+      ...(observationWindow ? { observation_window: observationWindow } : {}),
+      ...(checkpointReference ? { checkpoint_reference: checkpointReference } : {}),
     };
   }
 
@@ -1350,6 +1473,8 @@ export default class KeychainService extends Service {
         ? triggerEvent.payload
         : {};
       const isBindingDecision = this.isBindingDecisionEvent(triggerEvent, readSet, payload);
+      const observationWindow = isBindingDecision ? this.observationWindow(triggerEvent) : undefined;
+      if (observationWindow) triggerEvent.observation_window = observationWindow;
       const existing = await db.collection("transitions").findOne({
         $or: [
           { keychain_event_id: triggerEvent.idempotency_key },
@@ -1387,6 +1512,10 @@ export default class KeychainService extends Service {
                 snapshot_version: committed.version,
                 checkpoint_id: committed.checkpoint_id,
                 checkpoint_status: "delivered",
+                decision_context: this.buildDecisionContextManifest(triggerEvent, {
+                  checkpoint_id: committed.checkpoint_id,
+                  version: committed.version,
+                }),
                 delivered_at: committed.committed_at || committed.created_at,
                 created_at: triggerEvent.recorded_at,
               },
@@ -1640,7 +1769,7 @@ export default class KeychainService extends Service {
       typeBreakdown,
       roleBreakdown,
       state_vector: stateVector, // D1: current set of records per record type
-      decision_context: triggerEvent ? this.buildDecisionContextManifest(triggerEvent) : null,
+      decision_context: triggerEvent ? this.buildDecisionContextManifest(triggerEvent, { checkpoint_id: checkpointId, version }) : null,
       ...(triggerEvent?.source_namespace && triggerEvent?.source_event_id
         ? {
             source_namespace: triggerEvent.source_namespace,
@@ -1697,6 +1826,7 @@ export default class KeychainService extends Service {
             snapshot_version: version,
             checkpoint_id: checkpointId,
             checkpoint_status: "delivered",
+            decision_context: triggerEvent ? this.buildDecisionContextManifest(triggerEvent, { checkpoint_id: checkpointId, version }) : null,
             delivered_at: now,
             created_at: now,
           },
@@ -1735,7 +1865,7 @@ export default class KeychainService extends Service {
       roleBreakdown,
       recordTypeCount: Object.keys(stateVector).length,
       trigger: triggerEvent || null,
-      decision_context: triggerEvent ? this.buildDecisionContextManifest(triggerEvent) : null,
+      decision_context: triggerEvent ? this.buildDecisionContextManifest(triggerEvent, { checkpoint_id: checkpointId, version }) : null,
       deduplicated: false,
       prevVersion,
     };
