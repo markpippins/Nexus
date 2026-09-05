@@ -8,11 +8,20 @@
 -- sol-workspace/transform.py already excludes them from the standalone sol
 -- schema).
 --
--- ⚠ DRAFT — NOT AUTHORIZED TO RUN. Per DBA handoff 5e2884db: "Retirement is
--- currently blocked. No DROP TABLE, cascade, rename, or destructive migration
--- is authorized by this handoff." Execution requires explicit DBA/Architect
--- sign-off AFTER the reconciliation report + dry-run review, and a verified
--- backup first (pg_dump of the 9 tables, or a fresh backup-pg-to-barium run).
+-- ⚠️ STATUS: APPLIED + LEDGERED (2026-09-05). See the "Execution record"
+-- block below. The prior "DRAFT — NOT AUTHORIZED TO RUN" warning reflected
+-- pre-execution state; this migration is now confirmed live on titanium and
+-- recorded in resolution.migration_ledger (label
+-- V134_semantics_retire_ontology_tables). V116/V120 are marked superseded.
+--
+-- Execution record (2026-09-05): V134 was committed to main 2026-09-01
+-- 15:37 EDT (commit 30221fc6) and its effects are present in the live DB
+-- (check_statement_id → resolution.*; 9 semantics ontology tables absent;
+-- 36 legacy statement_evidence rows soft-expired; statement_evidence_type
+-- _check trimmed with the OR expired_at IS NOT NULL escape). The CI
+-- bootstrap (nexus-ci-bootstrap.sql) carries the same post-V134 state.
+-- Ledgered retroactively by architect (record e32a856c) after DBA proposal
+-- 7d9b5837 (V116/V087 restore) was ruled NOT APPROVED.
 --
 -- Data note: the 336 rows in these tables are NOT UUID-duplicated in
 -- resolution (natural-key overlap is partial — e.g. 19 semantics concepts vs
