@@ -99,6 +99,25 @@ namespace org.nexus.nexusbroker {
     bridge: KeychainVersionedReference;
     source_read_set: Record<unknown>;
     read_set_manifest: Record<unknown> | null;
+    observation_window?: KeychainObservationWindow;
+    checkpoint_reference?: KeychainCheckpointReference;
+  }
+
+  /** Bounded post-activation observation interval and classification. */
+  model KeychainObservationWindow {
+    activation_ref: string;
+    activated_at: string;
+    window_start: string;
+    window_end: string;
+    observed_at: string | null;
+    in_window: boolean | null;
+    phase: string;
+  }
+
+  /** Immutable reference to the checkpoint carrying the decision evidence. */
+  model KeychainCheckpointReference {
+    checkpoint_id: string;
+    version: int32;
   }
 
   /** Post-activation authority and grant identity used by the decision. */
@@ -192,7 +211,8 @@ namespace org.nexus.nexusbroker {
     rollback_reference?: string;
     rollback_status?: string;
     rollback_evidence_ids?: Record<unknown>;
-    observation_window?: Record<unknown>;
+    /** Bounded post-activation observation interval and classification. */
+    observation_window?: KeychainObservationWindow;
     effective_at?: string;
     recorded_at?: string;
     read_set?: Record<unknown>;

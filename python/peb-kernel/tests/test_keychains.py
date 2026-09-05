@@ -118,6 +118,8 @@ def _attach_binding(
         transaction.input["binding_decision"]["observation_window"] = {
             "activation_ref": "w9-activation-1",
             "activated_at": "2026-09-05T12:00:00Z",
+            "window_start": "2026-09-05T12:00:00Z",
+            "window_end": "2026-09-05T13:00:00Z",
             "binding_owner": "resolution",
             "authority_ref": "g1-verdict-986ec482",
             "authorization_ref": "w1.10-grant-05d0fe54",
@@ -163,6 +165,8 @@ def test_post_activation_observation_window_is_preserved():
     payload = json.loads(params[15])
     assert read_set["activation_ref"] == "w9-activation-1"
     assert read_set["activated_at"] == "2026-09-05T12:00:00Z"
+    assert read_set["observation_window"]["window_start"] == "2026-09-05T12:00:00Z"
+    assert read_set["observation_window"]["window_end"] == "2026-09-05T13:00:00Z"
     assert read_set["binding_owner"] == "resolution"
     assert read_set["authority_ref"] == "g1-verdict-986ec482"
     assert read_set["grant_id"] == "05d0fe54"
@@ -179,6 +183,27 @@ def test_incomplete_post_activation_observation_fails_closed():
     del tx.input["binding_decision"]["observation_window"]["activation_ref"]
     import pytest
     with pytest.raises(ValueError, match="observation window missing provenance"):
+        PebKeychainsAdapter().emit_transaction(conn, tx)
+    assert conn._cursor.calls == []
+
+
+
+def test_observation_window_rejects_bounds_before_activation():
+    conn = _Connection()
+    tx = _attach_binding(_binding_transaction(), observation=True)
+    tx.input["binding_decision"]["observation_window"]["window_start"] = "2026-09-04T23:59:00Z"
+    import pytest
+    with pytest.raises(ValueError, match="observation window bounds"):
+        PebKeychainsAdapter().emit_transaction(conn, tx)
+    assert conn._cursor.calls == []
+
+
+def test_observation_window_rejects_invalid_order():
+    conn = _Connection()
+    tx = _attach_binding(_binding_transaction(), observation=True)
+    tx.input["binding_decision"]["observation_window"]["window_end"] = "2026-09-05T11:59:00Z"
+    import pytest
+    with pytest.raises(ValueError, match="observation window bounds"):
         PebKeychainsAdapter().emit_transaction(conn, tx)
     assert conn._cursor.calls == []
 
