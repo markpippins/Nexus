@@ -1,0 +1,2694 @@
+openapi: 3.1.0
+info:
+  title: Aegis State-Machine Registry API — aegis-srv
+  version: 0.0.0
+tags: []
+paths:
+  /api/registries:
+    get:
+      operationId: listRegistries
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Registry'
+                required:
+                  - items
+    post:
+      operationId: createRegistry
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Registry'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistryCreate'
+  /api/registries/name/{name}:
+    get:
+      operationId: getRegistryByName
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Registry'
+                  - $ref: '#/components/schemas/ErrorDetail'
+  /api/registries/{id}:
+    get:
+      operationId: getRegistry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Registry'
+                  - $ref: '#/components/schemas/ErrorDetail'
+    patch:
+      operationId: updateRegistry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Registry'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistryUpdate'
+    delete:
+      operationId: deleteRegistry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    properties:
+                      deleted:
+                        type: string
+                    required:
+                      - deleted
+                  - $ref: '#/components/schemas/ErrorDetail'
+  /api/registries/{id}/attribute-mappings:
+    get:
+      operationId: listAttributeMappings
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AttributeMapping'
+                required:
+                  - items
+    post:
+      operationId: createAttributeMapping
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/AttributeMapping'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttributeMappingCreate'
+  /api/registries/{id}/attribute-mappings/{cid}:
+    get:
+      operationId: getAttributeMapping
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/AttributeMapping'
+                  - $ref: '#/components/schemas/ErrorDetail'
+    patch:
+      operationId: updateAttributeMapping
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/AttributeMapping'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttributeMappingUpdate'
+    delete:
+      operationId: deleteAttributeMapping
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    properties:
+                      deleted:
+                        type: string
+                    required:
+                      - deleted
+                  - $ref: '#/components/schemas/ErrorDetail'
+  /api/registries/{id}/concept-mappings:
+    get:
+      operationId: listConceptMappings
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConceptMapping'
+                required:
+                  - items
+    post:
+      operationId: createConceptMapping
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/ConceptMapping'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConceptMappingCreate'
+  /api/registries/{id}/concept-mappings/{cid}:
+    get:
+      operationId: getConceptMapping
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/ConceptMapping'
+                  - $ref: '#/components/schemas/ErrorDetail'
+    patch:
+      operationId: updateConceptMapping
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/ConceptMapping'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConceptMappingUpdate'
+    delete:
+      operationId: deleteConceptMapping
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    properties:
+                      deleted:
+                        type: string
+                    required:
+                      - deleted
+                  - $ref: '#/components/schemas/ErrorDetail'
+  /api/registries/{id}/constants:
+    get:
+      operationId: listConstants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Constant'
+                required:
+                  - items
+    post:
+      operationId: createConstant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Constant'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConstantCreate'
+  /api/registries/{id}/constants/{cid}:
+    get:
+      operationId: getConstant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Constant'
+                  - $ref: '#/components/schemas/ErrorDetail'
+    patch:
+      operationId: updateConstant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Constant'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConstantUpdate'
+    delete:
+      operationId: deleteConstant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    properties:
+                      deleted:
+                        type: string
+                    required:
+                      - deleted
+                  - $ref: '#/components/schemas/ErrorDetail'
+  /api/registries/{id}/execution-log:
+    get:
+      operationId: listExecutionLog
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExecutionLog'
+                required:
+                  - items
+    post:
+      operationId: createExecutionLog
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/ExecutionLog'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecutionLogCreate'
+  /api/registries/{id}/execution-log/{cid}:
+    get:
+      operationId: getExecutionLog
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/ExecutionLog'
+                  - $ref: '#/components/schemas/ErrorDetail'
+    patch:
+      operationId: updateExecutionLog
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/ExecutionLog'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecutionLogCreate'
+    delete:
+      operationId: deleteExecutionLog
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    properties:
+                      deleted:
+                        type: string
+                    required:
+                      - deleted
+                  - $ref: '#/components/schemas/ErrorDetail'
+  /api/registries/{id}/invariants:
+    get:
+      operationId: listInvariants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Invariant'
+                required:
+                  - items
+    post:
+      operationId: createInvariant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Invariant'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvariantCreate'
+  /api/registries/{id}/invariants/{cid}:
+    get:
+      operationId: getInvariant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Invariant'
+                  - $ref: '#/components/schemas/ErrorDetail'
+    patch:
+      operationId: updateInvariant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Invariant'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvariantUpdate'
+    delete:
+      operationId: deleteInvariant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    properties:
+                      deleted:
+                        type: string
+                    required:
+                      - deleted
+                  - $ref: '#/components/schemas/ErrorDetail'
+  /api/registries/{id}/model-check:
+    post:
+      operationId: modelCheckRegistry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/ModelCheckResult'
+                  - $ref: '#/components/schemas/ErrorDetail'
+  /api/registries/{id}/model-check-results:
+    get:
+      operationId: listModelCheckResults
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ModelCheckResult'
+                required:
+                  - items
+  /api/registries/{id}/properties:
+    get:
+      operationId: listProperties
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Property'
+                required:
+                  - items
+    post:
+      operationId: createProperty
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Property'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PropertyCreate'
+  /api/registries/{id}/properties/{cid}:
+    get:
+      operationId: getProperty
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Property'
+                  - $ref: '#/components/schemas/ErrorDetail'
+    patch:
+      operationId: updateProperty
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Property'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PropertyUpdate'
+    delete:
+      operationId: deleteProperty
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    properties:
+                      deleted:
+                        type: string
+                    required:
+                      - deleted
+                  - $ref: '#/components/schemas/ErrorDetail'
+  /api/registries/{id}/relationship-mappings:
+    get:
+      operationId: listRelationshipMappings
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RelationshipMapping'
+                required:
+                  - items
+    post:
+      operationId: createRelationshipMapping
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/RelationshipMapping'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelationshipMappingCreate'
+  /api/registries/{id}/relationship-mappings/{cid}:
+    get:
+      operationId: getRelationshipMapping
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/RelationshipMapping'
+                  - $ref: '#/components/schemas/ErrorDetail'
+    patch:
+      operationId: updateRelationshipMapping
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/RelationshipMapping'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelationshipMappingUpdate'
+    delete:
+      operationId: deleteRelationshipMapping
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    properties:
+                      deleted:
+                        type: string
+                    required:
+                      - deleted
+                  - $ref: '#/components/schemas/ErrorDetail'
+  /api/registries/{id}/states:
+    get:
+      operationId: listStates
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/State'
+                required:
+                  - items
+    post:
+      operationId: createState
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/State'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StateCreate'
+  /api/registries/{id}/states/{cid}:
+    get:
+      operationId: getState
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/State'
+                  - $ref: '#/components/schemas/ErrorDetail'
+    patch:
+      operationId: updateState
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/State'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StateUpdate'
+    delete:
+      operationId: deleteState
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    properties:
+                      deleted:
+                        type: string
+                    required:
+                      - deleted
+                  - $ref: '#/components/schemas/ErrorDetail'
+  /api/registries/{id}/temporal-properties:
+    get:
+      operationId: listTemporalProperties
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TemporalProperty'
+                required:
+                  - items
+    post:
+      operationId: createTemporalProperty
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/TemporalProperty'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemporalPropertyCreate'
+  /api/registries/{id}/temporal-properties/{cid}:
+    get:
+      operationId: getTemporalProperty
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/TemporalProperty'
+                  - $ref: '#/components/schemas/ErrorDetail'
+    patch:
+      operationId: updateTemporalProperty
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/TemporalProperty'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemporalPropertyUpdate'
+    delete:
+      operationId: deleteTemporalProperty
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    properties:
+                      deleted:
+                        type: string
+                    required:
+                      - deleted
+                  - $ref: '#/components/schemas/ErrorDetail'
+  /api/registries/{id}/transitions:
+    get:
+      operationId: listTransitions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transition'
+                required:
+                  - items
+    post:
+      operationId: createTransition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Transition'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransitionCreate'
+  /api/registries/{id}/transitions/{cid}:
+    get:
+      operationId: getTransition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Transition'
+                  - $ref: '#/components/schemas/ErrorDetail'
+    patch:
+      operationId: updateTransition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Transition'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransitionUpdate'
+    delete:
+      operationId: deleteTransition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    properties:
+                      deleted:
+                        type: string
+                    required:
+                      - deleted
+                  - $ref: '#/components/schemas/ErrorDetail'
+  /api/registries/{id}/validate:
+    post:
+      operationId: validateRegistry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/ValidationResult'
+                  - $ref: '#/components/schemas/ErrorDetail'
+  /api/registries/{id}/validation-results:
+    get:
+      operationId: listValidationResults
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ValidationResult'
+                required:
+                  - items
+  /api/registries/{id}/variables:
+    get:
+      operationId: listVariables
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Variable'
+                required:
+                  - items
+    post:
+      operationId: createVariable
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Variable'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VariableCreate'
+  /api/registries/{id}/variables/{cid}:
+    get:
+      operationId: getVariable
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Variable'
+                  - $ref: '#/components/schemas/ErrorDetail'
+    patch:
+      operationId: updateVariable
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Variable'
+                  - $ref: '#/components/schemas/ErrorDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VariableUpdate'
+    delete:
+      operationId: deleteVariable
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    properties:
+                      deleted:
+                        type: string
+                    required:
+                      - deleted
+                  - $ref: '#/components/schemas/ErrorDetail'
+  /health:
+    get:
+      operationId: health
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+components:
+  schemas:
+    AttributeMapping:
+      type: object
+      required:
+        - id
+        - registry_id
+        - tla_variable
+        - attribute_id
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        registry_id:
+          type: string
+          format: uuid
+        tla_variable:
+          type: string
+          description: TLA+ variable name — unique within its registry
+        attribute_id:
+          type: string
+          format: uuid
+          description: Resolution schema concept attribute id
+        conversion_function:
+          type: string
+        default_value:
+          type: object
+          unevaluatedProperties: {}
+        createdAt:
+          type: string
+          format: date-time
+    AttributeMappingCreate:
+      type: object
+      required:
+        - tla_variable
+        - attribute_id
+      properties:
+        tla_variable:
+          type: string
+        attribute_id:
+          type: string
+          format: uuid
+        conversion_function:
+          type: string
+        default_value:
+          type: object
+          unevaluatedProperties: {}
+    AttributeMappingUpdate:
+      type: object
+      properties:
+        tla_variable:
+          type: string
+        attribute_id:
+          type: string
+          format: uuid
+        conversion_function:
+          type: string
+        default_value:
+          type: object
+          unevaluatedProperties: {}
+    Cardinality:
+      type: string
+      enum:
+        - one_to_one
+        - one_to_many
+        - many_to_one
+    ConceptMapping:
+      type: object
+      required:
+        - id
+        - registry_id
+        - tla_name
+        - concept_id
+        - mapping_type
+        - cardinality
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        registry_id:
+          type: string
+          format: uuid
+        tla_name:
+          type: string
+          description: TLA+ concept name — unique within its registry
+        concept_id:
+          type: string
+          format: uuid
+          description: Resolution schema concept id
+        mapping_type:
+          type: string
+          description: direct | derived | composite
+        mapping_expression:
+          type: string
+        cardinality:
+          $ref: '#/components/schemas/Cardinality'
+          description: one_to_one | one_to_many | many_to_one
+        createdAt:
+          type: string
+          format: date-time
+    ConceptMappingCreate:
+      type: object
+      required:
+        - tla_name
+        - concept_id
+        - mapping_type
+      properties:
+        tla_name:
+          type: string
+        concept_id:
+          type: string
+          format: uuid
+        mapping_type:
+          type: string
+        mapping_expression:
+          type: string
+        cardinality:
+          $ref: '#/components/schemas/Cardinality'
+    ConceptMappingUpdate:
+      type: object
+      properties:
+        tla_name:
+          type: string
+        concept_id:
+          type: string
+          format: uuid
+        mapping_type:
+          type: string
+        mapping_expression:
+          type: string
+        cardinality:
+          $ref: '#/components/schemas/Cardinality'
+    Constant:
+      type: object
+      required:
+        - id
+        - registry_id
+        - name
+        - type
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        registry_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Constant name — unique within its registry
+        type:
+          type: string
+          description: 'TLA+ type: Set, Tuple, Function, etc.'
+        value:
+          type: object
+          unevaluatedProperties: {}
+          description: Constant value (JSONB)
+        description:
+          type: string
+        constraints:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+    ConstantCreate:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        value:
+          type: object
+          unevaluatedProperties: {}
+        description:
+          type: string
+        constraints:
+          type: array
+          items:
+            type: string
+    ConstantUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        value:
+          type: object
+          unevaluatedProperties: {}
+        description:
+          type: string
+        constraints:
+          type: array
+          items:
+            type: string
+    ErrorDetail:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: array
+          items: {}
+    ExecutionLog:
+      type: object
+      required:
+        - id
+        - registry_id
+        - entity_id
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        registry_id:
+          type: string
+          format: uuid
+        entity_id:
+          type: string
+          format: uuid
+          description: The external entity id whose transition is recorded
+        from_state_id:
+          type: string
+          format: uuid
+        to_state_id:
+          type: string
+          format: uuid
+        transition_id:
+          type: string
+          format: uuid
+        trigger_event:
+          type: string
+        trigger_user:
+          type: string
+          format: uuid
+        context:
+          type: object
+          unevaluatedProperties: {}
+        createdAt:
+          type: string
+          format: date-time
+    ExecutionLogCreate:
+      type: object
+      required:
+        - entity_id
+      properties:
+        entity_id:
+          type: string
+          format: uuid
+        from_state_id:
+          type: string
+          format: uuid
+        to_state_id:
+          type: string
+          format: uuid
+        transition_id:
+          type: string
+          format: uuid
+        trigger_event:
+          type: string
+        trigger_user:
+          type: string
+          format: uuid
+        context:
+          type: object
+          unevaluatedProperties: {}
+    HealthResponse:
+      type: object
+      required:
+        - ok
+      properties:
+        ok:
+          type: boolean
+        service:
+          type: string
+    Invariant:
+      type: object
+      required:
+        - id
+        - registry_id
+        - name
+        - expression
+        - is_type_invariant
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        registry_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Invariant name — unique within its registry
+        expression:
+          type: string
+          description: TLA+ expression
+        description:
+          type: string
+        is_type_invariant:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        rule_id:
+          type: string
+          format: uuid
+        expression_id:
+          type: string
+          format: uuid
+    InvariantCreate:
+      type: object
+      required:
+        - name
+        - expression
+      properties:
+        name:
+          type: string
+        expression:
+          type: string
+        description:
+          type: string
+        is_type_invariant:
+          type: boolean
+        rule_id:
+          type: string
+          format: uuid
+        expression_id:
+          type: string
+          format: uuid
+    InvariantUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        expression:
+          type: string
+        description:
+          type: string
+        is_type_invariant:
+          type: boolean
+        rule_id:
+          type: string
+          format: uuid
+        expression_id:
+          type: string
+          format: uuid
+    ModelCheckResult:
+      type: object
+      required:
+        - id
+        - registry_id
+        - status
+        - checked_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        registry_id:
+          type: string
+          format: uuid
+        property_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          description: e.g. success | failure | unknown | running
+        trace:
+          type: object
+          unevaluatedProperties: {}
+          description: Counterexample / trace (JSONB)
+        checked_properties:
+          type: array
+          items:
+            type: string
+        execution_time_ms:
+          type: integer
+          format: int32
+        checked_at:
+          type: string
+          format: date-time
+        checked_by:
+          type: string
+          format: uuid
+    ModelCheckResultCreate:
+      type: object
+      required:
+        - status
+      properties:
+        property_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        trace:
+          type: object
+          unevaluatedProperties: {}
+        checked_properties:
+          type: array
+          items:
+            type: string
+        execution_time_ms:
+          type: integer
+          format: int32
+        checked_by:
+          type: string
+          format: uuid
+    Property:
+      type: object
+      required:
+        - id
+        - registry_id
+        - name
+        - type
+        - expression
+        - is_verified
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        registry_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Property name — unique within its registry
+        type:
+          $ref: '#/components/schemas/PropertyType'
+          description: safety | liveness | fairness
+        expression:
+          type: string
+          description: TLA+ expression
+        description:
+          type: string
+        is_verified:
+          type: boolean
+        verified_at:
+          type: string
+          format: date-time
+        verified_by:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+    PropertyCreate:
+      type: object
+      required:
+        - name
+        - type
+        - expression
+      properties:
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/PropertyType'
+        expression:
+          type: string
+        description:
+          type: string
+        is_verified:
+          type: boolean
+        verified_at:
+          type: string
+          format: date-time
+        verified_by:
+          type: string
+          format: uuid
+    PropertyType:
+      type: string
+      enum:
+        - safety
+        - liveness
+        - fairness
+    PropertyUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/PropertyType'
+        expression:
+          type: string
+        description:
+          type: string
+        is_verified:
+          type: boolean
+        verified_at:
+          type: string
+          format: date-time
+        verified_by:
+          type: string
+          format: uuid
+    Registry:
+      type: object
+      required:
+        - id
+        - name
+        - version
+        - createdAt
+        - updatedAt
+        - is_active
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUID primary key (gen_random_uuid())
+        name:
+          type: string
+          description: Registry name — unique among active registries
+        description:
+          type: string
+          description: Human-readable description
+        version:
+          type: string
+          description: Semantic version of the TLA+ module
+        tla_plus_source:
+          type: string
+          description: Raw TLA+ source text
+        tla_plus_module:
+          type: string
+          description: TLA+ module name (e.g. "TrafficLight")
+        createdAt:
+          type: string
+          format: date-time
+          description: Server-assigned creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Server-assigned last-update timestamp
+        metadata:
+          type: object
+          unevaluatedProperties: {}
+          description: Arbitrary metadata (JSONB)
+        tags:
+          type: array
+          items:
+            type: string
+          description: Free-form tags
+        is_active:
+          type: boolean
+          description: Soft-delete flag (unique name index is partial on is_active)
+        expires_at:
+          type: string
+          format: date-time
+          description: Optional expiration timestamp
+        main_concept_id:
+          type: string
+          format: uuid
+          description: Resolution schema concept representing this registry's main concept
+    RegistryCreate:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Registry name — unique among active registries
+        description:
+          type: string
+        version:
+          type: string
+        tla_plus_source:
+          type: string
+        tla_plus_module:
+          type: string
+        metadata:
+          type: object
+          unevaluatedProperties: {}
+        tags:
+          type: array
+          items:
+            type: string
+        is_active:
+          type: boolean
+        expires_at:
+          type: string
+          format: date-time
+        main_concept_id:
+          type: string
+          format: uuid
+    RegistryUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        version:
+          type: string
+        tla_plus_source:
+          type: string
+        tla_plus_module:
+          type: string
+        metadata:
+          type: object
+          unevaluatedProperties: {}
+        tags:
+          type: array
+          items:
+            type: string
+        is_active:
+          type: boolean
+        expires_at:
+          type: string
+          format: date-time
+        main_concept_id:
+          type: string
+          format: uuid
+    RelationshipMapping:
+      type: object
+      required:
+        - id
+        - registry_id
+        - tla_relationship
+        - relationship_id
+        - mapping_type
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        registry_id:
+          type: string
+          format: uuid
+        tla_relationship:
+          type: string
+          description: TLA+ relationship name — unique within its registry
+        relationship_id:
+          type: string
+          format: uuid
+          description: Resolution schema concept relationship id
+        mapping_type:
+          type: string
+          description: direct | inverse | transitive
+        constraints:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+    RelationshipMappingCreate:
+      type: object
+      required:
+        - tla_relationship
+        - relationship_id
+        - mapping_type
+      properties:
+        tla_relationship:
+          type: string
+        relationship_id:
+          type: string
+          format: uuid
+        mapping_type:
+          type: string
+        constraints:
+          type: array
+          items:
+            type: string
+    RelationshipMappingUpdate:
+      type: object
+      properties:
+        tla_relationship:
+          type: string
+        relationship_id:
+          type: string
+          format: uuid
+        mapping_type:
+          type: string
+        constraints:
+          type: array
+          items:
+            type: string
+    State:
+      type: object
+      required:
+        - id
+        - registry_id
+        - name
+        - is_initial
+        - is_terminal
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        registry_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: State name — unique within its registry
+        description:
+          type: string
+        variable_assignments:
+          type: object
+          unevaluatedProperties: {}
+          description: variable -> value map (JSONB)
+        constraints:
+          type: array
+          items:
+            type: string
+        is_initial:
+          type: boolean
+        is_terminal:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        concept_id:
+          type: string
+          format: uuid
+        attribute_value_id:
+          type: string
+          format: uuid
+    StateCreate:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        variable_assignments:
+          type: object
+          unevaluatedProperties: {}
+        constraints:
+          type: array
+          items:
+            type: string
+        is_initial:
+          type: boolean
+        is_terminal:
+          type: boolean
+        concept_id:
+          type: string
+          format: uuid
+        attribute_value_id:
+          type: string
+          format: uuid
+    StateUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        variable_assignments:
+          type: object
+          unevaluatedProperties: {}
+        constraints:
+          type: array
+          items:
+            type: string
+        is_initial:
+          type: boolean
+        is_terminal:
+          type: boolean
+        concept_id:
+          type: string
+          format: uuid
+        attribute_value_id:
+          type: string
+          format: uuid
+    TemporalOperator:
+      type: string
+      enum:
+        - '[]'
+        - <>
+        - ->
+        - ~>
+        - =>
+    TemporalProperty:
+      type: object
+      required:
+        - id
+        - registry_id
+        - name
+        - operator
+        - expression
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        registry_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Property name — unique within its registry
+        operator:
+          $ref: '#/components/schemas/TemporalOperator'
+          description: '[] always, <> eventually, -> eventually-leads-to, ~> leads-to, => implies'
+        expression:
+          type: string
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    TemporalPropertyCreate:
+      type: object
+      required:
+        - name
+        - operator
+        - expression
+      properties:
+        name:
+          type: string
+        operator:
+          $ref: '#/components/schemas/TemporalOperator'
+        expression:
+          type: string
+        description:
+          type: string
+    TemporalPropertyUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        operator:
+          $ref: '#/components/schemas/TemporalOperator'
+        expression:
+          type: string
+        description:
+          type: string
+    Transition:
+      type: object
+      required:
+        - id
+        - registry_id
+        - name
+        - weak_fairness
+        - strong_fairness
+        - priority
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        registry_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Transition name — unique within its registry
+        description:
+          type: string
+        guard_expression:
+          type: string
+          description: Guard condition that gates firing
+        action:
+          type: object
+          unevaluatedProperties: {}
+          description: variable -> new value action map (JSONB)
+        weak_fairness:
+          type: boolean
+        strong_fairness:
+          type: boolean
+        temporal_conditions:
+          type: array
+          items:
+            type: string
+        priority:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        from_state_id:
+          type: string
+          format: uuid
+        to_state_id:
+          type: string
+          format: uuid
+        guard_rule_id:
+          type: string
+          format: uuid
+        transition_rule_id:
+          type: string
+          format: uuid
+        state_transition_id:
+          type: string
+          format: uuid
+    TransitionCreate:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        guard_expression:
+          type: string
+        action:
+          type: object
+          unevaluatedProperties: {}
+        weak_fairness:
+          type: boolean
+        strong_fairness:
+          type: boolean
+        temporal_conditions:
+          type: array
+          items:
+            type: string
+        priority:
+          type: integer
+          format: int32
+        from_state_id:
+          type: string
+          format: uuid
+        to_state_id:
+          type: string
+          format: uuid
+        guard_rule_id:
+          type: string
+          format: uuid
+        transition_rule_id:
+          type: string
+          format: uuid
+        state_transition_id:
+          type: string
+          format: uuid
+    TransitionUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        guard_expression:
+          type: string
+        action:
+          type: object
+          unevaluatedProperties: {}
+        weak_fairness:
+          type: boolean
+        strong_fairness:
+          type: boolean
+        temporal_conditions:
+          type: array
+          items:
+            type: string
+        priority:
+          type: integer
+          format: int32
+        from_state_id:
+          type: string
+          format: uuid
+        to_state_id:
+          type: string
+          format: uuid
+        guard_rule_id:
+          type: string
+          format: uuid
+        transition_rule_id:
+          type: string
+          format: uuid
+        state_transition_id:
+          type: string
+          format: uuid
+    ValidationResult:
+      type: object
+      required:
+        - id
+        - registry_id
+        - is_valid
+        - validated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        registry_id:
+          type: string
+          format: uuid
+        is_valid:
+          type: boolean
+        errors:
+          type: array
+          items: {}
+        warnings:
+          type: array
+          items: {}
+        suggestions:
+          type: array
+          items: {}
+        validated_at:
+          type: string
+          format: date-time
+        validated_by:
+          type: string
+          format: uuid
+    ValidationResultCreate:
+      type: object
+      required:
+        - is_valid
+      properties:
+        is_valid:
+          type: boolean
+        errors:
+          type: array
+          items: {}
+        warnings:
+          type: array
+          items: {}
+        suggestions:
+          type: array
+          items: {}
+        validated_by:
+          type: string
+          format: uuid
+    Variable:
+      type: object
+      required:
+        - id
+        - registry_id
+        - name
+        - type
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        registry_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Variable name — unique within its registry
+        type:
+          type: string
+        initial_value:
+          type: object
+          unevaluatedProperties: {}
+        domain:
+          type: object
+          unevaluatedProperties: {}
+        description:
+          type: string
+        constraints:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        attribute_id:
+          type: string
+          format: uuid
+          description: Resolution schema concept attribute backing this variable
+    VariableCreate:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        initial_value:
+          type: object
+          unevaluatedProperties: {}
+        domain:
+          type: object
+          unevaluatedProperties: {}
+        description:
+          type: string
+        constraints:
+          type: array
+          items:
+            type: string
+        attribute_id:
+          type: string
+          format: uuid
+    VariableUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        initial_value:
+          type: object
+          unevaluatedProperties: {}
+        domain:
+          type: object
+          unevaluatedProperties: {}
+        description:
+          type: string
+        constraints:
+          type: array
+          items:
+            type: string
+        attribute_id:
+          type: string
+          format: uuid
