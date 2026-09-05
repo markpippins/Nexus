@@ -84,7 +84,11 @@ def _binding_transaction(disposition: str = "allow") -> _Transaction:
     )
 
 
-def _attach_binding(transaction: _Transaction, disposition: str = "allow") -> _Transaction:
+def _attach_binding(
+    transaction: _Transaction,
+    disposition: str = "allow",
+    observation: bool = False,
+) -> _Transaction:
     transaction.input = {
         "binding_decision": {
             "binding_contract_version": 1,
@@ -110,6 +114,18 @@ def _attach_binding(transaction: _Transaction, disposition: str = "allow") -> _T
             "bridge_version": "1",
         },
     }
+    if observation:
+        transaction.input["binding_decision"]["observation_window"] = {
+            "activation_ref": "w9-activation-1",
+            "activated_at": "2026-09-05T12:00:00Z",
+            "binding_owner": "resolution",
+            "authority_ref": "g1-verdict-986ec482",
+            "authorization_ref": "w1.10-grant-05d0fe54",
+            "grant_id": "05d0fe54",
+            "rollback_ref": "rollback-plan-w9",
+            "rollback_status": "armed",
+            "rollback_evidence_ids": ["rollback-evidence-1"],
+        }
     return transaction
 
 
@@ -135,6 +151,36 @@ def test_binding_decision_emits_complete_keychains_provenance():
     assert payload["outcome"] == "committed"
     assert "evaluator_version" in read_set
     assert "ON CONFLICT (source_namespace, source_event_id) DO NOTHING" in statement
+
+
+def test_post_activation_observation_window_is_preserved():
+    conn = _Connection()
+    tx = _attach_binding(_binding_transaction(), observation=True)
+    PebKeychainsAdapter().emit_transaction(conn, tx)
+
+    _, params = conn._cursor.calls[0]
+    read_set = json.loads(params[14])
+    payload = json.loads(params[15])
+    assert read_set["activation_ref"] == "w9-activation-1"
+    assert read_set["activated_at"] == "2026-09-05T12:00:00Z"
+    assert read_set["binding_owner"] == "resolution"
+    assert read_set["authority_ref"] == "g1-verdict-986ec482"
+    assert read_set["grant_id"] == "05d0fe54"
+    assert read_set["rollback_ref"] == "rollback-plan-w9"
+    assert read_set["rollback_status"] == "armed"
+    assert read_set["rollback_evidence_ids"] == ["rollback-evidence-1"]
+    assert payload["activation_ref"] == "w9-activation-1"
+    assert payload["rollback_ref"] == "rollback-plan-w9"
+
+
+def test_incomplete_post_activation_observation_fails_closed():
+    conn = _Connection()
+    tx = _attach_binding(_binding_transaction(), observation=True)
+    del tx.input["binding_decision"]["observation_window"]["activation_ref"]
+    import pytest
+    with pytest.raises(ValueError, match="observation window missing provenance"):
+        PebKeychainsAdapter().emit_transaction(conn, tx)
+    assert conn._cursor.calls == []
 
 
 def test_all_binding_negative_dispositions_archive_without_checkpoint():

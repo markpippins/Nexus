@@ -104,6 +104,20 @@ class PebKeychainsAdapter:
             or candidate.get("grant_id")
         ):
             raise ValueError("binding decision missing provenance: authorization_ref")
+        observation = candidate.get("observation_window")
+        if observation is not None:
+            if not isinstance(observation, Mapping):
+                raise ValueError("observation_window must be an object")
+            observation_required = (
+                "activation_ref", "activated_at", "binding_owner", "authority_ref",
+            )
+            missing_observation = [
+                field for field in observation_required if observation.get(field) in (None, "")
+            ]
+            if missing_observation:
+                raise ValueError(
+                    "observation window missing provenance: " + ", ".join(missing_observation)
+                )
         return candidate
 
     @classmethod
@@ -166,12 +180,19 @@ class PebKeychainsAdapter:
         return binding.get("as_of") if binding is not None and binding.get("as_of") else getattr(transaction, "created_at", None)
 
     @classmethod
+    def _observation(cls, binding: Mapping[str, Any] | None) -> Mapping[str, Any]:
+        value = binding.get("observation_window") if binding is not None else None
+        return value if isinstance(value, Mapping) else {}
+
+    @classmethod
     def _authorization_ref(cls, transaction: Any, binding: Mapping[str, Any] | None) -> Any:
         input_payload = getattr(transaction, "input", None)
         outer = input_payload if isinstance(input_payload, Mapping) else {}
+        observation = cls._observation(binding)
         if binding is not None:
             return (
-                binding.get("authorization_ref")
+                observation.get("authorization_ref")
+                or binding.get("authorization_ref")
                 or binding.get("authority_ref")
                 or binding.get("grant_id")
                 or outer.get("authorization_ref")
@@ -197,18 +218,21 @@ class PebKeychainsAdapter:
 
         contract = cls._nested(binding, "contract")
         evaluator = cls._nested(binding, "evaluator")
+        observation = cls._observation(binding)
         input_payload = getattr(transaction, "input", None)
         outer = input_payload if isinstance(input_payload, Mapping) else {}
         read_set.update({
             "decision_class": binding["decision_class"],
             "binding_owner": (
-                binding.get("binding_owner")
+                observation.get("binding_owner")
+                or binding.get("binding_owner")
                 or binding.get("owner")
                 or outer.get("binding_owner")
-                or "resolution"
             ),
             "authority_level": binding.get("authority_level"),
             "authorization_ref": cls._authorization_ref(transaction, binding),
+            "authority_ref": observation.get("authority_ref") or binding.get("authority_ref") or outer.get("authority_ref"),
+            "grant_id": observation.get("grant_id") or binding.get("grant_id") or outer.get("grant_id"),
             "binding_contract_version": binding.get("binding_contract_version"),
             "decision_id": binding.get("decision_id"),
             "proposition_id": binding.get("proposition_id"),
@@ -221,6 +245,7 @@ class PebKeychainsAdapter:
             "evidence_fresh": binding.get("evidence_fresh"),
             "evaluation_fingerprint": binding.get("evaluation_fingerprint"),
             "lineage_fingerprint": binding.get("lineage_fingerprint"),
+            "observation_window": dict(observation) if observation else None,
             "contract_id": contract.get("id"),
             "contract_version": contract.get("version"),
             "evaluator_id": evaluator.get("id"),
@@ -230,6 +255,12 @@ class PebKeychainsAdapter:
             "law_version": binding.get("law_version"),
             "bridge_id": binding.get("bridge_id") or "peb-keychains-outbox",
             "bridge_version": binding.get("bridge_version") or "1",
+            "activation_ref": observation.get("activation_ref") or binding.get("activation_ref") or outer.get("activation_ref"),
+            "activated_at": observation.get("activated_at") or binding.get("activated_at") or outer.get("activated_at"),
+            "rollback_ref": observation.get("rollback_ref") or binding.get("rollback_ref") or outer.get("rollback_ref"),
+            "rollback_of": observation.get("rollback_of") or binding.get("rollback_of") or outer.get("rollback_of"),
+            "rollback_status": observation.get("rollback_status") or binding.get("rollback_status") or outer.get("rollback_status"),
+            "rollback_evidence_ids": observation.get("rollback_evidence_ids") or binding.get("rollback_evidence_ids") or outer.get("rollback_evidence_ids"),
             "read_set_manifest": binding.get("read_set_manifest") or outer.get("read_set_manifest"),
         })
         return read_set
@@ -245,12 +276,29 @@ class PebKeychainsAdapter:
             "kernel_event_type": transaction.kernel_event_type,
         }
         if binding is not None:
+            observation = cls._observation(binding)
             payload.update({
                 "decision_class": binding["decision_class"],
                 "decision_id": binding.get("decision_id"),
                 "disposition": binding.get("disposition"),
                 "authority_level": binding.get("authority_level"),
+                "binding_owner": observation.get("binding_owner") or binding.get("binding_owner"),
                 "authorization_ref": cls._authorization_ref(transaction, binding),
+                "authority_ref": observation.get("authority_ref") or binding.get("authority_ref"),
+                "grant_id": observation.get("grant_id") or binding.get("grant_id"),
+                "activation_ref": observation.get("activation_ref") or binding.get("activation_ref"),
+                "activated_at": observation.get("activated_at") or binding.get("activated_at"),
+                "proposition_id": binding.get("proposition_id"),
+                "subject_id": binding.get("subject_id"),
+                "work_item_id": binding.get("work_item_id"),
+                "evidence_ids": binding.get("evidence_ids"),
+                "replay_context": binding.get("replay_context"),
+                "as_of": binding.get("as_of"),
+                "rollback_ref": observation.get("rollback_ref") or binding.get("rollback_ref"),
+                "rollback_of": observation.get("rollback_of") or binding.get("rollback_of"),
+                "rollback_status": observation.get("rollback_status") or binding.get("rollback_status"),
+                "rollback_evidence_ids": observation.get("rollback_evidence_ids") or binding.get("rollback_evidence_ids"),
+                "observation_window": dict(observation) if observation else None,
                 "evaluation_fingerprint": binding.get("evaluation_fingerprint"),
                 "lineage_fingerprint": binding.get("lineage_fingerprint"),
                 "outcome": outcome,
