@@ -90,12 +90,46 @@ namespace org.nexus.nexusbroker {
     source_namespace: string;
     source_event_id: string | null;
     binding_decision_owner: KeychainBindingDecisionOwner;
+    activation: KeychainActivationProvenance;
+    decision: KeychainDecisionProvenance;
+    rollback: KeychainRollbackProvenance;
     evaluator: KeychainVersionedReference;
     contract: KeychainVersionedReference;
     law: KeychainVersionedReference;
     bridge: KeychainVersionedReference;
     source_read_set: Record<unknown>;
     read_set_manifest: Record<unknown> | null;
+  }
+
+  /** Post-activation authority and grant identity used by the decision. */
+  model KeychainActivationProvenance {
+    authorization_ref: string | null;
+    activation_ref: string | null;
+    grant_id: string | null;
+    authority_ref: string | null;
+    activated_at: string | null;
+  }
+
+  /** Immutable decision identity, outcome, evidence, and replay context. */
+  model KeychainDecisionProvenance {
+    id: string | null;
+    proposition_id: string | null;
+    subject_id: string | null;
+    work_item_id: string | null;
+    disposition: string | null;
+    outcome: string | null;
+    evidence_ids: Record<unknown> | null;
+    replay_context: Record<unknown> | string | null;
+    as_of: string | null;
+    evaluation_fingerprint: string | null;
+    lineage_fingerprint: string | null;
+  }
+
+  /** Rollback linkage captured when a governed decision is reversed. */
+  model KeychainRollbackProvenance {
+    reference: string | null;
+    status: string | null;
+    evidence_ids: Record<unknown> | null;
   }
 
   /** Binding authority provenance recorded by a decision checkpoint. */
@@ -138,7 +172,27 @@ namespace org.nexus.nexusbroker {
     decision_class?: string;
     binding_owner?: string;
     authorization_ref?: string;
+    authority_ref?: string;
+    grant_id?: string;
     authority_level?: string;
+    decision_id?: string;
+    activation_ref?: string;
+    proposition_id?: string;
+    subject_id?: string;
+    work_item_id?: string;
+    disposition?: string;
+    evidence_ids?: Record<unknown>;
+    replay_context?: Record<unknown> | string;
+    as_of?: string;
+    evaluation_fingerprint?: string;
+    lineage_fingerprint?: string;
+    activated_at?: string;
+    rollback_ref?: string;
+    rollback_of?: string;
+    rollback_reference?: string;
+    rollback_status?: string;
+    rollback_evidence_ids?: Record<unknown>;
+    observation_window?: Record<unknown>;
     effective_at?: string;
     recorded_at?: string;
     read_set?: Record<unknown>;

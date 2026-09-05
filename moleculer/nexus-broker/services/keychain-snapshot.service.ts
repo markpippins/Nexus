@@ -135,7 +135,27 @@ interface TriggerEventContract {
   decision_class?: string | null;
   binding_owner?: string | null;
   authorization_ref?: string | null;
+  authority_ref?: string | null;
+  grant_id?: string | null;
   authority_level?: string | null;
+  decision_id?: string | null;
+  activation_ref?: string | null;
+  proposition_id?: string | null;
+  subject_id?: string | null;
+  work_item_id?: string | null;
+  disposition?: string | null;
+  evidence_ids?: any;
+  replay_context?: any;
+  as_of?: string | null;
+  evaluation_fingerprint?: string | null;
+  lineage_fingerprint?: string | null;
+  activated_at?: string | null;
+  rollback_ref?: string | null;
+  rollback_of?: string | null;
+  rollback_reference?: string | null;
+  rollback_status?: string | null;
+  rollback_evidence_ids?: any;
+  observation_window?: any;
   effective_at?: string | null;
   recorded_at?: string | null;
   meta?: any;
@@ -163,6 +183,31 @@ interface DecisionContextManifest {
     role: string | null;
     authority_level: string | null;
     authorization_ref: string | null;
+  };
+  activation: {
+    authorization_ref: string | null;
+    activation_ref: string | null;
+    grant_id: string | null;
+    authority_ref: string | null;
+    activated_at: string | null;
+  };
+  decision: {
+    id: string | null;
+    proposition_id: string | null;
+    subject_id: string | null;
+    work_item_id: string | null;
+    disposition: string | null;
+    outcome: string | null;
+    evidence_ids: any;
+    replay_context: any;
+    as_of: string | null;
+    evaluation_fingerprint: string | null;
+    lineage_fingerprint: string | null;
+  };
+  rollback: {
+    reference: string | null;
+    status: string | null;
+    evidence_ids: any;
   };
   evaluator: { id: string | null; version: string | number | null };
   contract: { id: string | null; version: string | number | null };
@@ -1186,6 +1231,20 @@ export default class KeychainService extends Service {
       payload.authorization_ref,
       null,
     );
+    const field = (name: string): any => value(
+      (triggerEvent as any)[name],
+      meta[name],
+      readSet[name],
+      payload[name],
+      null,
+    );
+    const evidenceIds = field("evidence_ids");
+    const rollbackReference = value(
+      field("rollback_ref"),
+      field("rollback_of"),
+      field("rollback_reference"),
+      null,
+    );
     return {
       schema_version: 1,
       checkpoint_class: "decision",
@@ -1196,6 +1255,31 @@ export default class KeychainService extends Service {
         role: owner,
         authority_level: authorityLevel,
         authorization_ref: authorizationRef,
+      },
+      activation: {
+        authorization_ref: authorizationRef,
+        activation_ref: field("activation_ref"),
+        grant_id: field("grant_id"),
+        authority_ref: field("authority_ref"),
+        activated_at: field("activated_at"),
+      },
+      decision: {
+        id: field("decision_id"),
+        proposition_id: field("proposition_id"),
+        subject_id: field("subject_id"),
+        work_item_id: field("work_item_id"),
+        disposition: field("disposition"),
+        outcome: value(triggerEvent.outcome, meta.outcome, readSet.outcome, payload.outcome, null),
+        evidence_ids: evidenceIds,
+        replay_context: field("replay_context"),
+        as_of: field("as_of"),
+        evaluation_fingerprint: field("evaluation_fingerprint"),
+        lineage_fingerprint: field("lineage_fingerprint"),
+      },
+      rollback: {
+        reference: rollbackReference,
+        status: field("rollback_status"),
+        evidence_ids: field("rollback_evidence_ids"),
       },
       evaluator: {
         id: value(triggerEvent.evaluator_id, meta.evaluator_id, readSet.evaluator_id, payload.evaluator_id),
