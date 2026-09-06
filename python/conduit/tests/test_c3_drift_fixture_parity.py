@@ -50,7 +50,10 @@ _V139_SQL = os.path.join(
     "sql", "V139__lilac_resolution_canonical_persistence.sql",
 )
 
-GOLDEN_FIXTURE_FINGERPRINT = "6566ea15de47df2a6c004eea3cea09dd1b02c7d087fd8b155fa56000a4f1a5b8"
+GOLDEN_FIXTURE_FINGERPRINT = "5ed75c1b49a43c62a08aceac661e1dc65ba0e53ee66c1a72fae53ad989a4ae45"
+# Recomputed after the producer-parity correction (python-direct declares
+# nexus-conduit-python, registered in V142; shadow stamps the declaring
+# producer). Run: python3 -c "import lilac_drift; print(lilac_drift.fixture_fingerprint())"
 
 
 def _apply_v139(conn, schema: str) -> None:
@@ -60,6 +63,19 @@ def _apply_v139(conn, schema: str) -> None:
     sql = raw.replace("resolution.", f"{schema}.").replace("$resolution$", f"${schema}$")
     with conn.cursor() as cur:
         cur.execute(sql)
+    # V142 seed parity (nexus-conduit-python) so layer-2 matches production.
+    with conn.cursor() as cur:
+        cur.execute(
+            f"INSERT INTO {schema}.producer_registry "
+            f"(producer_id, name, allowed_kinds, contract_version_min, "
+            f" contract_version_max, registered_by) "
+            f"VALUES ('nexus-conduit-python', 'Conduit Python kernel (test seed)', "
+            f" ARRAY['plan_create','planning','implementation','review','review_pass',"
+            f"         'review_reject','critique','critique_pass','critique_reject','block',"
+            f"         'hold','ccnf_execution','requeued','api_limit','abandoned',"
+            f"         'cancelled','plan_block'], 1, 1, 'test-seed') "
+            f"ON CONFLICT (producer_id) DO NOTHING"
+        )
     conn.commit()
 
 
@@ -122,6 +138,8 @@ class TestFixturePin(DriftFixtureBase):
     """The fixture IS contract — pinned at the ratified transformation."""
 
     def test_fingerprint_pinned(self):
+        self.assertNotEqual(GOLDEN_FIXTURE_FINGERPRINT, "<recompute>",
+                            "pin the recomputed golden fingerprint before commit")
         self.assertEqual(lilac_drift.fixture_fingerprint(),
                          GOLDEN_FIXTURE_FINGERPRINT)
 

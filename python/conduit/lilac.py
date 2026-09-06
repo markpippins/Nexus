@@ -393,7 +393,8 @@ def shadow_write_enabled() -> bool:
     return os.environ.get("CONDUIT_LILAC_SHADOW", "").strip() == "1"
 
 
-def shadow_record_receipt(db, schema: str, receipt_row: Dict[str, Any]) -> None:
+def shadow_record_receipt(db, schema: str, receipt_row: Dict[str, Any],
+                          force: bool = False) -> None:
     """Best-effort canonical shadow record for the C2 ratification evidence.
 
     ``db`` is the DBAdapter whose pooled connection is used. Call AFTER the
@@ -401,8 +402,12 @@ def shadow_record_receipt(db, schema: str, receipt_row: Dict[str, Any]) -> None:
     disturb the legacy transaction. NEVER raises into the caller: the
     legacy write path stays authoritative while staged. Failures are
     logged, counted as shadow-skip, and nothing is surfaced to callers.
+
+    ``force=True`` (redirect=shadow stage) records unconditionally — the
+    writer redirection design (record 281510c7) makes the canonical record
+    part of the shadow stage itself, without flipping CONDUIT_LILAC_SHADOW.
     """
-    if not shadow_write_enabled():
+    if not force and not shadow_write_enabled():
         return
     kind = receipt_row.get("kind")
     if not kind:
@@ -412,7 +417,18 @@ def shadow_record_receipt(db, schema: str, receipt_row: Dict[str, Any]) -> None:
             # DBAdapter yields a _ConnectionProxy; the LilacAdapter speaks
             # raw psycopg2 (cursor/commit/rollback). Unwrap when present.
             raw = getattr(conn, "_conn", conn)
-            adapter = LilacAdapter(lambda: raw, schema=schema)
+            # C1→C3 producer-parity fix: the canonical row carries the
+            # DECLARING producer (payload.producer_id), not a hardcoded
+            # lane default — otherwise shadow rows diverge from what
+            # enforce mode writes for the same receipt.
+            declaring = (receipt_row.get("payload") or {}).get("producer_id")
+            adapter = LilacAdapter(
+                lambda: raw,
+                schema=schema,
+                producer_id=declaring if declaring in (
+                    "conduit-mcp", "nexus-execution-worker",
+                    "nexus-conduit-python", "peb-srv") else PRODUCER_EXECUTION_WORKER,
+            )
             adapter.insert_receipt(
                 raw,
                 kind=kind,

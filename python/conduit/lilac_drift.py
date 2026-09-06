@@ -55,10 +55,15 @@ KIND_BY_TYPE = {
 UNMAPPED_LEGACY_TYPES = ("PROPOSED",)
 
 # Channel → producer stamping (db_adapter provenance; Q3 authority model).
+# Corrected at C3 cutover prep: the python-direct channel declares
+# 'nexus-conduit-python' (db_adapter._receipt_provenance), NOT the worker
+# lane identity — registered in V142. The shadow seam stamps the DECLARING
+# producer (payload.producer_id), so parity holds across all channels.
 PRODUCER_BY_CHANNEL = {
-    "conduit-mcp-http": "conduit-mcp",          # TS front-door → kernel REST
-    "conduit-mcp-stdio": "conduit-mcp",         # MCP tools direct inserts
-    "python-direct": "nexus-execution-worker",  # in-process adapter callers
+    "conduit-mcp-http": "conduit-mcp",            # TS front-door → kernel REST
+    "conduit-mcp-stdio": "conduit-mcp",           # MCP tools direct inserts
+    "conduit-python": "nexus-conduit-python",     # Python kernel process (V142)
+    "python-direct": "nexus-conduit-python",      # in-process adapter callers
     "nexus-execution-worker": "nexus-execution-worker",
 }
 
@@ -110,8 +115,11 @@ def check_adapter_consistency(lilac_mod) -> list:
         drift.append("lilac.LIFECYCLE_KINDS != fixture GRANT_KINDS")
     if getattr(lilac_mod, "PRODUCER_CONDUIT_MCP", "") != PRODUCER_BY_CHANNEL["conduit-mcp-http"]:
         drift.append("lilac.PRODUCER_CONDUIT_MCP != fixture producer for conduit-mcp-http")
-    if getattr(lilac_mod, "PRODUCER_EXECUTION_WORKER", "") != PRODUCER_BY_CHANNEL["python-direct"]:
-        drift.append("lilac.PRODUCER_EXECUTION_WORKER != fixture producer for python-direct")
+    # PRODUCER_EXECUTION_WORKER is the adapter's lane-default (shadow
+    # fallback), not the declared python-direct producer — it must equal
+    # the registered worker identity, nothing else.
+    if getattr(lilac_mod, "PRODUCER_EXECUTION_WORKER", "") != PRODUCER_BY_CHANNEL["nexus-execution-worker"]:
+        drift.append("lilac.PRODUCER_EXECUTION_WORKER != registered worker identity")
     return drift
 
 
@@ -128,7 +136,8 @@ def check_db_registry(cur, schema: str = "resolution") -> list:
     rows = {r[0]: r for r in cur.fetchall()}
 
     for producer in (PRODUCER_BY_CHANNEL["conduit-mcp-http"],
-                     PRODUCER_BY_CHANNEL["python-direct"]):
+                     PRODUCER_BY_CHANNEL["python-direct"],
+                     PRODUCER_BY_CHANNEL["nexus-execution-worker"]):
         row = rows.get(producer)
         if row is None:
             drift.append(f"producer_registry missing seed: {producer}")
