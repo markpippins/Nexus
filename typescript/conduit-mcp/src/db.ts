@@ -4019,6 +4019,7 @@ export async function createNextTickets(
   planId: string, ticketRole: string, terminalStatus: string,
   parentTicketId: string = "", objective: string = "",
   completionCriteria: string = "", owner: string = "",
+  critiquePosition: "admission" | "artifact" | "" = "",
 ): Promise<number> {
   if (await _isPlanTerminal(planId)) {
     console.log(`Guard: plan ${planId} has terminal receipt(s) — skipping ticket creation`);
@@ -4029,7 +4030,16 @@ export async function createNextTickets(
   if (terminalStatus === "completed") {
     if (ticketRole === "builder") nextRoles.push("reviewer");
     else if (ticketRole === "planner") nextRoles.push("builder", "critic");
-    else if (ticketRole === "critic") nextRoles.push("builder");
+    // Plan 0016 — the ARTIFACT critique edge: a critic completing after an
+    // IMPLEMENTATION-triggered critique hands to the reviewer (the artifact has
+    // been implemented; a negative critique influenced the reviewer, but the
+    // next actor is the reviewer). An ADMISSION critique (after PLAN_CREATE)
+    // hands back to the builder to implement. The position is resolved from the
+    // last non-CRITIQUE receipt (critiquePosition arg) — NEVER ticket.objective.
+    else if (ticketRole === "critic") {
+      if (critiquePosition === "artifact") nextRoles.push("reviewer");
+      else nextRoles.push("builder"); // admission (or unknown) → builder
+    }
   } else if (terminalStatus === "failed") {
     if (ticketRole === "reviewer") nextRoles.push("builder");
     else if (ticketRole === "planner") nextRoles.push("planner");
@@ -4062,6 +4072,104 @@ export async function createNextTickets(
     if (changes > 0) count++;
   }
   return count;
+}
+
+/**
+ * Pure mapping: which role's ticket a receipt type completes, and with what
+ * terminal status. PLAN_CREATE creates the builder ticket (not a completion);
+ * BLOCK/HOLD/etc. complete no ticket. Exported + pure so the wiring contract
+ * is unit-testable without a DB (plan 0016 AC2 spirit — routing/advancement
+ * depends only on the receipt type and the non-CRITIQUE receipt position,
+ * never ticket.objective).
+ */
+export function receiptToCompletingRole(
+  receiptType: string,
+): { role: string; status: "completed" | "failed" } | null {
+  switch (receiptType) {
+    case "IMPLEMENTATION": return { role: "builder", status: "completed" };
+    case "CRITIQUE_PASS": return { role: "critic", status: "completed" };
+    case "CRITIQUE_REJECT": return { role: "critic", status: "completed" };
+    case "REVIEW_PASS": return { role: "reviewer", status: "completed" };
+    case "REVIEW_REJECT": return { role: "reviewer", status: "failed" };
+    default: return null;
+  }
+}
+
+/**
+ * WIRING FIX (plan 0016 follow-up; timers-readiness): advance the ticket
+ * lifecycle when a receipt lands.
+ *
+ * Previously createNextTickets had NO callers — tickets were created on
+ * PLAN_CREATE (createTicketIfMissing) but never completed or fanned out, so
+ * plans could not advance past a single ticket when timers re-enabled
+ * automatic dispatch. This function closes that gap: on the receipts that
+ * represent a role finishing its work, it
+ *   1. marks the completing role's open ticket completed/failed, and
+ *   2. spawns the next role's ticket via createNextTickets (which for a critic
+ *      uses the position — admission vs artifact — resolved from the last
+ *      non-CRITIQUE receipt; NEVER ticket.objective).
+ *
+ * Returns { completed, spawned, critiquePosition } for observability.
+ */
+export async function advanceTicketsOnReceipt(
+  planId: string,
+  receiptType: string,
+  _agentRole: string,
+): Promise<{ completed: number; spawned: number; critiquePosition?: "admission" | "artifact" }> {
+  const m = receiptToCompletingRole(receiptType);
+  if (!m) return { completed: 0, spawned: 0 };
+
+  // Find the open/claimed/stale ticket for the completing role.
+  const ticket = await qOne(
+    `SELECT id, objective, completion_criteria, owner
+     FROM ${VISION_SCHEMA}.tickets
+     WHERE plan_id = @planId AND role = @role AND status IN ('open','claimed','stale')
+     ORDER BY created_at ASC LIMIT 1`,
+    { planId, role: m.role },
+  );
+  if (!ticket) return { completed: 0, spawned: 0 };
+
+  // Mark it completed/failed.
+  const now = new Date().toISOString();
+  await qRun(
+    `UPDATE ${VISION_SCHEMA}.tickets
+     SET status = @status, closed_at = @now::timestamptz, last_activity = @now,
+         closure_reason = @reason
+     WHERE id = @ticketId AND status IN ('open','claimed','stale')`,
+    { ticketId: ticket.id, status: m.status, now, reason: `receipt:${receiptType}` },
+  );
+
+  // Resolve critique position locally from the receipt chain (db.ts reads PG
+  // directly — no HTTP, no import from receipts.ts to avoid a layering cycle).
+  let critiquePosition: "admission" | "artifact" | "" = "";
+  if (m.role === "critic") {
+    const position = await lastNonCritiqueReceiptType(planId);
+    if (position === "PLAN_CREATE") critiquePosition = "admission";
+    else if (position === "IMPLEMENTATION") critiquePosition = "artifact";
+  }
+
+  // Spawn the next role's ticket (position-aware for critic completion).
+  const spawned = await createNextTickets(
+    planId, m.role, m.status, ticket.id,
+    ticket.objective || "", ticket.completion_criteria || "", ticket.owner || m.role,
+    critiquePosition,
+  );
+
+  return {
+    completed: 1,
+    spawned,
+    critiquePosition: critiquePosition === "" ? undefined : critiquePosition,
+  };
+}
+
+/** The last receipt in plan history that is NOT in the critique family. */
+async function lastNonCritiqueReceiptType(planId: string): Promise<string | null> {
+  const rows = await getReceiptsForPlan(planId); // created_at ASC
+  const CRITIQUE_FAMILY = new Set(["CRITIQUE", "CRITIQUE_PASS", "CRITIQUE_REJECT"]);
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (!CRITIQUE_FAMILY.has(rows[i].type)) return rows[i].type;
+  }
+  return null;
 }
 
 export async function createTicketIfMissing(

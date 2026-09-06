@@ -20,7 +20,9 @@
     "node_modules",
     "dist",
     "src/db.schema.test.ts",
-    "src/schema-test-setup.ts"
+    "src/schema-test-setup.ts",
+    "src/wrp-contract-adjacency.test.ts",
+    "src/receipts-routing.test.ts"
   ],
   "include": [
     "src/**/*"

@@ -1,16 +1,23 @@
-import { getLatestReceiptType } from "./conduit-client";
+import { getReceiptsRaw, getLatestReceiptType } from "./conduit-client";
 
 // Allowed transitions: from → to (v018: removed PROPOSED, added HOLD)
 // v019: added CCNF_EXECUTION — sub-event within implementation phase
+// v020 (plan 0016): added the artifact-critique edge — a recurring CRITIQUE
+//   may follow IMPLEMENTATION. The ALLOWED table stays per-receipt-type; the
+//   POSITION of a CRITIQUE (admission vs artifact) is resolved by
+//   validateReceipt from the LAST NON-CRITIQUE receipt, never from
+//   ticket.objective (which is descriptive-only). No new CRITIQUE_ADMISSION /
+//   CRITIQUE_ARTIFACT / CRITIQUE_ARTIFACT_STATE receipt types or states.
 const ALLOWED: Record<string, string[]> = {
   // Anything can be created, or start from a requirement idea:
   // PLANNING is for revise_plan (fresh revision plans start with PLANNING receipt):
   "": ["PLAN_CREATE", "BLOCK", "PLANNING"],
-  // After creation, builder can implement, hold, or route to critique:
+  // After creation, builder can implement, hold, or route to critique (admission):
   PLAN_CREATE: ["IMPLEMENTATION", "BLOCK", "CRITIQUE", "HOLD", "PLAN_CREATE"],
-  // After implementation, reviewer can pass, reject, or hold:
-  // CCNF_EXECUTION is a sub-event that records CCNF conformance runs
-  IMPLEMENTATION: ["REVIEW_PASS", "REVIEW_REJECT", "REVIEW", "HOLD", "CCNF_EXECUTION"],
+  // After implementation, reviewer can pass, reject, or hold; and (plan 0016)
+  // the ARTIFACT critique edge — a second Critic review before the Reviewer.
+  // CCNF_EXECUTION is a sub-event that records CCNF conformance runs.
+  IMPLEMENTATION: ["REVIEW_PASS", "REVIEW_REJECT", "REVIEW", "HOLD", "CCNF_EXECUTION", "CRITIQUE"],
   // CCNF execution returns to implementation or chains another run:
   CCNF_EXECUTION: ["IMPLEMENTATION", "CCNF_EXECUTION", "HOLD"],
   // Rejection → builder re-implements, or manual REVIEW_PASS override, or hold:
@@ -26,11 +33,14 @@ const ALLOWED: Record<string, string[]> = {
   HOLD: ["PLAN_CREATE", "CANCELLED", "ABANDONED"],
   // Reviewer starts reviewing after implementation:
   REVIEW: ["REVIEW_PASS", "REVIEW_REJECT", "HOLD"],
-  // Critic starts critique after plan creation:
+  // Critic starts critique (admission after PLAN_CREATE, or — plan 0016 —
+  // artifact after IMPLEMENTATION). The POSITION is resolved by
+  // validateReceipt from the last non-CRITIQUE receipt.
   CRITIQUE: ["CRITIQUE_PASS", "CRITIQUE_REJECT", "HOLD"],
-  // Critic outcomes:
-  CRITIQUE_PASS: ["IMPLEMENTATION", "HOLD"], // critique passed → builder can implement or hold
-  CRITIQUE_REJECT: ["PLAN_CREATE", "HOLD"], // critique failed → back to planning or hold
+  // Critic outcomes — position-aware routing (admission vs artifact) is
+  // resolved by validateReceipt from the last non-CRITIQUE receipt.
+  CRITIQUE_PASS: ["IMPLEMENTATION", "REVIEW", "HOLD"],
+  CRITIQUE_REJECT: ["PLAN_CREATE", "IMPLEMENTATION", "HOLD"],
   // Planner block:
   PLAN_BLOCK: ["IMPLEMENTATION", "HOLD"], // unblock or hold
   // Requeued plans can be re-dispatched:
@@ -41,6 +51,35 @@ const ALLOWED: Record<string, string[]> = {
   // API_LIMIT is always valid (like BLOCK) — handled as special case in validateReceipt
   API_LIMIT: [],
 };
+
+/**
+ * The critique-family receipt types. All three (CRITIQUE and its two outcomes)
+ * share a single canonical WRP state; the distinction is a ROUTING decision
+ * resolved from the last non-CRITIQUE receipt — never a new state/receipt type.
+ */
+const CRITIQUE_FAMILY = new Set(["CRITIQUE", "CRITIQUE_PASS", "CRITIQUE_REJECT"]);
+
+/**
+ * Resolve the position of a critique-family receipt: "admission" (after
+ * PLAN_CREATE) vs "artifact" (after IMPLEMENTATION). SINGLE source of truth is
+ * the LAST NON-CRITIQUE receipt in plan history — never ticket.objective.
+ *
+ * Returns the routing basis: { position, basis } where basis is the last
+ * non-CRITIQUE receipt type that determined the position.
+ */
+export async function resolveCritiquePosition(
+  planId: string,
+): Promise<{ position: "admission" | "artifact" | "unknown"; basis: string | null }> {
+  const data = await getReceiptsRaw(planId);
+  const receipts = data?.receipts || [];
+  // Chronological scan (receipts already come newest-first per the raw endpoint);
+  // find the most recent receipt NOT in the critique family.
+  const nonCritique = receipts.find((r: any) => !CRITIQUE_FAMILY.has(r?.type));
+  const basis = nonCritique?.type ?? null;
+  if (basis === "PLAN_CREATE") return { position: "admission", basis };
+  if (basis === "IMPLEMENTATION") return { position: "artifact", basis };
+  return { position: "unknown", basis };
+}
 
 export async function validateReceipt(
   planId: string,
@@ -62,4 +101,27 @@ export async function validateReceipt(
   }
 
   return { valid: true };
+}
+
+/**
+ * Resolve the routing target for a critique-family OUTCOME receipt
+ * (CRITIQUE_PASS / CRITIQUE_REJECT) based on the position of the CRITIQUE it
+ * follows. INVARIANT (plan 0016 AC1): routing resolves ONLY from the last
+ * non-CRITIQUE receipt in plan history — ticket.objective MUST NEVER be read.
+ *
+ *   admission:  CRITIQUE_PASS → IMPLEMENTATION,  CRITIQUE_REJECT → PLAN_CREATE
+ *   artifact:   CRITIQUE_PASS → REVIEW,          CRITIQUE_REJECT → IMPLEMENTATION
+ */
+export async function resolveCritiqueOutcome(
+  planId: string,
+  outcome: "CRITIQUE_PASS" | "CRITIQUE_REJECT",
+): Promise<{ position: "admission" | "artifact" | "unknown"; target: string | null }> {
+  const { position } = await resolveCritiquePosition(planId);
+  if (position === "admission") {
+    return { position, target: outcome === "CRITIQUE_PASS" ? "IMPLEMENTATION" : "PLAN_CREATE" };
+  }
+  if (position === "artifact") {
+    return { position, target: outcome === "CRITIQUE_PASS" ? "REVIEW" : "IMPLEMENTATION" };
+  }
+  return { position, target: null };
 }

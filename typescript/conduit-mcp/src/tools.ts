@@ -6,6 +6,7 @@ import { validate } from "./validate";
 import { validateReceipt } from "./receipts";
 import {
   createTicketIfMissing,
+  advanceTicketsOnReceipt,
   getPlan,
   getPlanById,
   upsertPlan,
@@ -924,6 +925,30 @@ export function registerToolHandlers(
       // Force watcher to re-evaluate from DB receipts (not filesystem cache)
       if (args.type === "PLAN_CREATE") {
         watcher.removePlanFromMemory(args.plan_id);
+      }
+
+      // WIRING FIX (plan 0016 follow-up): advance the ticket lifecycle on the
+      // receipts that complete a role's work (IMPLEMENTATION / CRITIQUE_PASS /
+      // CRITIQUE_REJECT / REVIEW_PASS / REVIEW_REJECT). PLAN_CREATE is skipped
+      // because it CREATES the builder ticket rather than completing one. The
+      // advance marks the completing role's ticket done and spawns the next
+      // role's ticket (position-aware for critic completion). Best-effort and
+      // failure-isolated: a ticket advance error never fails the receipt itself.
+      if (args.type !== "PLAN_CREATE") {
+        try {
+          const advanced = await advanceTicketsOnReceipt(
+            args.plan_id, args.type, args.agent_role,
+          );
+          if (advanced.completed > 0 || advanced.spawned > 0) {
+            console.log(
+              `[${now}] Ticket advance for plan ${args.plan_id}: completed=${advanced.completed} spawned=${advanced.spawned}${advanced.critiquePosition ? ` critiquePosition=${advanced.critiquePosition}` : ""}`,
+            );
+          }
+        } catch (advErr) {
+          console.error(
+            `[${now}] advanceTicketsOnReceipt for plan ${args.plan_id} failed (non-fatal): ${(advErr as Error).message}`,
+          );
+        }
       }
 
       // SSE: notify all connected clients that state changed
