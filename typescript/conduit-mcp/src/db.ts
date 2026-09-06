@@ -2565,7 +2565,9 @@ const migrations: Migration[] = [
             MIN(r.created_at) AS created_at,
             MAX(r.created_at) AS updated_at
         FROM nebula.plans p
-        JOIN vision.receipts r ON r.plan_id = p.id
+        -- C5 (Lilac plan 8261639): read via the unified projection, not the
+        -- legacy table — same rows during dual-read, survives the C6 re-point.
+        JOIN nebula.receipts_unified r ON r.plan_id = p.id
         WHERE NOT EXISTS (
             SELECT 1 FROM execution.requests er
             WHERE er.source_plan_id = p.id
@@ -2701,7 +2703,9 @@ const migrations: Migration[] = [
             MIN(r.created_at) AS created_at,
             MAX(r.created_at) AS updated_at
         FROM nebula.plans p
-        JOIN vision.receipts r ON r.plan_id = p.id
+        -- C5 (Lilac plan 8261639): read via the unified projection, not the
+        -- legacy table — same rows during dual-read, survives the C6 re-point.
+        JOIN nebula.receipts_unified r ON r.plan_id = p.id
         WHERE NOT EXISTS (
             SELECT 1 FROM execution.requests er
             WHERE er.source_plan_id = p.id
