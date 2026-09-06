@@ -570,13 +570,23 @@ class DBAdapter:
           reviewer completed → (nothing — terminal REVIEW_PASS)
           reviewer failed    → builder (re-implementation)
           planner completed  → builder + critic
-          critic completed   → builder
+          critic completed   → builder  [DEPRECATED — see below]
 
         Guard: if the plan's derived_status is already terminal (REVIEW_PASS,
         BLOCK, PLAN_BLOCK), no new tickets are spawned regardless of role
         transition.  This prevents late-arriving ticket completions (e.g.
         critic finishing after the plan was already REVIEW_PASS) from
         dispatching unnecessary work.
+
+        DEPRECATION (architect, 2026-09-05, plan 0016 reconciliation): the
+        critic fan-out here is NOT position-aware and is superseded by the
+        MCP issue_receipt path (TS advanceTicketsOnReceipt → createNextTickets,
+        which resolves admission vs artifact from the last non-CRITIQUE
+        receipt). The only live caller of this method is the execution worker
+        (execution_worker.py) with ROLE="builder", so the critic/planner
+        branches below are currently unreachable in production. Keep them
+        (harmless) or delete when the ticket/receipt/claims service lands;
+        do NOT wire new callers onto the critic branch here.
         """
         _log.info("create_next_tickets: plan=%s ticket_role=%s terminal_status=%s", plan_id, ticket_role, terminal_status)
         with self._get_connection() as conn:
@@ -602,6 +612,9 @@ class DBAdapter:
             elif ticket_role == "planner":
                 next_roles = ["builder", "critic"]
             elif ticket_role == "critic":
+                # DEPRECATED (architect 2026-09-05, plan 0016): not
+                # position-aware; superseded by MCP advanceTicketsOnReceipt.
+                # Unreachable today (live caller is execution_worker builder).
                 next_roles = ["builder"]
         elif terminal_status == "failed":
             if ticket_role == "reviewer":

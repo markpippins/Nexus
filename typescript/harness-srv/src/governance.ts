@@ -18,6 +18,13 @@
  *   run completion → IMPLEMENTATION → REVIEW_PASS | REVIEW_REJECT
  *   watchdog kill  → BLOCK            (always-valid override receipt)
  *
+ * Artifact-critique edge (plan 0016): a CRITIQUE may also follow
+ * IMPLEMENTATION (the second Critic review before the Reviewer). This is
+ * additive — the harness may emit CRITIQUE after IMPLEMENTATION and the
+ * conduit validateReceipt resolves its position (admission vs artifact)
+ * from the last non-CRITIQUE receipt. The harness itself performs no state
+ * validation (pure pass-through); it relies on conduit's validateReceipt.
+ *
  * All POSTs are best-effort: failures are logged, never thrown, so the
  * run result is never held hostage by the governance ledger.
  *
@@ -41,7 +48,7 @@ const KNOWN_EXECUTORS = new Set([
 
 export interface GovernanceReceiptParams {
   planId: string;
-  /** One of: PLAN_CREATE | IMPLEMENTATION | REVIEW_PASS | REVIEW_REJECT | BLOCK */
+  /** One of: PLAN_CREATE | IMPLEMENTATION | REVIEW_PASS | REVIEW_REJECT | BLOCK | CRITIQUE | CRITIQUE_PASS | CRITIQUE_REJECT | PLANNING | HOLD */
   type: string;
   agentRole: string;
   sessionId: string;
