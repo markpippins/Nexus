@@ -165,6 +165,11 @@ export async function insertReceipt(r: {
   metadata_json?: string;
   tokens_used?: number;
   created_at: string;
+  /** C1 gate 1 (Lilac): declaring-producer identity forwarded to the Python
+   * REST persistence layer (optional; defaults to the Python channel). */
+  producer_id?: string;
+  source_channel?: string;
+  correlation_id?: string;
 }): Promise<{ ok: boolean; id: string; plan_id: string }> {
   return post("/api/receipts/", {
     id: r.id,
@@ -178,6 +183,9 @@ export async function insertReceipt(r: {
     metadata_json: r.metadata_json || "{}",
     tokens_used: r.tokens_used || 0,
     created_at: r.created_at,
+    producer_id: r.producer_id,
+    source_channel: r.source_channel,
+    correlation_id: r.correlation_id,
   });
 }
 

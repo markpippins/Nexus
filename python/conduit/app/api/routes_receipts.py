@@ -37,6 +37,12 @@ class ReceiptInsertRequest(BaseModel):
     metadata_json: str = "{}"
     tokens_used: int = 0
     created_at: str
+    # C1 gate 1 (Lilac plan 8261639): declaring-producer identity for the
+    # TS front-door channel. Optional + defaulting to the Python channel so
+    # the request shape stays backward compatible.
+    producer_id: Optional[str] = None
+    source_channel: Optional[str] = None
+    correlation_id: Optional[str] = None
 
 
 class DeleteReceiptsRequest(BaseModel):
@@ -118,56 +124,51 @@ def insert_receipt(body: ReceiptInsertRequest):
     """Insert a receipt. D-T19-2(b): execution.receipts (request-scoped) when the
     plan resolves to an execution.requests row; vision.receipts fallback for
     test/synthetic plans.
-    Validation (validateReceipt) is done client-side in conduit-mcp."""
+    Validation (validateReceipt) is done client-side in conduit-mcp.
+
+    C1 (Lilac plan 8261639): this route is the single persistence path for
+    the HTTP channel — it delegates to ``DBAdapter.insert_receipt`` so both
+    channels share one canonical identity/idempotency contract. The caller's
+    ``id`` is honored verbatim (idempotency key parity with the direct
+    Python path); no receipt id is generated here anymore. Provenance
+    (producer/source channel/correlation) is stamped inside the adapter."""
     from db_adapter import DBAdapter
     db = DBAdapter()
 
-    request_id = db.resolve_request_for_receipt(body.plan_id)
-    if request_id is not None:
-        base_meta = json.loads(body.metadata_json) if body.metadata_json else {}
-        exec_meta = {
-            **base_meta,
-            "session_id": body.session_id or "",
-            "artifact_path": body.artifact_path,
-            "ticket_id": body.ticket_id,
-            "tokens_used": body.tokens_used or 0,
-        }
-        with db._get_connection() as conn:
-            conn.execute(
-                "INSERT INTO execution.receipts "
-                "(request_id, attempt_id, type, agent_role, summary, metadata, "
-                "lineage_source, lineage_original_id, issued_at) "
-                "VALUES (%s, NULL, %s, %s, %s, %s, 'conduit', %s, %s) "
-                "ON CONFLICT (lineage_original_id) WHERE lineage_source = 'conduit' DO NOTHING",
-                (request_id, body.type, body.agent_role, body.summary or "",
-                 json.dumps(exec_meta), body.id, body.created_at),
+    base_meta: dict = {}
+    if body.metadata_json:
+        try:
+            base_meta = json.loads(body.metadata_json)
+            if not isinstance(base_meta, dict):
+                raise HTTPException(
+                    status_code=400,
+                    detail="metadata_json must decode to a JSON object",
+                )
+        except json.JSONDecodeError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"metadata_json is not valid JSON: {exc}",
             )
-            conn.commit()
-    else:
-        with db._get_connection() as conn:
-            conn.execute(
-                "INSERT INTO vision.receipts "
-                "(id, plan_id, type, agent_role, session_id, ticket_id, "
-                "artifact_path, summary, metadata_json, tokens_used, created_at) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
-                "ON CONFLICT (id) DO NOTHING",
-                (
-                    body.id,
-                    body.plan_id,
-                    body.type,
-                    body.agent_role,
-                    body.session_id or "",
-                    body.ticket_id,
-                    body.artifact_path,
-                    body.summary or "",
-                    body.metadata_json or "{}",
-                    body.tokens_used or 0,
-                    body.created_at,
-                ))
-            conn.commit()
 
-    _log.info("insert_receipt: plan=%s type=%s id=%s request=%s",
-              body.plan_id, body.type, body.id, request_id)
+    db.insert_receipt(
+        plan_id=body.plan_id,
+        receipt_type=body.type,
+        agent_role=body.agent_role,
+        session_id=body.session_id or "",
+        ticket_id=body.ticket_id,
+        summary=body.summary or "",
+        artifact_path=body.artifact_path,
+        metadata={**base_meta,
+                  "producer_id": body.producer_id,
+                  "source_channel": body.source_channel},
+        tokens_used=body.tokens_used or 0,
+        correlation_id=body.correlation_id,
+        receipt_id=body.id,
+    )
+
+    _log.info("insert_receipt: plan=%s type=%s id=%s channel=%s",
+              body.plan_id, body.type, body.id,
+              body.source_channel or "conduit-python")
     return {"ok": True, "id": body.id, "plan_id": body.plan_id}
 
 

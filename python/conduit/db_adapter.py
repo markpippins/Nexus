@@ -9,6 +9,12 @@ from datetime import datetime, timedelta
 
 _log = logging.getLogger("conduit.db_adapter")
 
+# C1 gate 1 (Lilac plan 8261639): process-level invocation identity for
+# receipt-write provenance. systemd sets INVOCATION_ID per service run;
+# outside systemd this is "unsupervised" — still deterministic per process
+# environment and visible in the provenance stamp.
+_INVOCATION_ID = os.environ.get("INVOCATION_ID", "unsupervised") or "unsupervised"
+
 # ── OpenCode model-ID qualification (shared by pipeline + executor) ──
 #
 # opencode registers each provider instance's models under
@@ -788,6 +794,71 @@ class DBAdapter:
 
     # ── Receipts (v078 — ticket_id required) ─────────────────────
 
+    @staticmethod
+    def _receipt_provenance(
+        correlation_id: Optional[str] = None,
+        producer_id: Optional[str] = None,
+        source_channel: Optional[str] = None,
+    ) -> Dict[str, str]:
+        """C1 gate 1 (Lilac plan 8261639): receipt-write provenance stamp.
+
+        Target shapes follow the C2 contract draft (architect record
+        2026-09-06): source_channel / source_system / producer identity,
+        process + invocation identity, and contract_version. Correlation ID
+        is caller-supplied when available (invocation context), otherwise
+        generated once per receipt. Invoked lazily at write time.
+
+        Identity split: ``producer_id``/``source_channel`` carry the
+        declaring write authority (e.g. the TS front-door when it declares
+        itself via the REST body), while ``process_id``/``invocation_id``
+        always describe the process that physically performed the write."""
+        return {
+            "producer_id": producer_id or "nexus-conduit-python",
+            "source_channel": source_channel or "conduit-python",
+            "source_system": "conduit",
+            "process_id": str(os.getpid()),
+            "invocation_id": _INVOCATION_ID,
+            "contract_version": "1",
+            "correlation_id": correlation_id or str(uuid.uuid4()),
+        }
+
+    @staticmethod
+    def _enforce_canary_policy(plan_id: str, fallback: bool, metadata: Dict[str, Any]) -> None:
+        """C1 gate 3 (Lilac plan 8261639): fail-closed canary enforcement.
+
+        Policy (env-gated; default OFF so the legacy fallback keeps working
+        until C2 ratifies the producer registry):
+        - ``CONDUIT_CANARY_ENFORCEMENT=1`` blocks undeclared synthetic writes
+          to the frozen ``vision.receipts`` surface entirely.
+        - ``CONDUIT_CANARY_ENFORCEMENT=log`` keeps the fallback open but logs
+          every synthetic write with its declared canary identity.
+        Synthetic writes declaring themselves via ``metadata['canary']=true``
+        plus a ``canary_correlation_id`` are always permitted so the C1 canary
+        procedure stays available in enforce mode."""
+        mode = os.environ.get("CONDUIT_CANARY_ENFORCEMENT", "").strip().lower()
+        if not fallback or not mode:
+            return
+        declared = bool(metadata.get("canary")) and bool(metadata.get("canary_correlation_id"))
+        if declared:
+            _log.info(
+                "canary write declared: plan=%s canary_correlation_id=%s",
+                plan_id, metadata.get("canary_correlation_id"),
+            )
+            return
+        if mode == "log":
+            _log.warning(
+                "UNDECLARED synthetic receipt write (canary policy=log): "
+                "plan=%s fallback target=vision.receipts",
+                plan_id,
+            )
+            return
+        raise PermissionError(
+            f"C1 canary policy: undeclared synthetic receipt write refused "
+            f"(plan_id={plan_id}, target=vision.receipts). Declare it by "
+            f"setting metadata canary=true with canary_correlation_id, or "
+            f"disable enforcement via CONDUIT_CANARY_ENFORCEMENT."
+        )
+
     def insert_receipt(
         self,
         plan_id: str,
@@ -799,24 +870,69 @@ class DBAdapter:
         artifact_path: str = "",
         metadata: Optional[Dict[str, Any]] = None,
         tokens_used: int = 0,
+        correlation_id: Optional[str] = None,
+        receipt_id: Optional[str] = None,
     ):
         """Insert a receipt. D-T19-2(b): canonical surface is execution.receipts
         (request-scoped, attempt_id NULL). Falls back to vision.receipts for
         test/synthetic plans that have no execution.requests row and no
-        nebula.plans row."""
+        nebula.plans row.
+
+        C1 gate 2 (Lilac plan 8261639): single canonical identity contract for
+        BOTH channels — ``receipt_id`` is honored verbatim when supplied
+        (HTTP front-door path passes the caller's id through), otherwise the
+        adapter derives ``rec-<plan>-<type>-<12 hex>`` exactly as the HTTP
+        path's contract specifies.
+
+        C1 gate 4 (Lilac plan 8261639) — vision.receipts fallback
+        reconciliation: per architect ruling Q1, ``nebula.receipts_unified``
+        is a VIEW = C5 projection surface over ``resolution.receipt`` (the
+        canonical kind-discriminated receipt stream). The frozen
+        ``vision.receipts`` surface remains the synthetic/standalone write
+        target ONLY until C4 executes the import; at that point each
+        legacy row is copied into ``resolution.receipt`` with an explicit
+        ``resolution.migration_disposition`` (source schema/table/PK →
+        target ref) — no silent joins, per lineage discipline R5. The
+        dual write policy (request-backed → execution.receipts, synthetic →
+        vision.receipts) is eliminated at C3 cutover when the Python builder
+        path is redirected through the Lilac adapter; provenance stamped
+        here (gate 1) is what makes each row's migration disposition
+        derivable without guesswork."""
         _log.info("insert_receipt: plan=%s type=%s role=%s ticket=%s tokens=%d",
                   plan_id, receipt_type, agent_role, ticket_id, tokens_used)
         now = datetime.utcnow().isoformat() + "Z"
-        receipt_id = f"rec-{plan_id}-{receipt_type}-{uuid.uuid4().hex[:8]}"
+        # C1 gate 2 (Lilac plan 8261639): the direct Python path now derives
+        # its identity from the same canonical scheme as the HTTP path —
+        # caller-supplied id is honored verbatim; otherwise
+        # rec-<plan>-<type>-<12 hex>. Provenance fields make the two paths
+        # distinguishable while keeping the identity contract identical.
+        receipt_id = receipt_id or f"rec-{plan_id}-{receipt_type}-{uuid.uuid4().hex[:12]}"
+        metadata = dict(metadata or {})
+        # Declaring-producer overrides (REST front-door path); stripped so
+        # they are not duplicated verbatim inside the metadata blob.
+        producer_id = metadata.pop("producer_id", None)
+        source_channel = metadata.pop("source_channel", None)
+        provenance = self._receipt_provenance(
+            correlation_id=correlation_id,
+            producer_id=producer_id,
+            source_channel=source_channel,
+        )
+        metadata.update(provenance)
 
         try:
             request_id = self.resolve_request_for_receipt(plan_id)
             if request_id is not None:
+                # C1 gate 3 (Lilac plan 8261639): canary policy only governs
+                # the frozen synthetic surface; request-backed canonical
+                # writes are unaffected.
+                self._enforce_canary_policy(plan_id, fallback=False, metadata=metadata)
                 # Canonical: execution.receipts, request-scoped, no attempt.
                 # The legacy "rec-*" id is preserved in lineage_original_id so
                 # tickets.created_by_receipt and other legacy lookups keep working.
+                # C1 gate 1: provenance rides inside metadata (no DDL before
+                # C2 ratifies resolution.receipt / producer_registry).
                 exec_meta = {
-                    **(metadata or {}),
+                    **metadata,
                     "session_id": session_id,
                     "artifact_path": artifact_path,
                     "ticket_id": ticket_id,
@@ -834,9 +950,12 @@ class DBAdapter:
                     )
                     conn.commit()
             else:
+                # C1 gate 3: fail-closed canary enforcement on the synthetic
+                # surface (env-gated; no-op by default until C2 ratification).
+                self._enforce_canary_policy(plan_id, fallback=True, metadata=metadata)
                 # Test/synthetic plan (no execution.requests + no nebula.plans row).
                 # Preserve the legacy write surface — frozen read-only in D-T19-2(d).
-                meta_json = json.dumps(metadata or {})
+                meta_json = json.dumps(metadata)
                 query = """
                     INSERT INTO vision.receipts (id, plan_id, type, agent_role, session_id,
                         ticket_id, summary, artifact_path, metadata_json, tokens_used, created_at)
@@ -849,6 +968,11 @@ class DBAdapter:
                         ticket_id, summary, artifact_path, meta_json, tokens_used, now,
                     ))
                     conn.commit()
+                _log.info(
+                    "insert_receipt: synthetic fallback id=%s plan=%s channel=%s producer=%s correlation=%s",
+                    receipt_id, plan_id, provenance["source_channel"],
+                    provenance["producer_id"], provenance["correlation_id"],
+                )
         except Exception as e:
             _log.error("insert_receipt failed plan=%s type=%s: %s", plan_id, receipt_type, e)
             self._emit_receipt_failure(plan_id, receipt_type, str(e))

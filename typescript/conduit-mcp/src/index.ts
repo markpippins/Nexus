@@ -43,7 +43,22 @@ import {
   WorkRequestState,
 } from "./runtime-kernel";
 import { loadEnv } from "./env"; // shared .env loader (no dotenv dependency)
-import { validateReceipt } from "./receipts";
+import { validateReceipt, receiptProvenanceMetadata } from "./receipts";
+
+/** C1 gate 1 (Lilac plan 8261639): defensively parse a caller-supplied
+ * metadata_json string into an object for provenance stamping. Returns {}
+ * for malformed input — persistence-layer validation still rejects it. */
+function safeParseJsonObject(raw: string | undefined | null): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
 
 // .env already loaded by env.ts at module evaluation time
 
@@ -926,9 +941,18 @@ app.post("/vision/receipts", async (req, res) => {
       ticket_id: req.body.ticket_id || null,
       artifact_path: artifact_path || null,
       summary: summary || '',
-      metadata_json: metadata_json || '{}',
+      // C1 gate 1 (Lilac): provenance overrides in metadata + declared
+      // producer identity so the persistence layer records the front-door
+      // channel, not just the physical Python writer.
+      metadata_json: JSON.stringify({
+        ...safeParseJsonObject(metadata_json),
+        ...receiptProvenanceMetadata(id),
+      }),
       tokens_used: tokens_used ?? 0,
       created_at,
+      producer_id: 'conduit-mcp',
+      source_channel: 'conduit-mcp-http',
+      correlation_id: id,
     });
     res.json({ ok: true, id, plan_id });
   } catch (err: any) {
