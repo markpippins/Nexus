@@ -977,6 +977,47 @@ class DBAdapter:
             _log.error("insert_receipt failed plan=%s type=%s: %s", plan_id, receipt_type, e)
             self._emit_receipt_failure(plan_id, receipt_type, str(e))
             raise
+
+        # C3 (Lilac plan 8261639) — STAGED canonical shadow write. Default
+        # OFF; when CONDUIT_LILAC_SHADOW=1, record the canonical
+        # resolution.receipt outcome alongside the legacy write as evidence
+        # for the C2 ratification record. Never affects the legacy outcome,
+        # never spawns tickets (the single live fan-out is unchanged).
+        try:
+            from lilac import shadow_record_receipt, receipt_type_to_kind
+            # Q3: the canonical stream lives in the fixed `resolution` schema
+            # (overridable only for hermetic parity tests).
+            shadow_record_receipt(
+                self,
+                schema=os.environ.get("CONDUIT_LILAC_SCHEMA", "resolution"),
+                receipt_row={
+                    "kind": receipt_type_to_kind(receipt_type),
+                    "source_receipt_id": receipt_id,
+                    "payload": {
+                        "plan_id": plan_id,
+                        "receipt_type": receipt_type,
+                        "agent_role": agent_role,
+                        "session_id": session_id,
+                        "ticket_id": ticket_id,
+                        "summary": summary,
+                        "artifact_path": artifact_path,
+                        "tokens_used": tokens_used,
+                        "metadata": metadata,
+                        "request_id": request_id,
+                        "producer_id": provenance["producer_id"],
+                        "source_channel": provenance["source_channel"],
+                        "correlation_id": provenance["correlation_id"],
+                    },
+                    "refs": {
+                        "plan_id": plan_id,
+                        "ticket_id": ticket_id or None,
+                        "request_id": request_id,
+                    },
+                },
+            )
+        except Exception:  # noqa: BLE001 — shadow plumbing must never break the legacy path
+            _log.exception("lilac shadow hook failed (non-fatal)")
+
         _log.debug("insert_receipt: created %s (request=%s)", receipt_id, request_id)
 
     def _emit_receipt_failure(self, plan_id: str, receipt_type: str, error: str) -> None:
