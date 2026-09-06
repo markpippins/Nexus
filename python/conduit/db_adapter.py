@@ -1014,7 +1014,10 @@ class DBAdapter:
                             source_system="conduit",
                         )
                     _log.info(
-                        "redirect=enforce: canonical %s accepted (outcome=%s id=%s)",
+                        "redirect=enforce: canonical %s accepted (outcome=%s "
+                        "id=%s) — caller-owned ticket fan-out proceeds off "
+                        "nebula.receipts_unified (V140 canonical branch "
+                        "surfaces rows with no legacy twin)",
                         kind, outcome, canonical_id)
                 except LilacPersistenceError:
                     # R4 fail-closed: conflict / grant refusal must NOT fall
@@ -1080,14 +1083,21 @@ class DBAdapter:
                 )
         except Exception as e:
             if redirect_mode == "enforce":
-                # The canonical write already committed; the legacy write is
-                # a courtesy shadow copy in enforce mode (Q-B default) and
-                # its failure is never fatal. No receipt.failed emission:
-                # that is a legacy-path contract and the canonical stream
-                # recorded the receipt successfully.
+                # Q-B asymmetry (ratified daae50b0): the canonical write
+                # already committed — the operation SUCCEEDS. The legacy
+                # courtesy copy's failure is never fatal, but it is NEVER
+                # silent: it is recorded as the distinct
+                # `legacy_shadow_failed` class (review F2) so the C6 soak
+                # gate observes it. Ticket fan-out correctness does not
+                # depend on the legacy row: advanceTicketsOnReceipt and
+                # create_next_tickets both read nebula.receipts_unified,
+                # whose canonical branch (V140) surfaces canonical rows
+                # lacking a legacy twin (review F3).
                 _log.warning(
                     "insert_receipt legacy shadow copy failed (non-fatal in "
                     "enforce mode) plan=%s type=%s: %s", plan_id, receipt_type, e)
+                self._record_legacy_shadow_failed(
+                    plan_id, receipt_type, receipt_id, e)
                 return
             _log.error("insert_receipt failed plan=%s type=%s: %s", plan_id, receipt_type, e)
             self._emit_receipt_failure(plan_id, receipt_type, str(e))
@@ -1170,6 +1180,59 @@ class DBAdapter:
                 conn.commit()
         except Exception:
             _log.exception("_emit_receipt_failure: failed to record receipt failure")
+
+    def _record_legacy_shadow_failed(
+        self,
+        plan_id: str,
+        receipt_type: str,
+        source_receipt_id: str,
+        error: Exception,
+    ) -> None:
+        """Q-B observability (architect review F2, record 761e6338):
+        a failed legacy courtesy copy under redirect=enforce is recorded as
+        the DISTINCT parity class ``legacy_shadow_failed`` — never a silent
+        skip, never a conflict/refused. Durable event row in the V141 soak
+        surface (resolution.soak_evidence, today's evidence day, green
+        forced false for the day) so the C6 soak cron and the drift report
+        see the failure instead of a clean scan. Best-effort: recording
+        must never disturb the already-committed canonical write.
+        """
+        event = {
+            "plan_id": plan_id,
+            "receipt_type": receipt_type,
+            "source_receipt_id": source_receipt_id,
+            "error": str(error)[:2000],
+            "recorded_at": datetime.utcnow().isoformat() + "Z",
+        }
+        # Fixed canonical schema in production (Q3); overridable only for
+        # hermetic tests (same convention as the enforce/shadow paths).
+        schema = os.environ.get("CONDUIT_LILAC_SCHEMA", "resolution")
+        try:
+            with self._get_connection() as conn:
+                conn.execute(
+                    f"""INSERT INTO {schema}.soak_evidence
+                           (evidence_date, report, green, recorded_by)
+                       VALUES (CURRENT_DATE, %s::jsonb, false,
+                               'legacy_shadow_failed')
+                       ON CONFLICT (evidence_date) DO UPDATE
+                         SET report = jsonb_set(
+                               {schema}.soak_evidence.report,
+                               '{{legacy_shadow_failed}}',
+                               COALESCE({schema}.soak_evidence.report
+                                        -> 'legacy_shadow_failed',
+                                        '[]'::jsonb) || %s::jsonb),
+                             green = false""",
+                    (json.dumps({"legacy_shadow_failed": [event]}),
+                     json.dumps(event)),
+                )
+                conn.commit()
+            _log.warning(
+                "legacy_shadow_failed recorded (Q-B non-fatal class) "
+                "plan=%s type=%s id=%s", plan_id, receipt_type, source_receipt_id)
+        except Exception:  # noqa: BLE001 — observability must never raise
+            _log.exception(
+                "legacy_shadow_failed record failed (non-fatal) "
+                "plan=%s id=%s", plan_id, source_receipt_id)
 
     def resolve_request_for_receipt(self, plan_id: str) -> Optional[str]:
         """D-T19-2(b): resolve (or get-or-create) the execution.requests id for a plan.

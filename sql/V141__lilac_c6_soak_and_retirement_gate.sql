@@ -4,8 +4,10 @@
 -- C6 has three phases: FENCE writers → SOAK on dual-read + shadow evidence
 -- → RETIRE duplicate tables. This migration provides the evidence and gate
 -- surfaces for the soak/retire phases. The retirement DDL itself lives in
--- V142 and is SELF-GATING: it refuses to apply until the function below
--- returns true.
+-- V144 and is SELF-GATING: it refuses to apply until the function below
+-- returns true. (Numbering ratified by architect review 761e6338 / F1:
+-- V142 = conduit-python producer registration; V143 = PEB partial unique
+-- index per Q-C; V144 = self-gating retirement DDL.)
 --
 -- Gate contract (all conditions must hold):
 --   1. Canonical infra present (V139 tables).
@@ -153,4 +155,4 @@ END;
 $$ LANGUAGE plpgsql;
 
 COMMENT ON FUNCTION resolution.c6_retirement_gate IS
-  'C6 retirement gate (fence→soak→retire). V142 refuses to apply unless satisfied. Verifiable conditions: import completeness, ticket seam drained, 7 green soak days, operator+architect signoff.';
+  'C6 retirement gate (fence→soak→retire). V144 refuses to apply unless satisfied. Verifiable conditions: import completeness, ticket seam drained, 7 green soak days, operator+architect signoff.';

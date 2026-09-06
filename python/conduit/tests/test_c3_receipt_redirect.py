@@ -51,6 +51,12 @@ _V139_SQL = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
     "sql", "V139__lilac_resolution_canonical_persistence.sql",
 )
+_V140_SQL = _V139_SQL.replace(
+    "V139__lilac_resolution_canonical_persistence.sql",
+    "V140__receipts_unified_lilac_dual_read.sql")
+_V141_SQL = _V139_SQL.replace(
+    "V139__lilac_resolution_canonical_persistence.sql",
+    "V141__lilac_c6_soak_and_retirement_gate.sql")
 
 # Canary namespace for the shared-live legacy surface (teardown-guaranteed).
 RECEIPT_ID_PREFIX = "rec-zz-redirect-"
@@ -77,6 +83,18 @@ def _apply_v139(conn, schema: str) -> None:
             f"         'cancelled','plan_block'], 1, 1, 'test-seed') "
             f"ON CONFLICT (producer_id) DO NOTHING"
         )
+    conn.commit()
+
+
+def _apply_sql_reschema(conn, sql_path: str, schema: str) -> None:
+    """Apply a migration file into a throwaway schema by prefix-rewriting
+    its canonical-schema references (resolution./nebula. — V140's legacy
+    branch references to execution./vision. stay LIVE but read-only)."""
+    with open(sql_path) as f:
+        raw = f.read()
+    sql = raw.replace("resolution.", f"{schema}.").replace("nebula.", f"{schema}.")
+    with conn.cursor() as cur:
+        cur.execute(sql)
     conn.commit()
 
 
@@ -270,6 +288,27 @@ class RedirectTestBase(unittest.TestCase):
         )
         return rid
 
+    def _fail_legacy_write(self):
+        """Make exactly the THIRD connection open inside insert_receipt fail
+        (canonical write = 1, request resolve = 2, legacy courtesy copy = 3)
+        so the canonical write succeeds while the legacy copy fails — the
+        precise Q-B enforce-mode scenario, without touching live surfaces."""
+        import contextlib
+        orig = self.db._get_connection
+        calls = {"n": 0}
+
+        @contextlib.contextmanager
+        def fake(*a, **k):
+            calls["n"] += 1
+            if calls["n"] == 3:
+                raise RuntimeError(
+                    "simulated legacy courtesy-copy failure (Q-B/F2 test)")
+            with orig(*a, **k) as c:
+                yield c
+
+        self.db._get_connection = fake
+        self.addCleanup(lambda: self.db.__dict__.pop("_get_connection", None))
+
 
 class TestModeParser(unittest.TestCase):
     """Fail-safe stage parsing — unknown values are OFF, never a guess."""
@@ -369,6 +408,122 @@ class TestRedirectEnforce(RedirectTestBase):
                       "conduit-mcp,nexus-conduit-python")
         rid = self._insert()
         self.assertEqual(self._canonical_count(rid), 1)
+
+
+class TestEnforceLegacyShadowFailed(RedirectTestBase):
+    """Q-B observability (review F2): a failed legacy courtesy copy under
+    enforce is recorded as the DISTINCT class legacy_shadow_failed —
+    never silent, never a conflict/refused."""
+
+    def setUp(self):
+        super().setUp()
+        self._set_env("CONDUIT_RECEIPT_REDIRECT", "enforce")
+        # V141 soak surface inside the throwaway schema (schema-rewritten).
+        _apply_sql_reschema(self._raw_conn, _V141_SQL, self.canon_schema)
+
+    def _soak_row(self):
+        cur = self._raw_conn.cursor()
+        cur.execute(
+            f"SELECT green, report->'legacy_shadow_failed' "
+            f"FROM {self.canon_schema}.soak_evidence "
+            f"WHERE evidence_date = CURRENT_DATE")
+        row = cur.fetchone()
+        self._raw_conn.commit()
+        return row
+
+    def test_legacy_failure_succeeds_operation_and_records_class(self):
+        self._fail_legacy_write()
+        rid = self._insert()
+        # Q-B asymmetry: operation SUCCEEDS (no raise) — canonical committed.
+        self.assertEqual(self._canonical_count(rid), 1)
+        self.assertEqual(self._legacy_count(rid), 0,
+                         "legacy courtesy copy failed (simulated)")
+        row = self._soak_row()
+        self.assertIsNotNone(row, "legacy_shadow_failed event must be recorded")
+        green, events = row
+        self.assertFalse(green, "soak day carrying a shadow failure is not green")
+        self.assertTrue(isinstance(events, (list, str)))
+        if isinstance(events, str):
+            import json as _json
+            events = _json.loads(events)
+        self.assertTrue(any(e.get("source_receipt_id") == rid for e in events),
+                         f"event for {rid} missing in {events}")
+
+    def test_drift_report_surfaces_class(self):
+        """F2 end-to-end: the drift checker surfaces legacy_shadow_failed
+        from the soak surface — a clean legacy scan must not mask it."""
+        import lilac_drift
+        self._fail_legacy_write()
+        rid = self._insert()
+        report = lilac_drift.check_legacy_surface(self._raw_conn,
+                                                  schema=self.canon_schema)
+        self.assertEqual(report["classes"].get("legacy_shadow_failed"), 1,
+                         f"expected the recorded event, got {report['classes']}")
+        self.assertTrue(any(
+            r.get("class") == "legacy_shadow_failed"
+            and r.get("source_receipt_id") == rid
+            for r in report["rows"]))
+
+
+class TestEnforceFanOutOnCanonical(RedirectTestBase):
+    """Review F3: caller-owned fan-out (advanceTicketsOnReceipt /
+    create_next_tickets) reads nebula.receipts_unified. The V140 canonical
+    branch surfaces canonical rows with no legacy twin — proven here with
+    the REAL V140 view applied in the throwaway schema."""
+
+    def setUp(self):
+        super().setUp()
+        self._set_env("CONDUIT_RECEIPT_REDIRECT", "enforce")
+        _apply_sql_reschema(self._raw_conn, _V140_SQL, self.canon_schema)
+
+    def _unified_types(self, plan_id):
+        cur = self._raw_conn.cursor()
+        cur.execute(
+            f"SELECT type FROM {self.canon_schema}.receipts_unified "
+            f"WHERE plan_id = %s ORDER BY created_at ASC", (plan_id,))
+        types = [r[0] for r in cur.fetchall()]
+        self._raw_conn.commit()
+        return types
+
+    def test_canonical_row_surfaces_unified_when_legacy_fails(self):
+        # Canonical write succeeds; legacy courtesy copy fails (simulated).
+        self._fail_legacy_write()
+        rid = self._insert()
+        self.assertEqual(self._canonical_count(rid), 1)
+        self.assertEqual(self._legacy_count(rid), 0)
+        # The V140 unified view — the fan-out's source — surfaces the
+        # canonical row despite the missing legacy twin.
+        self.assertIn("PLANNING", self._unified_types(self.plan_id),
+                      "canonical row must surface through the unified "
+                      "projection when no legacy twin exists")
+
+
+class TestShadowProducerPassthrough(RedirectTestBase):
+    """Review F4: shadow stamping passes the declaring producer through
+    UNFILTERED — the DB grant trigger is the per-write authority. A
+    payload declaring an UNREGISTERED producer must be refused by the
+    trigger (fail-closed), never silently re-labeled as the worker lane."""
+
+    def setUp(self):
+        super().setUp()
+        self._set_env("CONDUIT_RECEIPT_REDIRECT", "shadow")
+
+    def test_unregistered_producer_refused_not_relabeled(self):
+        """peb-srv holds admission only: declaring it for PLANNING must be
+        refused (P0004) by the grant trigger — not re-stamped as
+        nexus-execution-worker by any code-side whitelist."""
+        rid = RECEIPT_ID_PREFIX + uuid.uuid4().hex[:12]
+        self.db.insert_receipt(
+            plan_id=self.plan_id, receipt_type="PLANNING",
+            agent_role="engineer", session_id="sess-shadow-f4",
+            ticket_id="", summary="F4 passthrough probe",
+            metadata={"producer_id": "peb-srv"}, receipt_id=rid,
+        )
+        self.assertEqual(self._legacy_count(rid), 1,
+                         "legacy write is authoritative in shadow mode")
+        self.assertEqual(self._canonical_count(rid), 0,
+                         "unregistered producer/kind pair must be refused "
+                         "by the trigger, never silently re-labeled")
 
 
 if __name__ == "__main__":

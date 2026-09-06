@@ -226,6 +226,11 @@ def check_legacy_surface(conn, schema: str = "resolution",
 
     Read-only. The execution-domain surface is scanned via the V140
     identity (COALESCE(lineage_original_id, id::text)) when present.
+
+    Q-B observability (review F2): ``legacy_shadow_failed`` events
+    recorded by the adapter are surfaced from the V141 soak surface and
+    reported as their own class — a clean legacy scan must never mask a
+    chronic courtesy-copy failure in enforce mode.
     """
     report = {"scanned": 0, "classes": {}, "rows": []}
     cur = conn.cursor()
@@ -245,6 +250,26 @@ def check_legacy_surface(conn, schema: str = "resolution",
             report["classes"].get(result["class"], 0) + 1)
         if result["class"] != "parity":
             report["rows"].append(result)
+
+    # Q-B (F2): surface the enforce-mode legacy_shadow_failed events. The
+    # soak table is V141 — absent pre-V141, so absence is not an error.
+    try:
+        cur.execute(
+            f"SELECT report->'legacy_shadow_failed' FROM {schema}.soak_evidence "
+            f"WHERE report ? 'legacy_shadow_failed'"
+        )
+        events = []
+        for (blob,) in cur.fetchall():
+            if isinstance(blob, str):
+                blob = json.loads(blob or "[]")
+            events.extend(blob or [])
+        if events:
+            report["classes"]["legacy_shadow_failed"] = (
+                report["classes"].get("legacy_shadow_failed", 0) + len(events))
+            report["rows"].extend(
+                {"class": "legacy_shadow_failed", **e} for e in events)
+    except Exception:  # noqa: BLE001 — soak surface optional (pre-V141)
+        pass
     return report
 
 

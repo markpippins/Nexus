@@ -417,17 +417,19 @@ def shadow_record_receipt(db, schema: str, receipt_row: Dict[str, Any],
             # DBAdapter yields a _ConnectionProxy; the LilacAdapter speaks
             # raw psycopg2 (cursor/commit/rollback). Unwrap when present.
             raw = getattr(conn, "_conn", conn)
-            # C1→C3 producer-parity fix: the canonical row carries the
-            # DECLARING producer (payload.producer_id), not a hardcoded
-            # lane default — otherwise shadow rows diverge from what
-            # enforce mode writes for the same receipt.
+            # F4 (architect review 761e6338): the declaring producer is
+            # passed through UNFILTERED — the producer_registry grant
+            # trigger is the per-write authority in BOTH modes. Any code-
+            # side copy of the registry would silently misattribute writes
+            # from future producers (the exact bug the whitelist tried to
+            # fix); an unregistered producer is refused by the trigger
+            # (P0004) and lands in the shadow-skip log — visible, not
+            # silently mislabeled.
             declaring = (receipt_row.get("payload") or {}).get("producer_id")
             adapter = LilacAdapter(
                 lambda: raw,
                 schema=schema,
-                producer_id=declaring if declaring in (
-                    "conduit-mcp", "nexus-execution-worker",
-                    "nexus-conduit-python", "peb-srv") else PRODUCER_EXECUTION_WORKER,
+                producer_id=declaring or PRODUCER_EXECUTION_WORKER,
             )
             adapter.insert_receipt(
                 raw,
