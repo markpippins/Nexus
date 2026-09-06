@@ -104,6 +104,25 @@ export async function validateReceipt(
 }
 
 /**
+ * C1 gate 1 (Lilac plan 8261639): declaring-producer provenance fields for
+ * receipt writes issued by this (TypeScript front-door) channel. Spread into
+ * every insertReceipt metadata blob so the persistence layer can stamp
+ * declaring producer/source channel vs the physical writer process, per the
+ * C2 contract draft (producer identity, contract_version, correlation id).
+ * Values use the producer-registry naming proposed in the C2 draft.
+ */
+export function receiptProvenanceMetadata(
+  correlationId: string,
+): Record<string, unknown> {
+  return {
+    producer_id: "conduit-mcp",
+    source_channel: "conduit-mcp-http",
+    contract_version: "1",
+    correlation_id: correlationId,
+  };
+}
+
+/**
  * Resolve the routing target for a critique-family OUTCOME receipt
  * (CRITIQUE_PASS / CRITIQUE_REJECT) based on the position of the CRITIQUE it
  * follows. INVARIANT (plan 0016 AC1): routing resolves ONLY from the last

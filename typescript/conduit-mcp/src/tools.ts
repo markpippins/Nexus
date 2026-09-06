@@ -3,7 +3,7 @@ import http from "node:http";
 import { PipelineWatcher } from "./watcher";
 import { createError, createSuccess } from "./errors";
 import { validate } from "./validate";
-import { validateReceipt } from "./receipts";
+import { validateReceipt, receiptProvenanceMetadata } from "./receipts";
 import {
   createTicketIfMissing,
   advanceTicketsOnReceipt,
@@ -906,6 +906,7 @@ export function registerToolHandlers(
       }
 
       // Insert receipt (references the bootstrap ticket if PLAN_CREATE)
+      // C1 gate 1 (Lilac): declaring-producer provenance rides in metadata.
       await api.insertReceipt({
         id: receiptId,
         plan_id: args.plan_id,
@@ -915,9 +916,15 @@ export function registerToolHandlers(
         ticket_id: ticketId || args.ticket_id || null,
         artifact_path: args.artifact_path || null,
         summary: args.summary || "",
-        metadata_json: JSON.stringify(args.metadata || {}),
+        metadata_json: JSON.stringify({
+          ...(args.metadata || {}),
+          ...receiptProvenanceMetadata(receiptId),
+        }),
         tokens_used: 0,
         created_at: now,
+        producer_id: "conduit-mcp",
+        source_channel: "conduit-mcp-http",
+        correlation_id: receiptId,
       });
 
       checkpointWal();
@@ -1144,6 +1151,9 @@ export function registerToolHandlers(
         session_id: "",
         ticket_id: null,
         artifact_path: null,
+        producer_id: "conduit-mcp",
+        source_channel: "conduit-mcp-http",
+        correlation_id: receiptId,
         summary: `Revision of plan ${args.planNumber}`,
         metadata_json: JSON.stringify({ revised_from: args.planNumber }),
         tokens_used: 0,
@@ -1946,9 +1956,15 @@ export function registerToolHandlers(
         ticket_id: ticketId,
         artifact_path: null,
         summary: `Unblocked: ${plan.title}`,
-        metadata_json: JSON.stringify({ unblocked: true }),
+        metadata_json: JSON.stringify({
+          unblocked: true,
+          ...receiptProvenanceMetadata(receiptId),
+        }),
         tokens_used: 0,
         created_at: now,
+        producer_id: "conduit-mcp",
+        source_channel: "conduit-mcp-http",
+        correlation_id: receiptId,
       });
 
       checkpointWal();

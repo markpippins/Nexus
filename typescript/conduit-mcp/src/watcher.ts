@@ -38,6 +38,7 @@ import {
   verdictBlocksBootstrap,
 } from "./db";
 import * as api from "./conduit-client";
+import { receiptProvenanceMetadata } from "./receipts";
 import { breakerRowToStatus } from "./watchers/cb-watcher";
 
 export class PipelineWatcher {
@@ -387,6 +388,7 @@ export class PipelineWatcher {
           }
 
           // Issue PLAN_CREATE receipt with ticket reference
+          // C1 gate 1 (Lilac): declaring-producer provenance rides in metadata.
           await api.insertReceipt({
             id: receiptId,
             plan_id: plan.plan_number,
@@ -396,9 +398,14 @@ export class PipelineWatcher {
             ticket_id: ticketId,
             artifact_path: null,
             summary: `Auto-bootstrapped: ${plan.title}`,
-            metadata_json: JSON.stringify({ auto_bootstrapped: true }),
+            metadata_json: JSON.stringify({
+              auto_bootstrapped: true,
+            }),
             tokens_used: 0,
             created_at: now,
+            producer_id: "conduit-mcp",
+            source_channel: "conduit-mcp-http",
+            correlation_id: receiptId,
           });
 
           checkpointWal();
