@@ -69,7 +69,12 @@ class PebKeychainsAdapter:
                 now,
                 json.dumps(read_set, sort_keys=True, default=str),
                 json.dumps(payload, sort_keys=True, default=str),
-                "pending" if outcome == "committed" else "not_applicable",
+                # Every ratified deny_contract_promotion disposition is a
+                # governed decision point, including negative outcomes. The
+                # broker must consume those rows to create an immutable
+                # checkpoint/read-set record. Generic PEB outcomes remain
+                # archive-only unless they are committed.
+                "pending" if binding is not None or outcome == "committed" else "not_applicable",
             ),
         )
 
@@ -109,7 +114,8 @@ class PebKeychainsAdapter:
             if not isinstance(observation, Mapping):
                 raise ValueError("observation_window must be an object")
             observation_required = (
-                "activation_ref", "activated_at", "binding_owner", "authority_ref",
+                "activation_ref", "activated_at", "window_start", "window_end",
+                "binding_owner", "authority_ref",
             )
             missing_observation = [
                 field for field in observation_required if observation.get(field) in (None, "")
@@ -118,6 +124,16 @@ class PebKeychainsAdapter:
                 raise ValueError(
                     "observation window missing provenance: " + ", ".join(missing_observation)
                 )
+            try:
+                activated_at = datetime.fromisoformat(str(observation["activated_at"]).replace("Z", "+00:00"))
+                window_start = datetime.fromisoformat(str(observation["window_start"]).replace("Z", "+00:00"))
+                window_end = datetime.fromisoformat(str(observation["window_end"]).replace("Z", "+00:00"))
+            except (TypeError, ValueError) as exc:
+                raise ValueError("observation window bounds must be ISO-8601 timestamps") from exc
+            if any(value.tzinfo is None for value in (activated_at, window_start, window_end)):
+                raise ValueError("observation window bounds must include a timezone")
+            if window_start < activated_at or window_start > window_end:
+                raise ValueError("observation window bounds must start at/after activation and end after start")
         return candidate
 
     @classmethod

@@ -1,6 +1,7 @@
 import { Request, Response, Router } from 'express';
 import { query, withTransaction } from './db';
 import { checkModel, MCModel } from './model-checker';
+import { runTlc, stageSpec, TlcRunOpts, ParseOutcome, TlcResult } from './tlc-runner';
 
 const router = Router();
 
@@ -264,10 +265,14 @@ router.post('/registries/:id/validate', async (req, res) => {
   } catch (e) { pgError(res, e); }
 });
 
-// Model-check: deterministic state-space model check over the structured
-// aegis graph (reachability, deadlock, invariant/property/temporal verdicts).
-// Runs the pure checker in model-checker.ts, then persists the result to
-// aegis.model_check_result. Optional request body: { property_id, checked_by }.
+// Model-check: run the authoritative model check.
+//   - If the registry has tla_plus_source, run real TLC (tla2tools.jar) over
+//     the TLA+ module with invariants/properties as cfg checks.
+//   - Otherwise fall back to the deterministic structural state-space checker
+//     (model-checker.ts) over the structured aegis graph.
+// Persists the result to aegis.model_check_result. TLC is failure-isolated:
+// a checker crash/timeout yields an `error` status, never a failed request.
+// Optional request body: { property_id, checked_by }.
 router.post('/registries/:id/model-check', async (req, res) => {
   try {
     const registryId = await requireRegistry(req.params.id, res);
@@ -275,18 +280,56 @@ router.post('/registries/:id/model-check', async (req, res) => {
     const started = Date.now();
     const body = pick(req.body, ['property_id', 'checked_by']);
 
-    const model: MCModel = await loadModel(registryId);
-    const report = checkModel(model);
+    // Fetch the registry's TLA+ source + the invariant/property names for the cfg.
+    const [regRow, invRows, propRows] = await Promise.all([
+      query('SELECT tla_plus_source, tla_plus_module, name FROM aegis.registry WHERE id = $1', [registryId]),
+      query('SELECT name FROM aegis.invariant WHERE registry_id = $1', [registryId]),
+      query('SELECT name FROM aegis.property WHERE registry_id = $1', [registryId]),
+    ]);
+    const registry = regRow.rows[0];
+    const tlaSource: string | null = registry?.tla_plus_source || null;
 
-    const checked_properties: string[] = [];
-    for (const v of report.verdicts) {
-      checked_properties.push(`${v.kind}:${v.name}=${v.result}${v.type ? `(${v.type})` : ''}: ${v.detail}`);
-    }
-    if (report.unreachableStates.length > 0) {
-      checked_properties.push(`unreachable:${report.unreachableStates.join(',')}`);
+    let status: string;
+    let trace: any = null;
+    let checked_properties: string[] = [];
+    let warnings: string[] = [];
+
+    if (tlaSource && tlaSource.trim()) {
+      // ── Real TLC path ─────────────────────────────────────────────
+      const tlcOpts: TlcRunOpts = {
+        invariants: invRows.rows.map((r) => r.name),
+        properties: propRows.rows.map((r) => r.name),
+      };
+      const staged = stageSpec(tlaSource, tlcOpts);
+      let result: TlcResult;
+      try {
+        result = await runTlc(staged.specDir, staged.moduleName, tlcOpts);
+      } finally {
+        staged.cleanup();
+      }
+      status = result.status;
+      trace = result.trace ? { engine: 'tlc', steps: result.trace, violated: result.violated } : null;
+      for (const v of result.verdicts) {
+        checked_properties.push(`${v.kind}:${v.name}=${v.result}: ${v.detail}`);
+      }
+      if (result.violated) checked_properties.push(`violated:${result.violated}`);
+      warnings = result.warnings;
+    } else {
+      // ── Structural fallback path ──────────────────────────────────
+      const model: MCModel = await loadModel(registryId);
+      const report = checkModel(model);
+      status = report.status;
+      for (const v of report.verdicts) {
+        checked_properties.push(`${v.kind}:${v.name}=${v.result}${v.type ? `(${v.type})` : ''}: ${v.detail}`);
+      }
+      if (report.unreachableStates.length > 0) {
+        checked_properties.push(`unreachable:${report.unreachableStates.join(',')}`);
+      }
+      trace = report.deadlockTrace ? { engine: 'structural', deadlock: report.deadlockTrace, errors: report.errors } : null;
+      warnings = report.warnings;
     }
 
-    const trace = report.deadlockTrace ? { deadlock: report.deadlockTrace, errors: report.errors } : null;
+    checked_properties.push(`engine:${tlaSource && tlaSource.trim() ? 'tlc' : 'structural'}`);
 
     const { rows } = await query(
       `INSERT INTO aegis.model_check_result
@@ -295,7 +338,7 @@ router.post('/registries/:id/model-check', async (req, res) => {
       [
         registryId,
         body.property_id || null,
-        report.status,
+        status,
         trace ? JSON.stringify(trace) : null,
         checked_properties,
         Date.now() - started,

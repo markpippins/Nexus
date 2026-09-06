@@ -1,5 +1,15 @@
 -- V120: statement_evidence.statement_type extended with guarded 'resolution_proposition'
 -- =============================================================================
+-- ⚠️ PARTIALLY SUPERSEDED BY V134 (semantics_retire_ontology_tables, commit 30221fc6)
+-- The `resolution_proposition` branch and its resolution.proposition routing
+-- remain canonical (V134 keeps them). However, V120's check_statement_id()
+-- also routes representation_relationship / concept_relationship /
+-- execution_claim to semantics.* — those three branches were repointed at
+-- resolution.* and the semantics-side tables/procs retired by V134. Do NOT
+-- apply V120 against a post-V134 DB. The resolution_proposition extension is
+-- superseded-in-substance only by the re-pointing; treat V134 as the current
+-- authority for the polymorphic routing. Ledgered 2026-09-05 (architect).
+-- =============================================================================
 -- C1 of D-2026-08-23-A (condition precedent): extend statement_evidence with a
 -- GUARDED resolution_proposition type before any T24 projection implementation.
 --

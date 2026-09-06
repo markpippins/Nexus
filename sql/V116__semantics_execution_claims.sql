@@ -1,4 +1,15 @@
 -- ═══════════════════════════════════════════════════════════════════════
+-- ⚠️ SUPERSEDED BY V134 (semantics_retire_ontology_tables, commit 30221fc6)
+-- V134 converges nexus.semantics to the sol/semantics shape. The
+-- `semantics.execution_claim` table, its CRUD procedures, and the routing
+-- of `check_statement_id()`'s execution_claim branch to semantics.* were
+-- DELIBERATELY RETIRED: V134 Step 4 drops the CRUD procs and Step 5 drops
+-- the table, and Step 2 repoints the polymorphic check at
+-- resolution.execution_claim. Do NOT apply V116 against a post-V134 DB.
+-- Do NOT re-create semantics.execution_claim without an architect decision
+-- (the semantics-side schema differs from resolution.execution_claim — see
+-- V134 header "Data note"). Ledgered as superseded 2026-09-05 (architect).
+-- ═══════════════════════════════════════════════════════════════════════
 -- V116 — semantics: execution-claim projection and evidence linkage
 --
 -- Purpose:
