@@ -3,7 +3,7 @@
 # ==========================================================================
 #
 # Startup health-check that probes every registered service for reachability
-# and verifies migration ordering between local and barium before the system is
+# and verifies migration ordering between local and the off-box PG replica before the system is
 # declared operational.
 #
 # Usage
@@ -209,12 +209,15 @@ _probe_service() {
 # ── Migration ordering guard ─────────────────────────────────────────────
 
 LOCAL_MIGRATION_VERSION=""
-BARIUM_MIGRATION_VERSION=""
+REMOTE_MIGRATION_VERSION=""
+REPLICA_HOST="${PG_REPLICA_HOST:-vanadium}"   # off-box PG replica (2026-09-05 retarget)
 MIGRATION_DIVERGENCE=false
 MIGRATION_DIVERGENCE_DETAIL=""
 
 _check_migration_ordering() {
-    _log "Checking migration ordering (local vs barium)..."
+    # Replication target: vanadium (2026-09-05 retarget; barium disk-full incident).
+    # Override with PG_REPLICA_HOST if the target moves again.
+    _log "Checking migration ordering (local vs ${REPLICA_HOST})..."
 
     # Get local migration versions
     if command -v psql &>/dev/null; then
@@ -226,16 +229,16 @@ _check_migration_ordering() {
         LOCAL_MIGRATION_VERSION="psql-unavailable"
     fi
 
-    # Get barium migration versions
-    BARIUM_MIGRATION_VERSION=$(PGPASSWORD=pgpass psql -h barium -U pguser -d nexus -t -A -c \
+    # Get replica migration versions
+    REMOTE_MIGRATION_VERSION=$(PGPASSWORD=pgpass psql -h "$REPLICA_HOST" -U pguser -d nexus -t -A -c \
         "SELECT string_agg(version || ':' || md5(checksum::text), ', ' ORDER BY version)
          FROM (SELECT version, checksum FROM flyway_schema_history ORDER BY version) t" \
         2>/dev/null || echo "UNREACHABLE")
 
-    if [[ "$BARIUM_MIGRATION_VERSION" == "UNREACHABLE" ]]; then
+    if [[ "$REMOTE_MIGRATION_VERSION" == "UNREACHABLE" ]]; then
         MIGRATION_DIVERGENCE=true
-        MIGRATION_DIVERGENCE_DETAIL="barium unreachable"
-        _err "Migration check: barium unreachable"
+        MIGRATION_DIVERGENCE_DETAIL="${REPLICA_HOST} unreachable"
+        _err "Migration check: ${REPLICA_HOST} unreachable"
         return
     fi
 
@@ -251,9 +254,9 @@ _check_migration_ordering() {
     diff_result=$(python3 -c "
 import sys
 local_raw = sys.argv[1]
-barium_raw = sys.argv[2]
+replica_raw = sys.argv[2]
 
-if local_raw == 'psql-unavailable' or barium_raw == 'UNREACHABLE':
+if local_raw == 'psql-unavailable' or replica_raw == 'UNREACHABLE':
     print('SKIP')
     sys.exit(0)
 
@@ -266,31 +269,31 @@ def parse_versions(raw):
     return versions
 
 local_v = parse_versions(local_raw)
-barium_v = parse_versions(barium_raw)
+replica_v = parse_versions(replica_raw)
 
 divergences = []
 
-# Check: every local version must exist on barium with same checksum
+# Check: every local version must exist on the replica with same checksum
 for ver, chk in sorted(local_v.items()):
-    if ver not in barium_v:
+    if ver not in replica_v:
         divergences.append(f'LOCAL_ONLY:{ver}')
-    elif barium_v[ver] != chk:
-        divergences.append(f'CHECKSUM_MISMATCH:{ver} (local={chk[:12]}... barium={barium_v[ver][:12]}...)')
+    elif replica_v[ver] != chk:
+        divergences.append(f'CHECKSUM_MISMATCH:{ver} (local={chk[:12]}... replica={replica_v[ver][:12]}...)')
 
-# Check: any barium versions not on local (gaps are OK but worth noting)
-for ver in sorted(barium_v.keys()):
+# Check: any replica versions not on local (gaps are OK but worth noting)
+for ver in sorted(replica_v.keys()):
     if ver not in local_v:
-        divergences.append(f'BARIUM_AHEAD:{ver}')
+        divergences.append(f'REPLICA_AHEAD:{ver}')
 
 if divergences:
     print('DIVERGENCE:' + '; '.join(divergences))
 else:
     print('OK')
-" "$LOCAL_MIGRATION_VERSION" "$BARIUM_MIGRATION_VERSION" 2>/dev/null)
+" "$LOCAL_MIGRATION_VERSION" "$REMOTE_MIGRATION_VERSION" 2>/dev/null)
 
     case "$diff_result" in
         OK)
-            _log "Migration check: local and barium in sync"
+            _log "Migration check: local and ${REPLICA_HOST} in sync"
             ;;
         SKIP|"")
             _log "Migration check: skipped (data unavailable)"
@@ -395,7 +398,7 @@ for s in cfg.get('services', []):
         if $CHECK_MIGRATIONS; then
             echo "  \"migrations\": {"
             echo "    \"local_version\": \"${LOCAL_MIGRATION_VERSION:0:200}\","
-            echo "    \"barium_version\": \"${BARIUM_MIGRATION_VERSION:0:200}\","
+            echo "    \"replica_host\": \"${REPLICA_HOST}\","
             echo "    \"divergence\": $MIGRATION_DIVERGENCE,"
             echo "    \"divergence_detail\": \"$MIGRATION_DIVERGENCE_DETAIL\""
             echo "  },"
