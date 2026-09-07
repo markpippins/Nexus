@@ -4,8 +4,10 @@
 -- C6 has three phases: FENCE writers → SOAK on dual-read + shadow evidence
 -- → RETIRE duplicate tables. This migration provides the evidence and gate
 -- surfaces for the soak/retire phases. The retirement DDL itself lives in
--- V142 and is SELF-GATING: it refuses to apply until the function below
--- returns true.
+-- V144 and is SELF-GATING: it refuses to apply until the function below
+-- returns true. (Numbering ratified by architect review 761e6338 / F1:
+-- V142 = conduit-python producer registration; V143 = PEB partial unique
+-- index per Q-C; V144 = self-gating retirement DDL.)
 --
 -- Gate contract (all conditions must hold):
 --   1. Canonical infra present (V139 tables).
@@ -91,11 +93,20 @@ BEGIN
     v_ok := v_ok AND v_infra;
   END;
 
-  -- 2. C4 import completeness for vision.receipts.
+  -- 2. C4 import completeness for vision.receipts — mappable types ONLY.
+  -- The type list mirrors lilac.RECEIPT_KIND_BY_TYPE (drift fixture
+  -- lilac_drift.KIND_BY_TYPE): legacy-only types (e.g. PROPOSED) have no
+  -- ratified canonical kind and can never acquire twins, so counting them
+  -- would block the retirement gate forever.
   IF to_regclass('vision.receipts') IS NOT NULL THEN
     SELECT count(*) INTO v_missing_receipts
     FROM vision.receipts v
-    WHERE NOT EXISTS (
+    WHERE v.type IN (
+      'PLAN_CREATE','PLANNING','IMPLEMENTATION','REVIEW','REVIEW_PASS',
+      'REVIEW_REJECT','CRITIQUE','CRITIQUE_PASS','CRITIQUE_REJECT','BLOCK',
+      'HOLD','CCNF_EXECUTION','REQUEUED','API_LIMIT','ABANDONED',
+      'CANCELLED','PLAN_BLOCK')
+      AND NOT EXISTS (
       SELECT 1 FROM resolution.receipt r
       WHERE r.source_receipt_id = v.id
         AND r.source_system IN ('conduit', 'import:vision.receipts')
@@ -144,4 +155,4 @@ END;
 $$ LANGUAGE plpgsql;
 
 COMMENT ON FUNCTION resolution.c6_retirement_gate IS
-  'C6 retirement gate (fence→soak→retire). V142 refuses to apply unless satisfied. Verifiable conditions: import completeness, ticket seam drained, 7 green soak days, operator+architect signoff.';
+  'C6 retirement gate (fence→soak→retire). V144 refuses to apply unless satisfied. Verifiable conditions: import completeness, ticket seam drained, 7 green soak days, operator+architect signoff.';

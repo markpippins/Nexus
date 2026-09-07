@@ -859,6 +859,41 @@ class DBAdapter:
             f"disable enforcement via CONDUIT_CANARY_ENFORCEMENT."
         )
 
+    # ── C3 cutover (Lilac plan 8261639): staged writer redirection ──
+
+    @staticmethod
+    def _receipt_redirect_mode() -> str:
+        """Parse CONDUIT_RECEIPT_REDIRECT (off | shadow | enforce).
+
+        Fail-safe: unset or unknown values mean OFF — the legacy behavior
+        is never silently changed by a typo. Stages per the writer
+        redirection design (engineer record 281510c7):
+          off     legacy write; canonical only via CONDUIT_LILAC_SHADOW seam
+          shadow  legacy write + canonical record forced on for this write
+          enforce canonical write FIRST (R4 outcomes gate the write);
+                  legacy becomes a best-effort courtesy copy
+        """
+        raw_mode = os.environ.get("CONDUIT_RECEIPT_REDIRECT", "off").strip().lower()
+        if raw_mode not in ("off", "shadow", "enforce"):
+            _log.warning(
+                "CONDUIT_RECEIPT_REDIRECT=%r is not off|shadow|enforce — treating as off",
+                raw_mode,
+            )
+            return "off"
+        return raw_mode
+
+    @staticmethod
+    def _redirect_applies_to(producer_id: Optional[str]) -> bool:
+        """Q-A blast-radius containment: CONDUIT_RECEIPT_REDIRECT_PRODUCERS
+        (comma-separated) restricts the redirect to the listed producers.
+        Unset → applies to all producers. The producer_registry grant
+        trigger remains the real per-write authority in every mode."""
+        raw = os.environ.get("CONDUIT_RECEIPT_REDIRECT_PRODUCERS", "").strip()
+        if not raw:
+            return True
+        allowed = {p.strip() for p in raw.split(",") if p.strip()}
+        return (producer_id or "") in allowed
+
     def insert_receipt(
         self,
         plan_id: str,
@@ -919,6 +954,79 @@ class DBAdapter:
         )
         metadata.update(provenance)
 
+        # C3 cutover (Lilac plan 8261639): staged writer redirection.
+        # See _receipt_redirect_mode for the stage contract. The producer
+        # allowlist (Q-A) degrades the mode to off for non-listed producers.
+        from lilac import receipt_type_to_kind
+        redirect_mode = self._receipt_redirect_mode()
+        if redirect_mode != "off" and not self._redirect_applies_to(
+                provenance.get("producer_id")):
+            _log.info(
+                "redirect=%s not applicable to producer %s — mode off",
+                redirect_mode, provenance.get("producer_id"))
+            redirect_mode = "off"
+
+        if redirect_mode == "enforce":
+            kind = receipt_type_to_kind(receipt_type)
+            if kind is None:
+                # Unmapped legacy type (e.g. PROPOSED): no ratified canonical
+                # kind exists — legacy-only by contract (drift fixture class
+                # unmapped_type). NOT a refusal; documented divergence.
+                _log.warning(
+                    "redirect=enforce: receipt type %s is unmapped to a "
+                    "canonical kind — legacy-only write", receipt_type)
+            else:
+                request_id = self.resolve_request_for_receipt(plan_id)
+                canonical_payload = {
+                    "plan_id": plan_id,
+                    "receipt_type": receipt_type,
+                    "agent_role": agent_role,
+                    "session_id": session_id,
+                    "ticket_id": ticket_id,
+                    "summary": summary,
+                    "artifact_path": artifact_path,
+                    "tokens_used": tokens_used,
+                    "metadata": metadata,
+                    "request_id": request_id,
+                    "producer_id": provenance["producer_id"],
+                    "source_channel": provenance["source_channel"],
+                    "correlation_id": provenance["correlation_id"],
+                }
+                from lilac import LilacAdapter, LilacPersistenceError
+                try:
+                    with self._get_connection() as conn:
+                        raw_conn = getattr(conn, "_conn", conn)
+                        lilac_adapter = LilacAdapter(
+                            lambda: raw_conn,
+                            schema=os.environ.get("CONDUIT_LILAC_SCHEMA", "resolution"),
+                            # The declaring producer writes canonically —
+                            # the grant trigger validates it per write.
+                            producer_id=provenance["producer_id"] or "nexus-conduit-python",
+                        )
+                        outcome, canonical_id = lilac_adapter.insert_receipt(
+                            raw_conn,
+                            kind=kind,
+                            source_receipt_id=receipt_id,
+                            payload=canonical_payload,
+                            refs={"plan_id": plan_id,
+                                  "ticket_id": ticket_id or None,
+                                  "request_id": request_id},
+                            source_system="conduit",
+                        )
+                    _log.info(
+                        "redirect=enforce: canonical %s accepted (outcome=%s "
+                        "id=%s) — caller-owned ticket fan-out proceeds off "
+                        "nebula.receipts_unified (V140 canonical branch "
+                        "surfaces rows with no legacy twin)",
+                        kind, outcome, canonical_id)
+                except LilacPersistenceError:
+                    # R4 fail-closed: conflict / grant refusal must NOT fall
+                    # back to a legacy-only write — that would fork the
+                    # stream. The refusal message carries both fingerprints.
+                    _log.exception(
+                        "redirect=enforce: canonical write refused — failing closed")
+                    raise
+
         try:
             request_id = self.resolve_request_for_receipt(plan_id)
             if request_id is not None:
@@ -974,6 +1082,23 @@ class DBAdapter:
                     provenance["producer_id"], provenance["correlation_id"],
                 )
         except Exception as e:
+            if redirect_mode == "enforce":
+                # Q-B asymmetry (ratified daae50b0): the canonical write
+                # already committed — the operation SUCCEEDS. The legacy
+                # courtesy copy's failure is never fatal, but it is NEVER
+                # silent: it is recorded as the distinct
+                # `legacy_shadow_failed` class (review F2) so the C6 soak
+                # gate observes it. Ticket fan-out correctness does not
+                # depend on the legacy row: advanceTicketsOnReceipt and
+                # create_next_tickets both read nebula.receipts_unified,
+                # whose canonical branch (V140) surfaces canonical rows
+                # lacking a legacy twin (review F3).
+                _log.warning(
+                    "insert_receipt legacy shadow copy failed (non-fatal in "
+                    "enforce mode) plan=%s type=%s: %s", plan_id, receipt_type, e)
+                self._record_legacy_shadow_failed(
+                    plan_id, receipt_type, receipt_id, e)
+                return
             _log.error("insert_receipt failed plan=%s type=%s: %s", plan_id, receipt_type, e)
             self._emit_receipt_failure(plan_id, receipt_type, str(e))
             raise
@@ -983,13 +1108,19 @@ class DBAdapter:
         # resolution.receipt outcome alongside the legacy write as evidence
         # for the C2 ratification record. Never affects the legacy outcome,
         # never spawns tickets (the single live fan-out is unchanged).
+        # In enforce mode the canonical row was already written above —
+        # recording again would risk a fingerprint drift-conflict against
+        # rows the legacy branches mutate via the canary policy.
+        if redirect_mode == "enforce":
+            return
         try:
-            from lilac import shadow_record_receipt, receipt_type_to_kind
+            from lilac import shadow_record_receipt
             # Q3: the canonical stream lives in the fixed `resolution` schema
             # (overridable only for hermetic parity tests).
             shadow_record_receipt(
                 self,
                 schema=os.environ.get("CONDUIT_LILAC_SCHEMA", "resolution"),
+                force=(redirect_mode == "shadow"),
                 receipt_row={
                     "kind": receipt_type_to_kind(receipt_type),
                     "source_receipt_id": receipt_id,
@@ -1049,6 +1180,59 @@ class DBAdapter:
                 conn.commit()
         except Exception:
             _log.exception("_emit_receipt_failure: failed to record receipt failure")
+
+    def _record_legacy_shadow_failed(
+        self,
+        plan_id: str,
+        receipt_type: str,
+        source_receipt_id: str,
+        error: Exception,
+    ) -> None:
+        """Q-B observability (architect review F2, record 761e6338):
+        a failed legacy courtesy copy under redirect=enforce is recorded as
+        the DISTINCT parity class ``legacy_shadow_failed`` — never a silent
+        skip, never a conflict/refused. Durable event row in the V141 soak
+        surface (resolution.soak_evidence, today's evidence day, green
+        forced false for the day) so the C6 soak cron and the drift report
+        see the failure instead of a clean scan. Best-effort: recording
+        must never disturb the already-committed canonical write.
+        """
+        event = {
+            "plan_id": plan_id,
+            "receipt_type": receipt_type,
+            "source_receipt_id": source_receipt_id,
+            "error": str(error)[:2000],
+            "recorded_at": datetime.utcnow().isoformat() + "Z",
+        }
+        # Fixed canonical schema in production (Q3); overridable only for
+        # hermetic tests (same convention as the enforce/shadow paths).
+        schema = os.environ.get("CONDUIT_LILAC_SCHEMA", "resolution")
+        try:
+            with self._get_connection() as conn:
+                conn.execute(
+                    f"""INSERT INTO {schema}.soak_evidence
+                           (evidence_date, report, green, recorded_by)
+                       VALUES (CURRENT_DATE, %s::jsonb, false,
+                               'legacy_shadow_failed')
+                       ON CONFLICT (evidence_date) DO UPDATE
+                         SET report = jsonb_set(
+                               {schema}.soak_evidence.report,
+                               '{{legacy_shadow_failed}}',
+                               COALESCE({schema}.soak_evidence.report
+                                        -> 'legacy_shadow_failed',
+                                        '[]'::jsonb) || %s::jsonb),
+                             green = false""",
+                    (json.dumps({"legacy_shadow_failed": [event]}),
+                     json.dumps(event)),
+                )
+                conn.commit()
+            _log.warning(
+                "legacy_shadow_failed recorded (Q-B non-fatal class) "
+                "plan=%s type=%s id=%s", plan_id, receipt_type, source_receipt_id)
+        except Exception:  # noqa: BLE001 — observability must never raise
+            _log.exception(
+                "legacy_shadow_failed record failed (non-fatal) "
+                "plan=%s id=%s", plan_id, source_receipt_id)
 
     def resolve_request_for_receipt(self, plan_id: str) -> Optional[str]:
         """D-T19-2(b): resolve (or get-or-create) the execution.requests id for a plan.

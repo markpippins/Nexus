@@ -55,10 +55,15 @@ KIND_BY_TYPE = {
 UNMAPPED_LEGACY_TYPES = ("PROPOSED",)
 
 # Channel → producer stamping (db_adapter provenance; Q3 authority model).
+# Corrected at C3 cutover prep: the python-direct channel declares
+# 'nexus-conduit-python' (db_adapter._receipt_provenance), NOT the worker
+# lane identity — registered in V142. The shadow seam stamps the DECLARING
+# producer (payload.producer_id), so parity holds across all channels.
 PRODUCER_BY_CHANNEL = {
-    "conduit-mcp-http": "conduit-mcp",          # TS front-door → kernel REST
-    "conduit-mcp-stdio": "conduit-mcp",         # MCP tools direct inserts
-    "python-direct": "nexus-execution-worker",  # in-process adapter callers
+    "conduit-mcp-http": "conduit-mcp",            # TS front-door → kernel REST
+    "conduit-mcp-stdio": "conduit-mcp",           # MCP tools direct inserts
+    "conduit-python": "nexus-conduit-python",     # Python kernel process (V142)
+    "python-direct": "nexus-conduit-python",      # in-process adapter callers
     "nexus-execution-worker": "nexus-execution-worker",
 }
 
@@ -110,8 +115,11 @@ def check_adapter_consistency(lilac_mod) -> list:
         drift.append("lilac.LIFECYCLE_KINDS != fixture GRANT_KINDS")
     if getattr(lilac_mod, "PRODUCER_CONDUIT_MCP", "") != PRODUCER_BY_CHANNEL["conduit-mcp-http"]:
         drift.append("lilac.PRODUCER_CONDUIT_MCP != fixture producer for conduit-mcp-http")
-    if getattr(lilac_mod, "PRODUCER_EXECUTION_WORKER", "") != PRODUCER_BY_CHANNEL["python-direct"]:
-        drift.append("lilac.PRODUCER_EXECUTION_WORKER != fixture producer for python-direct")
+    # PRODUCER_EXECUTION_WORKER is the adapter's lane-default (shadow
+    # fallback), not the declared python-direct producer — it must equal
+    # the registered worker identity, nothing else.
+    if getattr(lilac_mod, "PRODUCER_EXECUTION_WORKER", "") != PRODUCER_BY_CHANNEL["nexus-execution-worker"]:
+        drift.append("lilac.PRODUCER_EXECUTION_WORKER != registered worker identity")
     return drift
 
 
@@ -128,7 +136,8 @@ def check_db_registry(cur, schema: str = "resolution") -> list:
     rows = {r[0]: r for r in cur.fetchall()}
 
     for producer in (PRODUCER_BY_CHANNEL["conduit-mcp-http"],
-                     PRODUCER_BY_CHANNEL["python-direct"]):
+                     PRODUCER_BY_CHANNEL["python-direct"],
+                     PRODUCER_BY_CHANNEL["nexus-execution-worker"]):
         row = rows.get(producer)
         if row is None:
             drift.append(f"producer_registry missing seed: {producer}")
@@ -217,6 +226,11 @@ def check_legacy_surface(conn, schema: str = "resolution",
 
     Read-only. The execution-domain surface is scanned via the V140
     identity (COALESCE(lineage_original_id, id::text)) when present.
+
+    Q-B observability (review F2): ``legacy_shadow_failed`` events
+    recorded by the adapter are surfaced from the V141 soak surface and
+    reported as their own class — a clean legacy scan must never mask a
+    chronic courtesy-copy failure in enforce mode.
     """
     report = {"scanned": 0, "classes": {}, "rows": []}
     cur = conn.cursor()
@@ -236,6 +250,26 @@ def check_legacy_surface(conn, schema: str = "resolution",
             report["classes"].get(result["class"], 0) + 1)
         if result["class"] != "parity":
             report["rows"].append(result)
+
+    # Q-B (F2): surface the enforce-mode legacy_shadow_failed events. The
+    # soak table is V141 — absent pre-V141, so absence is not an error.
+    try:
+        cur.execute(
+            f"SELECT report->'legacy_shadow_failed' FROM {schema}.soak_evidence "
+            f"WHERE report ? 'legacy_shadow_failed'"
+        )
+        events = []
+        for (blob,) in cur.fetchall():
+            if isinstance(blob, str):
+                blob = json.loads(blob or "[]")
+            events.extend(blob or [])
+        if events:
+            report["classes"]["legacy_shadow_failed"] = (
+                report["classes"].get("legacy_shadow_failed", 0) + len(events))
+            report["rows"].extend(
+                {"class": "legacy_shadow_failed", **e} for e in events)
+    except Exception:  # noqa: BLE001 — soak surface optional (pre-V141)
+        pass
     return report
 
 
