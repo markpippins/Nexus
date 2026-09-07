@@ -30,6 +30,10 @@
 --        leg 2: legacy_shadow_failed events (from soak_evidence) whose
 --               source_receipt_id does NOT start with 'rec-zz-redirect-'
 --      Events older than the window are out of scope by design (trailing).
+--      F1 (architect review 2026-09-07): the window keys on the EVENT's own
+--      `recorded_at`, NOT the row's `created_at` — soak_evidence rows are
+--      UPSERTed per day, so created_at is the first event's time and a real
+--      refusal appended late in the day would otherwise escape the window.
 --
 -- Idempotent / reversible:
 --   DROP FUNCTION ...; DROP TABLE ...;  (no data movement; the table starts
@@ -86,11 +90,24 @@ BEGIN
   -- namespace ('rec-zz-redirect-' source_receipt_id prefix, C2) is excluded
   -- by identity, never by inference. One legacy_shadow_failed event =
   -- one jsonb array element on that day's soak_evidence row.
+  -- F1 (architect review 2026-09-07): window on the EVENT's own
+  -- `recorded_at` — the row is UPSERTed per day, so `created_at` is the
+  -- first event's time and late-in-day events would escape the window.
+  -- Malformed/missing event timestamps FAIL CLOSED: an unparseable stamp
+  -- raises InvalidDatetimeFormat (the gate ERRORS — never silently green);
+  -- a NULL/empty stamp is COALESCEd to now() = always in-window = counted.
+  -- The adapter always writes recorded_at; these branches are defensive.
   SELECT count(*) INTO v_shadow_bad
   FROM resolution.soak_evidence se,
        jsonb_array_elements(
          COALESCE(se.report->'legacy_shadow_failed', '[]'::jsonb)) ev
-  WHERE se.created_at >= now() - make_interval(hours => p_hours)
+  WHERE COALESCE(
+          CASE
+            WHEN ev->>'recorded_at' IS NULL OR ev->>'recorded_at' = ''
+              THEN NULL
+            ELSE (ev->>'recorded_at')::timestamptz
+          END, now())
+          >= now() - make_interval(hours => p_hours)
     AND (ev->>'source_receipt_id') NOT LIKE 'rec-zz-redirect-%';
 
   v_ok := (v_refusals = 0) AND (v_shadow_bad = 0);
@@ -107,6 +124,6 @@ END;
 $$;
 
 COMMENT ON FUNCTION resolution.c2_trailing_gate(text, integer) IS
-  'Stage C C2 gate (d4c0a9ff): trailing-24h zero-alert check for a per-producer enforce flip. Leg 1 = real-writer refusals (producer_refusals); leg 2 = non-canary legacy_shadow_failed events (declared rec-zz-redirect- prefix excluded by identity). Satisfied iff both are zero in the window.';
+  'Stage C C2 gate (d4c0a9ff): trailing-24h zero-alert check for a per-producer enforce flip. Leg 1 = real-writer refusals (producer_refusals); leg 2 = non-canary legacy_shadow_failed events (declared rec-zz-redirect- prefix excluded by identity), windowed on each EVENT''s recorded_at (F1: rows are upserted per day, so the row clock is not the event clock). Missing/malformed event timestamps fail closed. Satisfied iff both are zero in the window.';
 
 COMMIT;

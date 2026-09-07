@@ -23,6 +23,7 @@ import os
 import sys
 import unittest
 import uuid
+from datetime import datetime, timedelta
 
 import psycopg2
 
@@ -109,16 +110,36 @@ class C2TrailingGateTest(unittest.TestCase):
         self._raw.commit()
         return receipt_id
 
-    def _add_shadow_failed(self, source_id, evidence_date=None):
+    def _add_shadow_failed(self, source_id, evidence_date=None,
+                           row_age_hours=None, event_age_hours=None):
+        """Insert a soak_evidence row carrying one legacy_shadow_failed event.
+
+        F1 regression surface: the ROW's created_at (first-insert/upsert time)
+        and the EVENT's recorded_at are independent clocks — tests can set
+        them apart to prove the gate keys on the event's own timestamp.
+        """
         evidence_date = evidence_date or "CURRENT_DATE"
+        row_col = ""
+        row_val = ""
+        if row_age_hours is not None:
+            row_col = ", created_at"
+            row_val = (f", now() - make_interval(hours => "
+                       f"{float(row_age_hours)}::int)")
+        recorded_at = (datetime.utcnow().isoformat() + "Z")
+        if event_age_hours is not None:
+            recorded_at = (datetime.utcnow()
+                           - timedelta(hours=event_age_hours)
+                           ).isoformat() + "Z"
         with self._raw.cursor() as cur:
             cur.execute(
                 f"""INSERT INTO {self.canon}.soak_evidence
-                       (evidence_date, report, green, recorded_by)
-                    VALUES ({evidence_date},
+                       (evidence_date{row_col},
+                        report, green, recorded_by)
+                    VALUES ({evidence_date}{row_val},
                             %s::jsonb, false, 'test')""",
                 (json.dumps({"legacy_shadow_failed": [
-                    {"source_receipt_id": source_id}]}),))
+                    {"source_receipt_id": source_id,
+                     "recorded_at": recorded_at}]}),))
         self._raw.commit()
 
     def test_clean_window_satisfied(self):
@@ -153,6 +174,51 @@ class C2TrailingGateTest(unittest.TestCase):
         self._add_shadow_failed("rec-zz-redirect-canary-2")
         g = self._gate()
         self.assertTrue(g["satisfied"])
+
+    def test_f1_row_clock_is_not_event_clock_angry_case(self):
+        """F1 (architect review 2026-09-07): the gate must key on the EVENT's
+        recorded_at, not the row's created_at. soak_evidence rows are
+        UPSERTed per day, so created_at is the FIRST event's time — a real
+        refusal appended late in the day must still block the gate.
+
+        Angry case: row created 24.5h ago (first event of the day), a REAL
+        refusal event recorded 25 min ago appended to that row.
+        """
+        self._add_shadow_failed("rec-real-f1-1", row_age_hours=24.5,
+                                event_age_hours=25.0 / 60.0)
+        g = self._gate()
+        self.assertFalse(g["satisfied"],
+                         "a 25-minute-old real refusal must block the gate "
+                         "even when its soak row was created 24.5h ago")
+        self.assertEqual(g["non_canary_shadow_failures"], 1)
+
+    def test_f1_expiry_control_row_and_event_both_old(self):
+        """F1 control: row created 25h ago AND event recorded 25h ago →
+        the event is genuinely outside the window → satisfied."""
+        self._add_shadow_failed("rec-real-f1-2", row_age_hours=25,
+                                event_age_hours=25)
+        g = self._gate()
+        self.assertTrue(g["satisfied"],
+                        "a 25h-old event must expire from the 24h window")
+
+    def test_f1_malformed_event_timestamp_fails_closed(self):
+        """F1 defensive posture: an event whose recorded_at cannot be bounded
+        by the window must FAIL CLOSED — the gate ERRORS (InvalidDatetimeFormat)
+        rather than returning a green verdict it cannot certify. (A NULL/empty
+        stamp takes the COALESCE-to-now() branch = always in-window = counted.
+        Either way: no green past an unboundable event.)
+        """
+        with self._raw.cursor() as cur:
+            cur.execute(
+                f"""INSERT INTO {self.canon}.soak_evidence
+                       (evidence_date, report, green, recorded_by)
+                    VALUES (CURRENT_DATE, %s::jsonb, false, 'test')""",
+                (json.dumps({"legacy_shadow_failed": [
+                    {"source_receipt_id": "rec-real-f1-3",
+                     "recorded_at": "not-a-timestamp"}]}),))
+        self._raw.commit()
+        with self.assertRaises(psycopg2.errors.InvalidDatetimeFormat):
+            self._gate()
 
     def test_window_expiry(self):
         self._add_refusal(age_hours=25)
