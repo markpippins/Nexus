@@ -88,6 +88,17 @@ class TestE2EPipeline(unittest.TestCase):
             except OSError:
                 pass
 
+        # Legacy-surface cleanup FIRST (same leak fix as test_lifecycle):
+        # the synthetic fallback writes test rows to shared-live
+        # vision.receipts; delete them before the schema dies.
+        try:
+            self._raw_cur.execute(
+                "DELETE FROM vision.receipts WHERE plan_id = %s",
+                (self.plan_id,))
+            self._raw_conn.commit()
+        except Exception:
+            self._raw_conn.rollback()
+
         # Close the test connection first (releases locks on test schema)
         try:
             self._raw_cur.close()

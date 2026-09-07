@@ -67,6 +67,18 @@ class TestPlanLifecycle(unittest.TestCase):
             raise
 
     def tearDown(self):
+        # Legacy-surface cleanup FIRST: insert_receipt's synthetic fallback
+        # writes test rows to the SHARED-LIVE vision.receipts (the test
+        # schema only holds plans/tickets). Without this, every suite run
+        # leaks 'Test %' rows into the live surface — which the C4 backfill
+        # would then faithfully import as canonical garbage.
+        try:
+            self._raw_cur.execute(
+                "DELETE FROM vision.receipts WHERE plan_id = %s",
+                (self.plan_id,))
+            self._raw_conn.commit()
+        except Exception:
+            self._raw_conn.rollback()
         # Close the test connection first (releases locks on test schema)
         try:
             self._raw_cur.close()
