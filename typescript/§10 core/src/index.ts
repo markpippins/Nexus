@@ -16,10 +16,6 @@ export * from "./runtime/runtime";
 export * from "./runtime/governedAction";
 export * from "./runtime/replayVerifier";
 export * from "./runtime/witnessedRun";
-export * from "./runtime/witnessedRunSource";
-export * from "./runtime/doctrineLookup";
-export * from "./runtime/doctrineLookup.pg";
-export * from "./runtime/doctrineLookup.registry";
 export * from "./runtime/modes";
 export * from "./runtime/lifecycle";
 export type {

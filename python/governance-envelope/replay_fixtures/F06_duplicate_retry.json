@@ -52,6 +52,12 @@
     }
   ],
   "retry_after_admission": true,
+  "prior_admission": {
+    "envelopeId": "3b7e8f2a-1c4d-4e5f-9a0b-c6d7e8f9a0b1",
+    "evaluationFingerprint": "sha256:9eaba4fab7739d0f93692d12e4819ad57f42dfb2b781a79676bf9efb07a58d55",
+    "pebTransactionId": "77777777-3333-4444-8555-666666666666",
+    "admissionReceiptId": "88888888-4444-4555-8666-777777777777"
+  },
   "attempts": [
     {
       "envelope": {

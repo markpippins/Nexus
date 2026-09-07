@@ -34,8 +34,9 @@ public final class PlatformHealthResponse {
         health.put("runnableServices", buildSection(runnableServices, "ON", "OFFLINE", "DEGRADED"));
         health.put("hostServers", buildServerSection(servers));
 
-        // terrainUp is true ONLY if every probed service is ON or UNKNOWN (no probe),
-        // and no probed service is OFFLINE or DEGRADED.
+        // terrainUp is true ONLY if every ACTIVE probed service is ON or UNKNOWN (no probe),
+        // and no ACTIVE probed service is OFFLINE or DEGRADED. Retired services
+        // (activeFlag = false) are excluded from platform health.
         boolean terrainUp = allServicesHealthy(mcpServers) && allServicesHealthy(runnableServices);
         health.put("terrainUp", terrainUp);
 
@@ -45,28 +46,38 @@ public final class PlatformHealthResponse {
     /**
      * A service is healthy if its liveStatus (when present and meaningful) is ON,
      * or if no probe was attempted (liveStatus UNKNOWN) and stored status is ONLINE.
+     * Retired services (activeFlag = false) are skipped.
      */
     private static boolean allServicesHealthy(List<Map<String, Object>> items) {
-        return items.stream().allMatch(i -> {
-            Object live = i.get("liveStatus");
-            if (live instanceof String s && !"UNKNOWN".equals(s)) {
-                // Probe ran — service is healthy only if ON
-                return "ON".equals(s);
-            }
-            // No probe — fall back to stored status
-            return "ONLINE".equals(i.get("status"));
-        });
+        return items.stream()
+                .filter(PlatformHealthResponse::isActive)
+                .allMatch(i -> {
+                    Object live = i.get("liveStatus");
+                    if (live instanceof String s && !"UNKNOWN".equals(s)) {
+                        // Probe ran — service is healthy only if ON
+                        return "ON".equals(s);
+                    }
+                    // No probe — fall back to stored status
+                    return "ONLINE".equals(i.get("status"));
+                });
+    }
+
+    private static boolean isActive(Map<String, Object> item) {
+        return !Boolean.FALSE.equals(item.get("activeFlag"));
     }
 
     private static Map<String, Object> buildSection(List<Map<String, Object>> items,
                                                      String onlineVal,
                                                      String offlineVal,
                                                      String degradedVal) {
+        List<Map<String, Object>> active = items.stream()
+                .filter(PlatformHealthResponse::isActive)
+                .toList();
         Map<String, Object> section = new LinkedHashMap<>();
-        section.put("total", items.size());
-        section.put("online", countByLiveOrStoredStatus(items, onlineVal));
-        section.put("offline", countByLiveOrStoredStatus(items, offlineVal));
-        section.put("degraded", countByLiveOrStoredStatus(items, degradedVal));
+        section.put("total", active.size());
+        section.put("online", countByLiveOrStoredStatus(active, onlineVal));
+        section.put("offline", countByLiveOrStoredStatus(active, offlineVal));
+        section.put("degraded", countByLiveOrStoredStatus(active, degradedVal));
         section.put("items", items);
         return section;
     }
