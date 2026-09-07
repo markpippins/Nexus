@@ -109,7 +109,8 @@ public class PlatformHealthController {
             m.put("liveStatus", "UNKNOWN");
 
             String healthCheckUrl = s.getHealthCheckUrl();
-            if (healthCheckUrl != null && !healthCheckUrl.isBlank()) {
+            if (Boolean.TRUE.equals(s.getActiveFlag())
+                    && healthCheckUrl != null && !healthCheckUrl.isBlank()) {
                 probes.add(probeUrl(healthCheckUrl, m));
             }
             result.add(m);
@@ -137,7 +138,8 @@ public class PlatformHealthController {
             m.put("liveStatus", "UNKNOWN");
 
             String healthCheckUrl = s.getHealthCheckUrl();
-            if (healthCheckUrl != null && !healthCheckUrl.isBlank()) {
+            if (Boolean.TRUE.equals(s.getActiveFlag())
+                    && healthCheckUrl != null && !healthCheckUrl.isBlank()) {
                 probes.add(probeUrl(healthCheckUrl, m));
             }
             result.add(m);

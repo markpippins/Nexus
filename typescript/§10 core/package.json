@@ -1,7 +1,7 @@
 {
-  "name": "@nexus/viewspec-compiler",
+  "name": "§10-core",
   "version": "0.1.0",
-  "description": "DesignIR → ViewSpec compiler and runtime — deterministic UI generation from semantic intent",
+  "private": true,
   "type": "module",
   "scripts": {
     "build": "tsc",
@@ -17,6 +17,9 @@
   },
   "devDependencies": {
     "typescript": "^5.5.0",
-    "tsx": "^4.19.0"
+    "tsx": "^4.7.0"
+  },
+  "dependencies": {
+    "@hotmoka/§10-core": "file:../§10-core-3p"
   }
 }
