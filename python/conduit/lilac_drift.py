@@ -24,11 +24,15 @@ an explicit contract-v2 discussion — never a silent edit.
 
 Run as a CLI for the live, read-only report:
     CONDUIT_PG_DSN='...' python3 lilac_drift.py
+
+Q-D soak mode (writes ONLY the day's soak_evidence row):
+    CONDUIT_PG_DSN='...' python3 lilac_drift.py --record-soak
 """
 import hashlib
 import json
 import os
 import sys
+from datetime import date
 
 # ── The golden fixture ────────────────────────────────────────────────────
 # Mirrors lilac.RECEIPT_KIND_BY_TYPE / LILAC_CONTRACT_VERSION /
@@ -273,6 +277,49 @@ def check_legacy_surface(conn, schema: str = "resolution",
     return report
 
 
+def record_soak_evidence(conn, schema: str = "resolution",
+                         legacy_schema: str = "vision",
+                         recorded_by: str = "soak-cron") -> dict:
+    """Q-D soak recorder (ratified daae50b0): run the full read-only parity
+    report and persist TODAY's GREEN/RED verdict into the V141 soak surface
+    (resolution.soak_evidence, evidence_date UNIQUE — idempotent per day).
+
+    Green = adapter layer CLEAN and registry layer CLEAN and no legacy
+    parity drift and zero legacy_shadow_failed events (Q-B: those are
+    expected during Stage C — but they are NOT green-day evidence; the
+    C6 retirement gate counts only clean days).
+    """
+    report = full_report(conn, schema=schema, legacy_schema=legacy_schema)
+    green = (
+        not report.get("adapter_consistency")
+        and not report.get("db_registry")
+        and (report.get("legacy_parity", {}).get("classes", {})
+             .get("legacy_shadow_failed", 0) == 0)
+        and "error" not in report.get("legacy_parity", {})
+    )
+    summary = {
+        "fixture_fingerprint": report.get("fixture_fingerprint"),
+        "adapter_consistency": report.get("adapter_consistency"),
+        "db_registry": report.get("db_registry"),
+        "classes": report.get("legacy_parity", {}).get("classes"),
+        "scanned": report.get("legacy_parity", {}).get("scanned"),
+    }
+    cur = conn.cursor()
+    cur.execute(
+        f"""INSERT INTO {schema}.soak_evidence
+               (evidence_date, report, green, recorded_by)
+           VALUES (CURRENT_DATE, %s::jsonb, %s, %s)
+           ON CONFLICT (evidence_date) DO UPDATE
+             SET report = {schema}.soak_evidence.report || EXCLUDED.report,
+             green = EXCLUDED.green,
+             recorded_by = EXCLUDED.recorded_by""",
+        (json.dumps(summary), green, recorded_by),
+    )
+    conn.commit()
+    return {"evidence_date": str(date.today()), "green": green,
+            "summary": summary}
+
+
 def full_report(conn, schema: str = "resolution",
                 legacy_schema: str = "vision") -> dict:
     """All three layers in one read-only report (CLI / live evidence)."""
@@ -308,4 +355,8 @@ if __name__ == "__main__":
         print("CONDUIT_PG_DSN must be set", file=sys.stderr)
         raise SystemExit(2)
     raw = psycopg2.connect(dsn)
+    if "--record-soak" in sys.argv:
+        result = record_soak_evidence(raw)
+        print(json.dumps(result, indent=2, default=str))
+        raise SystemExit(0 if result["green"] else 1)
     print(json.dumps(full_report(raw), indent=2, default=str))
