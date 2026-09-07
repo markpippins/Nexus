@@ -17,7 +17,8 @@
 --       * vision_tickets_undisposed = 0         (C6 ticket dispositions)
 --       * vision_tickets_non_closed = 0         (real work drained)
 --       * green_soak_days >= 7                  (Q-D soak, C1 provenance)
---       * binding_signoffs >= 2                 (operator + architect, I1)
+--       * binding_signoffs = 3                 (operator + architect + dba,
+--                                              three-signatory rule, V146)
 --     If any condition is unmet, the migration raises errcode 'P1000' and
 --     the transaction aborts — no partial state. The gate function reads
 --     vision.receipts / vision.tickets via to_regclass, so this migration
