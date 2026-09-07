@@ -43,7 +43,6 @@ export class NotesComponent implements OnDestroy {
     return '<p>Error: Markdown parsing libraries not loaded.</p>';
   });
 
-  private lastLoadedPath: string | null = null;
 
   constructor() {
     effect(() => {
@@ -53,7 +52,6 @@ export class NotesComponent implements OnDestroy {
       if (this.lastLoadedPath === pathKey) {
         return;
       }
-      this.lastLoadedPath = pathKey;
       if (this.isNoteAvailable()) {
         this.loadNote();
       } else {

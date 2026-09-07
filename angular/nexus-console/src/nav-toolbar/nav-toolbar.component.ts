@@ -30,6 +30,12 @@ export const NAV_ITEMS: NavItemOrSeparator[] = [
     iconPath: 'M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z',
   },
   {
+    type: 'item', key: 'atlas',
+    label: 'Atlas',
+    title: 'Atlas',
+    iconPath: 'M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z',
+  },
+  {
     type: 'item', key: 'nebula-rms',
     label: 'Nebula',
     title: 'Nebula',
@@ -75,6 +81,13 @@ export const NAV_ITEMS: NavItemOrSeparator[] = [
     title: 'Semantics Database Explorer',
     // Heroicons v2 'book-open' icon — a stylised open book.
     iconPath: 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25',
+  },
+  {
+    type: 'item', key: 'shrapnel',
+    label: 'Shrapnel',
+    title: 'Shrapnel',
+    // Heroicons v2 'cube' icon.
+    iconPath: 'm21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9',
   },
   {
     type: 'item', key: 'barbie',
