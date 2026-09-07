@@ -178,7 +178,45 @@ class LilacAdapter:
                     "conflict: same source id, different payload — "
                     f"existing_fingerprint={existing_fp} incoming_fingerprint={fp}"
                 ) from exc
+            # Stage B (V143): the partial unique index on the admission txn
+            # id also rejects replays that carry a NEW source id but the SAME
+            # peb_transaction_id. Classify that replay against the indexed
+            # surface (R4): identical payload → duplicate-equivalent (the
+            # canonical row's id wins); different payload → conflict.
+            if sqlstate == "23505" and kind == "admission":
+                txn_id = payload.get("peb_transaction_id")
+                if txn_id:
+                    dup_txn = self._find_admission_by_txn(conn, str(txn_id))
+                    if dup_txn is not None:
+                        existing_fp, existing_id = dup_txn
+                        if existing_fp == fp:
+                            return "duplicate-equivalent", existing_id
+                        raise LilacPersistenceError(
+                            "conflict: same peb_transaction_id, different payload — "
+                            f"existing_fingerprint={existing_fp} incoming_fingerprint={fp}"
+                        ) from exc
             raise
+
+    def _find_admission_by_txn(self, conn, txn_id: str) -> Optional[Tuple[str, str]]:
+        """Canonical admission lookup by the Stage B indexed expression.
+
+        Only meaningful when the txn-id unique index rejected an insert —
+        i.e. some admission row already owns this peb_transaction_id.
+        Returns (payload_fingerprint, id) of the oldest such row.
+        """
+        cur = conn.cursor()
+        cur.execute(
+            self._q(
+                """SELECT payload_fingerprint, id FROM %SCHEMA%.receipt
+                   WHERE kind='admission'
+                     AND payload->>'peb_transaction_id'=%s
+                   ORDER BY created_at ASC LIMIT 1"""
+            ),
+            (txn_id,),
+        )
+        row = cur.fetchone()
+        conn.commit()
+        return (str(row[0]), str(row[1])) if row else None
 
     def _find_existing_receipt(self, conn, source_system: str, source_receipt_id: str,
                                expect_fingerprint: Optional[str]) -> Optional[Tuple[str, str]]:
