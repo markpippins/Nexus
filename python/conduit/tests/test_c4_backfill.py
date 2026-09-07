@@ -301,6 +301,10 @@ class TestC4LiveSanity(C4BackfillTestBase):
     """Read-only sanity of the live surfaces the pass will touch."""
 
     def test_live_counts_are_sane(self):
+        """Live invariants (pool grows as units write; don't pin counts):
+        mapped C4 dispositions can never exceed the mappable legacy pool
+        (discarded rows are non-mappable by definition, so the comparison
+        is mapped-only)."""
         cur = self._raw_conn.cursor()
         cur.execute("SELECT count(*) FROM vision.receipts")
         legacy_total = cur.fetchone()[0]
@@ -309,11 +313,11 @@ class TestC4LiveSanity(C4BackfillTestBase):
             (list(lilac_drift.KIND_BY_TYPE),))
         mappable = cur.fetchone()[0]
         cur.execute("SELECT count(*) FROM resolution.migration_disposition "
-                    "WHERE migration_version='C4'")
-        disposed = cur.fetchone()[0]
+                    "WHERE migration_version='C4' AND disposition_class='mapped'")
+        mapped = cur.fetchone()[0]
         self._raw_conn.commit()
         self.assertGreater(legacy_total, 0)
-        self.assertGreaterEqual(mappable, disposed)
+        self.assertGreaterEqual(mappable, mapped)
 
 
 if __name__ == "__main__":
