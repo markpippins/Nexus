@@ -48,8 +48,9 @@
     { "key": "peb-ui",            "name": "PEB UI",              "port": 4206, "healthPath": "/", "category": "ui" },
     { "key": "plurality-ui",      "name": "Plurality UI",        "port": 3004, "healthPath": "/", "category": "ui" },
     { "key": "semantic-kernel-ui","name": "Semantic Kernel UI",  "port": 4207, "healthPath": "/", "category": "ui" },
-    { "key": "tackle-ui",         "name": "Tackle UI",           "port": 4202, "healthPath": "/", "category": "ui" },
-    { "key": "view-architect",    "name": "View Architect",      "port": 3003, "healthPath": "/", "category": "ui" }
+    { "key": "tackle-ui",         "name": "Tackle UI",           "port": 4202, "healthPath": "/", "category": "ui" },{"key": "view-architect", "name": "View Architect", "port": 3003, "healthPath": "/", "category": "ui"},
+  {"key": "atlas-ui", "name": "Atlas", "port": 4216, "healthPath": "/", "category": "ui"},
+  {"key": "shrapnel-ui", "name": "Shrapnel", "port": 4217, "healthPath": "/", "category": "ui"}
   ],
   "pollIntervalSeconds": 30,
   "tcpTimeoutMs": 2000
