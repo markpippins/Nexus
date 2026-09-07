@@ -1019,12 +1019,15 @@ class DBAdapter:
                         "nebula.receipts_unified (V140 canonical branch "
                         "surfaces rows with no legacy twin)",
                         kind, outcome, canonical_id)
-                except LilacPersistenceError:
+                except LilacPersistenceError as lex:
                     # R4 fail-closed: conflict / grant refusal must NOT fall
                     # back to a legacy-only write — that would fork the
                     # stream. The refusal message carries both fingerprints.
                     _log.exception(
                         "redirect=enforce: canonical write refused — failing closed")
+                    self._record_producer_refusal(
+                        provenance.get("producer_id") or "nexus-conduit-python",
+                        receipt_type, receipt_id, plan_id, lex)
                     raise
 
         try:
@@ -1180,6 +1183,50 @@ class DBAdapter:
                 conn.commit()
         except Exception:
             _log.exception("_emit_receipt_failure: failed to record receipt failure")
+
+    def _record_producer_refusal(
+        self,
+        producer_id: str,
+        receipt_type: str,
+        source_receipt_id: str,
+        plan_id: str,
+        error: Exception,
+    ) -> None:
+        """Stage C C2 gate (architect review d4c0a9ff), leg 1 feed:
+        a redirect=enforce refusal of a REAL writer is durably recorded in
+        resolution.producer_refusals (V145) so c2_trailing_gate() counts it.
+
+        Canary writers (declared ``rec-zz-redirect-`` source_receipt_id
+        prefix) are excluded here BY CONSTRUCTION — their refusals are
+        canary evidence, not real-writer alerts. The record is best-effort:
+        the raise below is the fail-closed contract; observability must not
+        mask it.
+        """
+        if source_receipt_id.startswith("rec-zz-redirect-"):
+            _log.info(
+                "producer_refusal suppressed (declared canary id): producer=%s id=%s",
+                producer_id, source_receipt_id)
+            return
+        sqlstate = getattr(error, "pgcode", None) or ""
+        try:
+            schema = os.environ.get("CONDUIT_LILAC_SCHEMA", "resolution")
+            with self._get_connection() as conn:
+                conn.execute(
+                    f"""INSERT INTO {schema}.producer_refusals
+                           (producer_id, receipt_type, source_receipt_id,
+                            plan_id, sqlstate, error)
+                        VALUES (%s, %s, %s, %s, %s, %s)""",
+                    (producer_id, receipt_type, source_receipt_id,
+                     plan_id, sqlstate, str(error)[:2000]),
+                )
+                conn.commit()
+            _log.warning(
+                "producer_refusal recorded (C2 leg 1) producer=%s type=%s id=%s state=%s",
+                producer_id, receipt_type, source_receipt_id, sqlstate)
+        except Exception:  # noqa: BLE001 — observability must never mask the raise
+            _log.exception(
+                "producer_refusal record failed (non-fatal) producer=%s id=%s",
+                producer_id, source_receipt_id)
 
     def _record_legacy_shadow_failed(
         self,
