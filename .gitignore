@@ -47,6 +47,9 @@ yarn.lock
 *.dump
 logs/
 
+# In-flight scratch (not part of the repo)
+slash/
+
 # Project-specific
 python/ingest/html-importer/transcripts/
 python/rover/.venv/
