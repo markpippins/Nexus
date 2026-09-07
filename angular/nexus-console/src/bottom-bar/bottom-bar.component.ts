@@ -4,7 +4,7 @@ import { MessageBoxService } from '../services/message-box.service.js';
 import { LinkService } from '../services/link.service.js';
 import { LinkEditorDialogComponent } from '../components/link-editor-dialog/link-editor-dialog.component.js';
 
-export type ViewMode = 'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'wind-ui' | 'nebula-cp' | 'semantics-ui' | 'throttler-ui' | 'barbie' | 'monaco-judge' | 'conduit-legacy-ui' | 'data-explorer';
+export type ViewMode = 'file-explorer' | 'service-mesh' | 'atlas' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'wind-ui' | 'nebula-cp' | 'semantics-ui' | 'shrapnel' | 'throttler-ui' | 'barbie' | 'monaco-judge' | 'conduit-legacy-ui' | 'data-explorer';
 
 @Component({
   selector: 'app-bottom-bar',

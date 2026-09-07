@@ -43,6 +43,8 @@ UI_NAMES=(
     "semantics-ui"         # 4213 (live; mock was :3000)
     "assembly-ui"          # 4214 (live; mock was :3000)
     "mildred-ui"           # 4215 (live; mock was :3000)
+    "atlas-ui"             # 4216 (live; mock was :3000)
+    "shrapnel-ui"          # 4217 (live; mock was :3000)
 )
 
 UI_PORTS[nebula-ui]=4210
@@ -66,6 +68,8 @@ UI_PORTS[data-explorer-ui]=4212
 UI_PORTS[semantics-ui]=4213  # live mode (mock was :3000, intentionally unbound in live mode)
 UI_PORTS[assembly-ui]=4214   # live mode (mock was :3000, intentionally unbound in live mode)
 UI_PORTS[mildred-ui]=4215  # live mode (mock was :3000, intentionally unbound in live mode)
+UI_PORTS[atlas-ui]=4216  # live mode (mock was :3000)
+UI_PORTS[shrapnel-ui]=4217  # live mode (mock was :3000)
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 

@@ -186,7 +186,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedDetailItem = signal<FileSystemNode | null>(null);
   connectionStatus = signal<ConnectionStatus>('disconnected');
   refreshPanes = signal(0);
-  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'wind-ui' | 'nebula-cp' | 'semantics-ui' | 'throttler-ui' | 'barbie' | 'monaco-judge' | 'conduit-legacy-ui' | 'data-explorer'>('file-explorer');  // Default to file explorer
+  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'atlas' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'wind-ui' | 'nebula-cp' | 'semantics-ui' | 'shrapnel' | 'throttler-ui' | 'barbie' | 'monaco-judge' | 'conduit-legacy-ui' | 'data-explorer'>('file-explorer');  // Default to file explorer
   meshViewMode = signal<'console' | 'graph'>('console');  // Sub-mode when in service-mesh
   graphBackgroundColor = signal('#000510');  // Graph background color
   graphSubView = signal<'canvas' | 'creator'>('canvas');  // Sub-view when in graph mode (canvas vs creator)
@@ -211,11 +211,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     'wind-ui': 'http://localhost:4209',
     'nebula-cp': 'http://localhost:4014',
     'semantics-ui': 'http://localhost:4213',
+    'shrapnel': 'http://localhost:4217',
     'throttler-ui': 'http://localhost:4211',
     'barbie': 'http://localhost:3010',
     'monaco-judge': 'http://localhost:4016',
     'conduit-legacy-ui': 'http://localhost:4015',
     'data-explorer': 'http://localhost:4212',
+    'atlas': 'http://localhost:4216',
   };
 
   isIframeMode = computed(() =>
@@ -233,11 +235,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.currentViewMode() === 'wind-ui' ||
     this.currentViewMode() === 'nebula-cp' ||
     this.currentViewMode() === 'semantics-ui' ||
+    this.currentViewMode() === 'shrapnel' ||
     this.currentViewMode() === 'throttler-ui' ||
     this.currentViewMode() === 'barbie' ||
     this.currentViewMode() === 'monaco-judge' ||
     this.currentViewMode() === 'conduit-legacy-ui' ||
-    this.currentViewMode() === 'data-explorer'
+    this.currentViewMode() === 'data-explorer' ||
+    this.currentViewMode() === 'atlas'
   );
 
   isKanbanMode = computed(() => this.currentViewMode() === 'kanban');
@@ -248,10 +252,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     'conduit-legacy-ui',
     'cascade-ui',
     'tackle-ui',
+    'atlas',
     // All views after the first separator
     'throttler-ui',
     'nebula-cp',
     'semantics-ui',
+    'shrapnel',
     'barbie',
     'wind-ui',
     'conduit-ui',
