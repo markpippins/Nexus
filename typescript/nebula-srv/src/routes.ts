@@ -8905,7 +8905,7 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
 
       const { rows } = await pool.query(
         `SELECT hc.id, hc.title, hc.intent_description, hc.status,
-                hc.compilation_readiness, hc.completed, hc.tags,
+                hc.compilation_readiness, hc.completed, hc.tags, hc.type,
                 COALESCE(sys.name, '(none)') AS system_name,
                 COALESCE(sub.name, '(none)') AS subsystem_name,
                 (SELECT count(*)::int FROM nebula.candidate_dependencies cd WHERE cd.candidate_id = hc.id AND cd.valid_until > now()) AS dep_count
@@ -8913,7 +8913,9 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
          LEFT JOIN nebula.systems sys ON sys.id = hc.system_id
          LEFT JOIN nebula.subsystems sub ON sub.id = hc.subsystem_id
          ${where}
-         ORDER BY hc.compilation_readiness DESC NULLS LAST, hc.created_at DESC`,
+         ORDER BY hc.compilation_readiness DESC NULLS LAST,
+                  (hc.type = 'drift') DESC,
+                  hc.created_at DESC`,
         vals
       );
 
@@ -8928,6 +8930,7 @@ The lease has been auto-revoked. Issue a new lease to resume work.`,
         compilation_readiness: r.compilation_readiness == null ? null : Number(r.compilation_readiness),
         completed: r.completed,
         tags: r.tags || [],
+        type: r.type,
         system_name: r.system_name,
         subsystem_name: r.subsystem_name,
         dep_count: r.dep_count,
