@@ -210,8 +210,9 @@ def _sentinel_harvest_id(cur):
     row = cur.fetchone()
     if not row:
         raise RuntimeError(
-            "sentinel harvest 'observations/drift' not found — V147 migration must be "
-            "applied before drift-intake runs (R-2026-09-08-02 C1)"
+            "sentinel harvest 'observations/drift' not found — V147 migration "
+            "(sql/V147__harvest_candidates_drift_intake.sql) must be applied before "
+            "drift-intake runs (architect ruling R-2026-09-08-02 clause C1 creates it)"
         )
     return row["id"]
 
@@ -233,11 +234,11 @@ def resolve_candidates_for_finding(cur, finding_id, resolved_at):
             valid_until = now(),
             updated_at = now()
         WHERE type = 'drift'
-          AND provenance_block_indices::text ILIKE %s
+          AND provenance_block_indices @> jsonb_build_object('finding_id', %s)
           AND valid_until = '9999-12-31 23:59:59+00'
         RETURNING id
         """,
-        (f'finding_resolved:{finding_id}', f'%{finding_id}%'),
+        (f'finding_resolved:{finding_id}', str(finding_id)),
     )
     return [r["id"] for r in cur.fetchall()]
 
