@@ -29,6 +29,12 @@ export interface ColumnInfo {
   comment?: string;
 }
 
+export interface DatabaseDiscovery {
+  name: string;
+  allowConnections: boolean;
+  isTemplate: boolean;
+}
+
 export interface SchemaDiscovery {
   name: string;
   tables: Array<{
@@ -93,6 +99,7 @@ export interface DbDriver {
     version?: string;
     database?: string;
   }>;
+  discoverDatabases(spec: ConnSpec): Promise<{ databases: DatabaseDiscovery[] }>;
   discoverSchemas(spec: ConnSpec): Promise<{ schemas: SchemaDiscovery[] }>;
   execute(spec: ConnSpec, sql: string): Promise<QueryResult>;
 }

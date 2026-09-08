@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { ConnSpec, DbDriver, EngineCapabilities, QueryResult, SchemaDiscovery } from './types';
+import { ConnSpec, DatabaseDiscovery, DbDriver, EngineCapabilities, QueryResult, SchemaDiscovery } from './types';
 
 /** Map pg column type OID to a readable type name for the results grid. */
 const PG_TYPES: Record<number, string> = {
@@ -151,13 +151,31 @@ export class PostgresDriver implements DbDriver {
     }
   }
 
+  async discoverDatabases(spec: ConnSpec): Promise<{ databases: DatabaseDiscovery[] }> {
+    const pool = this.pooled({ ...spec, database: spec.database || 'postgres' });
+    const { rows } = await pool.query(`
+      SELECT datname AS name,
+             datallowconn AS allow_connections,
+             datistemplate AS is_template
+      FROM pg_database
+      WHERE datallowconn = true
+      ORDER BY datistemplate, datname`);
+    return {
+      databases: rows.map((row) => ({
+        name: row.name,
+        allowConnections: Boolean(row.allow_connections),
+        isTemplate: Boolean(row.is_template),
+      })),
+    };
+  }
+
   async discoverSchemas(spec: ConnSpec): Promise<{ schemas: SchemaDiscovery[] }> {
     const pool = this.pooled(spec);
     try {
-            // All seven catalog probes run in parallel — they are independent
-      // reads against different catalogs; sequentially they dominated
-      // schema-discovery latency.
+      // All catalog probes run in parallel — they are independent reads against
+      // different catalogs; sequentially they dominated schema-discovery latency.
       const [
+        { rows: schemaRows },
         { rows: tableRows },
         { rows: columnRows },
         { rows: pkRows },
@@ -167,6 +185,12 @@ export class PostgresDriver implements DbDriver {
         { rows: triggerRows },
         { rows: procRows },
       ] = await Promise.all([
+        await pool.query(`
+        SELECT n.nspname AS schema_name
+        FROM pg_namespace n
+        WHERE n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+          AND n.nspname NOT LIKE 'pg_temp%'
+        ORDER BY n.nspname`),
         await pool.query(`
         SELECT n.nspname AS schema_name,
                c.relname AS table_name,
@@ -275,6 +299,7 @@ export class PostgresDriver implements DbDriver {
         return schemaMap[name];
       };
 
+      for (const r of schemaRows) ensure(r.schema_name);
       for (const r of tableRows) {
         ensure(r.schema_name).tables.push({
           name: r.table_name,
