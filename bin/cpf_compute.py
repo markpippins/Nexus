@@ -58,6 +58,16 @@ def psql(sql: str, timeout: int = 30) -> tuple[int, str]:
         return 1, "(timeout)"
 
 
+def is_drift_candidate(candidate: dict) -> bool:
+    """True if the candidate is drift-typed (plan 8261640 intake seam).
+
+    Drift candidates own their readiness (severity-based) by design and must be
+    excluded from the legacy transcript-derived CPF recompute, which would
+    otherwise floor them at ~0.5 and drop them below the 0.7 shortlist threshold.
+    """
+    return candidate.get("type") == "drift"
+
+
 def fetch_candidates(candidate_id: str | None = None) -> list[dict]:
     """Fetch candidates with all fields needed for CPF computation."""
     where = ""
@@ -77,7 +87,8 @@ def fetch_candidates(candidate_id: str | None = None) -> list[dict]:
                 hc.implementation_notes,
                 hc.code_snippets,
                 hc.completed,
-                hc.compilation_readiness
+                hc.compilation_readiness,
+                hc.type
             FROM nebula.harvest_candidates hc
             {where}
             ORDER BY hc.created_at
@@ -289,7 +300,16 @@ def main():
 
     results = []
     updated = 0
+    skipped_drift = 0
     for c in candidates:
+        # Drift-typed candidates (plan 8261640 intake seam) own their readiness
+        # (severity-based: high 0.85 / medium 0.75 / low 0.70) by design — ranked
+        # above transcript-derived at equal readiness. The legacy recompute must
+        # NOT overwrite that (it has no hierarchy/artifact signal and would floor
+        # them at ~0.5, dropping them below the 0.7 shortlist threshold).
+        if is_drift_candidate(c):
+            skipped_drift += 1
+            continue
         r = compute_readiness(c, all_deps, all_statuses)
         results.append(r)
         delta = ""
@@ -317,6 +337,8 @@ def main():
 
     # Summary
     log.info("─" * 60)
+    if skipped_drift:
+        log.info("Skipped %d drift-typed candidates (readiness owned by drift-intake seam, plan 8261640)", skipped_drift)
     ready = [r for r in results if r["score"] >= 0.7]
     log.info("CPF >= 0.7 (ready): %d / %d", len(ready), len(results))
     for r in ready:
