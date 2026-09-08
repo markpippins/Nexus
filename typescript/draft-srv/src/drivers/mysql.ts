@@ -1,4 +1,4 @@
-import { ConnSpec, DbDriver, EngineCapabilities, QueryResult, SchemaDiscovery } from './types';
+import { ConnSpec, DatabaseDiscovery, DbDriver, EngineCapabilities, QueryResult, SchemaDiscovery } from './types';
 
 /**
  * MySQL driver — PROVISIONED STUB (not enabled).
@@ -35,6 +35,10 @@ export class MysqlDriver implements DbDriver {
   }
 
   async testConnection(_spec: ConnSpec): Promise<never> {
+    this.unavailable();
+  }
+
+  async discoverDatabases(_spec: ConnSpec): Promise<{ databases: DatabaseDiscovery[] }> {
     this.unavailable();
   }
 

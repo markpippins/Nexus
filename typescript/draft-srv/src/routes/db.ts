@@ -39,6 +39,23 @@ export function dbWorkbenchRoutes(): Router {
     }
   });
 
+  router.post('/db/databases', async (req: Request, res: Response) => {
+    const spec = req.body || {};
+    const engine = getDriver(spec.engine);
+    if (!engine) return res.status(400).json({ error: `Unknown engine "${spec.engine}"` });
+    if (!isEngineAvailable(spec.engine)) {
+      return res.status(501).json({ error: `Engine "${engine.capabilities.id}" is not enabled yet` });
+    }
+    try {
+      const result = await engine.discoverDatabases(spec as ConnSpec);
+      res.json(result);
+    } catch (err: any) {
+      res.status(err?.code === 'ENGINE_NOT_IMPLEMENTED' ? 501 : 502).json({
+        error: err?.message || 'Database discovery failed',
+      });
+    }
+  });
+
   router.post('/db/schemas', async (req: Request, res: Response) => {
     const spec = req.body || {};
     const engine = getDriver(spec.engine);
